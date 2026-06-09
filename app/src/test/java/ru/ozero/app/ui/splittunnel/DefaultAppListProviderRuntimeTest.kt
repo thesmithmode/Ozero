@@ -44,6 +44,7 @@ class DefaultAppListProviderRuntimeTest {
         packageManager().removePackage("pkg.icon")
         packageManager().removePackage("pkg.drawable")
         packageManager().removePackage("pkg.missing")
+        packageManager().removePackage("pkg.blanklabel")
         packageManager().removePackage("pkg.added")
         packageManager().removePackage("pkg.broadcast")
     }
@@ -81,6 +82,16 @@ class DefaultAppListProviderRuntimeTest {
         assertEquals(listOf("pkg.one"), first.map { it.packageName })
         assertEquals(listOf("pkg.one"), cached.map { it.packageName })
         assertEquals(listOf("pkg.one", "pkg.two"), refreshed.map { it.packageName })
+    }
+
+    @Test
+    fun `loadApps falls back to package name when label is blank`() = runTest {
+        val shadowPm = packageManager()
+        shadowPm.installPackage(packageInfo("pkg.blanklabel", "", system = false))
+
+        val apps = DefaultAppListProvider(RuntimeEnvironment.getApplication()).loadApps()
+
+        assertEquals("pkg.blanklabel", apps.single { it.packageName == "pkg.blanklabel" }.label)
     }
 
     @Test
@@ -122,6 +133,23 @@ class DefaultAppListProviderRuntimeTest {
 
         assertNull(provider.loadIcon("pkg.missing"))
         assertNull(provider.loadIcon("pkg.missing"))
+    }
+
+    @Test
+    fun `package broadcast clears missing icon marker for affected package`() = runTest {
+        val context = RuntimeEnvironment.getApplication()
+        val shadowPm = packageManager()
+        val provider = DefaultAppListProvider(context)
+
+        assertNull(provider.loadIcon("pkg.missing"))
+        shadowPm.installPackage(packageInfo("pkg.missing", "Now Present", system = false))
+        shadowPm.setApplicationIcon(
+            "pkg.missing",
+            BitmapDrawable(context.resources, Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)),
+        )
+        provider.invalidateForTest("pkg.missing")
+
+        assertNotNull(provider.loadIcon("pkg.missing"))
     }
 
     @Test
@@ -176,6 +204,33 @@ class DefaultAppListProviderRuntimeTest {
 
             assertTrue(provider.loadApps().any { it.packageName == "pkg.added" })
             assertTrue(provider.loadIcon("pkg.broadcast") !== firstIcon)
+        } finally {
+            collector.cancel()
+        }
+    }
+
+    @Test
+    fun `packageChanges without package data refreshes list while keeping unrelated icon cache`() = runTest {
+        val context = RuntimeEnvironment.getApplication()
+        val shadowPm = packageManager()
+        shadowPm.installPackage(packageInfo("pkg.icon", "Icon", system = false))
+        shadowPm.setApplicationIcon(
+            "pkg.icon",
+            BitmapDrawable(context.resources, Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)),
+        )
+        val provider = DefaultAppListProvider(context)
+        val collector = launch { provider.packageChanges.collect { } }
+
+        try {
+            val firstIcon = provider.loadIcon("pkg.icon")
+            provider.loadApps()
+            shadowPm.installPackage(packageInfo("pkg.added", "Added App", system = false))
+            context.sendBroadcast(Intent(Intent.ACTION_PACKAGE_REPLACED))
+            shadowOf(Looper.getMainLooper()).idle()
+            advanceUntilIdle()
+
+            assertTrue(provider.loadApps().any { it.packageName == "pkg.added" })
+            assertTrue(provider.loadIcon("pkg.icon") === firstIcon)
         } finally {
             collector.cancel()
         }

@@ -310,6 +310,150 @@ class RuntimeConfigRestartCoordinatorTest {
         assertFalse(coordinator.restartInProgress())
     }
 
+    @Test
+    fun `restart returns false for failed disconnecting and probing without engine`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        val coordinator = coordinator(recordingContext(startServiceActions), tunnelController)
+
+        tunnelController.setState(TunnelState.Failed(EngineId.WARP, "failed"))
+        assertFalse(coordinator.restartVpnIfRunning("failed-state"))
+
+        tunnelController.setState(TunnelState.Disconnecting)
+        assertFalse(coordinator.restartVpnIfRunning("disconnecting-state"))
+
+        tunnelController.setState(TunnelState.Probing(null))
+        assertFalse(coordinator.restartVpnIfRunning("probing-without-engine"))
+
+        assertTrue(startServiceActions.isEmpty())
+        assertTrue(coordinator.restartQueue().isEmpty())
+        assertFalse(coordinator.restartInProgress())
+    }
+
+    @Test
+    fun `restart accepts idle after previous false result`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        val coordinator = coordinator(recordingContext(startServiceActions), tunnelController)
+
+        assertFalse(coordinator.restartVpnIfRunning("idle"))
+        tunnelController.setState(TunnelState.Connected(EngineId.SINGBOX, 2080))
+        val restarted = launch {
+            assertTrue(coordinator.restartVpnIfRunning("connected"))
+        }
+        runCurrent()
+        tunnelController.setState(TunnelState.Disconnecting)
+        tunnelController.setState(TunnelState.Connected(EngineId.SINGBOX, 2080))
+        restarted.join()
+
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
+        assertTrue(coordinator.restartQueue().isEmpty())
+        assertFalse(coordinator.restartInProgress())
+    }
+
+    @Test
+    fun `queued restart aborts when second processed restart sees failed state`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val allowRestartStart = CompletableDeferred<Unit>()
+        var calls = 0
+        val coordinator = coordinator(
+            context = recordingContext(startServiceActions) {
+                calls += 1
+                tunnelController.setState(TunnelState.Disconnecting)
+                launch {
+                    allowRestartStart.await()
+                    if (calls == 1) {
+                        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+                    } else {
+                        tunnelController.setState(TunnelState.Failed(EngineId.WARP, "second failed"))
+                    }
+                }
+            },
+            tunnelController = tunnelController,
+        )
+
+        val firstRestart = launch {
+            assertFalse(coordinator.restartVpnIfRunning("first-request"))
+        }
+        runCurrent()
+        val secondRestart = launch {
+            assertFalse(coordinator.restartVpnIfRunning("second-request"))
+        }
+        runCurrent()
+        allowRestartStart.complete(Unit)
+        firstRestart.join()
+        secondRestart.join()
+
+        assertEquals(2, calls)
+        assertEquals(2, startServiceActions.size)
+        assertTrue(coordinator.restartQueue().isEmpty())
+        assertFalse(coordinator.restartInProgress())
+    }
+
+    @Test
+    fun `queued restart waits for failed settle signal before next request`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val allowFirstStart = CompletableDeferred<Unit>()
+        var calls = 0
+        val coordinator = coordinator(
+            context = recordingContext(startServiceActions) {
+                calls += 1
+                tunnelController.setState(TunnelState.Disconnecting)
+                launch {
+                    allowFirstStart.await()
+                    tunnelController.setState(TunnelState.Failed(EngineId.WARP, "settled failed"))
+                }
+            },
+            tunnelController = tunnelController,
+        )
+
+        val firstRestart = launch {
+            assertFalse(coordinator.restartVpnIfRunning("first-request"))
+        }
+        runCurrent()
+        val secondRestart = launch {
+            assertFalse(coordinator.restartVpnIfRunning("second-request"))
+        }
+        runCurrent()
+        allowFirstStart.complete(Unit)
+        firstRestart.join()
+        secondRestart.join()
+
+        assertEquals(1, calls)
+        assertEquals(1, startServiceActions.size)
+        assertTrue(coordinator.restartQueue().isEmpty())
+        assertFalse(coordinator.restartInProgress())
+    }
+
+    @Test
+    fun `start ignores duplicate subscription even when changes keep arriving`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val changes = MutableStateFlow<Any?>("baseline")
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val coordinator = RuntimeConfigRestartCoordinator(
+            context = recordingContext(startServiceActions) {
+                tunnelController.setState(TunnelState.Disconnecting)
+                launch { tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820)) }
+            },
+            observer = EngineRuntimeConfigRestartObserver(setOf(runtimeProvider(EngineId.WARP, changes))),
+            tunnelController = tunnelController,
+        )
+
+        repeat(5) { coordinator.start(backgroundScope) }
+        runCurrent()
+        changes.value = "changed-1"
+        runCurrent()
+        changes.value = "changed-2"
+        runCurrent()
+
+        assertEquals(2, startServiceActions.size)
+    }
+
     private fun coordinator(
         context: Context,
         tunnelController: TunnelController,

@@ -22,11 +22,14 @@ import ru.ozero.enginescore.TunSpec
  *
  * Per-engine override через `applyUnderlying` parameter в applyLockdown.
  */
-class TunBuilderHelper(private val service: VpnService) {
+class TunBuilderHelper(
+    private val service: VpnService,
+    private val builderFactory: () -> VpnService.Builder = { service.Builder() },
+) {
 
     @Suppress("UnusedParameter")
     fun applyEngineTunSpec(spec: TunSpec, ipv6Enabled: Boolean): VpnService.Builder {
-        val builder = service.Builder()
+        val builder = builderFactory()
             .setSession(spec.sessionName)
             .setMtu(spec.mtu)
             .setBlocking(spec.blocking)
@@ -80,7 +83,7 @@ class TunBuilderHelper(private val service: VpnService) {
         customDnsServers: List<String> = emptyList(),
         applyUnderlying: Boolean = false,
     ): VpnService.Builder {
-        val builder = service.Builder()
+        val builder = builderFactory()
             .addAddress(TUN_ADDRESS, TUN_PREFIX_LENGTH)
             .setSession(SESSION_NAME)
         applyLockdown(builder, "buildTunBuilder", applyUnderlying = applyUnderlying)
@@ -88,7 +91,8 @@ class TunBuilderHelper(private val service: VpnService) {
             builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)
             builder.addRoute("::", 0)
         }
-        // Ровно один DNS — паритет с upstream ByeByeDPI. Множественные DNS дублируют lookup через TUN и тормозят resolve.
+        // Ровно один DNS — паритет с upstream ByeByeDPI.
+        // Множественные DNS дублируют lookup через TUN и тормозят resolve.
         val dnsServers = (if (customDnsServers.isNotEmpty()) customDnsServers else TUN_DNS_SERVERS).take(1)
         dnsServers.forEach { dns ->
             runCatching { builder.addDnsServer(dns) }

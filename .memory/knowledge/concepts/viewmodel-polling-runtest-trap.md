@@ -7,7 +7,7 @@ sources:
   - "daily/2026-05-19.md"
   - "daily/2026-05-20.md"
 created: 2026-05-10
-updated: 2026-05-20
+updated: 2026-06-09
 ---
 
 # ViewModel Polling Loop Breaks advanceUntilIdle in runTest
@@ -147,6 +147,7 @@ The underlying rule: **never use wall clock (`System.currentTimeMillis`, `Instan
 - [[concepts/byedpi-mock-server-ci-fragility]] - `System.currentTimeMillis()` in mock server context (parallel trap in test code, not production code)
 - [[concepts/urnetwork-peer-watchdog-recovery]] - The peer watchdog where the wall clock trap was discovered; fixed with poll counter
 - [[concepts/urnetwork-sdk-integration]] - URnetwork location polling was the context where the original delay-loop deadlock was discovered
+- [[concepts/urnetwork-ip-refresh-active-location-polling]] - Runtime reason the active URnetwork polling loop exists
 
 ### Diagnostic Pattern
 

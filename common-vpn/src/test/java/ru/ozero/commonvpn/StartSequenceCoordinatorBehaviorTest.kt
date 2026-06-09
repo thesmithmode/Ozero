@@ -636,6 +636,110 @@ class StartSequenceCoordinatorBehaviorTest {
         verify(exactly = 1) { fixture.tunnelGateway.start(match { it.tunPfd === finalFd && it.socksPort == 2095 }) }
     }
 
+    @Test
+    fun `manual TUN chain failure reports engine failure before establishing TUN`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            startResult = StartResult.Failure("manual failed"),
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(trafficMode = TrafficMode.TUN, manualEngine = EngineId.BYEDPI),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.startedConfigs.size)
+        verify(exactly = 1) { fixture.engineWatchdog.handleEngineFailure(EngineId.BYEDPI, "manual failed") }
+        verify(exactly = 0) { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any()) }
+        verify(exactly = 0) { fixture.tunnelGateway.start(any()) }
+        verify(exactly = 0) { fixture.statsLogger.start() }
+    }
+
+    @Test
+    fun `manual proxy success with zero port stops chain and reports local proxy failure`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.SINGBOX,
+            socksPort = 0,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(trafficMode = TrafficMode.PROXY, manualEngine = EngineId.SINGBOX),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.startedConfigs.size)
+        assertEquals(1, engine.stopCalls)
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.SINGBOX,
+                "engine does not expose local proxy endpoint",
+            )
+        }
+        coVerify(exactly = 0) { fixture.healthMonitor.start(any()) }
+        verify(exactly = 0) { fixture.statsLogger.start() }
+    }
+
+    @Test
+    fun `manual TUN awaitReady timeout stops chain after native tunnel start`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2096,
+            readyResult = EnginePlugin.ReadyResult.Timeout("not ready"),
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(trafficMode = TrafficMode.TUN, manualEngine = EngineId.BYEDPI),
+        )
+        fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.stopCalls)
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.BYEDPI,
+                match { it.startsWith("awaitReady fail") },
+            )
+        }
+        coVerify(exactly = 0) { fixture.healthMonitor.start(any()) }
+        verify(exactly = 0) { fixture.statsLogger.start() }
+    }
+
+    @Test
+    fun `manual TUN stopping after establish closes TUN and stops chain`() = runTest {
+        val engine = FakeEnginePlugin(id = EngineId.BYEDPI, socksPort = 2097, capabilities = tunnelCapabilities())
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(trafficMode = TrafficMode.TUN, manualEngine = EngineId.BYEDPI),
+        )
+        val tunFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 2097
+        }
+        val builder = mockk<VpnService.Builder> {
+            every { establish() } answers {
+                fixture.state.stopping.set(true)
+                tunFd
+            }
+        }
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any()) } returns builder
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any(), any()) } returns builder
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.startedConfigs.size)
+        assertEquals(1, engine.stopCalls)
+        assertEquals(null, fixture.state.tunFdRef.get())
+        verify(exactly = 1) { tunFd.close() }
+        verify(exactly = 0) { fixture.tunnelGateway.start(any()) }
+        verify(exactly = 0) { fixture.statsLogger.start() }
+    }
+
     private fun startFixture(
         vararg engines: EnginePlugin,
         settings: SettingsModel,

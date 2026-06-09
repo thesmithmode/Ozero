@@ -158,6 +158,134 @@ class TunBuilderConfiguratorTest {
     }
 
     @Test
+    fun allowlistExcludeSelfTrueWithOnlySelfAddsSelfAsKillAllFallback() {
+        val b = mockBuilder()
+        every { b.addAllowedApplication(any()) } returns b
+
+        configurator.apply(
+            b,
+            SplitTunnelConfig(mode = SplitTunnelMode.ALLOWLIST, allowlist = setOf("ru.ozero.app")),
+            excludeSelf = true,
+        )
+
+        verify(exactly = 1) { b.addRoute("0.0.0.0", 0) }
+        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
+        verify(exactly = 0) { b.addDisallowedApplication(any()) }
+    }
+
+    @Test
+    fun allowlistExcludeSelfTrueWithEmptySetAddsSelfAsKillAllFallback() {
+        val b = mockBuilder()
+        every { b.addAllowedApplication(any()) } returns b
+
+        configurator.apply(
+            b,
+            SplitTunnelConfig(mode = SplitTunnelMode.ALLOWLIST, allowlist = emptySet()),
+            excludeSelf = true,
+        )
+
+        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
+    }
+
+    @Test
+    fun allowlistExcludeSelfTrueDoesNotFallbackWhenAnyNonSelfPackageAdded() {
+        val b = mockBuilder()
+        every { b.addAllowedApplication(any()) } returns b
+
+        configurator.apply(
+            b,
+            SplitTunnelConfig(
+                mode = SplitTunnelMode.ALLOWLIST,
+                allowlist = setOf("ru.ozero.app", "com.example.one", "com.example.two"),
+            ),
+            excludeSelf = true,
+        )
+
+        verify(exactly = 1) { b.addAllowedApplication("com.example.one") }
+        verify(exactly = 1) { b.addAllowedApplication("com.example.two") }
+        verify(exactly = 0) { b.addAllowedApplication("ru.ozero.app") }
+    }
+
+    @Test
+    fun blocklistSkipsSelfEvenWhenPresentInConfig() {
+        val b = mockBuilder()
+        every { b.addDisallowedApplication(any()) } returns b
+
+        configurator.apply(
+            b,
+            SplitTunnelConfig(
+                mode = SplitTunnelMode.BLOCKLIST,
+                blocklist = setOf("ru.ozero.app", "com.bank.app", "com.chat.app"),
+            ),
+        )
+
+        verify(exactly = 0) { b.addDisallowedApplication("ru.ozero.app") }
+        verify(exactly = 1) { b.addDisallowedApplication("com.bank.app") }
+        verify(exactly = 1) { b.addDisallowedApplication("com.chat.app") }
+    }
+
+    @Test
+    fun blocklistGracefullyIgnoresPackageNotFoundAndContinues() {
+        val b = mockBuilder()
+        every {
+            b.addDisallowedApplication("missing.pkg")
+        } throws android.content.pm.PackageManager.NameNotFoundException()
+        every { b.addDisallowedApplication("ok.pkg") } returns b
+
+        configurator.apply(
+            b,
+            SplitTunnelConfig(
+                mode = SplitTunnelMode.BLOCKLIST,
+                blocklist = setOf("missing.pkg", "ok.pkg"),
+            ),
+        )
+
+        verify(exactly = 1) { b.addDisallowedApplication("missing.pkg") }
+        verify(exactly = 1) { b.addDisallowedApplication("ok.pkg") }
+    }
+
+    @Test
+    fun blocklistExcludeSelfTrueContinuesWhenSelfExclusionFails() {
+        val b = mockBuilder()
+        every {
+            b.addDisallowedApplication("ru.ozero.app")
+        } throws android.content.pm.PackageManager.NameNotFoundException()
+        every { b.addDisallowedApplication("ok.pkg") } returns b
+
+        configurator.apply(
+            b,
+            SplitTunnelConfig(mode = SplitTunnelMode.BLOCKLIST, blocklist = setOf("ok.pkg")),
+            excludeSelf = true,
+        )
+
+        verify(exactly = 1) { b.addDisallowedApplication("ru.ozero.app") }
+        verify(exactly = 1) { b.addDisallowedApplication("ok.pkg") }
+    }
+
+    @Test
+    fun allModeExcludeSelfTrueContinuesWhenSelfExclusionFails() {
+        val b = mockBuilder()
+        every {
+            b.addDisallowedApplication("ru.ozero.app")
+        } throws android.content.pm.PackageManager.NameNotFoundException()
+
+        configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.ALL), excludeSelf = true)
+
+        verify(exactly = 1) { b.addRoute("0.0.0.0", 0) }
+        verify(exactly = 1) { b.addDisallowedApplication("ru.ozero.app") }
+    }
+
+    @Test
+    fun bypassLanWithoutExcludeSelfDoesNotTouchApplications() {
+        val b = mockBuilder()
+
+        configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.BYPASS_LAN), excludeSelf = false)
+
+        verify(exactly = 0) { b.addAllowedApplication(any()) }
+        verify(exactly = 0) { b.addDisallowedApplication(any()) }
+    }
+
+    @Test
     fun gracefullyIgnoresPackageNotFound() {
         val b = mockBuilder()
         every {

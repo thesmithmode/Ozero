@@ -5,7 +5,7 @@ tags: [android, hilt, dependency-injection, gotcha, engine]
 sources:
   - "daily/2026-05-10.md"
 created: 2026-05-10
-updated: 2026-05-10
+updated: 2026-06-09
 ---
 
 # Hilt @AssistedInject: Mixing Regular and Assisted Dependencies
@@ -92,6 +92,7 @@ Missing this module causes a Hilt compile error: "ByeDpiConnectionProbe cannot b
 ## Related Concepts
 
 - [[concepts/byedpi-mock-server-ci-fragility]] - The refactoring that introduced injectable probe and exposed this @AssistedInject pattern
+- [[concepts/byedpi-connection-probe-injection-contract]] - The extracted probe dependency that must remain a regular injected dependency, not an assisted runtime parameter
 - [[concepts/hilt-di-native-library-failure]] - Earlier Hilt DI trap: native library load in provider breaks entire graph; same DI architecture
 
 ## Sources

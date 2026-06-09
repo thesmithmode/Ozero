@@ -7,8 +7,9 @@ sources:
   - "daily/2026-04-30.md"
   - "daily/2026-05-01.md"
   - "daily/2026-05-20.md"
+  - "daily/2026-05-10.md"
 created: 2026-04-29
-updated: 2026-05-20
+updated: 2026-06-09
 ---
 
 # Wiki Knowledge Base Setup
@@ -83,6 +84,7 @@ Duplicate article `urnetwork-filter-locations-trigger.md` was deleted (duplicate
 
 - [[concepts/ci-workflow-discipline]] - The CI workflow that the wiki documents and tracks
 - [[concepts/release-process]] - Release decisions captured in daily logs and compiled into articles
+- [[concepts/wikifind-backend-dependency-drift]] - Tooling drift that can break retrieval-first investigation
 
 ## Sources
 
@@ -90,3 +92,4 @@ Duplicate article `urnetwork-filter-locations-trigger.md` was deleted (duplicate
 - [[daily/2026-04-30.md]] - Auto-flush hook unreliability discovered; compact-before-clear ordering established; 14 failed flushes in productive session
 - [[daily/2026-05-01.md]] - Continued flush failures (3/3 failed: timeout + exit code 1); pattern confirmed across 3 consecutive days
 - [[daily/2026-05-20.md]] - 13+ FLUSH_ERROR (exit code 1) with no stderr detail; FLUSH_OK "nothing worth saving" from productive sessions; root cause: truncated JSONL transcript (tool results stripped) → Claude sees assistant-only messages; contradiction audit session 18:27 found 9 issues (4 direct contradictions, 5 inconsistencies) across ~140 articles; session 18:53: lint.py overflow fix (path-list+Read on demand), 3-round iterative resolution (9→3→3→1→0), duplicate article deleted, transient re-run rule
+- [[daily/2026-05-10.md]] - `wiki-find` failed with missing `claude_agent_sdk`; direct `knowledge/` reads were used as fallback during CI diagnosis

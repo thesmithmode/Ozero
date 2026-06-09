@@ -3,14 +3,17 @@ title: sing-box process stop-and-wait sentinel
 sources:
   - daily/2026-05-30.md
 created: 2026-05-31
-updated: 2026-05-31
+updated: 2026-06-09
 ---
 # sing-box process stop-and-wait sentinel
+## Summary
+sing-box process lifecycle changes require acknowledged stop, runtime health proof, and nonzero module tests so CI cannot accept a broken process boundary.
 
 ## Key Points
 - sing-box process shutdown must be acknowledged before unbind, close, or profile-change restart proceeds.
 - Fire-and-forget `stop()` can race with `close()/unbind` and leave stale runtime state or broken traffic path.
 - `activeSocksPort` must not be published until runtime health is proven.
+- Profile-change restarts should not run while sing-box is still `Connecting` or `Probing`.
 - CI is not green for changed production code when the touched module reports zero tests.
 - This extends [[concepts/singbox-probe-socks-port-lifecycle]] and [[concepts/singbox-aidl-async-error-swallow]].
 
@@ -22,14 +25,18 @@ The stable contract is to expose an acknowledged shutdown boundary such as `stop
 
 The same session found a validation gap: a green CI run did not prove sing-box process coverage because the changed `singbox-process` module had `0` tests. A sentinel test was added and a new CI run was required. For this module, N=0 is a false-green signal, not acceptance.
 
+The runtime symptom also explained why exit-IP timeout and missing traffic should be treated as lifecycle evidence, not only resolver evidence. If the process can be closed or unbound before stop acknowledgement, a later successful-looking start may still have no valid traffic path, and any `activeSocksPort` exposed before runtime health can mislead exit-node probing.
+
 ## Related Concepts
 - [[concepts/singbox-probe-socks-port-lifecycle]]
 - [[concepts/singbox-active-socks-port-failure-reset]]
 - [[concepts/singbox-aidl-async-error-swallow]]
 - [[concepts/ci-engine-module-missing-tests]]
+- [[connections/runtime-regression-signal-separation-loop]]
 
 ## Sources
 - [[daily/2026-05-30]]: sing-box showed native crash, later apparent start, missing real traffic, and exit IP timeout.
 - [[daily/2026-05-30]]: The lifecycle root cause was fire-and-forget stop followed by close/unbind and restarts during unstable states.
 - [[daily/2026-05-30]]: The accepted fix added acknowledged stop/runtime health checks and delayed `activeSocksPort` publication until runtime health.
 - [[daily/2026-05-30]]: Artifact audit found `singbox-process` reported zero tests despite production-code changes, requiring a new sentinel and CI run.
+- [[daily/2026-05-30]]: Profile-change restarts during unstable states were identified as part of the lifecycle race.

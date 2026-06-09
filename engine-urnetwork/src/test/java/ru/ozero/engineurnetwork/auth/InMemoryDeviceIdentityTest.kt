@@ -99,4 +99,67 @@ class InMemoryDeviceIdentityTest {
 
         assertEquals(before, identity.pubkeyBase58())
     }
+
+    @Test
+    fun `exportSeedForBackup returns defensive copy`() = runTest {
+        val identity = InMemoryUrnetworkDeviceIdentity(ByteArray(32) { (it + 13).toByte() })
+        val before = identity.pubkeyBase58()
+        val exported = identity.exportSeedForBackup()
+
+        exported.fill(0)
+
+        assertEquals(before, identity.pubkeyBase58())
+    }
+
+    @Test
+    fun `importSeedFromBackup copies input seed defensively`() = runTest {
+        val seed = ByteArray(32) { (it + 17).toByte() }
+        val expected = InMemoryUrnetworkDeviceIdentity(seed).pubkeyBase58()
+        val identity = InMemoryUrnetworkDeviceIdentity(ByteArray(32) { 1 })
+
+        assertTrue(identity.importSeedFromBackup(seed))
+        seed.fill(0)
+
+        assertEquals(expected, identity.pubkeyBase58())
+    }
+
+    @Test
+    fun `sign empty message produces verifiable Ed25519 signature`() = runTest {
+        val seed = ByteArray(32) { (it + 21).toByte() }
+        val identity = InMemoryUrnetworkDeviceIdentity(seed)
+        val pubkeyBytes = Base58.decode(identity.pubkeyBase58())
+        val message = ByteArray(0)
+        val sig = identity.sign(message)
+        val verifier = Ed25519Signer().apply {
+            init(false, Ed25519PublicKeyParameters(pubkeyBytes, 0))
+            update(message, 0, message.size)
+        }
+
+        assertTrue(verifier.verifySignature(sig))
+    }
+
+    @Test
+    fun `signature fails verification for different message`() = runTest {
+        val seed = ByteArray(32) { (it + 25).toByte() }
+        val identity = InMemoryUrnetworkDeviceIdentity(seed)
+        val pubkeyBytes = Base58.decode(identity.pubkeyBase58())
+        val sig = identity.sign("first".toByteArray())
+        val verifier = Ed25519Signer().apply {
+            init(false, Ed25519PublicKeyParameters(pubkeyBytes, 0))
+            val other = "second".toByteArray()
+            update(other, 0, other.size)
+        }
+
+        assertEquals(false, verifier.verifySignature(sig))
+    }
+
+    @Test
+    fun `import valid seed changes identity`() = runTest {
+        val identity = InMemoryUrnetworkDeviceIdentity(ByteArray(32) { 1 })
+        val before = identity.pubkeyBase58()
+
+        assertTrue(identity.importSeedFromBackup(ByteArray(32) { 2 }))
+
+        assertNotEquals(before, identity.pubkeyBase58())
+    }
 }

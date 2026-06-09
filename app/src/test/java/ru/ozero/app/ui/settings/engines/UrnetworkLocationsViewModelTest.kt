@@ -645,6 +645,138 @@ class UrnetworkLocationsViewModelTest {
         assertEquals("Munich", bridge.lastPreferredLocation?.city)
     }
 
+    @Test
+    fun `cached country with invalid code has blank flag and russian name`() = runTest {
+        val store = ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                cachedCountries = listOf(
+                    UrnetworkCachedLocation(name = "Unknown", countryCode = "U"),
+                    UrnetworkCachedLocation(name = "Germany", countryCode = "de"),
+                ),
+            ),
+        )
+        val v = UrnetworkLocationsViewModel(
+            FakeUrnetworkBridge(deviceAvailable = false),
+            FakeSettingsRepo(),
+            store,
+            idleTunnel(),
+        )
+        advanceUntilIdle()
+
+        val state = assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertEquals("", state.countries[0].flag)
+        assertEquals("", state.countries[0].nameRu)
+        assertTrue(state.countries[1].flag.isNotBlank())
+        assertTrue(state.countries[1].nameRu.isNotBlank())
+    }
+
+    @Test
+    fun `blank search keeps countries regions cities and hides best matches`() = runTest {
+        val store = ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                cachedCountries = listOf(UrnetworkCachedLocation(name = "Germany", countryCode = "DE")),
+                cachedRegions = listOf(
+                    UrnetworkCachedLocation(name = "Bavaria", countryCode = "DE", region = "Bavaria"),
+                ),
+                cachedCities = listOf(
+                    UrnetworkCachedLocation(name = "Munich", countryCode = "DE", city = "Munich"),
+                ),
+                cachedBestMatches = listOf(
+                    UrnetworkCachedLocation(name = "Munich Top", countryCode = "DE", city = "Munich"),
+                ),
+            ),
+        )
+        val v = UrnetworkLocationsViewModel(
+            FakeUrnetworkBridge(deviceAvailable = false),
+            FakeSettingsRepo(),
+            store,
+            idleTunnel(),
+        )
+        advanceUntilIdle()
+
+        v.setSearchQuery("")
+        advanceUntilIdle()
+
+        val state = assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertEquals(1, state.countries.size)
+        assertEquals(1, state.regions.size)
+        assertEquals(1, state.cities.size)
+        assertTrue(state.bestMatches.isEmpty())
+    }
+
+    @Test
+    fun `search query matches russian country name and country code`() = runTest {
+        val store = ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                cachedCountries = listOf(
+                    UrnetworkCachedLocation(name = "Germany", countryCode = "DE"),
+                    UrnetworkCachedLocation(name = "Poland", countryCode = "PL"),
+                ),
+            ),
+        )
+        val v = UrnetworkLocationsViewModel(
+            FakeUrnetworkBridge(deviceAvailable = false),
+            FakeSettingsRepo(),
+            store,
+            idleTunnel(),
+        )
+        advanceUntilIdle()
+
+        v.setSearchQuery("de")
+        advanceUntilIdle()
+
+        val byCode = assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertEquals("DE", byCode.countries.single().countryCode)
+
+        v.setSearchQuery("гер")
+        advanceUntilIdle()
+
+        val byRuName = assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertEquals("DE", byRuName.countries.single().countryCode)
+    }
+
+    @Test
+    fun `setProvidePaused from NotConnected builds ready state from cached lists`() = runTest {
+        val store = fakeUrnetworkConfigStore()
+        val v = UrnetworkLocationsViewModel(
+            FakeUrnetworkBridge(deviceAvailable = false),
+            FakeSettingsRepo(),
+            store,
+            idleTunnel(),
+        )
+        advanceUntilIdle()
+        assertIs<UrnetworkSettingsUiState.NotConnected>(v.uiState.value)
+
+        v.setProvidePaused(true)
+        advanceUntilIdle()
+
+        val state = assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertTrue(state.providePaused)
+        assertTrue(state.countries.isEmpty())
+    }
+
+    @Test
+    fun `refresh unavailable device clears cached ready state to NotConnected`() = runTest {
+        val store = ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                cachedCountries = listOf(UrnetworkCachedLocation(name = "Germany", countryCode = "DE")),
+            ),
+        )
+        val v = UrnetworkLocationsViewModel(
+            FakeUrnetworkBridge(deviceAvailable = false),
+            FakeSettingsRepo(),
+            store,
+            idleTunnel(),
+        )
+        advanceUntilIdle()
+        assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+
+        v.refresh()
+        advanceUntilIdle()
+
+        assertIs<UrnetworkSettingsUiState.NotConnected>(v.uiState.value)
+    }
+
     private suspend fun TestScope.awaitReadyState(v: UrnetworkLocationsViewModel): UrnetworkSettingsUiState.Ready {
         repeat(10) {
             val state = v.uiState.value
