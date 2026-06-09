@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.ChainOrchestrator
 import ru.ozero.enginescore.EngineCapabilities
@@ -60,15 +61,16 @@ class EngineWatchdogInfiniteRetryTest {
         plugin: EnginePlugin,
         scope: CoroutineScope,
         stopVpnInvocations: AtomicReference<Int>,
-    ): Pair<EngineWatchdogCoordinator, TunnelController> {
-        val controller = TunnelController().apply {
+        healthMonitor: HealthMonitor = HealthMonitor(),
+        controller: TunnelController = TunnelController().apply {
             onProbing(EngineId.WARP)
             onConnecting(EngineId.WARP)
             onEngineStarted(EngineId.WARP, socksPort = 0)
-        }
+        },
+    ): Pair<EngineWatchdogCoordinator, TunnelController> {
         val watchdog = EngineWatchdogCoordinator(
             scope = scope,
-            healthMonitor = HealthMonitor(),
+            healthMonitor = healthMonitor,
             enginePlugins = setOf(plugin),
             tunnelController = controller,
             chainOrchestrator = mockk<ChainOrchestrator>(relaxed = true),
@@ -148,6 +150,73 @@ class EngineWatchdogInfiniteRetryTest {
                 "не 'engine сломан'. UI покажет degraded indicator. " +
                 "Защита от регрессии: вернуть handleEngineFailure на NotSupported → юзер увидит красную кнопку.",
         )
+        watchdog.cancelWatchers()
+    }
+
+    @Test
+    fun `stagnation watchdog successful recover keeps VPN running`() = runTest {
+        var nowMs = 0L
+        val controller = TunnelController(
+            stagnationMonitor = StatsStagnationMonitor(thresholdMs = 1L, nowMs = { nowMs }),
+        ).apply {
+            onProbing(EngineId.WARP)
+            onConnecting(EngineId.WARP)
+            onEngineStarted(EngineId.WARP, socksPort = 0)
+        }
+        val plugin = FakeFailingPlugin {
+            EnginePlugin.RecoverResult.Success
+        }
+        val stopVpnCount = AtomicReference(0)
+        val (watchdog, _) = buildWatchdog(
+            plugin = plugin,
+            scope = backgroundScope,
+            stopVpnInvocations = stopVpnCount,
+            controller = controller,
+        )
+
+        controller.updateStats(TunnelStats(txPackets = 1, txBytes = 10, rxPackets = 1, rxBytes = 20, timestampMs = 1))
+        nowMs = 2
+        controller.updateStats(TunnelStats(txPackets = 1, txBytes = 10, rxPackets = 1, rxBytes = 20, timestampMs = 2))
+        watchdog.startStagnationWatchdog(EngineId.WARP)
+        runCurrent()
+
+        advanceTimeBy(EngineWatchdogCoordinator.STAGNATION_RECOVER_THRESHOLD_MS + 1_000L)
+        runCurrent()
+
+        assertTrue(plugin.recoverCalls.get() >= 1)
+        assertEquals(0, stopVpnCount.get())
+        watchdog.cancelWatchers()
+    }
+
+    @Test
+    fun `health degraded with killswitch off does not stop VPN from watcher`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val healthMonitor = HealthMonitor(
+            intervalMs = 1L,
+            probeTimeoutMs = 1,
+            failuresBeforeDegraded = 1,
+            dispatcher = dispatcher,
+            probe = { _, _, _ -> error("probe fail") },
+        )
+        val plugin = FakeFailingPlugin {
+            EnginePlugin.RecoverResult.Success
+        }
+        val stopVpnCount = AtomicReference(0)
+        val (watchdog, controller) = buildWatchdog(
+            plugin = plugin,
+            scope = backgroundScope,
+            stopVpnInvocations = stopVpnCount,
+            healthMonitor = healthMonitor,
+        )
+
+        watchdog.startHealthKillswitchWatcher(EngineId.WARP)
+        healthMonitor.start(socksPort = 1080)
+        advanceTimeBy(2L)
+        runCurrent()
+
+        assertEquals(0, stopVpnCount.get())
+        assertTrue(controller.state.value is TunnelState.Connected)
+        healthMonitor.shutdown()
         watchdog.cancelWatchers()
     }
 }

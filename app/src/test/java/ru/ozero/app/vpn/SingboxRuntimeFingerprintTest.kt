@@ -63,6 +63,44 @@ class SingboxRuntimeFingerprintTest {
         )
     }
 
+    @Test
+    fun `selected profile fingerprint resolves row synchronously before missing-row fallback`() =
+        kotlinx.coroutines.test.runTest {
+            val prefs = prefs(selected = 10L, bean = byteArrayOf(5, 5))
+            val profiles = listOf(profile(20, byteArrayOf(7, 7)))
+
+            val fingerprint = singboxRuntimeFingerprint(
+                prefs = prefs,
+                profiles = profiles,
+                chainSteps = emptyList(),
+                resolveProfileById = { id -> profile(id, byteArrayOf(9, 9)) },
+            )
+
+            assertEquals(
+                listOf(10L, byteArrayOf(9, 9).contentHashCode(), emptyList<Pair<Long, Int>>()),
+                fingerprint,
+            )
+        }
+
+    @Test
+    fun `selected profile fingerprint keeps fail closed fallback when synchronous row is absent`() =
+        kotlinx.coroutines.test.runTest {
+            val prefs = prefs(selected = 10L, bean = byteArrayOf(5, 5))
+            val profiles = listOf(profile(20, byteArrayOf(7, 7)))
+
+            val fingerprint = singboxRuntimeFingerprint(
+                prefs = prefs,
+                profiles = profiles,
+                chainSteps = emptyList(),
+                resolveProfileById = { null },
+            )
+
+            assertEquals(
+                listOf(10L, 0, emptyList<Pair<Long, Int>>()),
+                fingerprint,
+            )
+        }
+
     private fun prefs(
         selected: Long? = null,
         bean: ByteArray? = null,

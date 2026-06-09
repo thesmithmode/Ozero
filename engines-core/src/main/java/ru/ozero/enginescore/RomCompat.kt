@@ -4,8 +4,8 @@ import android.os.Build
 
 object RomCompat {
     fun isNubiaRedMagic(
-        manufacturer: String = Build.MANUFACTURER,
-        model: String = Build.MODEL,
+        manufacturer: String = Build.MANUFACTURER.orEmpty(),
+        model: String = Build.MODEL.orEmpty(),
     ): Boolean {
         val mfr = manufacturer.lowercase()
         val mdl = model.lowercase()

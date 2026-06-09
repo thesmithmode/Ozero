@@ -8,6 +8,7 @@ import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
 import kotlin.test.assertContains
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 
@@ -252,6 +253,48 @@ class ConfigBuilderBranchCoverageTest {
     }
 
     @Test
+    fun `default outbound branches omit transport tls detour and probe socks`() {
+        val vmessJson = ConfigBuilder.buildSingboxConfig(vmess().apply {
+            type = "tcp"
+            security = "none"
+            encryption = ""
+        })
+        val trojanJson = ConfigBuilder.buildSingboxConfig(trojan().apply {
+            type = "tcp"
+            security = "none"
+        })
+        val shadowsocksJson = ConfigBuilder.buildChainConfig(
+            bean = shadowsocks().apply {
+                plugin = "v2ray-plugin"
+                pluginOpts = "mode=websocket"
+            },
+            socksPort = 2091,
+            upstream = ConfigBuilder.Upstream("127.0.0.1", 1080),
+        )
+
+        assertContains(vmessJson, "\"type\":\"vmess\"")
+        assertContains(vmessJson, "\"security\":\"auto\"")
+        assertFalse(vmessJson.contains("\"transport\""))
+        assertFalse(vmessJson.contains("\"tls\""))
+        assertFalse(vmessJson.contains("\"listen_port\":0"))
+        assertContains(trojanJson, "\"type\":\"trojan\"")
+        assertFalse(trojanJson.contains("\"packet_encoding\""))
+        assertFalse(trojanJson.contains("\"tls\""))
+        assertContains(shadowsocksJson, "\"plugin\":\"v2ray-plugin\"")
+        assertContains(shadowsocksJson, "\"plugin_opts\":\"mode=websocket\"")
+        assertContains(shadowsocksJson, "\"detour\":\"upstream\"")
+    }
+
+    @Test
+    fun `json string escapes carriage return tab backspace and form feed`() {
+        val json = ConfigBuilder.buildSingboxConfig(vless().apply {
+            serverAddress = "srv\r\t\b${12.toChar()}.example.com"
+        })
+
+        assertContains(json, """srv\r\t\b\f.example.com""")
+    }
+
+    @Test
     fun `vless flow normalization keeps vision variants only`() {
         val blank = ConfigBuilder.buildSingboxConfig(vless().apply { flow = " " })
         val exact = ConfigBuilder.buildSingboxConfig(vless().apply { flow = "xtls-rprx-vision" })
@@ -276,6 +319,96 @@ class ConfigBuilderBranchCoverageTest {
         assertContains(json, "\"detour\":\"upstream\"")
         assertContains(json, "\"listen_port\":2090")
         assertFalse(json.contains("unsupported"))
+    }
+
+    @Test
+    fun `profile chain without wrappers keeps selected outbound direct`() {
+        val json = ConfigBuilder.buildProfileChainConfig(
+            selected = vless(uuid = "selected-only"),
+            wrappers = emptyList(),
+        )
+
+        assertContains(json, "\"tag\":\"proxy\"")
+        assertFalse(json.contains("\"tag\":\"chain-0\""))
+        assertFalse(json.contains("\"detour\":\"chain-"))
+    }
+
+    @Test
+    fun `vmess and trojan emit transport and tls optional branches`() {
+        val vmessJson = ConfigBuilder.buildSingboxConfig(vmess().apply {
+            type = "ws"
+            path = ""
+            host = ""
+            earlyDataHeaderName = "Sec-WebSocket-Protocol"
+            maxEarlyData = 32
+            security = "tls"
+            sni = "vmess.example.com"
+            allowInsecure = false
+            utlsFingerprint = ""
+        })
+        val trojanJson = ConfigBuilder.buildSingboxConfig(trojan().apply {
+            type = "grpc"
+            grpcServiceName = "trojan-service"
+            security = "tls"
+            host = "front.example.com;other.example.com"
+            sni = ""
+        })
+
+        assertContains(vmessJson, "\"type\":\"ws\"")
+        assertContains(vmessJson, "\"path\":\"/\"")
+        assertContains(vmessJson, "\"max_early_data\":32")
+        assertContains(vmessJson, "\"early_data_header_name\":\"Sec-WebSocket-Protocol\"")
+        assertContains(vmessJson, "\"tls\":{\"enabled\":true")
+        assertFalse(vmessJson.contains("\"headers\""))
+        assertFalse(vmessJson.contains("\"insecure\""))
+        assertContains(trojanJson, "\"type\":\"grpc\"")
+        assertContains(trojanJson, "\"service_name\":\"trojan-service\"")
+        assertContains(trojanJson, "\"server_name\":\"trojan.example.com\"")
+        assertContains(trojanJson, "\"tls\":{\"enabled\":true")
+    }
+
+    @Test
+    fun `empty security and plugin option edges omit optional blocks`() {
+        val emptySecurityJson = ConfigBuilder.buildSingboxConfig(vless().apply {
+            security = ""
+            host = ""
+        })
+        val pluginOptsWithoutPluginJson = ConfigBuilder.buildSingboxConfig(shadowsocks().apply {
+            plugin = ""
+            pluginOpts = "mode=websocket"
+        })
+
+        assertFalse(emptySecurityJson.contains("\"tls\""))
+        assertFalse(pluginOptsWithoutPluginJson.contains("\"plugin\""))
+        assertFalse(pluginOptsWithoutPluginJson.contains("\"plugin_opts\""))
+    }
+
+    @Test
+    fun `warp adapter covers cidr preservation ipv6 default suffix and mtu clamp`() {
+        val lowMtu = WarpToWireGuardAdapter.convert(
+            privateKey = "private",
+            peerPublicKey = "peer",
+            peerEndpoint = "[2001:db8::1]:51820",
+            interfaceAddressV4 = "10.0.0.2/24",
+            interfaceAddressV6 = "fd00::2",
+            mtu = 1000,
+            keepaliveSeconds = 25,
+        )
+        val highMtu = WarpToWireGuardAdapter.convert(
+            privateKey = "private",
+            peerPublicKey = "peer",
+            peerEndpoint = "203.0.113.1:51820",
+            interfaceAddressV4 = "",
+            interfaceAddressV6 = "fd00::3/64",
+            mtu = 2000,
+            keepaliveSeconds = 0,
+        )
+
+        assertEquals("2001:db8::1", lowMtu.serverHost)
+        assertEquals(listOf("10.0.0.2/24", "fd00::2/128"), lowMtu.localAddresses)
+        assertEquals(1280, lowMtu.mtu)
+        assertEquals(listOf("fd00::3/64"), highMtu.localAddresses)
+        assertEquals(1500, highMtu.mtu)
     }
 
     private fun vless(uuid: String = "12345678-1234-1234-1234-123456789abc") = VLESSBean().apply {

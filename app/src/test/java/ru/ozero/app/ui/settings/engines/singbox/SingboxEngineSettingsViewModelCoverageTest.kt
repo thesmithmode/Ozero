@@ -32,6 +32,7 @@ import ru.ozero.singboxroom.entity.ProxyChainStep
 import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 import ru.ozero.singboxsubscription.GroupSeeder
+import ru.ozero.singboxsubscription.RawUpdater
 import java.io.ByteArrayInputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -523,6 +524,86 @@ class SingboxEngineSettingsViewModelCoverageTest {
         assertTrue(harness.viewModel.state.value.isPinging.isEmpty())
     }
 
+    @Test
+    fun `onGroupExpand toggles expanded group without duplicate refresh`() = runTest {
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0)),
+            initialProfiles = listOf(profile(id = 71L, groupId = 1L, name = "Existing", userOrder = 0)),
+        )
+        coEvery { harness.rawUpdater.refresh(any()) } returns Result.success(1)
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onGroupExpand(1L)
+        advanceUntilIdle()
+
+        assertEquals(1L, harness.viewModel.state.value.expandedGroupId)
+        assertEquals(listOf(71L), harness.viewModel.state.value.groupProfiles.getValue(1L).map { it.id })
+
+        harness.viewModel.onGroupExpand(1L)
+        advanceUntilIdle()
+
+        assertNull(harness.viewModel.state.value.expandedGroupId)
+        coVerify(exactly = 0) { harness.rawUpdater.refresh(any()) }
+    }
+
+    @Test
+    fun `onGroupExpand refreshes empty group and records updater error`() = runTest {
+        val harness = Harness(initialGroups = listOf(group(id = 1L, userOrder = 0)))
+        coEvery { harness.rawUpdater.refresh(any()) } returns Result.failure(IllegalStateException("network down"))
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onGroupExpand(1L)
+        advanceUntilIdle()
+
+        assertEquals(1L, harness.viewModel.state.value.expandedGroupId)
+        assertEquals("network down", harness.viewModel.state.value.groupRefreshErrors[1L])
+        assertTrue(harness.viewModel.state.value.isRefreshing.isEmpty())
+        coVerify(exactly = 1) { harness.rawUpdater.refresh(match { it.id == 1L }) }
+    }
+
+    @Test
+    fun `onRefresh stores thrown updater error and still refreshes visible group profiles`() = runTest {
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0)),
+            initialProfiles = listOf(profile(id = 91L, groupId = 1L, name = "Visible", userOrder = 0)),
+        )
+        coEvery { harness.rawUpdater.refresh(any()) } throws IllegalArgumentException("bad payload")
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onGroupExpand(1L)
+        advanceUntilIdle()
+        harness.viewModel.onRefresh(1L)
+        advanceUntilIdle()
+
+        assertEquals("bad payload", harness.viewModel.state.value.groupRefreshErrors[1L])
+        assertEquals(listOf(91L), harness.viewModel.state.value.groupProfiles.getValue(1L).map { it.id })
+        assertTrue(harness.viewModel.state.value.isRefreshing.isEmpty())
+    }
+
+    @Test
+    fun `manual import maps all supported protocols to protocol types`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onImportFromFile(
+            """
+                vless://12345678-1234-1234-1234-123456789abc@vless.example.com:443?type=tcp#VLESS
+                vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsInBvcnQiOjQ0MywiaWQiOiIxMjM0NTY3OC0xMjM0LTEyMzQtMTIzNC0xMjM0NTY3ODlhYmMiLCJhaWQiOjAsIm5ldCI6InRjcCIsInR5cGUiOiJub25lIiwicHMiOiJWTWVzcyJ9
+                trojan://secret@trojan.example.com:443#Trojan
+                ss://YWVzLTI1Ni1nY206c2VjcmV0@ss.example.com:8388#SS
+            """.trimIndent(),
+            "protocols.txt",
+        )
+        advanceUntilIdle()
+
+        assertEquals("protocols", harness.insertedGroups.single().name)
+        assertEquals(listOf(0, 1, 2, 3), harness.profileDao.insertedProfiles.map { it.protocolType })
+    }
+
     private fun group(id: Long, userOrder: Int): SubscriptionGroup =
         SubscriptionGroup(
             id = id,
@@ -577,6 +658,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         val profileDao: RecordingProxyProfileDao
         val chainDao: RecordingProxyChainDao
         val groupSeeder: GroupSeeder
+        val rawUpdater: RawUpdater
 
         private var nextGroupId = 1L
 
@@ -612,6 +694,8 @@ class SingboxEngineSettingsViewModelCoverageTest {
             }
             profileDao = RecordingProxyProfileDao(profilesFlow)
             chainDao = RecordingProxyChainDao(chainFlow)
+            rawUpdater = mockk(relaxed = true)
+            coEvery { rawUpdater.refresh(any()) } returns Result.success(0)
             val probeService = SingboxProbeService(
                 profileDao = profileDao,
                 dataStore = dataStore(),
@@ -623,7 +707,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
                 groupDao = groupDao,
                 profileDao = profileDao,
                 proxyChainDao = chainDao,
-                rawUpdater = mockk(relaxed = true),
+                rawUpdater = rawUpdater,
                 groupSeeder = groupSeeder,
                 probeService = probeService,
             )

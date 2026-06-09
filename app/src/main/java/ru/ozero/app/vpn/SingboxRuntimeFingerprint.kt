@@ -28,3 +28,21 @@ internal fun singboxRuntimeFingerprint(
         .mapNotNull { id -> profilesById[id]?.let { id to it.beanBlob.contentHashCode() } }
     return listOf(selectedProfileId, selectedBlobHash, activeProfileBlobHashes)
 }
+
+internal suspend fun singboxRuntimeFingerprint(
+    prefs: Preferences,
+    profiles: List<ProxyProfile>,
+    chainSteps: List<ProxyChainStep>,
+    resolveProfileById: suspend (Long) -> ProxyProfile?,
+): Any {
+    val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
+    if (selectedProfileId == null || selectedProfileId == SingboxEngine.SELECTED_AUTO) {
+        return singboxRuntimeFingerprint(prefs, profiles, chainSteps)
+    }
+    if (profiles.any { it.id == selectedProfileId }) {
+        return singboxRuntimeFingerprint(prefs, profiles, chainSteps)
+    }
+    val resolvedProfile = resolveProfileById(selectedProfileId)
+    val resolvedProfiles = if (resolvedProfile == null) profiles else profiles + resolvedProfile
+    return singboxRuntimeFingerprint(prefs, resolvedProfiles, chainSteps)
+}

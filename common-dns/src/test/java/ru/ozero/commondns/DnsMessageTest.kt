@@ -85,6 +85,35 @@ class DnsMessageTest {
     }
 
     @Test
+    fun parseAAnswersExtractsIpv4FromUncompressedAnswerName() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 1, 0, 1,
+            1, 'a'.code.toByte(), 0, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4,
+            5, 6, 7, 8,
+        )
+        assertEquals(listOf("5.6.7.8"), DnsMessage.parseAAnswers(body))
+    }
+
+    @Test
+    fun parseAAnswersStopsWhenQuestionNameOverrunsBody() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            10, 'a'.code.toByte(),
+        )
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun buildAQueryIgnoresEmptyLabelsAroundHostname() {
+        val normal = DnsMessage.buildAQuery("example.com")
+        val dotted = DnsMessage.buildAQuery(".example..com.")
+
+        assertEquals(normal.drop(2), dotted.drop(2))
+    }
+
+    @Test
     fun parseAAnswersStopsOnTruncatedCompressedAnswerName() {
         val body = byteArrayOf(
             0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,

@@ -125,7 +125,12 @@ object SingboxModule {
             profileDao.getAllFlow(),
             proxyChainDao.getAllFlow(),
         ) { prefs, profiles, chainSteps ->
-            singboxRuntimeFingerprint(prefs, profiles, chainSteps)
+            singboxRuntimeFingerprint(
+                prefs = prefs,
+                profiles = profiles,
+                chainSteps = chainSteps,
+                resolveProfileById = profileDao::getById,
+            )
         }
         override val includeStarting: Boolean = false
         override val replayAfterStarting: Boolean = true

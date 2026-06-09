@@ -38,4 +38,9 @@ class RomCompatTest {
 
     @Test
     fun empty_strings_return_false() = assertFalse(check("", ""))
+
+    @Test
+    fun default_android_build_values_are_safe_to_check() {
+        RomCompat.isNubiaRedMagic()
+    }
 }

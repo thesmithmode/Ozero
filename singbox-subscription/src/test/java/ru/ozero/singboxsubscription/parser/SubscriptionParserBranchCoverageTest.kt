@@ -636,4 +636,87 @@ class SubscriptionParserBranchCoverageTest {
         assertEquals("true", (result[2] as ShadowsocksBean).method)
         assertEquals("mode=cfb,rounds=2", (result[3] as ShadowsocksBean).method)
     }
+
+    @Test
+    fun `clash parser covers yaml coercion bool aliases and transport direct fields`() {
+        assertTrue(ClashYamlParser.parse("proxies:\n  - plain-item\n  - 7\n").isEmpty())
+        assertTrue(ClashYamlParser.parse("proxies: []\n---\nscalar").isEmpty())
+
+        val yaml = """
+            proxies:
+              - name:
+                  label: mapped-name
+                  tier: 1
+                type: vless
+                server: mapped-name.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                reality: 1
+                tls: 0
+                allowInsecure: false
+                network: ""
+              - name:
+                  - list
+                  - name
+                type: trojan
+                server: direct-grpc.example.com
+                port: 443
+                password: secret
+                network: grpc
+                serviceName: direct-service
+                skip-cert-verify: true
+              - name: HTTP Upgrade Direct
+                type: vmess
+                server: httpupgrade-direct.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                httpupgrade-opts:
+                  path: /upgrade
+                host: direct-host.example.com
+                tls: "1"
+              - name: SS Method Fallback
+                type: ss
+                server: ss-method.example.com
+                port: 8388
+                method: chacha20-ietf-poly1305
+                password: secret
+                plugin_opts:
+                  mode: websocket
+                  host: plugin.example.com
+              - name: VMess Net Alias
+                type: vmess
+                server: net-alias.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                net: xhttp
+                security: ""
+                skip-cert-verify: yes
+        """.trimIndent()
+
+        val result = ClashYamlParser.parse(yaml)
+
+        assertEquals(5, result.size)
+        val mappedName = result[0] as VLESSBean
+        assertEquals("label=mapped-name,tier=1", mappedName.name)
+        assertEquals("tcp", mappedName.type)
+        assertEquals("reality", mappedName.security)
+        assertFalse(mappedName.allowInsecure)
+        val directGrpc = result[1] as TrojanBean
+        assertEquals("list,name", directGrpc.name)
+        assertEquals("grpc", directGrpc.type)
+        assertEquals("direct-service", directGrpc.grpcServiceName)
+        assertTrue(directGrpc.allowInsecure)
+        val httpUpgrade = result[2] as VMessBean
+        assertEquals("httpupgrade", httpUpgrade.type)
+        assertEquals("/upgrade", httpUpgrade.path)
+        assertEquals("direct-host.example.com", httpUpgrade.host)
+        assertEquals("tls", httpUpgrade.security)
+        val ss = result[3] as ShadowsocksBean
+        assertEquals("chacha20-ietf-poly1305", ss.method)
+        assertEquals("mode=websocket,host=plugin.example.com", ss.pluginOpts)
+        val vmessNetAlias = result[4] as VMessBean
+        assertEquals("splithttp", vmessNetAlias.type)
+        assertEquals("none", vmessNetAlias.security)
+        assertTrue(vmessNetAlias.allowInsecure)
+    }
 }

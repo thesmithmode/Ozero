@@ -805,6 +805,35 @@ class EngineRuntimeConfigRestartObserverTest {
     }
 
     @Test
+    fun `singbox runtime provider resolves selected profile from dao when flow cache misses`() = runTest(dispatcher) {
+        val prefs = MutableStateFlow<Preferences>(
+            mutablePreferencesOf(
+                singboxSelectedProfileKey to 1L,
+                singboxBeanKey to byteArrayOf(1),
+            ),
+        )
+        val profiles = MutableStateFlow(
+            listOf(proxyProfile(id = 2, blob = byteArrayOf(2))),
+        )
+        val profileDao = fakeProfileDao(
+            flow = profiles,
+            lookupById = { id -> proxyProfile(id = id, blob = byteArrayOf(9)) },
+        )
+        val provider = SingboxModule.provideSingboxRuntimeConfigProvider(
+            dataStore = flowDataStore(prefs),
+            profileDao = profileDao,
+            proxyChainDao = fakeProxyChainDao(MutableStateFlow(emptyList())),
+        )
+
+        val fingerprint = provider.changes.first()
+
+        assertEquals(
+            listOf(1L, byteArrayOf(9).contentHashCode(), emptyList<Pair<Long, Int>>()),
+            fingerprint,
+        )
+    }
+
+    @Test
     fun `singbox runtime provider ignores unrelated profile changes in manual mode`() = runTest(dispatcher) {
         val prefs = MutableStateFlow<Preferences>(
             mutablePreferencesOf(
@@ -935,11 +964,14 @@ class EngineRuntimeConfigRestartObserverTest {
             }
         }
 
-    private fun fakeProfileDao(flow: MutableStateFlow<List<ProxyProfile>>): ProxyProfileDao =
+    private fun fakeProfileDao(
+        flow: MutableStateFlow<List<ProxyProfile>>,
+        lookupById: (Long) -> ProxyProfile? = { id -> flow.value.firstOrNull { it.id == id } },
+    ): ProxyProfileDao =
         object : ProxyProfileDao {
             override suspend fun insert(profile: ProxyProfile): Long = profile.id
             override suspend fun insertAll(profiles: List<ProxyProfile>) = Unit
-            override suspend fun getById(id: Long): ProxyProfile? = flow.value.firstOrNull { it.id == id }
+            override suspend fun getById(id: Long): ProxyProfile? = lookupById(id)
             override fun getAllFlow() = flow
             override fun getByGroupIdFlow(groupId: Long) = flow
             override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> =

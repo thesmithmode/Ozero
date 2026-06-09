@@ -232,6 +232,18 @@ class RawUpdaterTest {
     }
 
     @Test
+    fun `should return failure on unsuccessful http response`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(503).setBody("temporarily unavailable"))
+        val g = group()
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()!!.message!!.contains("Subscription HTTP 503"))
+        assertEquals(0, profileDao.profiles.size)
+    }
+
+    @Test
     fun `should normalize TLS chain validation failures`() = runBlocking {
         rawUpdater = RawUpdater(
             okHttpClient = OkHttpClient.Builder()
@@ -271,6 +283,18 @@ class RawUpdaterTest {
     @Test
     fun `should return zero count for empty body`() = runBlocking {
         server.enqueue(MockResponse().setBody(""))
+        val g = group()
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isSuccess)
+        assertEquals(0, result.getOrNull())
+        assertEquals(0, profileDao.profiles.size)
+    }
+
+    @Test
+    fun `should treat bodyless successful response as empty subscription`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(204))
         val g = group()
 
         val result = rawUpdater.refresh(g)
@@ -376,4 +400,5 @@ class RawUpdaterTest {
         assertEquals(2, ids.toSet().size)
         assertTrue(profileDao.profiles.any { it.id == 77L })
     }
+
 }

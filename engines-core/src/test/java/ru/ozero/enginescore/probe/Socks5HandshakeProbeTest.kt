@@ -21,12 +21,34 @@ class Socks5HandshakeProbeTest {
     }
 
     @Test
+    fun `probe uses default timeout when caller omits it`() = runTest {
+        val server = OneShotSocksServer(byteArrayOf(0x05, 0x00))
+
+        val latency = Socks5HandshakeProbe.probe("127.0.0.1", server.port)
+
+        assertTrue(latency >= 0)
+        assertTrue(server.received.contentEquals(byteArrayOf(0x05, 0x01, 0x00)))
+    }
+
+    @Test
     fun `probe rejects invalid port and timeout`() = runTest {
         assertFailsWith<IllegalArgumentException> {
             Socks5HandshakeProbe.probe("127.0.0.1", 0, timeoutMs = 1_000)
         }
         assertFailsWith<IllegalArgumentException> {
+            Socks5HandshakeProbe.probe("127.0.0.1", 65_536, timeoutMs = 1_000)
+        }
+        assertFailsWith<IllegalArgumentException> {
             Socks5HandshakeProbe.probe("127.0.0.1", 1080, timeoutMs = 0)
+        }
+    }
+
+    @Test
+    fun `probe propagates connection failure`() = runTest {
+        val closedPort = ServerSocket(0).use { it.localPort }
+
+        assertFailsWith<IOException> {
+            Socks5HandshakeProbe.probe("127.0.0.1", closedPort, timeoutMs = 200)
         }
     }
 
