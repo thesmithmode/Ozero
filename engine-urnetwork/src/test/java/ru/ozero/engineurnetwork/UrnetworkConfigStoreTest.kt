@@ -3,6 +3,8 @@ package ru.ozero.engineurnetwork
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.mutablePreferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -376,9 +378,115 @@ class UrnetworkConfigStoreTest {
         assertEquals("??", UrnetworkLocationSelection.EMPTY.summary())
     }
 
+    @Test
+    fun `persisted enum and boolean values reload through readConfig`() = runTest {
+        val (store, ds) = newStore()
+        store.setWindowType(UrnetworkWindowType.QUALITY)
+        store.setFixedIpSize(true)
+        store.setAllowDirect(false)
+        store.setProvideEnabled(false)
+        store.setProvideControlMode(UrnetworkProvideControlMode.AUTO)
+        store.setProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
+
+        val reloaded = DataStoreUrnetworkConfigStore(ds)
+        reloaded.update { it }
+        val snap = reloaded.config().first()
+
+        assertEquals(UrnetworkWindowType.QUALITY, snap.windowType)
+        assertEquals(true, snap.fixedIpSize)
+        assertEquals(false, snap.allowDirect)
+        assertEquals(false, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(UrnetworkProvideNetworkMode.ALL, snap.provideNetworkMode)
+    }
+
+    @Test
+    fun `persisted credentials and selected location reload through readConfig`() = runTest {
+        val (store, ds) = newStore()
+        store.setWalletOverride("wallet-override")
+        store.setByJwt("by.jwt")
+        store.setByClientJwt("client.jwt")
+        store.setDevicePubkey("device-pubkey")
+        store.setDeviceNetworkName("device-network")
+        store.setSelectedLocation(UrnetworkLocationSelection(" de ", " Bavaria ", " Munich "))
+
+        val reloaded = DataStoreUrnetworkConfigStore(ds)
+        reloaded.update { it }
+        val snap = reloaded.config().first()
+
+        assertEquals("wallet-override", snap.walletOverride)
+        assertEquals("by.jwt", snap.byJwt)
+        assertEquals("client.jwt", snap.byClientJwt)
+        assertEquals("device-pubkey", snap.devicePubkey)
+        assertEquals("device-network", snap.deviceNetworkName)
+        assertEquals(UrnetworkLocationSelection("DE", "Bavaria", "Munich"), snap.selectedLocation)
+    }
+
+    @Test
+    fun `blank persisted optional values are treated as absent after reload`() = runTest {
+        val (_, ds) = newStore()
+        ds.editRaw(
+            "urnetwork_wallet_override" to " ",
+            "urnetwork_by_jwt" to "",
+            "urnetwork_by_client_jwt" to "   ",
+            "urnetwork_device_pubkey" to "",
+            "urnetwork_device_network_name" to " ",
+            "urnetwork_selected_country_code" to "",
+            "urnetwork_selected_region" to " ",
+            "urnetwork_selected_city" to "",
+        )
+
+        val reloaded = DataStoreUrnetworkConfigStore(ds)
+        reloaded.update { it }
+        val snap = reloaded.config().first()
+
+        assertNull(snap.walletOverride)
+        assertNull(snap.byJwt)
+        assertNull(snap.byClientJwt)
+        assertNull(snap.devicePubkey)
+        assertNull(snap.deviceNetworkName)
+        assertEquals(UrnetworkLocationSelection.EMPTY, snap.selectedLocation)
+    }
+
+    @Test
+    fun `malformed persisted cached locations reload as empty lists`() = runTest {
+        val (_, ds) = newStore()
+        ds.editRaw(
+            "urnetwork_cached_countries" to "{",
+            "urnetwork_cached_regions" to "not-json",
+            "urnetwork_cached_cities" to "",
+            "urnetwork_cached_best_matches" to "[]",
+        )
+
+        val reloaded = DataStoreUrnetworkConfigStore(ds)
+        reloaded.update { snap ->
+            assertTrue(snap.cachedCountries.isEmpty())
+            assertTrue(snap.cachedRegions.isEmpty())
+            assertTrue(snap.cachedCities.isEmpty())
+            assertTrue(snap.cachedBestMatches.isEmpty())
+            snap
+        }
+    }
+
     private class FakePreferencesDataStore : DataStore<Preferences> {
         private val state = MutableStateFlow<Preferences>(emptyPreferences())
         override val data: Flow<Preferences> get() = state
+
+        suspend fun editRaw(vararg values: Pair<String, String>) {
+            updateData { prefs ->
+                mutablePreferencesOf(
+                    *prefs.asMap()
+                        .mapNotNull { (key, value) -> (value as? String)?.let { key.name to it } }
+                        .plus(values)
+                        .map { (key, value) -> stringPreferencesKey(key) to value }
+                        .toTypedArray(),
+                ).apply {
+                    values.forEach { (key, value) ->
+                        this[stringPreferencesKey(key)] = value
+                    }
+                }
+            }
+        }
 
         override suspend fun updateData(
             transform: suspend (t: Preferences) -> Preferences,

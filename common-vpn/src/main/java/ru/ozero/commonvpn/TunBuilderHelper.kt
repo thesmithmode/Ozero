@@ -116,15 +116,13 @@ class TunBuilderHelper(private val service: VpnService) {
      */
     private fun applyLockdown(builder: VpnService.Builder, callerTag: String, applyUnderlying: Boolean) {
         if (!applyUnderlying) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-            runCatching { builder.setUnderlyingNetworks(null) }
-                .onFailure { t ->
-                    PersistentLoggers.warn(
-                        TAG,
-                        "$callerTag: setUnderlyingNetworks(null) failed: ${t.message}",
-                    )
-                }
-        }
+        runCatching { builder.setUnderlyingNetworks(null) }
+            .onFailure { t ->
+                PersistentLoggers.warn(
+                    TAG,
+                    "$callerTag: setUnderlyingNetworks(null) failed: ${t.message}",
+                )
+            }
     }
 
     private fun addCidrRoutes(builder: VpnService.Builder, cidrs: List<String>, familyTag: String) {
