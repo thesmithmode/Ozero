@@ -43,6 +43,7 @@ import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
+import ru.ozero.enginescore.settings.TrafficMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 import kotlin.test.assertEquals
@@ -357,9 +358,9 @@ class MainViewModelTest {
 
     @Test
     fun trafficModeMirrorsSettingsRepository() = runTest {
-        settingsRepository.emit(SettingsModel.DEFAULT.copy(trafficMode = ru.ozero.enginescore.settings.TrafficMode.SYSTEM))
+        settingsRepository.emit(SettingsModel.DEFAULT.copy(trafficMode = TrafficMode.SYSTEM))
         advanceUntilIdle()
-        assertEquals(ru.ozero.enginescore.settings.TrafficMode.SYSTEM, viewModel.trafficMode.value)
+        assertEquals(TrafficMode.SYSTEM, viewModel.trafficMode.value)
     }
 
     @Test
