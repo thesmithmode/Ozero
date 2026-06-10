@@ -122,6 +122,22 @@ class BinaryDownloaderTest {
     }
 
     @Test
+    fun `599 is treated as retryable server error`() {
+        repeat(2) { server.enqueue(MockResponse().setResponseCode(599)) }
+        val cache = tmp.resolve("cache")
+        val dst = tmp.resolve("out/libbyedpi.so")
+        val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = listOf(0, 0))
+
+        assertThatThrownBy {
+            downloader.download(server.url("/x.so").toString(), "0".repeat(64), dst)
+        }
+            .isInstanceOf(BinaryDownloadException::class.java)
+            .hasMessageContaining("599")
+
+        assertThat(server.requestCount).isEqualTo(2)
+    }
+
+    @Test
     fun `single retry slot still reports final failure without sleeping`() {
         server.enqueue(MockResponse().setResponseCode(500))
         val cache = tmp.resolve("cache")

@@ -19,6 +19,8 @@ import java.security.MessageDigest
 class DownloadBinaryTaskTest {
     private lateinit var server: MockWebServer
 
+    private class NamedBlankMessageException : RuntimeException("   ")
+
     @TempDir
     lateinit var tmp: Path
 
@@ -336,6 +338,13 @@ class DownloadBinaryTaskTest {
     }
 
     @Test
+    fun `gradleMessage keeps non blank exception message`() {
+        val exception = RuntimeException("clear failure")
+
+        assertThat(exception.gradleMessage()).isEqualTo("clear failure")
+    }
+
+    @Test
     fun `gradleMessage falls back to exception type when message is null`() {
         val exception = object : RuntimeException() {
             override val message: String? = null
@@ -346,9 +355,9 @@ class DownloadBinaryTaskTest {
 
     @Test
     fun `gradleMessage falls back when message is blank`() {
-        val exception = object : RuntimeException("   ") {}
+        val exception = NamedBlankMessageException()
 
-        assertThat(exception.gradleMessage()).isEqualTo("RuntimeException")
+        assertThat(exception.gradleMessage()).isEqualTo("NamedBlankMessageException")
     }
 
     @Test

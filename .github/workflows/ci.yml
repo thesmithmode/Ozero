@@ -400,9 +400,7 @@ jobs:
     name: Tests — app
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs:
-      - kotlin-style
-      - coverage-gate
+    needs: kotlin-style
     if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
@@ -524,9 +522,7 @@ jobs:
     name: Tests — common-vpn
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs:
-      - kotlin-style
-      - coverage-gate
+    needs: kotlin-style
     if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
@@ -576,9 +572,7 @@ jobs:
     name: Tests — engine-warp
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - kotlin-style
-      - coverage-gate
+    needs: kotlin-style
     if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
@@ -628,9 +622,7 @@ jobs:
     name: Tests — engine-urnetwork + engine-byedpi
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - kotlin-style
-      - coverage-gate
+    needs: kotlin-style
     if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
@@ -729,9 +721,7 @@ jobs:
     name: Tests — core + common modules
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - kotlin-style
-      - coverage-gate
+    needs: kotlin-style
     if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
@@ -841,9 +831,7 @@ jobs:
     name: Tests — singbox + extra modules
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs:
-      - kotlin-style
-      - coverage-gate
+    needs: kotlin-style
     if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read

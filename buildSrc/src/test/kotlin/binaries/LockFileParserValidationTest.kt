@@ -55,6 +55,22 @@ class LockFileParserValidationTest {
     }
 
     @Test
+    fun `parse lock without artifacts as empty list`() {
+        val f = write(
+            """
+            tag: binaries-x
+            generated_at: "2026-04-25T10:00:00Z"
+            """.trimIndent(),
+        )
+
+        val lock = LockFileParser.parse(f)
+
+        assertThat(lock.tag).isEqualTo("binaries-x")
+        assertThat(lock.generatedAt).isEqualTo("2026-04-25T10:00:00Z")
+        assertThat(lock.artifacts).isEmpty()
+    }
+
+    @Test
     fun `reject missing sha256 on artifact`() {
         val f = write(
             """
@@ -448,6 +464,33 @@ class LockFileParserValidationTest {
         assertThatThrownBy { LockFileParser.parse(f) }
             .isInstanceOf(LockFileException::class.java)
             .hasMessageContaining("name")
+    }
+
+    @Test
+    fun `ignore blank target filename and keep original artifact name`() {
+        val f = write(
+            """
+            tag: binaries-x
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libx.so
+                target_filename: " "
+                engine: x
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/x.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: "1"
+                source_repo: https://example.com
+                source_commit: 9999999999999999999999999999999999999999
+            """.trimIndent(),
+        )
+
+        val artifact = LockFileParser.parse(f).artifacts.single()
+
+        assertThat(artifact.targetFilename).isNull()
+        assertThat(artifact.name).isEqualTo("libx.so")
+        assertThat(artifact.sizeBytes).isEqualTo(1L)
     }
 
     @Test
