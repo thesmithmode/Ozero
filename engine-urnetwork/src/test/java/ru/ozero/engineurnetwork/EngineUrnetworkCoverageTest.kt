@@ -9,11 +9,13 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
 import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.settings.SettingsModel
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -157,10 +159,107 @@ class EngineUrnetworkCoverageTest {
         empty.close()
     }
 
+    @Test
+    fun `buildManualConfig maps nullable settings to urnetwork config`() {
+        val fixture = fixture()
+
+        assertEquals(
+            EngineConfig.Urnetwork(jwtToken = "", region = null),
+            fixture.engine.buildManualConfig(null),
+        )
+        assertEquals(
+            EngineConfig.Urnetwork(jwtToken = "jwt", region = "DE"),
+            fixture.engine.buildManualConfig(SettingsModel(urnetworkJwt = "jwt", urnetworkCountryCode = "DE")),
+        )
+        fixture.close()
+    }
+
+    @Test
+    fun `recover fails when bridge stopped reconnects selected location and best available`() = runTest {
+        val stopped = fixture(bridge = RecordingBridge(running = false))
+        assertEquals(EnginePlugin.RecoverResult.Failed("bridge not running"), stopped.engine.recover())
+        stopped.close()
+
+        val selectedBridge = RecordingBridge(selected = Location("FR"))
+        val selected = fixture(bridge = selectedBridge)
+        assertEquals(EnginePlugin.RecoverResult.Success, selected.engine.recover())
+        assertEquals(1, selectedBridge.connectToCalls)
+        assertEquals(0, selectedBridge.bestAvailableCalls)
+        selected.close()
+
+        val bestBridge = RecordingBridge(selected = null)
+        val best = fixture(bridge = bestBridge)
+        assertEquals(EnginePlugin.RecoverResult.Success, best.engine.recover())
+        assertEquals(0, bestBridge.connectToCalls)
+        assertEquals(1, bestBridge.bestAvailableCalls)
+        best.close()
+    }
+
+    @Test
+    fun `recover converts bridge reconnect throw to failure`() = runTest {
+        val bridge = RecordingBridge(selected = Location("IT"), connectToThrows = true)
+        val fixture = fixture(bridge = bridge)
+
+        val result = fixture.engine.recover()
+
+        assertIs<EnginePlugin.RecoverResult.Failed>(result)
+        assertTrue(result.reason.contains("recover"))
+        fixture.close()
+    }
+
+    @Test
+    fun `tunSpec probe preflight and policy expose urnetwork contract`() = runTest {
+        val fixture = fixture()
+
+        val spec = fixture.engine.tunSpec()
+        assertEquals("URnetwork", spec.sessionName)
+        assertEquals(1440, spec.mtu)
+        assertEquals("169.254.2.1", spec.ipv4Address)
+        assertEquals(listOf("1.1.1.1", "8.8.8.8"), spec.dnsServers)
+        assertTrue(spec.excludeRfc1918)
+        assertIs<UrnetworkPreflight>(fixture.engine.preflight())
+        assertEquals(
+            ru.ozero.enginescore.ProbeResult.Failure("URnetwork does not provide a SOCKS endpoint"),
+            fixture.engine.probe(),
+        )
+        assertEquals(8_000L, fixture.engine.stopTimeoutMs())
+        assertTrue(fixture.engine.peerWatchdogPolicy().recoverBeforeFirstPeer)
+        fixture.close()
+    }
+
+    @Test
+    fun `awaitReady accepts runtime readiness signals and times out when absent`() = runTest {
+        val readySignals = listOf(
+            UrnetworkSdkBridge.RuntimeSnapshot(tunnelStarted = true, connectIssued = true),
+            UrnetworkSdkBridge.RuntimeSnapshot(providerStateAdded = 1),
+            UrnetworkSdkBridge.RuntimeSnapshot(peers = 1),
+            UrnetworkSdkBridge.RuntimeSnapshot(connectionStatus = "connected"),
+        )
+        readySignals.forEach { snapshot ->
+            val fixture = fixture(
+                bridge = RecordingBridge(snapshot = snapshot),
+                startupReadyTimeoutMs = 50L,
+                startupReadyPollMs = 1L,
+            )
+            assertEquals(EnginePlugin.ReadyResult.Ready, fixture.engine.awaitReady())
+            fixture.close()
+        }
+
+        val timeout = fixture(
+            bridge = RecordingBridge(snapshot = UrnetworkSdkBridge.RuntimeSnapshot()),
+            startupReadyTimeoutMs = 2L,
+            startupReadyPollMs = 1L,
+        )
+        assertIs<EnginePlugin.ReadyResult.Timeout>(timeout.engine.awaitReady())
+        timeout.close()
+    }
+
     private fun fixture(
         store: InMemoryUrnetworkConfigStore = InMemoryUrnetworkConfigStore(UrnetworkConfig(byClientJwt = "client")),
         bridge: RecordingBridge = RecordingBridge(),
         bootstrap: UrnetworkJwtBootstrapper.Result = UrnetworkJwtBootstrapper.Result.AlreadyPresent,
+        startupReadyTimeoutMs: Long = 8_000L,
+        startupReadyPollMs: Long = 200L,
     ): Fixture {
         val dispatcher = StandardTestDispatcher()
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -171,6 +270,8 @@ class EngineUrnetworkCoverageTest {
                 jwtBootstrapper = StaticBootstrapper(bootstrap),
                 pluginScope = scope,
                 statsPollIntervalMs = 10_000L,
+                startupReadyTimeoutMs = startupReadyTimeoutMs,
+                startupReadyPollMs = startupReadyPollMs,
             ),
             bridge = bridge,
             scope = scope,
@@ -201,11 +302,15 @@ class EngineUrnetworkCoverageTest {
     private class RecordingBridge(
         private val startResult: UrnetworkSdkBridge.StartResult = UrnetworkSdkBridge.StartResult.Success,
         private val attachResult: UrnetworkSdkBridge.AttachResult = UrnetworkSdkBridge.AttachResult.Success,
+        private val running: Boolean = true,
         private val selected: UrnetworkSdkBridge.LocationToken? = null,
         private val locationInfo: UrnetworkSdkBridge.LocationInfo? = null,
         private val snapshot: UrnetworkSdkBridge.RuntimeSnapshot = UrnetworkSdkBridge.RuntimeSnapshot(),
+        private val connectToThrows: Boolean = false,
     ) : UrnetworkSdkBridge {
         var startCalls = 0
+        var connectToCalls = 0
+        var bestAvailableCalls = 0
         var lastClientJwt: String? = null
         var recordedPreferredLocation: UrnetworkLocationSelection? = null
         var windowType: UrnetworkWindowType? = null
@@ -227,10 +332,15 @@ class EngineUrnetworkCoverageTest {
         }
 
         override suspend fun stop() = Unit
-        override fun isRunning(): Boolean = true
+        override fun isRunning(): Boolean = running
         override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult = attachResult
-        override fun connectTo(location: UrnetworkSdkBridge.LocationToken) = Unit
-        override fun connectBestAvailable() = Unit
+        override fun connectTo(location: UrnetworkSdkBridge.LocationToken) {
+            connectToCalls++
+            if (connectToThrows) error("connect failed")
+        }
+        override fun connectBestAvailable() {
+            bestAvailableCalls++
+        }
         override fun selectedLocation(): UrnetworkSdkBridge.LocationToken? = selected
         override fun selectedLocationInfo(): UrnetworkSdkBridge.LocationInfo? = locationInfo
         override fun openLocationsViewController(): com.bringyour.sdk.LocationsViewController? = null

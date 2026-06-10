@@ -219,4 +219,59 @@ class NativeHevTunnelGatewayCoverageTest {
 
         assertEquals(2, stats.size)
     }
+
+    @Test
+    fun `stats poller records movement and idle samples`(@TempDir tmp: File) {
+        val statsCalls = AtomicInteger(0)
+        val samples = listOf(
+            longArrayOf(0L, 0L, 0L, 0L),
+            longArrayOf(1L, 10L, 2L, 20L),
+            longArrayOf(1L, 10L, 2L, 20L),
+            longArrayOf(1L, 10L, 2L, 20L),
+            longArrayOf(1L, 10L, 2L, 20L),
+            longArrayOf(1L, 10L, 2L, 20L),
+            longArrayOf(1L, 10L, 2L, 20L),
+            longArrayOf(1L, 10L, 2L, 20L),
+        )
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = loader,
+            nativeStart = { _, _ -> 0 },
+            nativeStop = {},
+            nativeStats = {
+                samples.getOrElse(statsCalls.getAndIncrement()) { samples.last() }
+            },
+            pollIntervalMs = 2L,
+            statsPollerEnabled = true,
+        )
+
+        gateway.start(HevTunnelConfig(tunPfd = pfd(13), socksAddress = "127.0.0.1", socksPort = 1080))
+        Thread.sleep(30L)
+        gateway.stop()
+
+        assertTrue(statsCalls.get() >= samples.size)
+    }
+
+    @Test
+    fun `stats poller stops when nativeStats throws`(@TempDir tmp: File) {
+        val statsCalls = AtomicInteger(0)
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = loader,
+            nativeStart = { _, _ -> 0 },
+            nativeStop = {},
+            nativeStats = {
+                statsCalls.incrementAndGet()
+                error("stats boom")
+            },
+            pollIntervalMs = 2L,
+            statsPollerEnabled = true,
+        )
+
+        gateway.start(HevTunnelConfig(tunPfd = pfd(14), socksAddress = "127.0.0.1", socksPort = 1080))
+        Thread.sleep(15L)
+        gateway.stop()
+
+        assertEquals(1, statsCalls.get())
+    }
 }
