@@ -6,6 +6,7 @@ import android.content.Intent
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -452,6 +453,109 @@ class RuntimeConfigRestartCoordinatorTest {
         runCurrent()
 
         assertEquals(2, startServiceActions.size)
+    }
+
+    @Test
+    fun `start does nothing when already started`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val coordinator = coordinator(
+            context = recordingContext(startServiceActions),
+            tunnelController = TunnelController(),
+        )
+
+        coordinator.start(backgroundScope)
+        coordinator.start(backgroundScope)
+        coordinator.start(backgroundScope)
+
+        assertTrue(startServiceActions.isEmpty())
+    }
+
+    @Test
+    fun `restart queues and coalesces while restart in progress`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val allowStop = CompletableDeferred<Unit>()
+        val allowRestartStart = CompletableDeferred<Unit>()
+        val coordinator = coordinator(
+            context = recordingContext(startServiceActions) {
+                tunnelController.setState(TunnelState.Disconnecting)
+                launch {
+                    allowStop.await()
+                    tunnelController.setState(TunnelState.Probing(EngineId.WARP))
+                    allowRestartStart.await()
+                    tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+                }
+            },
+            tunnelController = tunnelController,
+        )
+
+        val first = launch { assertTrue(coordinator.restartVpnIfRunning("first")) }
+        runCurrent()
+        val second = launch { assertFalse(coordinator.restartVpnIfRunning("second")) }
+        runCurrent()
+        allowStop.complete(Unit)
+        runCurrent()
+        allowRestartStart.complete(Unit)
+        first.join()
+        second.join()
+
+        assertEquals(2, startServiceActions.size)
+        assertTrue(coordinator.restartQueue().isEmpty())
+        assertFalse(coordinator.restartInProgress())
+    }
+
+    @Test
+    fun `restart aborts queued work when exception happens during queued processing`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val coordinator = RuntimeConfigRestartCoordinator(
+            context = object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+                override fun startService(intent: Intent): android.content.ComponentName? {
+                    startServiceActions += intent.action
+                    tunnelController.setState(TunnelState.Disconnecting)
+                    throw IllegalStateException("boom")
+                }
+            },
+            observer = EngineRuntimeConfigRestartObserver(emptySet()),
+            tunnelController = tunnelController,
+        )
+
+        val first = runCatching { coordinator.restartVpnIfRunning("first") }
+        val second = runCatching { coordinator.restartVpnIfRunning("second") }
+
+        assertTrue(first.isFailure)
+        assertTrue(second.isFailure)
+        assertEquals(2, startServiceActions.size)
+        assertTrue(coordinator.restartQueue().isEmpty())
+        assertFalse(coordinator.restartInProgress())
+    }
+
+    @Test
+    fun `restart sees queued state from observable state flow`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.SINGBOX, 2080))
+        val changes = MutableStateFlow<Any?>("baseline")
+        val coordinator = RuntimeConfigRestartCoordinator(
+            context = recordingContext(startServiceActions) {
+                tunnelController.setState(TunnelState.Disconnecting)
+                launch { tunnelController.setState(TunnelState.Connected(EngineId.SINGBOX, 2080)) }
+            },
+            observer = EngineRuntimeConfigRestartObserver(setOf(runtimeProvider(EngineId.SINGBOX, changes))),
+            tunnelController = tunnelController,
+        )
+
+        coordinator.start(backgroundScope)
+        runCurrent()
+        changes.value = "changed"
+        runCurrent()
+
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
+        assertTrue(coordinator.restartQueue().isEmpty())
+        assertFalse(coordinator.restartInProgress())
+        assertEquals(TunnelState.Connected(EngineId.SINGBOX, 2080), tunnelController.state.first())
     }
 
     private fun coordinator(

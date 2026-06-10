@@ -92,6 +92,137 @@ jobs:
           dockerfile: build-tools/Dockerfile
           failure-threshold: error
 
+  coverage-gate:
+    name: Coverage gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: kotlin-style
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: Get URnetwork AAR tag
+        id: aar-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG=$(gh release list --limit 100 --json tagName \
+            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
+            | head -n1 | tr -d '"')
+          if [ -z "$TAG" ]; then
+            echo "::error::no urnetwork-sdk release found"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Cache URnetwork AAR
+        uses: actions/cache@v5
+        id: aar-cache
+        with:
+          path: engine-urnetwork/libs
+          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}-go-stripped-v1
+
+      - name: Download URnetwork AAR
+        if: steps.aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p engine-urnetwork/libs
+          gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
+          for aar in engine-urnetwork/libs/*.aar; do
+            [ -f "$aar" ] || continue
+            tmpdir=$(mktemp -d)
+            unzip -o "$aar" -d "$tmpdir/aar-exploded"
+            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
+            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
+            rm -rf "$tmpdir"
+          done
+
+      - name: Cache Singbox libs
+        uses: actions/cache@v5
+        id: singbox-aar-cache
+        with:
+          path: |
+            singbox-core/libs
+            singbox-core/libs-stubs
+            singbox-core/src/main/jniLibs
+          key: singbox-libbox-1.13.12-exploded-v6
+
+      - name: Download and explode Singbox AAR
+        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          mkdir -p singbox-core/libs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
+
+      - name: coverage verification first
+        run: >
+          ./gradlew
+          :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification
+          :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport :common-vpn:jacocoTestCoverageVerification
+          :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport :engine-urnetwork:jacocoTestCoverageVerification
+          --stacktrace --continue
+
+      - name: Verify tests were discovered
+        run: python3 scripts/verify-junit-nonzero.py app common-vpn engine-urnetwork
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-coverage-gate
+          path: |
+            app/build/reports/jacoco/**
+            common-vpn/build/reports/jacoco/**
+            engine-urnetwork/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-coverage-gate
+          path: |
+            app/build/reports/tests/**
+            common-vpn/build/reports/tests/**
+            engine-urnetwork/build/reports/tests/**
+          retention-days: 14
+
   test-buildsrc:
     name: Tests — buildSrc (supply-chain SHA256)
     runs-on: ubuntu-latest
@@ -145,6 +276,7 @@ jobs:
     timeout-minutes: 25
     needs:
       - kotlin-style
+      - coverage-gate
       - test-buildsrc
       - test-common-vpn
       - test-engine-warp
@@ -270,6 +402,7 @@ jobs:
     timeout-minutes: 20
     needs:
       - kotlin-style
+      - coverage-gate
     if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
@@ -391,7 +524,9 @@ jobs:
     name: Tests — common-vpn
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: kotlin-style
+    needs:
+      - kotlin-style
+      - coverage-gate
     if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
@@ -441,7 +576,9 @@ jobs:
     name: Tests — engine-warp
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: kotlin-style
+    needs:
+      - kotlin-style
+      - coverage-gate
     if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
@@ -491,7 +628,9 @@ jobs:
     name: Tests — engine-urnetwork + engine-byedpi
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: kotlin-style
+    needs:
+      - kotlin-style
+      - coverage-gate
     if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
@@ -590,7 +729,9 @@ jobs:
     name: Tests — core + common modules
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: kotlin-style
+    needs:
+      - kotlin-style
+      - coverage-gate
     if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
@@ -700,7 +841,9 @@ jobs:
     name: Tests — singbox + extra modules
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: kotlin-style
+    needs:
+      - kotlin-style
+      - coverage-gate
     if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
