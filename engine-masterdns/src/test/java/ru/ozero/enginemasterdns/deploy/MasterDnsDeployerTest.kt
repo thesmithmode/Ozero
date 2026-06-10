@@ -174,6 +174,38 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `malformed structured port busy falls back to generic port error`() = runTest {
+        transport.setResponse("bind_probe", "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("port_53_busy|proto=udp|addr=0.0.0.0:53|owner=", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("apt-get") })
+    }
+
+    @Test
+    fun `legacy port busy marker maps to generic port error without details`() = runTest {
+        transport.setResponse("bind_probe", MasterDnsDockerScripts.MARKER_PORT_BUSY)
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("port_53_busy", error.message)
+    }
+
+    @Test
+    fun `amnezia dns conflict defaults missing marker fields`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_CONFLICT)
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val conflict = states.last() as MasterDnsDeployState.AmneziaDnsConflict
+        assertEquals("unknown", conflict.protocol)
+        assertEquals("0.0.0.0", conflict.address)
+    }
+
+    @Test
     fun `should recheck port after docker install before docker build and run`() = runTest {
         transport.setResponses(
             "bind_probe",
@@ -312,6 +344,33 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `bin missing build error redacts password and token diagnostics`() = runTest {
+        transport.setResponse(
+            "Dockerfile",
+            "ERR_BUILD|reason=bin_missing|password=secret-value|token=token-value|candidate=/tmp/bin",
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertTrue(error.message.startsWith("build_failed/bin_missing|ERR_BUILD|reason=bin_missing"))
+        assertTrue(error.message.contains("password=<redacted>"))
+        assertTrue(error.message.contains("token=<redacted>"))
+        assertFalse(error.message.contains("secret-value"))
+        assertFalse(error.message.contains("token-value"))
+    }
+
+    @Test
+    fun `bin missing build marker without diagnostics uses compact error`() = runTest {
+        transport.setResponse("Dockerfile", MasterDnsDockerScripts.MARKER_ERR_BUILD_BIN_MISSING)
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("build_failed/bin_missing|${MasterDnsDockerScripts.MARKER_ERR_BUILD_BIN_MISSING}", error.message)
+    }
+
+    @Test
     fun `should return Error when container run fails`() = runTest {
         transport.setResponse("docker run -d", MasterDnsDockerScripts.MARKER_ERR_RUN)
 
@@ -335,6 +394,27 @@ class MasterDnsDeployerTest {
         assertTrue(error.message.startsWith("run_failed|phase=docker_run|exit=127|state=created"))
         assertTrue(error.message.contains("masterdnsvpn-server"))
         assertTrue(error.message.contains("no such file or directory"))
+    }
+
+    @Test
+    fun `run error marker with blank details maps to compact run failed`() = runTest {
+        transport.setResponse("docker run -d", "${MasterDnsDockerScripts.MARKER_ERR_RUN}|")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("run_failed", error.message)
+    }
+
+    @Test
+    fun `firewall command failure is reported as unexpected error`() = runTest {
+        transport.failOn("ufw")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("unexpected_error", error.message)
+        assertTrue(transport.closeCalled)
     }
 
     @Test
@@ -370,6 +450,17 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `deploy returns unexpected error when command execution throws`() = runTest {
+        transport.failOn("free -m")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("unexpected_error", error.message)
+        assertTrue(transport.closeCalled)
+    }
+
+    @Test
     fun `should return Error when SSH auth fails`() = runTest {
         transport.authShouldFail = true
 
@@ -377,6 +468,39 @@ class MasterDnsDeployerTest {
 
         val error = states.last() as MasterDnsDeployState.Error
         assertEquals("auth_failed", error.message)
+    }
+
+    @Test
+    fun `undeploy returns unexpected error when remove command throws`() = runTest {
+        transport.failOn("docker rm -f")
+
+        val states = deployer.undeploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("unexpected_error", error.message)
+        assertTrue(states.any { it is MasterDnsDeployState.Removing })
+        assertTrue(transport.closeCalled)
+    }
+
+    @Test
+    fun `remove and continue treats not found marker as successful removal`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_NOT_FOUND)
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        assertTrue(states.any { it is MasterDnsDeployState.Removing })
+        assertInstanceOf(MasterDnsDeployState.Done::class.java, states.last())
+    }
+
+    @Test
+    fun `remove and continue returns unexpected error when remove command throws`() = runTest {
+        transport.failOn("docker inspect amnezia-dns")
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("unexpected_error", error.message)
+        assertTrue(transport.closeCalled)
     }
 
     @Test

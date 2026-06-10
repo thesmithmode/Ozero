@@ -26,6 +26,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@Suppress("LargeClass")
 class FptnEngineTest {
 
     private lateinit var store: InMemoryFptnConfigStore
@@ -138,6 +139,48 @@ class FptnEngineTest {
         val result = engine.start(EngineConfig.Fptn(token = "fptn:!!!"), Upstream.None)
         val failure = assertIs<StartResult.Failure>(result)
         assertEquals(FptnEngine.FPTN_INVALID_TOKEN, failure.reason)
+    }
+
+    @Test
+    fun `start with valid token but no servers returns no server failure`() = runTest {
+        val token = java.util.Base64.getEncoder().encodeToString(
+            """{"version":1,"username":"u","password":"p","servers":[]}""".toByteArray(),
+        )
+
+        val result = engine.start(EngineConfig.Fptn(token = "fptn:$token"), Upstream.None)
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals(FptnEngine.FPTN_NO_SERVER_AVAILABLE, failure.reason)
+    }
+
+    @Test
+    fun `start manual selected server absent returns no server failure before native load`() = runTest {
+        val result = engine.start(
+            EngineConfig.Fptn(
+                token = "fptn:${validTokenB64()}",
+                autoSelect = false,
+                selectedServerName = "Missing",
+            ),
+            Upstream.None,
+        )
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals(FptnEngine.FPTN_NO_SERVER_AVAILABLE, failure.reason)
+    }
+
+    @Test
+    fun `start manual without selected server returns no server failure before native load`() = runTest {
+        val result = engine.start(
+            EngineConfig.Fptn(
+                token = "fptn:${validTokenB64()}",
+                autoSelect = false,
+                selectedServerName = null,
+            ),
+            Upstream.None,
+        )
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals(FptnEngine.FPTN_NO_SERVER_AVAILABLE, failure.reason)
     }
 
     @Test
@@ -272,6 +315,38 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `manual runtime server selection returns null for unknown selected server`() {
+        val tokenData = tokenData(
+            server("S1"),
+            server("S2"),
+        )
+
+        val result = engine.selectServer(
+            EngineConfig.Fptn(autoSelect = false, selectedServerName = "S3"),
+            tokenData,
+        )
+
+        assertNull(result)
+    }
+
+    @Test
+    fun `manual selected server candidate preserves full server metadata`() {
+        val selected = server("S2").copy(
+            host = "selected.example.com",
+            port = 8443,
+            md5Fingerprint = "fingerprint",
+            countryCode = "fr",
+        )
+
+        val result = engine.selectServerCandidates(
+            EngineConfig.Fptn(autoSelect = false, selectedServerName = "S2"),
+            tokenData(server("S1"), selected),
+        )
+
+        assertEquals(listOf(selected), result)
+    }
+
+    @Test
     fun `start runtime path keeps auto fallback inside bounded budget`() {
         val source = File(
             System.getProperty("user.dir") ?: ".",
@@ -364,6 +439,32 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `startup failure reason prioritizes dns api timeout and empty failures`() {
+        assertEquals(
+            FptnEngine.FPTN_AUTH_TIMEOUT,
+            startupFptnFailureReason(emptyList(), candidateCount = 1),
+        )
+        assertEquals(
+            "${FptnEngine.FPTN_ALL_CANDIDATES_FAILED}: ${FptnEngine.FPTN_DNS_FAILED}",
+            startupFptnFailureReason(
+                listOf(FptnEngine.FPTN_API_ERROR, FptnEngine.FPTN_DNS_FAILED),
+                candidateCount = 3,
+            ),
+        )
+        assertEquals(
+            FptnEngine.FPTN_API_ERROR,
+            startupFptnFailureReason(listOf(FptnEngine.FPTN_API_ERROR), candidateCount = 1),
+        )
+        assertEquals(
+            "${FptnEngine.FPTN_ALL_CANDIDATES_FAILED}: ${FptnEngine.FPTN_AUTH_TIMEOUT}",
+            startupFptnFailureReason(
+                listOf("unexpected", FptnEngine.FPTN_AUTH_TIMEOUT),
+                candidateCount = 2,
+            ),
+        )
+    }
+
+    @Test
     fun `exit node strategy exposes resolved server ip and flag source`() {
         val strategy = fptnExitNodeStrategy(
             server("Berlin").copy(countryCode = "de"),
@@ -374,6 +475,35 @@ class FptnEngineTest {
         assertEquals("198.51.100.70", label.ip)
         assertEquals("DE", label.countryCode)
         assertTrue(label.label.isNotBlank())
+    }
+
+    @Test
+    fun `exit node strategy trims country code and omits blank server ip`() {
+        val strategy = fptnExitNodeStrategy(
+            server("Fallback").copy(countryCode = " us "),
+            serverIp = " ",
+            displayLocale = Locale.ENGLISH,
+        )
+
+        val label = assertIs<ExitNodeStrategy.ProviderLabel>(strategy)
+        assertEquals("United States", label.label)
+        assertEquals("US", label.countryCode)
+        assertNull(label.ip)
+    }
+
+    @Test
+    fun `exit node strategy falls back when country code is blank long or numeric`() {
+        listOf("", "USA", "1A").forEach { code ->
+            val strategy = fptnExitNodeStrategy(
+                server("Token-$code").copy(countryCode = code),
+                serverIp = null,
+                displayLocale = Locale.ENGLISH,
+            )
+
+            val label = assertIs<ExitNodeStrategy.ProviderLabel>(strategy)
+            assertEquals("Token-$code", label.label)
+            assertNull(label.countryCode)
+        }
     }
 
     @Test
@@ -460,6 +590,46 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `auth failure classifier maps text signals without response code`() {
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            classifyFptnAuthFailure(error = "authentication failed"),
+        )
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            classifyFptnAuthFailure(body = "invalid token"),
+        )
+        assertEquals(
+            FptnEngine.FPTN_AUTH_TIMEOUT,
+            classifyFptnAuthFailure(error = "timed out while reading"),
+        )
+        assertEquals(
+            FptnEngine.FPTN_DNS_FAILED,
+            classifyFptnAuthFailure(exceptionName = "UnresolvedAddressException"),
+        )
+        assertEquals(
+            FptnEngine.FPTN_API_ERROR,
+            classifyFptnAuthFailure(error = "connection reset"),
+        )
+    }
+
+    @Test
+    fun `auth failure classifier prefers response code over ambiguous text`() {
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            classifyFptnAuthFailure(FptnNativeResponse(403, "timeout", "dns")),
+        )
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            classifyFptnAuthFailure(FptnNativeResponse(608, "invalid token", "")),
+        )
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            classifyFptnAuthFailure(FptnNativeResponse(502, "forbidden", "")),
+        )
+    }
+
+    @Test
     fun `buildManualConfig returns null when token blank`() {
         assertNull(engine.buildManualConfig(null))
     }
@@ -505,6 +675,39 @@ class FptnEngineTest {
         store.inject { it.copy(token = "fptn:abc", sniDomain = "custom.example.com") }
         val fptn = assertIs<EngineConfig.Fptn>(engine.buildManualConfig(null))
         assertEquals("custom.example.com", fptn.sniDomain)
+    }
+
+    @Test
+    fun `buildManualConfig propagates default config values when only token set`() {
+        store.inject { it.copy(token = "fptn:abc") }
+
+        val fptn = assertIs<EngineConfig.Fptn>(engine.buildManualConfig(null))
+
+        assertEquals(null, fptn.selectedServerName)
+        assertEquals(FptnBypassMethod.DEFAULT.strategyName, fptn.bypassMethod)
+        assertEquals(FptnConfig.DEFAULT_SNI_DOMAIN, fptn.sniDomain)
+        assertEquals(true, fptn.autoSelect)
+        assertEquals(true, fptn.reconnectOnNetworkChange)
+        assertEquals(false, fptn.reconnectOnIpChange)
+        assertEquals(5, fptn.maxReconnectAttempts)
+        assertEquals(2, fptn.reconnectPauseSeconds)
+        assertEquals(true, fptn.resetServerOnDisconnect)
+    }
+
+    @Test
+    fun `in memory config store update and flow expose same snapshot`() = runTest {
+        store.update {
+            it.copy(
+                token = "fptn:updated",
+                selectedServerName = "S2",
+                autoSelect = false,
+            )
+        }
+
+        assertEquals(store.config().first(), store.currentConfig())
+        assertEquals("fptn:updated", store.snapshot.token)
+        assertEquals("S2", store.snapshot.selectedServerName)
+        assertEquals(false, store.snapshot.autoSelect)
     }
 
     @Test

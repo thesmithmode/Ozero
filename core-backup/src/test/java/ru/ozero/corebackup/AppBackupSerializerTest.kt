@@ -7,6 +7,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@Suppress("LargeClass")
 class AppBackupSerializerTest {
 
     private val fullBackupSettings = BackupSettings(
@@ -294,6 +295,273 @@ class AppBackupSerializerTest {
         assertEquals(25, slot.keepaliveSeconds)
         assertEquals(null, slot.awgS3)
         assertEquals(null, slot.awgI1Hex)
+    }
+
+    @Test
+    fun `warp serializer preserves optional amnezia fields when present`() {
+        val json = JSONObject()
+            .put("id", "slot")
+            .put("name", "Slot")
+            .put("isActive", true)
+            .put("priv", "priv")
+            .put("pub", "pub")
+            .put("peerPub", "peer")
+            .put("peerEndpoint", "1.2.3.4:2408")
+            .put("ifaceV4", "172.16.0.2/32")
+            .put("ifaceV6", "2606:4700:110::2/128")
+            .put("license", "license")
+            .put("mtu", 1420)
+            .put("keepalive", 30)
+            .put("awgS3", 0)
+            .put("awgS4", 4)
+            .put("awgI1", 1)
+            .put("awgI2", 2)
+            .put("awgI3", 3)
+            .put("awgI4", 4)
+            .put("awgI5", 5)
+            .put("awgI1Hex", "01")
+            .put("awgI2Hex", "02")
+            .put("awgI3Hex", "03")
+            .put("awgI4Hex", "04")
+            .put("awgI5Hex", "05")
+
+        val slot = BackupWarpSerializer.fromJson(json)
+        val serialized = BackupWarpSerializer.toJson(slot)
+
+        assertEquals(true, slot.isActive)
+        assertEquals(1420, slot.mtu)
+        assertEquals(30, slot.keepaliveSeconds)
+        assertEquals(0, slot.awgS3)
+        assertEquals(4, slot.awgS4)
+        assertEquals(1, slot.awgI1)
+        assertEquals(5, slot.awgI5)
+        assertEquals("01", slot.awgI1Hex)
+        assertEquals("05", slot.awgI5Hex)
+        assertTrue(serialized.has("awgS3"))
+        assertTrue(serialized.has("awgI5Hex"))
+    }
+
+    @Test
+    fun `warp serializer omits absent optional amnezia fields`() {
+        val json = BackupWarpSerializer.toJson(
+            fullBackupWarpSlot.copy(
+                awgS3 = null,
+                awgS4 = null,
+                awgI1 = null,
+                awgI2 = null,
+                awgI3 = null,
+                awgI4 = null,
+                awgI5 = null,
+                awgI1Hex = null,
+                awgI2Hex = null,
+                awgI3Hex = null,
+                awgI4Hex = null,
+                awgI5Hex = null,
+            ),
+        )
+
+        assertFalse(json.has("awgS3"))
+        assertFalse(json.has("awgS4"))
+        assertFalse(json.has("awgI1"))
+        assertFalse(json.has("awgI5Hex"))
+    }
+
+    @Test
+    fun `strategy deserializer applies defaults for absent arrays and settings`() {
+        val data = AppBackupSerializer.deserialize(
+            """
+            {
+              "version": ${AppBackupData.CURRENT_VERSION},
+              "strategy": {}
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(BackupStrategy(), data.strategy)
+    }
+
+    @Test
+    fun `strategy deserializer keeps false booleans and blank optional names nullable`() {
+        val data = AppBackupSerializer.deserialize(
+            """
+            {
+              "version": ${AppBackupData.CURRENT_VERSION},
+              "strategy": {
+                "settings": {
+                  "useCustomStrategies": false,
+                  "customStrategies": "",
+                  "evolutionMode": false,
+                  "evolutionMutationRate": 0.25,
+                  "evolutionTargetFitness": 0.75
+                },
+                "domainLists": [
+                  {"id": "dl", "name": "Domains"}
+                ],
+                "savedStrategies": [
+                  {"id": "saved", "command": "cmd", "name": ""}
+                ]
+              }
+            }
+            """.trimIndent(),
+        )
+
+        val strategy = requireNotNull(data.strategy)
+
+        assertEquals(false, strategy.settings?.useCustomStrategies)
+        assertEquals(null, strategy.settings?.customStrategies)
+        assertEquals(false, strategy.settings?.evolutionMode)
+        assertEquals(0.25f, strategy.settings?.evolutionMutationRate)
+        assertEquals(0.75f, strategy.settings?.evolutionTargetFitness)
+        assertEquals(
+            listOf(
+                BackupDomainList(
+                    id = "dl",
+                    name = "Domains",
+                    isActive = true,
+                    isBuiltIn = false,
+                    domains = emptyList(),
+                ),
+            ),
+            strategy.domainLists,
+        )
+        assertEquals(
+            listOf(BackupSavedStrategy(id = "saved", command = "cmd", name = null, isPinned = false)),
+            strategy.savedStrategies,
+        )
+    }
+
+    @Test
+    fun `urnetwork selected location empty object keeps nullable fields`() {
+        val data = AppBackupSerializer.deserialize(
+            """
+            {
+              "version": ${AppBackupData.CURRENT_VERSION},
+              "urnetwork": {
+                "selectedLocation": {}
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(BackupUrnetworkLocation(), data.urnetwork.selectedLocation)
+    }
+
+    @Test
+    fun `serialize writes selected location only with present nested fields`() {
+        val json = JSONObject(
+            AppBackupSerializer.serialize(
+                minimalBackupData.copy(
+                    urnetwork = BackupUrnetwork(
+                        selectedLocation = BackupUrnetworkLocation(
+                            countryCode = null,
+                            region = "Bavaria",
+                            city = "Munich",
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val location = json.getJSONObject("urnetwork").getJSONObject("selectedLocation")
+
+        assertFalse(location.has("countryCode"))
+        assertEquals("Bavaria", location.getString("region"))
+        assertEquals("Munich", location.getString("city"))
+    }
+
+    @Test
+    fun `settings serializer preserves every nullable bucket when present`() {
+        val json = BackupSettingsSerializer.serialize(fullBackupSettings)
+        val restored = BackupSettingsSerializer.deserialize(json)
+
+        assertEquals(fullBackupSettings, restored)
+        assertEquals(false, restored.autoStart)
+        assertEquals(false, restored.bydpiDefaultAccepted)
+    }
+
+    @Test
+    fun `settings deserializer treats blank strings as absent and false booleans as present`() {
+        val settings = BackupSettingsSerializer.deserialize(
+            JSONObject()
+                .put("splitMode", "")
+                .put("manualEngine", "")
+                .put("bydpiWinningArgs", "")
+                .put("urnetworkJwt", "")
+                .put("customDnsServers", "")
+                .put("hostsMode", "")
+                .put("hostsList", "")
+                .put("uiLocaleTag", "")
+                .put("appMode", "")
+                .put("engineAutoPriority", "")
+                .put("trafficMode", "")
+                .put("bydpiUiSettingsJson", "")
+                .put("urnetworkCountryCode", "")
+                .put("fptnToken", "")
+                .put("ipv6Enabled", false)
+                .put("autoStart", false)
+                .put("urnetworkEnabled", false)
+                .put("bydpiUseUiMode", false)
+                .put("bydpiDefaultAccepted", false),
+        )
+
+        assertEquals(
+            BackupSettings(
+                splitMode = null,
+                ipv6Enabled = false,
+                autoStart = false,
+                manualEngine = null,
+                bydpiWinningArgs = null,
+                urnetworkEnabled = false,
+                urnetworkJwt = null,
+                customDnsServers = null,
+                hostsMode = null,
+                hostsList = null,
+                uiLocaleTag = null,
+                appMode = null,
+                bydpiUseUiMode = false,
+                bydpiDefaultAccepted = false,
+            ),
+            settings,
+        )
+    }
+
+    @Test
+    fun `strategy serializer writes nullable settings and optional saved strategy name`() {
+        val json = BackupStrategySerializer.serialize(fullBackupStrategy)
+        val restored = BackupStrategySerializer.deserialize(json)
+
+        assertEquals(fullBackupStrategy, restored)
+        assertTrue(json.getJSONArray("savedStrategies").getJSONObject(0).has("name"))
+        assertEquals(500L, restored.settings?.delayBetweenMs)
+        assertEquals("alpha", restored.settings?.customStrategies)
+        assertEquals(listOf("one.example", "two.example"), restored.domainLists.single().domains)
+    }
+
+    @Test
+    fun `strategy serializer omits absent settings and saved strategy names`() {
+        val strategy = BackupStrategy(
+            settings = BackupStrategySettings(),
+            savedStrategies = listOf(BackupSavedStrategy(id = "saved", command = "cmd")),
+        )
+        val json = BackupStrategySerializer.serialize(strategy)
+        val restored = BackupStrategySerializer.deserialize(json)
+
+        assertEquals(strategy, restored)
+        assertFalse(json.getJSONArray("savedStrategies").getJSONObject(0).has("name"))
+        assertEquals(emptyList(), restored.domainLists)
+    }
+
+    @Test
+    fun `base64 text handles padding whitespace and invalid input`() {
+        assertEquals("", Base64Text.encode(byteArrayOf()))
+        assertEquals("AQ==", Base64Text.encode(byteArrayOf(1)))
+        assertEquals("AQI=", Base64Text.encode(byteArrayOf(1, 2)))
+        assertEquals("AQID", Base64Text.encode(byteArrayOf(1, 2, 3)))
+        assertEquals(listOf(1, 2), Base64Text.decode("AQ\nI=").map { it.toInt() })
+
+        val badLength = assertFailsWith<IllegalArgumentException> { Base64Text.decode("A") }
+        val badChar = assertFailsWith<IllegalArgumentException> { Base64Text.decode("????") }
+        assertTrue(badLength.message.orEmpty().contains("bad base64 length"))
+        assertTrue(badChar.message.orEmpty().contains("bad base64 char"))
     }
 
     @Test
