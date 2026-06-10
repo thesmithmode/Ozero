@@ -39,6 +39,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@Suppress("LargeClass")
 class SingboxEngineSettingsViewModelCoverageTest {
 
     private val sortOrderKey = intPreferencesKey("singbox_sort_order")
@@ -472,10 +473,14 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `restore defaults reads preset asset and clears restore error`() = runTest {
         val harness = Harness()
-        every { harness.appContext.assets.open("singbox/preset_groups.json") } returns ByteArrayInputStream(
-            """{"groups":[{"name":"Preset A","url":"https://example.com/a"},{"name":"Preset B","url":"https://example.com/b"}]}"""
-                .toByteArray(),
-        )
+        val json = """
+            {"groups":[
+                {"name":"Preset A","url":"https://example.com/a"},
+                {"name":"Preset B","url":"https://example.com/b"}
+            ]}
+        """.trimIndent()
+        every { harness.appContext.assets.open("singbox/preset_groups.json") } returns
+            ByteArrayInputStream(json.toByteArray())
         harness.startStateCollection()
         advanceUntilIdle()
 
@@ -653,7 +658,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         harness.viewModel.onImportFromFile(
             """
                 vless://12345678-1234-1234-1234-123456789abc@vless.example.com:443?type=tcp#VLESS
-                vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsInBvcnQiOjQ0MywiaWQiOiIxMjM0NTY3OC0xMjM0LTEyMzQtMTIzNC0xMjM0NTY3ODlhYmMiLCJhaWQiOjAsIm5ldCI6InRjcCIsInR5cGUiOiJub25lIiwicHMiOiJWTWVzcyJ9
+                $VMESS_LINK
                 trojan://secret@trojan.example.com:443#Trojan
                 ss://YWVzLTI1Ni1nY206c2VjcmV0@ss.example.com:8388#SS
             """.trimIndent(),
@@ -698,6 +703,115 @@ class SingboxEngineSettingsViewModelCoverageTest {
         assertEquals(listOf("One.example.com", "Two.example.com"), harness.probeCalls)
         assertEquals(listOf(101L), harness.viewModel.state.value.groupProfiles.getValue(1L).map { it.id })
         assertFalse(harness.viewModel.state.value.isAutoSelecting)
+    }
+
+    @Test
+    fun `add group field updates are partial and preserve previous values`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onAddGroupFieldChanged(name = "First")
+        harness.viewModel.onAddGroupFieldChanged(url = "https://example.com/sub")
+        advanceUntilIdle()
+
+        assertEquals("First", harness.viewModel.state.value.addGroupName)
+        assertEquals("https://example.com/sub", harness.viewModel.state.value.addGroupUrl)
+    }
+
+    @Test
+    fun `manual links group name update preserves parse error and input update clears it`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onManualLinksFieldChanged(input = "broken")
+        harness.viewModel.onConfirmManualLinks()
+        harness.viewModel.onManualLinksFieldChanged(groupName = "Manual group")
+        advanceUntilIdle()
+
+        assertEquals("parse", harness.viewModel.state.value.manualLinksError)
+        assertEquals("Manual group", harness.viewModel.state.value.manualLinksGroupName)
+
+        harness.viewModel.onManualLinksFieldChanged(input = "still broken")
+        advanceUntilIdle()
+
+        assertNull(harness.viewModel.state.value.manualLinksError)
+        assertEquals("Manual group", harness.viewModel.state.value.manualLinksGroupName)
+    }
+
+    @Test
+    fun `add menu toggles independently from dialogs`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onShowAddMenu(true)
+        assertTrue(harness.viewModel.state.value.showAddMenu)
+
+        harness.viewModel.onShowAddManualLinksDialog(true)
+        assertFalse(harness.viewModel.state.value.showAddMenu)
+        assertTrue(harness.viewModel.state.value.showAddManualLinksDialog)
+
+        harness.viewModel.onShowAddMenu(true)
+        harness.viewModel.onShowAddMenu(false)
+        assertFalse(harness.viewModel.state.value.showAddMenu)
+    }
+
+    @Test
+    fun `expanding or refreshing missing group is no-op`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onGroupExpand(99L)
+        harness.viewModel.onRefresh(99L)
+        advanceUntilIdle()
+
+        assertEquals(99L, harness.viewModel.state.value.expandedGroupId)
+        assertTrue(harness.viewModel.state.value.groupProfiles.getValue(99L).isEmpty())
+        assertTrue(harness.viewModel.state.value.groupRefreshErrors.isEmpty())
+        coVerify(exactly = 0) { harness.rawUpdater.refresh(any()) }
+    }
+
+    @Test
+    fun `onPing without group probes every non empty group`() = runTest {
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0), group(id = 2L, userOrder = 1)),
+            initialProfiles = listOf(
+                profile(id = 111L, groupId = 1L, name = "One", userOrder = 0),
+                profile(id = 222L, groupId = 2L, name = "Two", userOrder = 0),
+            ),
+        )
+        harness.startStateCollection()
+        advanceUntilIdle()
+
+        harness.viewModel.onPing()
+        advanceUntilIdle()
+
+        assertEquals(listOf("One.example.com", "Two.example.com"), harness.probeCalls)
+        assertTrue(harness.viewModel.state.value.isPinging.isEmpty())
+        assertTrue(harness.viewModel.state.value.testingProfileIds.isEmpty())
+    }
+
+    @Test
+    fun `onPing refreshes expanded group profiles after probe updates latency`() = runTest {
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0)),
+            initialProfiles = listOf(profile(id = 121L, groupId = 1L, name = "Before", userOrder = 0)),
+        )
+        harness.startStateCollection()
+        advanceUntilIdle()
+        harness.viewModel.onGroupExpand(1L)
+        advanceUntilIdle()
+
+        harness.profilesFlow.value = listOf(profile(id = 121L, groupId = 1L, name = "After", userOrder = 0))
+        harness.viewModel.onPing(1L)
+        advanceUntilIdle()
+
+        assertEquals(listOf("After.example.com"), harness.probeCalls)
+        assertEquals("After", harness.viewModel.state.value.groupProfiles.getValue(1L).single().name)
+        assertTrue(harness.viewModel.state.value.testingProfileIds.isEmpty())
     }
 
     private fun group(id: Long, userOrder: Int): SubscriptionGroup =
@@ -913,5 +1027,12 @@ class SingboxEngineSettingsViewModelCoverageTest {
             calls += bean.serverAddress
             return 1
         }
+    }
+
+    private companion object {
+        const val VMESS_LINK =
+            "vmess://eyJhZGQiOiJ2bWVzcy5leGFtcGxlLmNvbSIsInBvcnQiOjQ0MywiaWQiOiIxMjM0NTY3OC0" +
+                "xMjM0LTEyMzQtMTIzNC0xMjM0NTY3ODlhYmMiLCJhaWQiOjAsIm5ldCI6InRjcCIsInR5cGUiOiJu" +
+                "b25lIiwicHMiOiJWTWVzcyJ9"
     }
 }

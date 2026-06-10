@@ -64,7 +64,7 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
-    fun `health degraded without killswitch keeps connection and does not stop`() = runTest(UnconfinedTestDispatcher()) {
+    fun `degraded health without killswitch keeps connection`() = runTest(UnconfinedTestDispatcher()) {
         val health = degradingHealthMonitor()
         val stopCount = AtomicReference(0)
         val controller = connectedController(EngineId.BYEDPI)

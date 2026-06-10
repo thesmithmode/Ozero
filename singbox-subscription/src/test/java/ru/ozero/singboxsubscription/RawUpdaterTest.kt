@@ -373,6 +373,24 @@ class RawUpdaterTest {
     }
 
     @Test
+    fun `should preserve profile id when subscription renames same server`() = runBlocking {
+        val renamed =
+            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443?type=tcp&security=none#Renamed"
+        server.enqueue(MockResponse().setBody(vless1))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val first = profileDao.profiles.single()
+
+        server.enqueue(MockResponse().setBody(renamed))
+        rawUpdater.refresh(g)
+        val second = profileDao.profiles.single()
+
+        assertEquals(first.id, second.id)
+        assertEquals("Renamed", second.name)
+    }
+
+    @Test
     fun `should not reuse the same existing id for duplicate stable matches`() = runBlocking {
         val duplicate1 =
             "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup.example.com:443?type=tcp&security=none#Dup"

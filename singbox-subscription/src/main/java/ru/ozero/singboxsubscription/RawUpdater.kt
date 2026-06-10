@@ -118,7 +118,6 @@ private fun ProxyProfile.stableIdentityKey(): String =
     listOf(
         groupId.toString(),
         protocolType.toString(),
-        name.trim(),
         runCatching { KryoSerializer.deserialize<AbstractBean>(beanBlob) }
             .getOrNull()
             ?.let { "${it.serverAddress}|${it.serverPort}" }

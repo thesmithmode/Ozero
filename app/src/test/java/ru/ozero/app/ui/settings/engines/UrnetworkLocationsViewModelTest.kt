@@ -24,6 +24,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("LargeClass")
 class UrnetworkLocationsViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
@@ -196,7 +197,8 @@ class UrnetworkLocationsViewModelTest {
         )
         assertTrue(
             updateBody.contains("filtered.bestMatches"),
-            "updateLocations обязан читать filtered.bestMatches — иначе SDK top-matches не попадают в UI (Москва пустая при поиске)",
+            "updateLocations обязан читать filtered.bestMatches — иначе SDK top-matches " +
+                "не попадают в UI (Москва пустая при поиске)",
         )
     }
 
