@@ -78,7 +78,7 @@ In v0.2.8/v0.2.9, subscription URLs were not being accepted by the input field. 
 
 ### Karing Reference
 
-The Karing reference implementation (`C:\Soft\Projects\Ozero\.claude\Контекст\karing`) provides a subscription input UI that accepts URLs, files, and clipboard content. It may be used as a reference for the T8 subscription input redesign.
+The Karing reference implementation (`<local-reference>/karing`) provides a subscription input UI that accepts URLs, files, and clipboard content. It may be used as a reference for the T8 subscription input redesign.
 
 ## Related Concepts
 
