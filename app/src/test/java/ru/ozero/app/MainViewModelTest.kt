@@ -50,6 +50,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
+@Suppress("LargeClass")
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
     private val dispatcher = StandardTestDispatcher()
