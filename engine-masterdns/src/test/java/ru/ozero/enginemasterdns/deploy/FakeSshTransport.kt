@@ -1,6 +1,6 @@
 package ru.ozero.enginemasterdns.deploy
 
-class FakeSshTransport : SshTransport {
+internal class FakeSshTransport : SshTransport {
     var connectShouldFail = false
     var authShouldFail = false
     private val commandResponses = mutableMapOf<String, ArrayDeque<String>>()

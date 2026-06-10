@@ -20,7 +20,7 @@ When split tunnel is enabled with at least one excluded application, IPv6-depend
 - **Scope**: WARP engine only (BLOCKLIST mode has a different code path from ALL-apps mode)
 - **Hypothesis**: `VpnService.Builder.allowFamily(AF_INET)` without `allowFamily(AF_INET6)` → Android silently drops IPv6 traffic not from an allowed family, preventing Gemini (which prefers IPv6) from connecting
 - **Proposed fix**: remove both `allowFamily` calls from `applyEngineTunSpec` — VPN routes (`addRoute`) already control which traffic enters the tunnel; `allowFamily` is redundant and creates implicit IPv6 blocking
-- **Log path for diagnosis**: `C:\Users\thesm\Downloads\ozero.log`
+- **Log path for diagnosis**: `<user-log>/ozero.log`
 
 ## Details
 

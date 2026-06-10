@@ -24,21 +24,21 @@ TOML double-quoted strings treat `\` as an escape character. Windows paths use `
 
 ### The Incident
 
-Codex agent added a JetBrains MCP entry to `~/.codex/config.toml`. The entry included Windows-style paths like `C:\Users\...\jetbrains-mcp-proxy.exe` written in double-quoted TOML strings. TOML requires all backslashes in double-quoted strings to be escaped as `\\`, so the unescaped path produced a parse error and Codex failed to start.
+Codex agent added a JetBrains MCP entry to `~/.codex/config.toml`. The entry included Windows-style paths like `<windows-user>\...\jetbrains-mcp-proxy.exe` written in double-quoted TOML strings. TOML requires all backslashes in double-quoted strings to be escaped as `\\`, so the unescaped path produced a parse error and Codex failed to start.
 
 ### TOML Quote Types
 
 ```toml
 # BROKEN: double-quoted string, backslash is escape char
-command = "C:\Users\thesm\AppData\Local\Programs\jetbrains-mcp-proxy.exe"
+command = "<local-programs>/jetbrains-mcp-proxy.exe"
 
 # FIXED: single-quoted literal string, backslash is literal
-command = 'C:\Users\thesm\AppData\Local\Programs\jetbrains-mcp-proxy.exe'
+command = '<local-programs>/jetbrains-mcp-proxy.exe'
 ```
 
 For any Windows path in TOML, single-quoted literals are always safe. Double-quoted strings require `\\` for every separator:
 ```toml
-command = "C:\\Users\\thesm\\AppData\\Local\\Programs\\jetbrains-mcp-proxy.exe"
+command = "<local-programs>/jetbrains-mcp-proxy.exe"
 ```
 
 ### Prevention for Automated Agents
