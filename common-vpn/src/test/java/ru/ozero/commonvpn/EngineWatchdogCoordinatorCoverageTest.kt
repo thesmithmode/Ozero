@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.ChainOrchestrator
@@ -129,10 +130,12 @@ class EngineWatchdogCoordinatorCoverageTest {
 
         watchdog.startPeerWatchdog(plugin.id)
         advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
+        runCurrent()
         advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_TIMEOUT_MS)
+        runCurrent()
+        watchdog.cancelWatchers()
 
         assertEquals(1, plugin.recoverCalls)
-        watchdog.cancelWatchers()
     }
 
     @Test
@@ -151,16 +154,23 @@ class EngineWatchdogCoordinatorCoverageTest {
 
         watchdog.startPeerWatchdog(plugin.id)
         advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
+        runCurrent()
         advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_TIMEOUT_MS * 2)
+        runCurrent()
+        watchdog.cancelWatchers()
 
         assertEquals(1, plugin.recoverCalls)
-        watchdog.cancelWatchers()
     }
 
     @Test
     fun `stagnation watchdog recovers after consecutive stagnant polls`() = runTest(UnconfinedTestDispatcher()) {
         val plugin = FakeWatchdogPlugin(recoverResults = listOf(EnginePlugin.RecoverResult.Success))
-        val controller = connectedController(plugin.id)
+        var clock = 1_000L
+        val controller = TunnelController(StatsStagnationMonitor(nowMs = { clock })).apply {
+            onProbing(plugin.id)
+            onConnecting(plugin.id)
+            onEngineStarted(plugin.id, socksPort = 1080)
+        }
         val watchdog = watchdog(
             scope = this,
             plugins = setOf(plugin),
@@ -170,12 +180,14 @@ class EngineWatchdogCoordinatorCoverageTest {
         )
 
         controller.updateStats(stats(txBytes = 100, rxBytes = 100, timestampMs = 1))
+        clock += StatsStagnationMonitor.STAGNATION_THRESHOLD_MS
         controller.updateStats(stats(txBytes = 100, rxBytes = 100, timestampMs = 2))
         watchdog.startStagnationWatchdog(plugin.id)
         advanceTimeBy(EngineWatchdogCoordinator.STAGNATION_RECOVER_THRESHOLD_MS)
+        runCurrent()
+        watchdog.cancelWatchers()
 
         assertEquals(1, plugin.recoverCalls)
-        watchdog.cancelWatchers()
     }
 
     @Test
