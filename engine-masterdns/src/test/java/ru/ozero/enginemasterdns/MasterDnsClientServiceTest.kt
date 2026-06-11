@@ -4,6 +4,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -52,6 +54,51 @@ class MasterDnsClientServiceTest {
         service.stop()
         assertEquals(MasterDnsClientState.Idle, service.state.first())
         assertTrue(process.destroyed)
+    }
+
+    @Test
+    fun `reader consumes stdout until truncation cap`(@TempDir tmp: Path) = runTest {
+        val output = (0..205).joinToString("\n") { "line-$it" }
+        val service = makeService(
+            tmp,
+            FakeProcess(alive = true, exitOutput = output),
+            StandardTestDispatcher(testScheduler),
+        )
+        service.start(runtime())
+        service.state.first { it is MasterDnsClientState.Running }
+        runCurrent()
+        val state = service.state.first()
+        assertTrue(state is MasterDnsClientState.Running)
+        service.stop()
+    }
+
+    @Test
+    fun `watchdog reports unexpected process exit`(@TempDir tmp: Path) = runTest {
+        val process = FakeProcess(alive = true)
+        val service = makeService(tmp, process, StandardTestDispatcher(testScheduler))
+        service.start(runtime())
+        service.state.first { it is MasterDnsClientState.Running }
+        process.alive = false
+        advanceTimeBy(500)
+        val state = service.state.first { it is MasterDnsClientState.Error }
+        assertEquals("masterdns exited unexpectedly", (state as MasterDnsClientState.Error).message)
+        service.stop()
+    }
+
+    @Test
+    fun `stop during startup cancels launch and kills process`(@TempDir tmp: Path) = runTest {
+        val process = FakeProcess(alive = true)
+        val service = makeService(
+            tmp,
+            process,
+            StandardTestDispatcher(testScheduler),
+            startupCheckMs = 1_000,
+        )
+        service.start(runtime())
+        runCurrent()
+        service.stop()
+        assertTrue(process.destroyed)
+        assertEquals(MasterDnsClientState.Idle, service.state.first())
     }
 
     @Test
@@ -129,6 +176,7 @@ class MasterDnsClientServiceTest {
         tmp: Path,
         process: FakeProcess,
         dispatcher: CoroutineDispatcher,
+        startupCheckMs: Long = 1,
     ): MasterDnsClientService {
         val workDir = File(tmp.toFile(), "masterdns")
         return MasterDnsClientService(
@@ -145,13 +193,13 @@ class MasterDnsClientServiceTest {
                 }
             },
             writer = MasterDnsConfigWriter(workDir),
-            startupCheckMs = 1,
+            startupCheckMs = startupCheckMs,
             ioDispatcher = dispatcher,
         )
     }
 
     private class FakeProcess(
-        private val alive: Boolean,
+        var alive: Boolean,
         private val exitOutput: String = "",
     ) : Process() {
         var destroyed = false
