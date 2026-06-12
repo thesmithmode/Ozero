@@ -8,8 +8,9 @@ sources:
   - "daily/2026-05-20.md"
   - "daily/2026-05-23.md"
   - "daily/2026-05-27.md"
+  - "daily/2026-05-18.md"
 created: 2026-04-29
-updated: 2026-05-27
+updated: 2026-06-12
 ---
 
 # Release Process
@@ -109,6 +110,7 @@ Pipeline steps that download binaries from upstream GitHub releases must use ver
 - [[daily/2026-04-29.md]] - v1.0.5 tag created after third CI run; release watcher killed before APK build confirmed
 - [[daily/2026-05-04.md]] - Session 12:05: prerelease = contains(tag, '-') logic confirmed; v0.0.2 full release (no hyphen); tag recreated twice (OkHttp fix + stub removal)
 - [[daily/2026-05-20.md]] - KB audit (18:43): arm64-v8a only constraint confirmed; "universal APK" in old summary was misleading — universal means single APK for all users, not multi-ABI; other ABIs excluded because libhev/libam-go/libbyedpi/libmtg are arm64-v8a only
+- [[daily/2026-05-18.md]] - Session 10:41: v0.1.1 release failed because the `libmtg.so` sentinel still expected three ABIs; fix aligned it with arm64-v8a-only APK packaging and updated stale ABI instructions
 - [[daily/2026-05-23.md]] - Session 20:44: v0.2.0 regression — `actions/checkout` without `fetch-depth: 0` → shallow clone → `git rev-list --count HEAD = 1` → `versionCode=1` → Android `INSTALL_FAILED_VERSION_DOWNGRADE`; fix: `fetch-depth: 0` + sentinel assert `versionCode > 1` in pipeline (commit `75e72b48`)
 - [[daily/2026-05-25.md]] - GitHub force-push on existing tag → HTTP 500; safe path: delete via API + POST new tag; used during v0.2.3 re-release (singbox go.Seq fix)
 - [[daily/2026-05-27.md]] - 8 failed release runs debugging: byedpi asset name mismatch, deb heredoc variable trap, Windows gradlew shell, R8 OOM on macOS/Windows runners; v0.2.12 successfully released with all 4 artifacts

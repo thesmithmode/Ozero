@@ -5,7 +5,7 @@ tags: [byedpi, native, jni, gotcha, architecture]
 sources:
   - "daily/2026-05-18.md"
 created: 2026-05-18
-updated: 2026-05-18
+updated: 2026-06-12
 ---
 
 # ByeDPI Stale server_fd: Unconditional forceClose in Stop and Failure Paths
@@ -19,6 +19,7 @@ updated: 2026-05-18
 - Production evidence: 10+ consecutive `jniStartProxy завершился с кодом -1` in ozero.log (2026-05-15 01:33–01:40), single `jniForceClose` (line 15254) recovered connection 4 min later
 - `EvolutionEngine` 0% fitness = same root cause: 600 start/stop cycles accumulate stale fds → all `EvalResult.startFailed=true` → fitness 0
 - Fix: remove `if (proxyJob.isActive)` guard — always `join + forceClose` in both `stop()` and `start()` failure path
+- Later review found the same stale-fd class in `start()` pre-flight cleanup: a prior job that already returned `-1` still needs unconditional `forceClose` after `join`
 - Existing test `startFailureNoStopProxyWhenProxyReturnedErrorImmediately` was inverted — it proved the bug as "expected behavior"
 
 ## Details
@@ -60,6 +61,10 @@ This is an instance of [[concepts/sentinel-protecting-bug-trap]]: a test guardin
 
 `jniForceClose` is safe to call multiple times — when `server_fd < 0` (already closed), it's a no-op. This means unconditional calls in both `stop()` and `start()` failure paths don't create double-close issues.
 
+### Pre-Flight Cleanup Uses the Same Rule
+
+The same pattern later appeared in `ByeDpiEngine.start()` pre-flight. If an old proxy job had already returned `-1` during `withTimeoutOrNull`, `oldJob.isActive` was false, so the pre-flight branch skipped `forceClose`. That left `server_fd` stale before launching the next attempt. The review fix applied the same invariant everywhere: after joining a prior proxy job, call `forceClose` unconditionally.
+
 ## Related Concepts
 
 - [[concepts/byedpi-jni-guard-hardening]] - Guard ownership prevents `jniForceClose` from releasing `g_proxy_running`; this article covers a different fd lifecycle issue
@@ -70,3 +75,4 @@ This is an instance of [[concepts/sentinel-protecting-bug-trap]]: a test guardin
 ## Sources
 
 - [[daily/2026-05-18.md]] - Session 12:06: 10 consecutive -1 fails in prod log, single jniForceClose recovery, 0% evolution fitness traced to same root cause; conditional `if (proxyJob.isActive)` removed; test inverted; committed as fix
+- [[daily/2026-05-18.md]] - Sessions 16:59 and 19:55: code review found the same `isActive` gate in start pre-flight; fix made pre-flight `forceClose` unconditional after join
