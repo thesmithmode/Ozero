@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
-import org.robolectric.RuntimeEnvironment
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.ExitNodeStrategy
@@ -423,7 +422,7 @@ class SingboxEngineProbeTest {
         )
 
     private fun unboundContext(): Context =
-        object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+        object : ContextWrapper(mockk(relaxed = true)) {
             override fun bindService(service: Intent, conn: ServiceConnection, flags: Int): Boolean = false
             override fun unbindService(conn: ServiceConnection) = Unit
         }

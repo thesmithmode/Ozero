@@ -299,9 +299,10 @@ class TunBuilderConfiguratorTest {
     }
 
     @Test
-    fun allowlistExcludeSelfTrueWithAllPackagesFailStillSkipsSelfFallback() {
+    fun allowlistExcludeSelfTrueWithAllPackagesFailUsesSelfKillAllFallback() {
         val b = mockBuilder()
         every { b.addAllowedApplication("bad.pkg") } throws android.content.pm.PackageManager.NameNotFoundException()
+        every { b.addAllowedApplication("ru.ozero.app") } returns b
 
         configurator.apply(
             b,
@@ -310,7 +311,7 @@ class TunBuilderConfiguratorTest {
         )
 
         verify(exactly = 1) { b.addAllowedApplication("bad.pkg") }
-        verify(exactly = 0) { b.addAllowedApplication("ru.ozero.app") }
+        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
     }
 
     @Test

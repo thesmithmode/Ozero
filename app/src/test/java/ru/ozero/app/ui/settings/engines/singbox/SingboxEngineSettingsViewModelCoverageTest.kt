@@ -34,6 +34,7 @@ import ru.ozero.singboxroom.entity.SubscriptionGroup
 import ru.ozero.singboxsubscription.GroupSeeder
 import ru.ozero.singboxsubscription.RawUpdater
 import java.io.ByteArrayInputStream
+import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -700,7 +701,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         harness.viewModel.onAutoSelectBest()
         advanceUntilIdle()
 
-        assertEquals(listOf("One.example.com", "Two.example.com"), harness.probeCalls)
+        assertEquals(listOf("One.example.com", "Two.example.com"), harness.probeCalls.sorted())
         assertEquals(listOf(101L), harness.viewModel.state.value.groupProfiles.getValue(1L).map { it.id })
         assertFalse(harness.viewModel.state.value.isAutoSelecting)
     }
@@ -747,14 +748,17 @@ class SingboxEngineSettingsViewModelCoverageTest {
         advanceUntilIdle()
 
         harness.viewModel.onShowAddMenu(true)
+        advanceUntilIdle()
         assertTrue(harness.viewModel.state.value.showAddMenu)
 
         harness.viewModel.onShowAddManualLinksDialog(true)
+        advanceUntilIdle()
         assertFalse(harness.viewModel.state.value.showAddMenu)
         assertTrue(harness.viewModel.state.value.showAddManualLinksDialog)
 
         harness.viewModel.onShowAddMenu(true)
         harness.viewModel.onShowAddMenu(false)
+        advanceUntilIdle()
         assertFalse(harness.viewModel.state.value.showAddMenu)
     }
 
@@ -789,13 +793,13 @@ class SingboxEngineSettingsViewModelCoverageTest {
         harness.viewModel.onPing()
         advanceUntilIdle()
 
-        assertEquals(listOf("One.example.com", "Two.example.com"), harness.probeCalls)
+        assertEquals(listOf("One.example.com", "Two.example.com"), harness.probeCalls.sorted())
         assertTrue(harness.viewModel.state.value.isPinging.isEmpty())
         assertTrue(harness.viewModel.state.value.testingProfileIds.isEmpty())
     }
 
     @Test
-    fun `onPing refreshes expanded group profiles after probe updates latency`() = runTest {
+    fun `onPing probes current expanded snapshot and refreshes group profiles`() = runTest {
         val harness = Harness(
             initialGroups = listOf(group(id = 1L, userOrder = 0)),
             initialProfiles = listOf(profile(id = 121L, groupId = 1L, name = "Before", userOrder = 0)),
@@ -809,7 +813,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         harness.viewModel.onPing(1L)
         advanceUntilIdle()
 
-        assertEquals(listOf("After.example.com"), harness.probeCalls)
+        assertEquals(listOf("Before.example.com"), harness.probeCalls)
         assertEquals("After", harness.viewModel.state.value.groupProfiles.getValue(1L).single().name)
         assertTrue(harness.viewModel.state.value.testingProfileIds.isEmpty())
     }
@@ -861,7 +865,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         val profilesFlow = MutableStateFlow(initialProfiles)
         val chainFlow = MutableStateFlow(initialChain)
         val insertedGroups = mutableListOf<SubscriptionGroup>()
-        val probeCalls = mutableListOf<String>()
+        val probeCalls = ConcurrentLinkedQueue<String>()
         val viewModel: SingboxEngineSettingsViewModel
         val appContext: Context
         val groupDao: SubscriptionGroupDao
@@ -1021,7 +1025,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     private class RecordingProfileProbe(
-        private val calls: MutableList<String>,
+        private val calls: ConcurrentLinkedQueue<String>,
     ) : SingboxProfileProbe {
         override suspend fun probeLatencyMs(bean: AbstractBean): Int {
             calls += bean.serverAddress

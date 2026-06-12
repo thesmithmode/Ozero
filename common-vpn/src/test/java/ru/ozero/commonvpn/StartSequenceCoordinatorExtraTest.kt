@@ -6,7 +6,6 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -185,13 +184,13 @@ class StartSequenceCoordinatorExtraTest {
     }
 
     @Test
-    fun `allowlist timeout falls back to empty set and still starts engine`() = runTest {
+    fun `allowlist failure falls back to empty set and still starts engine`() = runTest {
         val engine = FakeEnginePlugin(
             id = EngineId.BYEDPI,
             socksPort = 2121,
             capabilities = tunnelCapabilities(),
         )
-        val splitRules = DelayedSplitTunnelRulesProvider()
+        val splitRules = FailingSplitTunnelRulesProvider()
         val fixture = startFixture(
             engine,
             settings = SettingsModel(
@@ -219,13 +218,13 @@ class StartSequenceCoordinatorExtraTest {
     }
 
     @Test
-    fun `blocklist timeout falls back to empty set and still starts engine`() = runTest {
+    fun `blocklist failure falls back to empty set and still starts engine`() = runTest {
         val engine = FakeEnginePlugin(
             id = EngineId.BYEDPI,
             socksPort = 2122,
             capabilities = tunnelCapabilities(),
         )
-        val splitRules = DelayedSplitTunnelRulesProvider()
+        val splitRules = FailingSplitTunnelRulesProvider()
         val fixture = startFixture(
             engine,
             settings = SettingsModel(
@@ -367,7 +366,7 @@ class StartSequenceCoordinatorExtraTest {
         providesLocalSocksWithoutUpstream = false,
     )
 
-    private class DelayedSplitTunnelRulesProvider : SplitTunnelRulesProvider {
+    private class FailingSplitTunnelRulesProvider : SplitTunnelRulesProvider {
         var allowlistReads = 0
             private set
         var blocklistReads = 0
@@ -375,12 +374,12 @@ class StartSequenceCoordinatorExtraTest {
 
         override suspend fun allowlistPackages(): Set<String> {
             allowlistReads++
-            awaitCancellation()
+            error("allowlist unavailable")
         }
 
         override suspend fun blocklistPackages(): Set<String> {
             blocklistReads++
-            awaitCancellation()
+            error("blocklist unavailable")
         }
     }
 

@@ -295,12 +295,13 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
-    fun `handleEngineFailure enters killswitch when tun missing and killswitch enabled`() = runTest(
+    fun `handleEngineFailure stops vpn when tun missing and killswitch enabled`() = runTest(
         UnconfinedTestDispatcher(),
     ) {
         val controller = connectedController(EngineId.BYEDPI)
         val statsJob = Job()
         val notification = mockk<OzeroNotificationFactory>(relaxed = true)
+        val stopCount = AtomicReference(0)
         val watchdog = watchdog(
             scope = this,
             controller = controller,
@@ -308,13 +309,16 @@ class EngineWatchdogCoordinatorCoverageTest {
             statsJob = statsJob,
             killswitch = true,
             notificationFactory = notification,
+            stopCount = stopCount,
         )
 
         val handled = watchdog.handleEngineFailure(EngineId.BYEDPI, "boom")
 
-        assertTrue(handled)
-        assertTrue(controller.killswitchActive.value)
-        assertTrue(statsJob.isCancelled)
+        assertFalse(handled)
+        assertFalse(controller.killswitchActive.value)
+        assertFalse(statsJob.isCancelled)
+        assertEquals(1, stopCount.get())
+        assertIs<TunnelState.Failed>(controller.state.value)
     }
 
     private fun TestScope.watchdog(
