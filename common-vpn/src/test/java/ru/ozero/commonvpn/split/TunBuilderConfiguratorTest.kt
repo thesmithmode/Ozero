@@ -1,61 +1,49 @@
 package ru.ozero.commonvpn.split
 
-import android.net.VpnService
-import io.mockk.every
-import io.mockk.mockk
-import io.mockk.unmockkAll
-import io.mockk.verify
-import org.junit.jupiter.api.AfterEach
+import android.content.pm.PackageManager
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.settings.SplitTunnelMode
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 class TunBuilderConfiguratorTest {
 
     private val configurator = TunBuilderConfigurator(packageName = "ru.ozero.app")
 
-    private fun mockBuilder(): VpnService.Builder = mockk(relaxed = true)
-
-    @AfterEach
-    fun tearDown() {
-        unmockkAll()
-    }
-
     @Test
     fun allModeAddsDefaultRouteV4Only() {
-        val b = mockBuilder()
+        val b = recordingBuilder()
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.ALL))
-        verify(exactly = 1) { b.addRoute("0.0.0.0", 0) }
-        verify(exactly = 0) { b.addRoute("::", 0) }
-        verify(exactly = 0) { b.addAllowedApplication(any()) }
-        verify(exactly = 0) { b.addDisallowedApplication(any()) }
+        assertEquals(1, b.routeCalls.count { it == "0.0.0.0" to 0 })
+        assertEquals(0, b.routeCalls.count { it == "::" to 0 })
+        assertEquals(emptyList(), b.allowedCalls)
+        assertEquals(emptyList(), b.disallowedCalls)
     }
 
     @Test
     fun bypassLanAddsV4RoutesOnly() {
-        val b = mockBuilder()
+        val b = recordingBuilder()
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.BYPASS_LAN))
-        verify(exactly = 0) { b.addRoute("0.0.0.0", 0) }
-        verify { b.addRoute("8.0.0.0", 7) }
-        verify { b.addRoute("1.0.0.0", 8) }
-        verify(exactly = 0) { b.addRoute("2000::", 3) }
-        verify(exactly = 0) { b.addDisallowedApplication(any()) }
+        assertEquals(0, b.routeCalls.count { it == "0.0.0.0" to 0 })
+        assertEquals(1, b.routeCalls.count { it == "8.0.0.0" to 7 })
+        assertEquals(1, b.routeCalls.count { it == "1.0.0.0" to 8 })
+        assertEquals(0, b.routeCalls.count { it == "2000::" to 3 })
+        assertEquals(emptyList(), b.disallowedCalls)
     }
 
     @Test
     fun allowlistDoesNotAddIpv6Route() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication(any()) } returns b
+        val b = recordingBuilder()
         configurator.apply(
             b,
             SplitTunnelConfig(mode = SplitTunnelMode.ALLOWLIST, allowlist = setOf("com.x")),
         )
-        verify(exactly = 0) { b.addRoute("::", 0) }
+        assertEquals(0, b.routeCalls.count { it == "::" to 0 })
     }
 
     @Test
     fun allowlistIncludeSelfTrueSkipsKillAllFallbackAndAddsSelfOnlyOnce() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication(any()) } returns b
+        val b = recordingBuilder()
 
         configurator.apply(
             b,
@@ -66,17 +54,13 @@ class TunBuilderConfiguratorTest {
             excludeSelf = false,
         )
 
-        verify(exactly = 1) { b.addAllowedApplication("com.example.one") }
-        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
+        assertEquals(1, b.allowedCalls.count { it == "com.example.one" })
+        assertEquals(1, b.allowedCalls.count { it == "ru.ozero.app" })
     }
 
     @Test
     fun allowlistIncludeSelfTrueContinuesWhenSelfAddFails() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication("com.example.one") } returns b
-        every {
-            b.addAllowedApplication("ru.ozero.app")
-        } throws android.content.pm.PackageManager.NameNotFoundException()
+        val b = recordingBuilder(failedAllowed = setOf("ru.ozero.app"))
 
         configurator.apply(
             b,
@@ -87,25 +71,23 @@ class TunBuilderConfiguratorTest {
             excludeSelf = false,
         )
 
-        verify(exactly = 1) { b.addAllowedApplication("com.example.one") }
-        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
+        assertEquals(1, b.allowedCalls.count { it == "com.example.one" })
+        assertEquals(1, b.allowedCalls.count { it == "ru.ozero.app" })
     }
 
     @Test
     fun blocklistDoesNotAddIpv6Route() {
-        val b = mockBuilder()
-        every { b.addDisallowedApplication(any()) } returns b
+        val b = recordingBuilder()
         configurator.apply(
             b,
             SplitTunnelConfig(mode = SplitTunnelMode.BLOCKLIST, blocklist = setOf("com.x")),
         )
-        verify(exactly = 0) { b.addRoute("::", 0) }
+        assertEquals(0, b.routeCalls.count { it == "::" to 0 })
     }
 
     @Test
     fun allowlistAddsRouteAndPackages() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication(any()) } returns b
+        val b = recordingBuilder()
         configurator.apply(
             b,
             SplitTunnelConfig(
@@ -113,15 +95,14 @@ class TunBuilderConfiguratorTest {
                 allowlist = setOf("com.example.browser", "com.example.app"),
             ),
         )
-        verify(exactly = 1) { b.addRoute("0.0.0.0", 0) }
-        verify { b.addAllowedApplication("com.example.browser") }
-        verify { b.addAllowedApplication("com.example.app") }
+        assertEquals(1, b.routeCalls.count { it == "0.0.0.0" to 0 })
+        assertEquals(1, b.allowedCalls.count { it == "com.example.browser" })
+        assertEquals(1, b.allowedCalls.count { it == "com.example.app" })
     }
 
     @Test
     fun allowlistDefaultIncludesSelf() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication(any()) } returns b
+        val b = recordingBuilder()
         configurator.apply(
             b,
             SplitTunnelConfig(
@@ -129,14 +110,13 @@ class TunBuilderConfiguratorTest {
                 allowlist = setOf("ru.ozero.app", "com.example.x"),
             ),
         )
-        verify(exactly = 1) { b.addAllowedApplication("com.example.x") }
-        verify { b.addAllowedApplication("ru.ozero.app") }
+        assertEquals(1, b.allowedCalls.count { it == "com.example.x" })
+        assertEquals(1, b.allowedCalls.count { it == "ru.ozero.app" })
     }
 
     @Test
     fun blocklistDefaultDoesNotAddSelfToDisallowed() {
-        val b = mockBuilder()
-        every { b.addDisallowedApplication(any()) } returns b
+        val b = recordingBuilder()
         configurator.apply(
             b,
             SplitTunnelConfig(
@@ -144,18 +124,14 @@ class TunBuilderConfiguratorTest {
                 blocklist = setOf("com.bank.app"),
             ),
         )
-        verify(exactly = 1) { b.addRoute("0.0.0.0", 0) }
-        verify { b.addDisallowedApplication("com.bank.app") }
-        verify(exactly = 0) { b.addDisallowedApplication("ru.ozero.app") }
+        assertEquals(1, b.routeCalls.count { it == "0.0.0.0" to 0 })
+        assertEquals(1, b.disallowedCalls.count { it == "com.bank.app" })
+        assertEquals(0, b.disallowedCalls.count { it == "ru.ozero.app" })
     }
 
     @Test
     fun allowlistIgnoresPackageNotFoundAndContinuesWithOtherPackages() {
-        val b = mockBuilder()
-        every {
-            b.addAllowedApplication("missing.pkg")
-        } throws android.content.pm.PackageManager.NameNotFoundException()
-        every { b.addAllowedApplication("ok.pkg") } returns b
+        val b = recordingBuilder(failedAllowed = setOf("missing.pkg"))
 
         configurator.apply(
             b,
@@ -165,23 +141,21 @@ class TunBuilderConfiguratorTest {
             ),
         )
 
-        verify(exactly = 1) { b.addAllowedApplication("missing.pkg") }
-        verify(exactly = 1) { b.addAllowedApplication("ok.pkg") }
+        assertEquals(1, b.allowedCalls.count { it == "missing.pkg" })
+        assertEquals(1, b.allowedCalls.count { it == "ok.pkg" })
     }
 
     @Test
     fun allowlistEmptySetIncludesOnlySelf() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication(any()) } returns b
+        val b = recordingBuilder()
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.ALLOWLIST, allowlist = emptySet()))
-        verify(exactly = 1) { b.addRoute("0.0.0.0", 0) }
-        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
+        assertEquals(1, b.routeCalls.count { it == "0.0.0.0" to 0 })
+        assertEquals(1, b.allowedCalls.count { it == "ru.ozero.app" })
     }
 
     @Test
     fun allowlistExcludeSelfTrueSkipsSelf() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication(any()) } returns b
+        val b = recordingBuilder()
         configurator.apply(
             b,
             SplitTunnelConfig(
@@ -190,46 +164,39 @@ class TunBuilderConfiguratorTest {
             ),
             excludeSelf = true,
         )
-        verify(exactly = 0) { b.addAllowedApplication("ru.ozero.app") }
-        verify(exactly = 1) { b.addAllowedApplication("com.example.x") }
+        assertEquals(0, b.allowedCalls.count { it == "ru.ozero.app" })
+        assertEquals(1, b.allowedCalls.count { it == "com.example.x" })
     }
 
     @Test
     fun allModeExcludeSelfTrueAddsDisallowed() {
-        val b = mockBuilder()
-        every { b.addDisallowedApplication(any()) } returns b
+        val b = recordingBuilder()
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.ALL), excludeSelf = true)
-        verify(exactly = 1) { b.addDisallowedApplication("ru.ozero.app") }
+        assertEquals(1, b.disallowedCalls.count { it == "ru.ozero.app" })
     }
 
     @Test
     fun bypassLanExcludeSelfTrueAddsDisallowed() {
-        val b = mockBuilder()
-        every { b.addDisallowedApplication(any()) } returns b
+        val b = recordingBuilder()
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.BYPASS_LAN), excludeSelf = true)
-        verify(exactly = 1) { b.addDisallowedApplication("ru.ozero.app") }
+        assertEquals(1, b.disallowedCalls.count { it == "ru.ozero.app" })
     }
 
     @Test
     fun blocklistExcludeSelfTrueAddsSelfToDisallowed() {
-        val b = mockBuilder()
-        every { b.addDisallowedApplication(any()) } returns b
+        val b = recordingBuilder()
         configurator.apply(
             b,
             SplitTunnelConfig(mode = SplitTunnelMode.BLOCKLIST, blocklist = setOf("com.bank.app")),
             excludeSelf = true,
         )
-        verify { b.addDisallowedApplication("ru.ozero.app") }
-        verify { b.addDisallowedApplication("com.bank.app") }
+        assertEquals(1, b.disallowedCalls.count { it == "ru.ozero.app" })
+        assertEquals(1, b.disallowedCalls.count { it == "com.bank.app" })
     }
 
     @Test
     fun blocklistExcludeSelfTrueContinuesWhenSelfAddFails() {
-        val b = mockBuilder()
-        every { b.addDisallowedApplication("ok.pkg") } returns b
-        every {
-            b.addDisallowedApplication("ru.ozero.app")
-        } throws android.content.pm.PackageManager.NameNotFoundException()
+        val b = recordingBuilder(failedDisallowed = setOf("ru.ozero.app"))
 
         configurator.apply(
             b,
@@ -237,14 +204,13 @@ class TunBuilderConfiguratorTest {
             excludeSelf = true,
         )
 
-        verify(exactly = 1) { b.addDisallowedApplication("ru.ozero.app") }
-        verify(exactly = 1) { b.addDisallowedApplication("ok.pkg") }
+        assertEquals(1, b.disallowedCalls.count { it == "ru.ozero.app" })
+        assertEquals(1, b.disallowedCalls.count { it == "ok.pkg" })
     }
 
     @Test
     fun allowlistExcludeSelfTrueWithOnlySelfAddsSelfAsKillAllFallback() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication(any()) } returns b
+        val b = recordingBuilder()
 
         configurator.apply(
             b,
@@ -252,15 +218,14 @@ class TunBuilderConfiguratorTest {
             excludeSelf = true,
         )
 
-        verify(exactly = 1) { b.addRoute("0.0.0.0", 0) }
-        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
-        verify(exactly = 0) { b.addDisallowedApplication(any()) }
+        assertEquals(1, b.routeCalls.count { it == "0.0.0.0" to 0 })
+        assertEquals(1, b.allowedCalls.count { it == "ru.ozero.app" })
+        assertEquals(emptyList(), b.disallowedCalls)
     }
 
     @Test
     fun allowlistExcludeSelfTrueDoesNotFallbackWhenOtherPackagesSucceed() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication(any()) } returns b
+        val b = recordingBuilder()
 
         configurator.apply(
             b,
@@ -271,15 +236,14 @@ class TunBuilderConfiguratorTest {
             excludeSelf = true,
         )
 
-        verify(exactly = 1) { b.addAllowedApplication("com.example.one") }
-        verify(exactly = 1) { b.addAllowedApplication("com.example.two") }
-        verify(exactly = 0) { b.addAllowedApplication("ru.ozero.app") }
+        assertEquals(1, b.allowedCalls.count { it == "com.example.one" })
+        assertEquals(1, b.allowedCalls.count { it == "com.example.two" })
+        assertEquals(0, b.allowedCalls.count { it == "ru.ozero.app" })
     }
 
     @Test
     fun allowlistExcludeSelfTrueWithEmptySetAddsSelfAsKillAllFallback() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication(any()) } returns b
+        val b = recordingBuilder()
 
         configurator.apply(
             b,
@@ -287,29 +251,25 @@ class TunBuilderConfiguratorTest {
             excludeSelf = true,
         )
 
-        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
+        assertEquals(1, b.allowedCalls.count { it == "ru.ozero.app" })
     }
 
     @Test
     fun allowlistDefaultFallsBackToSelfWhenAllPackagesFail() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication("bad.pkg") } throws android.content.pm.PackageManager.NameNotFoundException()
-        every { b.addAllowedApplication("ru.ozero.app") } returns b
+        val b = recordingBuilder(failedAllowed = setOf("bad.pkg"))
 
         configurator.apply(
             b,
             SplitTunnelConfig(mode = SplitTunnelMode.ALLOWLIST, allowlist = setOf("bad.pkg")),
         )
 
-        verify(exactly = 1) { b.addAllowedApplication("bad.pkg") }
-        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
+        assertEquals(1, b.allowedCalls.count { it == "bad.pkg" })
+        assertEquals(1, b.allowedCalls.count { it == "ru.ozero.app" })
     }
 
     @Test
     fun allowlistExcludeSelfTrueWithAllPackagesFailUsesSelfKillAllFallback() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication("bad.pkg") } throws android.content.pm.PackageManager.NameNotFoundException()
-        every { b.addAllowedApplication("ru.ozero.app") } returns b
+        val b = recordingBuilder(failedAllowed = setOf("bad.pkg"))
 
         configurator.apply(
             b,
@@ -317,14 +277,13 @@ class TunBuilderConfiguratorTest {
             excludeSelf = true,
         )
 
-        verify(exactly = 1) { b.addAllowedApplication("bad.pkg") }
-        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
+        assertEquals(1, b.allowedCalls.count { it == "bad.pkg" })
+        assertEquals(1, b.allowedCalls.count { it == "ru.ozero.app" })
     }
 
     @Test
     fun allowlistExcludeSelfTrueDoesNotFallbackWhenAnyNonSelfPackageAdded() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication(any()) } returns b
+        val b = recordingBuilder()
 
         configurator.apply(
             b,
@@ -335,15 +294,14 @@ class TunBuilderConfiguratorTest {
             excludeSelf = true,
         )
 
-        verify(exactly = 1) { b.addAllowedApplication("com.example.one") }
-        verify(exactly = 1) { b.addAllowedApplication("com.example.two") }
-        verify(exactly = 0) { b.addAllowedApplication("ru.ozero.app") }
+        assertEquals(1, b.allowedCalls.count { it == "com.example.one" })
+        assertEquals(1, b.allowedCalls.count { it == "com.example.two" })
+        assertEquals(0, b.allowedCalls.count { it == "ru.ozero.app" })
     }
 
     @Test
     fun blocklistSkipsSelfEvenWhenPresentInConfig() {
-        val b = mockBuilder()
-        every { b.addDisallowedApplication(any()) } returns b
+        val b = recordingBuilder()
 
         configurator.apply(
             b,
@@ -353,18 +311,14 @@ class TunBuilderConfiguratorTest {
             ),
         )
 
-        verify(exactly = 0) { b.addDisallowedApplication("ru.ozero.app") }
-        verify(exactly = 1) { b.addDisallowedApplication("com.bank.app") }
-        verify(exactly = 1) { b.addDisallowedApplication("com.chat.app") }
+        assertEquals(0, b.disallowedCalls.count { it == "ru.ozero.app" })
+        assertEquals(1, b.disallowedCalls.count { it == "com.bank.app" })
+        assertEquals(1, b.disallowedCalls.count { it == "com.chat.app" })
     }
 
     @Test
     fun blocklistGracefullyIgnoresPackageNotFoundAndContinues() {
-        val b = mockBuilder()
-        every {
-            b.addDisallowedApplication("missing.pkg")
-        } throws android.content.pm.PackageManager.NameNotFoundException()
-        every { b.addDisallowedApplication("ok.pkg") } returns b
+        val b = recordingBuilder(failedDisallowed = setOf("missing.pkg"))
 
         configurator.apply(
             b,
@@ -374,17 +328,13 @@ class TunBuilderConfiguratorTest {
             ),
         )
 
-        verify(exactly = 1) { b.addDisallowedApplication("missing.pkg") }
-        verify(exactly = 1) { b.addDisallowedApplication("ok.pkg") }
+        assertEquals(1, b.disallowedCalls.count { it == "missing.pkg" })
+        assertEquals(1, b.disallowedCalls.count { it == "ok.pkg" })
     }
 
     @Test
     fun blocklistExcludeSelfTrueContinuesWhenSelfExclusionFails() {
-        val b = mockBuilder()
-        every {
-            b.addDisallowedApplication("ru.ozero.app")
-        } throws android.content.pm.PackageManager.NameNotFoundException()
-        every { b.addDisallowedApplication("ok.pkg") } returns b
+        val b = recordingBuilder(failedDisallowed = setOf("ru.ozero.app"))
 
         configurator.apply(
             b,
@@ -392,40 +342,33 @@ class TunBuilderConfiguratorTest {
             excludeSelf = true,
         )
 
-        verify(exactly = 1) { b.addDisallowedApplication("ru.ozero.app") }
-        verify(exactly = 1) { b.addDisallowedApplication("ok.pkg") }
+        assertEquals(1, b.disallowedCalls.count { it == "ru.ozero.app" })
+        assertEquals(1, b.disallowedCalls.count { it == "ok.pkg" })
     }
 
     @Test
     fun allModeExcludeSelfTrueContinuesWhenSelfExclusionFails() {
-        val b = mockBuilder()
-        every {
-            b.addDisallowedApplication("ru.ozero.app")
-        } throws android.content.pm.PackageManager.NameNotFoundException()
+        val b = recordingBuilder(failedDisallowed = setOf("ru.ozero.app"))
 
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.ALL), excludeSelf = true)
 
-        verify(exactly = 1) { b.addRoute("0.0.0.0", 0) }
-        verify(exactly = 1) { b.addDisallowedApplication("ru.ozero.app") }
+        assertEquals(1, b.routeCalls.count { it == "0.0.0.0" to 0 })
+        assertEquals(1, b.disallowedCalls.count { it == "ru.ozero.app" })
     }
 
     @Test
     fun bypassLanWithoutExcludeSelfDoesNotTouchApplications() {
-        val b = mockBuilder()
+        val b = recordingBuilder()
 
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.BYPASS_LAN), excludeSelf = false)
 
-        verify(exactly = 0) { b.addAllowedApplication(any()) }
-        verify(exactly = 0) { b.addDisallowedApplication(any()) }
+        assertEquals(emptyList(), b.allowedCalls)
+        assertEquals(emptyList(), b.disallowedCalls)
     }
 
     @Test
     fun gracefullyIgnoresPackageNotFound() {
-        val b = mockBuilder()
-        every {
-            b.addAllowedApplication("missing.pkg")
-        } throws android.content.pm.PackageManager.NameNotFoundException()
-        every { b.addAllowedApplication("ok.pkg") } returns b
+        val b = recordingBuilder(failedAllowed = setOf("missing.pkg"))
         configurator.apply(
             b,
             SplitTunnelConfig(
@@ -433,51 +376,80 @@ class TunBuilderConfiguratorTest {
                 allowlist = setOf("missing.pkg", "ok.pkg"),
             ),
         )
-        verify(exactly = 1) { b.addAllowedApplication("missing.pkg") }
-        verify(exactly = 1) { b.addAllowedApplication("ok.pkg") }
+        assertEquals(1, b.allowedCalls.count { it == "missing.pkg" })
+        assertEquals(1, b.allowedCalls.count { it == "ok.pkg" })
     }
 
     @Test
     fun defaultAllModeNeverExcludesSelfFromTun() {
-        val b = mockBuilder()
+        val b = recordingBuilder()
 
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.ALL))
 
-        verify(exactly = 0) { b.addDisallowedApplication("ru.ozero.app") }
+        assertFalse("ru.ozero.app" in b.disallowedCalls)
     }
 
     @Test
     fun defaultBypassLanModeNeverExcludesSelfFromTun() {
-        val b = mockBuilder()
+        val b = recordingBuilder()
 
         configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.BYPASS_LAN))
 
-        verify(exactly = 0) { b.addDisallowedApplication("ru.ozero.app") }
+        assertFalse("ru.ozero.app" in b.disallowedCalls)
     }
 
     @Test
     fun defaultAllowlistModeNeverExcludesSelfFromTun() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication(any()) } returns b
+        val b = recordingBuilder()
 
         configurator.apply(
             b,
             SplitTunnelConfig(mode = SplitTunnelMode.ALLOWLIST, allowlist = setOf("com.bank.app")),
         )
 
-        verify(exactly = 0) { b.addDisallowedApplication("ru.ozero.app") }
+        assertFalse("ru.ozero.app" in b.disallowedCalls)
     }
 
     @Test
     fun defaultBlocklistModeNeverExcludesSelfFromTun() {
-        val b = mockBuilder()
-        every { b.addDisallowedApplication(any()) } returns b
+        val b = recordingBuilder()
 
         configurator.apply(
             b,
             SplitTunnelConfig(mode = SplitTunnelMode.BLOCKLIST, blocklist = setOf("com.bank.app")),
         )
 
-        verify(exactly = 0) { b.addDisallowedApplication("ru.ozero.app") }
+        assertFalse("ru.ozero.app" in b.disallowedCalls)
+    }
+
+    private fun recordingBuilder(
+        failedAllowed: Set<String> = emptySet(),
+        failedDisallowed: Set<String> = emptySet(),
+    ) = RecordingBuilder(failedAllowed, failedDisallowed)
+
+    private class RecordingBuilder(
+        private val failedAllowed: Set<String>,
+        private val failedDisallowed: Set<String>,
+    ) : TunBuilder {
+        val routeCalls = mutableListOf<Pair<String, Int>>()
+        val allowedCalls = mutableListOf<String>()
+        val disallowedCalls = mutableListOf<String>()
+
+        override fun addRoute(address: String, prefixLength: Int): TunBuilder {
+            routeCalls += address to prefixLength
+            return this
+        }
+
+        override fun addAllowedApplication(packageName: String): TunBuilder {
+            allowedCalls += packageName
+            if (packageName in failedAllowed) throw PackageManager.NameNotFoundException()
+            return this
+        }
+
+        override fun addDisallowedApplication(packageName: String): TunBuilder {
+            disallowedCalls += packageName
+            if (packageName in failedDisallowed) throw PackageManager.NameNotFoundException()
+            return this
+        }
     }
 }

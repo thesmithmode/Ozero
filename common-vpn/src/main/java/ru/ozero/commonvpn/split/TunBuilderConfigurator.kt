@@ -17,6 +17,15 @@ class TunBuilderConfigurator(
         config: SplitTunnelConfig,
         excludeSelf: Boolean = false,
     ): VpnService.Builder {
+        apply(AndroidTunBuilder(builder), config, excludeSelf)
+        return builder
+    }
+
+    internal fun apply(
+        builder: TunBuilder,
+        config: SplitTunnelConfig,
+        excludeSelf: Boolean = false,
+    ): TunBuilder {
         when (config.mode) {
             SplitTunnelMode.ALL -> {
                 builder.addRoute("0.0.0.0", 0)
@@ -46,12 +55,12 @@ class TunBuilderConfigurator(
         return builder
     }
 
-    private fun excludeSelfFromTun(builder: VpnService.Builder) {
+    private fun excludeSelfFromTun(builder: TunBuilder) {
         runCatching { builder.addDisallowedApplication(packageName) }
             .onFailure { PersistentLoggers.error(TAG, "addDisallowedApplication self failed: ${it.message}") }
     }
 
-    private fun applyAllowed(builder: VpnService.Builder, packages: Set<String>, includeSelf: Boolean = false) {
+    private fun applyAllowed(builder: TunBuilder, packages: Set<String>, includeSelf: Boolean = false) {
         var added = 0
         var failed = 0
         for (pkg in packages) {
@@ -74,7 +83,7 @@ class TunBuilderConfigurator(
         }
     }
 
-    private fun applyDisallowed(builder: VpnService.Builder, packages: Set<String>) {
+    private fun applyDisallowed(builder: TunBuilder, packages: Set<String>) {
         var added = 0
         var failed = 0
         for (pkg in packages) {
@@ -89,5 +98,30 @@ class TunBuilderConfigurator(
 
     private companion object {
         const val TAG = "TunBuilderConfigurator"
+    }
+}
+
+internal interface TunBuilder {
+    fun addRoute(address: String, prefixLength: Int): TunBuilder
+    fun addAllowedApplication(packageName: String): TunBuilder
+    fun addDisallowedApplication(packageName: String): TunBuilder
+}
+
+private class AndroidTunBuilder(
+    private val builder: VpnService.Builder,
+) : TunBuilder {
+    override fun addRoute(address: String, prefixLength: Int): TunBuilder {
+        builder.addRoute(address, prefixLength)
+        return this
+    }
+
+    override fun addAllowedApplication(packageName: String): TunBuilder {
+        builder.addAllowedApplication(packageName)
+        return this
+    }
+
+    override fun addDisallowedApplication(packageName: String): TunBuilder {
+        builder.addDisallowedApplication(packageName)
+        return this
     }
 }

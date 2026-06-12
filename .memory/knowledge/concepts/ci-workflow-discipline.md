@@ -11,7 +11,7 @@ sources:
   - "daily/2026-05-14.md"
   - "daily/2026-05-24.md"
 created: 2026-04-29
-updated: 2026-05-24
+updated: 2026-06-12
 ---
 
 # CI Workflow Discipline

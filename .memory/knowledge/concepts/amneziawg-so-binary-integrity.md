@@ -5,7 +5,7 @@ tags: [warp, amneziawg, native, security, gotcha]
 sources:
   - "daily/2026-05-08.md"
 created: 2026-05-08
-updated: 2026-05-08
+updated: 2026-06-12
 ---
 
 # AmneziaWG SO Binary Integrity: Maven vs Reference
@@ -19,6 +19,7 @@ The `libam-go.so` from Maven artifact `com.zaneschepke:amneziawg-android:2.3.7` 
 - SHA256 verification of checked-in SO at build time is mandatory — sentinel test `AmneziaWgRuntimeBinaryTest` hardcodes expected `2EBC0EE9...`
 - Migration approach: remove Maven dependency, copy 3 SO files from PORTAL_WG into `engine-warp/src/main/jniLibs/arm64-v8a/`
 - `release.yml` step `assert libam-go.so SHA256` catches any regression where wrong binary gets packaged
+- Binary integrity is not complete until the release APK is checked for both the expected SO hash and the expected native assets
 
 ## Details
 
@@ -39,6 +40,8 @@ The correct approach is to check in the verified binary directly rather than dep
 
 The SHA256 sentinel test is the critical guard: `AmneziaWgRuntimeBinaryTest` reads the packaged SO and asserts its hash matches the known-good reference value. Any future change that swaps the binary (Maven dependency re-introduction, version bump) immediately fails CI.
 
+The release workflow must repeat the check at artifact level. Source tests prove the repository contains the expected file; release assertions prove the generated APK actually packages the same file and did not fall back to a Maven/AAR artifact or omit native assets.
+
 ### Java Glue Required
 
 Removing the Maven AAR removes the Java/Kotlin classes that the SO's `JNI_OnLoad` registers via `RegisterNatives`. These must be provided manually:
@@ -54,7 +57,10 @@ See [[concepts/amneziawg-jni-classpath-completeness]] for why all three are requ
 - [[concepts/amneziawg-relinker-loading-trap]] - Prior SO loading issue with the Maven AAR
 - [[concepts/amnezia-wg-warp-migration]] - The WARP engine migration context
 - [[connections/release-checks-beyond-ci]] - release.yml SO SHA256 assertion as independent gate
+- [[connections/warp-portal-runtime-migration-proof-loop]] - The full migration proof chain from binary identity to APK packaging
 
 ## Sources
+
+- [[daily/2026-05-08.md]] - Session 12:18: release workflow was updated to assert `libam-go.so` SHA256 and verify the APK contains the AmneziaWG SO files.
 
 - [[daily/2026-05-08.md]] - Session 12:05: Maven libam-go.so sha256=cc119dbc vs PORTAL_WG sha256=2ebc0ee9; 8589456B vs 8578640B; all prior Kotlin fixes were futile — binary was root cause; migration to checked-in SO committed in session 12:18

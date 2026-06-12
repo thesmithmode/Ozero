@@ -7,7 +7,7 @@ sources:
   - "daily/2026-05-07.md"
   - "daily/2026-05-22.md"
 created: 2026-05-02
-updated: 2026-05-24
+updated: 2026-06-12
 ---
 
 # WARP Config Generator API Contract

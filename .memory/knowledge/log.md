@@ -19,3 +19,15 @@ test
 - Source: daily/2026-06-04.md
 - Articles created: [[concepts/ktlint-test-line-length-ci-blocker]], [[concepts/buildsrc-dead-fallback-coverage-simplification]], [[concepts/jacoco-sourcefile-hotspot-driven-coverage]], [[connections/local-validation-vs-terminal-ci-proof-loop]]
 - Articles updated: [[concepts/local-gradle-validation-ban-ci-only]], [[concepts/masterdns-fake-ssh-specificity]], [[concepts/singbox-vless-early-data-string-contract]], [[concepts/coverage-gap-targeted-branch-remediation]]
+## [2026-06-12T18:21:15+03:00] compile | 2026-05-02.md
+- Source: daily/2026-05-02.md
+- Articles created: [[concepts/urnetwork-consent-system-deletion]], [[concepts/warp-mirror-security-and-config-backlog]], [[concepts/ci-workflow-anchor-and-auto-release-watchers]], [[connections/runtime-api-contract-review-release-loop]]
+- Articles updated: [[concepts/engine-sdk-bridge-stop-lifecycle]], [[concepts/urnetwork-networkspace-init]], [[concepts/warp-config-generator-api]], [[concepts/ci-workflow-discipline]], [[concepts/android-parcelfiledescriptor-close-trap]]
+## [2026-06-12T18:29:53+03:00] compile | 2026-05-06.md
+- Source: daily/2026-05-06.md
+- Articles created: [[concepts/amneziawg-artifact-identity-boundary]], [[concepts/portal-wg-reference-oracle]], [[concepts/warp-manual-config-screen-contract]], [[concepts/todo-before-autonomous-work-contract]], [[connections/warp-awgturnon-reference-diagnostic-loop]]
+- Articles updated: [[concepts/amneziawg-turnon-minus-one]], [[concepts/android-xml-string-escaping]], [[concepts/kotlin-suspendcancellablecoroutine-type-inference]]
+## [2026-06-12T18:38:59+03:00] compile | 2026-05-08.md
+- Source: daily/2026-05-08.md
+- Articles created: [[concepts/memory-instruction-token-budget-maintenance]], [[concepts/statusline-overlapping-rate-limit-bars]], [[connections/warp-portal-runtime-migration-proof-loop]]
+- Articles updated: [[concepts/amneziawg-so-binary-integrity]], [[concepts/warp-handle-leak-sigabrt]], [[concepts/health-monitor-p2p-mismatch]], [[concepts/test-io-thread-zombie-trap]]

@@ -5,7 +5,7 @@ tags: [engine, lifecycle, android, urnetwork, goroutine, gotcha]
 sources:
   - "daily/2026-05-02.md"
 created: 2026-05-02
-updated: 2026-05-02
+updated: 2026-06-12
 ---
 
 # Engine SDK Bridge Stop Lifecycle

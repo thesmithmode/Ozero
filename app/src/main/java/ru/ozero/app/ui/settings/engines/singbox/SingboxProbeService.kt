@@ -195,7 +195,8 @@ private class SingboxServiceProfileProbe(
                 process = null
             }
         }
-        val intent = Intent().setComponent(ComponentName(context, "ru.ozero.singboxprocess.SingboxEngineService"))
+        val component = ComponentName(context, "ru.ozero.singboxprocess.SingboxEngineService")
+        val intent = Intent().apply { this.component = component }
         val bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
         if (!bound) {
             runCatching { context.unbindService(connection) }
