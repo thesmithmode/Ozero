@@ -5,9 +5,9 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import io.mockk.any
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.ofType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -55,8 +55,8 @@ class AppListProviderCoverageTest {
         val drawable = mockk<Drawable>()
         every { drawable.intrinsicWidth } returns 0
         every { drawable.intrinsicHeight } returns 0
-        every { drawable.setBounds(any(), any(), any(), any()) } returns Unit
-        every { drawable.draw(any()) } returns Unit
+        every { drawable.setBounds(0, 0, 1, 1) } returns Unit
+        every { drawable.draw(ofType(android.graphics.Canvas::class)) } returns Unit
 
         assertNotNull(invokeDrawableToImageBitmap(drawable))
     }

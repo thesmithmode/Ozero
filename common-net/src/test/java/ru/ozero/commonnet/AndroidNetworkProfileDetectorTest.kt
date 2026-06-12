@@ -6,7 +6,6 @@ import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.RouteInfo
-import io.mockk.any
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
@@ -76,7 +75,10 @@ class AndroidNetworkProfileDetectorTest {
         every { cm.activeNetwork } returns network
         every { cm.getNetworkCapabilities(network) } returns caps
         every { cm.getLinkProperties(network) } returns null
-        every { caps.hasTransport(any()) } returns false
+        every { caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) } returns false
+        every { caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) } returns false
+        every { caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) } returns false
+        every { caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) } returns false
 
         val detector = AndroidNetworkProfileDetector(context)
 

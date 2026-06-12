@@ -15,6 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowPackageManager
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -109,5 +110,5 @@ class DefaultAppListProviderRuntimeCoverageTest {
     }
 
     private fun packageManager(): ShadowPackageManager =
-        org.robolectric.Shadow.extract(RuntimeEnvironment.getApplication().packageManager)
+        Shadow.extract(RuntimeEnvironment.getApplication().packageManager)
 }

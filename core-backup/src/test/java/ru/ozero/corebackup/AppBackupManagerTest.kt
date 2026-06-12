@@ -439,7 +439,7 @@ class AppBackupManagerTest {
                 allowDirect = false,
                 provideEnabled = false,
                 provideControlMode = UrnetworkProvideControlMode.ALWAYS,
-                provideNetworkMode = UrnetworkProvideNetworkMode.PUBLIC,
+                provideNetworkMode = UrnetworkProvideNetworkMode.WIFI,
                 selectedLocation = UrnetworkLocationSelection("US", "CA", "LA"),
             )
         }
@@ -462,7 +462,7 @@ class AppBackupManagerTest {
         assertEquals(false, cfg.allowDirect)
         assertEquals(false, cfg.provideEnabled)
         assertEquals(UrnetworkProvideControlMode.ALWAYS, cfg.provideControlMode)
-        assertEquals(UrnetworkProvideNetworkMode.PUBLIC, cfg.provideNetworkMode)
+        assertEquals(UrnetworkProvideNetworkMode.WIFI, cfg.provideNetworkMode)
         assertEquals(null, cfg.selectedLocation.countryCode)
         assertEquals("Region", cfg.selectedLocation.region)
         assertEquals("City", cfg.selectedLocation.city)
@@ -502,7 +502,7 @@ class AppBackupManagerTest {
         assertEquals(true, cfg.allowDirect)
         assertEquals(true, cfg.provideEnabled)
         assertEquals(UrnetworkProvideControlMode.ALWAYS, cfg.provideControlMode)
-        assertEquals(UrnetworkProvideNetworkMode.PUBLIC, cfg.provideNetworkMode)
+        assertEquals(UrnetworkProvideNetworkMode.WIFI, cfg.provideNetworkMode)
         assertEquals(urnIdentity.pubkeyBase58(), importedIdentity.pubkeyBase58())
     }
 

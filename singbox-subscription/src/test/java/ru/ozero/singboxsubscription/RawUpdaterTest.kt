@@ -30,7 +30,7 @@ class RawUpdaterTest {
     private val vless2 =
         "vless://bbbbbbbb-2222-2222-2222-bbbbbbbbbbbb@s2.example.com:443?type=tcp&security=none#S2"
     private val vless1RotatedRuntime =
-        "vless://cccccccc-3333-3333-3333-cccccccccccc@s1.example.com:443?type=grpc&security=none#S1"
+        "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443?type=grpc&security=none#S1"
 
     @BeforeEach
     fun setUp() {

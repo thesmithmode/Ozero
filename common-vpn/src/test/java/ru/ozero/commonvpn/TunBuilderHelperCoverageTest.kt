@@ -1,7 +1,6 @@
 package ru.ozero.commonvpn
 
 import android.net.VpnService
-import io.mockk.any
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify

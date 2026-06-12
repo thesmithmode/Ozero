@@ -19,6 +19,8 @@ import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
+import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyChainStep
@@ -90,6 +92,72 @@ class SingboxEngineProbeTest {
 
         val failure = assertIs<StartResult.Failure>(result)
         assertTrue(failure.reason.contains("requires Socks5"))
+    }
+
+    @Test
+    fun `start builds direct tun config before failing unavailable service binding`() = runTest {
+        val engine = buildEngine()
+
+        val result = engine.start(
+            EngineConfig.Singbox(beanBlob = makeVlessBlob(), protocolType = SingboxEngine.PROTOCOL_VLESS),
+            Upstream.None,
+        )
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertTrue(failure.reason.contains("bindService failed"))
+        assertEquals(null, engine.privateField("pendingConfig"))
+        assertEquals(0, engine.privateIntField("pendingSocksPort"))
+    }
+
+    @Test
+    fun `start builds proxy mode config before failing unavailable service binding`() = runTest {
+        val engine = buildEngine()
+
+        val result = engine.start(
+            EngineConfig.Singbox(
+                beanBlob = makeVlessBlob(),
+                protocolType = SingboxEngine.PROTOCOL_VLESS,
+                proxyMode = true,
+            ),
+            Upstream.None,
+        )
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertTrue(failure.reason.contains("bindService failed"))
+        assertEquals(0, engine.privateIntField("activeSocksPort"))
+    }
+
+    @Test
+    fun `start builds socks chain config before failing unavailable service binding`() = runTest {
+        val engine = buildEngine()
+
+        val result = engine.start(
+            EngineConfig.Singbox(beanBlob = makeVlessBlob(), protocolType = SingboxEngine.PROTOCOL_VLESS),
+            Upstream.Socks5("127.0.0.1", 1080),
+        )
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertTrue(failure.reason.contains("bindService failed"))
+        assertEquals(0, engine.privateIntField("activeSocksPort"))
+    }
+
+    @Test
+    fun `start builds auto select config before failing unavailable service binding`() = runTest {
+        val engine = buildEngine()
+
+        val result = engine.start(
+            EngineConfig.Singbox(
+                beanBlob = ByteArray(0),
+                protocolType = SingboxEngine.PROTOCOL_AUTO_SELECT,
+                autoSelectBeanBlobs = listOf(makeVlessBlob("one.example.com"), makeVlessBlob("two.example.com")),
+            ),
+            Upstream.None,
+        )
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertTrue(failure.reason.contains("bindService failed"))
+        assertEquals(null, engine.privateField("pendingConfig"))
+        assertEquals(0, engine.privateIntField("pendingSocksPort"))
     }
 
     @Test
@@ -347,6 +415,17 @@ class SingboxEngineProbeTest {
             dataStore = fakeDataStore(),
             profileDao = fakeProfileDao(),
             proxyChainDao = fakeProxyChainDao(),
+        )
+
+    private fun makeVlessBlob(host: String = "proxy.example.com"): ByteArray =
+        KryoSerializer.serialize(
+            VLESSBean().apply {
+                uuid = "12345678-1234-1234-1234-123456789abc"
+                serverAddress = host
+                serverPort = 443
+                type = "tcp"
+                security = "none"
+            },
         )
 
     private fun fakeDataStore(): DataStore<Preferences> {

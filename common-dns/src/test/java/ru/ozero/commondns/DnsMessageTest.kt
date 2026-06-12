@@ -164,12 +164,12 @@ class DnsMessageTest {
         val body = ByteArray(12 + 2 + 4) {
             0
         }.also {
-            it[2] = 0x81.toByte()
-            it[3] = 0x80.toByte()
-            it[5] = 1
-            it[7] = 1
-            it[12] = 0xC0.toByte()
-            it[13] = 12
+            it.set(2, 0x81.toByte())
+            it.set(3, 0x80.toByte())
+            it.set(5, 1.toByte())
+            it.set(7, 1.toByte())
+            it.set(12, 0xC0.toByte())
+            it.set(13, 12.toByte())
         }
         assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
     }
@@ -179,14 +179,14 @@ class DnsMessageTest {
         val body = ByteArray(12 + 129 * 2 + 4) {
             0
         }.also {
-            it[2] = 0x81.toByte()
-            it[3] = 0x80.toByte()
-            it[5] = 1
-            it[7] = 1
+            it.set(2, 0x81.toByte())
+            it.set(3, 0x80.toByte())
+            it.set(5, 1.toByte())
+            it.set(7, 1.toByte())
             var offset = 12
             repeat(129) {
-                it[offset] = 1
-                it[offset + 1] = 'a'.code.toByte()
+                it.set(offset, 1.toByte())
+                it.set(offset + 1, 'a'.code.toByte())
                 offset += 2
             }
         }

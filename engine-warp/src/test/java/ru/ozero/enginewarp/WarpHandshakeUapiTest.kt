@@ -44,6 +44,11 @@ class WarpHandshakeUapiTest {
     }
 
     @Test
+    fun `findUapiSocket null when sockets directory and legacy socket are absent`(@TempDir tmp: File) {
+        assertNull(WarpHandshakeUapi.findUapiSocket(tmp.absolutePath, "ozero-warp"))
+    }
+
+    @Test
     fun `findUapiSocket ignores non sock files when choosing newest fallback`(@TempDir tmp: File) {
         val sockets = File(tmp, "sockets").apply { mkdirs() }
         File(sockets, "newest.txt").also {

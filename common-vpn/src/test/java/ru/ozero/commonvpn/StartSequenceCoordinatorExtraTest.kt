@@ -1,9 +1,12 @@
 package ru.ozero.commonvpn
 
+import android.net.VpnService
+import android.os.ParcelFileDescriptor
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -88,7 +91,7 @@ class StartSequenceCoordinatorExtraTest {
 
         fixture.coordinator.run()
 
-        assertEquals(1, fixture.stopRequested.get())
+        assertEquals(true, fixture.stopRequested.get())
         val state = fixture.tunnelController.state.value
         assertTrue(
             state is TunnelState.Failed ||
@@ -108,7 +111,7 @@ class StartSequenceCoordinatorExtraTest {
 
         fixture.coordinator.run()
 
-        assertEquals(1, fixture.stopRequested.get())
+        assertEquals(true, fixture.stopRequested.get())
         val state = fixture.tunnelController.state.value
         assertTrue(
             state is TunnelState.Failed ||
@@ -135,7 +138,7 @@ class StartSequenceCoordinatorExtraTest {
         fixture.coordinator.run()
 
         assertEquals(0, first.startedConfigs.size)
-        assertEquals(1, fixture.stopRequested.get())
+        assertEquals(true, fixture.stopRequested.get())
         verify(exactly = 1) {
             fixture.engineWatchdog.handleEngineFailure(
                 EngineId.BYEDPI,
@@ -159,7 +162,7 @@ class StartSequenceCoordinatorExtraTest {
         fixture.coordinator.run()
 
         assertEquals(0, fixture.settingsRepository.reads)
-        assertEquals(0, fixture.stopRequested.get())
+        assertEquals(false, fixture.stopRequested.get())
         verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(any(), any()) }
         assertIs<TunnelState.Idle>(fixture.tunnelController.state.value)
     }
@@ -177,7 +180,7 @@ class StartSequenceCoordinatorExtraTest {
         fixture.coordinator.run()
 
         assertEquals(1, fixture.settingsRepository.reads)
-        assertEquals(1, fixture.stopRequested.get())
+        assertEquals(true, fixture.stopRequested.get())
         verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(any(), any()) }
     }
 
@@ -306,20 +309,39 @@ class StartSequenceCoordinatorExtraTest {
         )
         return StartFixture(
             coordinator = coordinator,
+            state = state,
             settingsRepository = settingsRepository,
             stopRequested = stopRequested,
             tunnelController = tunnelController,
+            tunnelGateway = tunnelGateway,
+            tunBuilderHelper = tunBuilderHelper,
             engineWatchdog = engineWatchdog,
         )
     }
 
     private data class StartFixture(
         val coordinator: StartSequenceCoordinator,
+        val state: StartSequenceState,
         val tunnelController: TunnelController,
+        val tunnelGateway: HevTunnelGateway,
+        val tunBuilderHelper: TunBuilderHelper,
         val engineWatchdog: EngineWatchdogCoordinator,
         val settingsRepository: StaticSettingsRepository,
         val stopRequested: AtomicBoolean,
-    )
+    ) {
+        fun establishedTunFd(fd: ParcelFileDescriptor? = testFd()) =
+            fd.also { tunFd ->
+                val builder = mockk<VpnService.Builder> {
+                    every { establish() } returns tunFd
+                }
+                every { tunBuilderHelper.buildTunBuilder(any(), any(), any()) } returns builder
+                every { tunBuilderHelper.buildTunBuilder(any(), any(), any(), any()) } returns builder
+            }
+
+        private fun testFd(): ParcelFileDescriptor = mockk(relaxed = true) {
+            every { fd } returns 42
+        }
+    }
 
     private fun standaloneProxyCapabilities(
         providesLocalSocksWithoutUpstream: Boolean = true,
@@ -330,8 +352,42 @@ class StartSequenceCoordinatorExtraTest {
         localOnly = true,
         requiresServer = false,
         supportsUpstreamSocks = false,
+        providesLocalSocks = true,
         providesLocalSocksWithoutUpstream = providesLocalSocksWithoutUpstream,
     )
+
+    private fun tunnelCapabilities(): EngineCapabilities = EngineCapabilities(
+        supportsTcp = true,
+        supportsUdp = true,
+        supportsDoH = false,
+        localOnly = true,
+        requiresServer = false,
+        supportsUpstreamSocks = false,
+        providesLocalSocks = true,
+        providesLocalSocksWithoutUpstream = false,
+    )
+
+    private class DelayedSplitTunnelRulesProvider(
+        private val allowlist: Set<String> = emptySet(),
+        private val blocklist: Set<String> = emptySet(),
+    ) : SplitTunnelRulesProvider {
+        var allowlistReads = 0
+            private set
+        var blocklistReads = 0
+            private set
+
+        override suspend fun allowlistPackages(): Set<String> {
+            allowlistReads++
+            delay(StartSequenceCoordinator.SETTINGS_READ_TIMEOUT_MS + 1)
+            return allowlist
+        }
+
+        override suspend fun blocklistPackages(): Set<String> {
+            blocklistReads++
+            delay(StartSequenceCoordinator.SETTINGS_READ_TIMEOUT_MS + 1)
+            return blocklist
+        }
+    }
 
     private class FakeEnginePlugin(
         override val id: EngineId,

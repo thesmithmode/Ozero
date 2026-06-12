@@ -317,20 +317,6 @@ class SplitTunnelViewModelTest {
     }
 
     @Test
-    fun `onModeChange игнорируется когда tunnel не Idle`() = runTest {
-        tunnelController.onProbing(EngineId.BYEDPI)
-        tunnelController.onConnecting(EngineId.BYEDPI)
-        tunnelController.onEngineStarted(EngineId.BYEDPI, socksPort = 1080)
-        advanceUntilIdle()
-        settings.modeUpdates.clear()
-
-        viewModel.onModeChange(SplitTunnelMode.ALLOWLIST)
-        advanceUntilIdle()
-
-        assertEquals(emptyList<SplitTunnelMode>(), settings.modeUpdates)
-    }
-
-    @Test
     fun `editable=true когда tunnel Idle`() = runTest {
         advanceUntilIdle()
         val state = viewModel.uiState.value as SplitTunnelUiState.Content

@@ -359,9 +359,9 @@ class MainViewModelTest {
 
     @Test
     fun trafficModeMirrorsSettingsRepository() = runTest {
-        settingsRepository.emit(SettingsModel.DEFAULT.copy(trafficMode = TrafficMode.SYSTEM))
+        settingsRepository.emit(SettingsModel.DEFAULT.copy(trafficMode = TrafficMode.PROXY))
         advanceUntilIdle()
-        assertEquals(TrafficMode.SYSTEM, viewModel.trafficMode.value)
+        assertEquals(TrafficMode.PROXY, viewModel.trafficMode.value)
     }
 
     @Test

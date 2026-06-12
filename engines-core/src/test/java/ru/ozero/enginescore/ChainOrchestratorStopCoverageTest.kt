@@ -17,7 +17,7 @@ class ChainOrchestratorStopCoverageTest {
         val plugin = StopThrowingPlugin()
         val orchestrator = ChainOrchestrator(setOf(plugin))
 
-        val start = orchestrator.start(listOf(ChainStep(plugin.id, EngineConfig.ByeDpi(1080))))
+        val start = orchestrator.start(listOf(ChainStep(plugin.id, EngineConfig.ByeDpi(socksPort = 1080))))
         assertIs<ChainResult.Success>(start)
         orchestrator.stop()
 
@@ -30,7 +30,7 @@ class ChainOrchestratorStopCoverageTest {
         val plugin = SlowStopPlugin()
         val orchestrator = ChainOrchestrator(setOf(plugin))
 
-        val start = orchestrator.start(listOf(ChainStep(plugin.id, EngineConfig.ByeDpi(1080))))
+        val start = orchestrator.start(listOf(ChainStep(plugin.id, EngineConfig.ByeDpi(socksPort = 1080))))
         assertIs<ChainResult.Success>(start)
         orchestrator.stop()
         orchestrator.stop()
@@ -45,7 +45,7 @@ class ChainOrchestratorStopCoverageTest {
         val orchestrator = ChainOrchestrator(setOf(plugin))
 
         assertFailsWith<CancellationException> {
-            orchestrator.start(listOf(ChainStep(plugin.id, EngineConfig.ByeDpi(1080))))
+            orchestrator.start(listOf(ChainStep(plugin.id, EngineConfig.ByeDpi(socksPort = 1080))))
         }
 
         assertEquals(emptyList(), orchestrator.activeEngines())
