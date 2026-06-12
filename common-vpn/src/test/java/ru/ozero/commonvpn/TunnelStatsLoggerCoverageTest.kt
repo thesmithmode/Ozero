@@ -50,15 +50,18 @@ class TunnelStatsLoggerCoverageTest {
         )
         every { UidTrafficStats.read() } returns UidTrafficStats.Snapshot(rxBytes = 1, txBytes = 2)
 
-        logger.start()
-        scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
-        scope.runCurrent()
+        try {
+            logger.start()
+            scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            scope.runCurrent()
 
-        assertEquals(101, controller.stats.value?.rxBytes)
-        assertEquals(202, controller.stats.value?.txBytes)
-        verify(exactly = 1) { notification.notifyStats(any()) }
-        verify(exactly = 0) { UidTrafficStats.read() }
-        logger.cancel()
+            assertEquals(101, controller.stats.value?.rxBytes)
+            assertEquals(202, controller.stats.value?.txBytes)
+            verify(exactly = 1) { notification.notifyStats(any()) }
+            verify(exactly = 0) { UidTrafficStats.read() }
+        } finally {
+            logger.cancel()
+        }
     }
 
     @Test
@@ -76,14 +79,17 @@ class TunnelStatsLoggerCoverageTest {
         mockkObject(UidTrafficStats)
         every { UidTrafficStats.read() } returns UidTrafficStats.Snapshot(rxBytes = 303, txBytes = 404)
 
-        logger.start()
-        scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
-        scope.runCurrent()
+        try {
+            logger.start()
+            scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            scope.runCurrent()
 
-        assertEquals(303, controller.stats.value?.rxBytes)
-        assertEquals(404, controller.stats.value?.txBytes)
-        verify(exactly = 1) { notification.notifyStats(any()) }
-        logger.cancel()
+            assertEquals(303, controller.stats.value?.rxBytes)
+            assertEquals(404, controller.stats.value?.txBytes)
+            verify(exactly = 1) { notification.notifyStats(any()) }
+        } finally {
+            logger.cancel()
+        }
     }
 
     @Test
@@ -103,16 +109,19 @@ class TunnelStatsLoggerCoverageTest {
         every { TunInterfaceStats.readTunStats("tun0") } returns null
         every { UidTrafficStats.read() } returns UidTrafficStats.Snapshot(rxBytes = 505, txBytes = 606)
 
-        logger.start()
-        scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
-        scope.runCurrent()
+        try {
+            logger.start()
+            scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            scope.runCurrent()
 
-        assertEquals(505, controller.stats.value?.rxBytes)
-        assertEquals(606, controller.stats.value?.txBytes)
-        verify(exactly = 1) { TunInterfaceStats.readTunStats("tun0") }
-        verify(exactly = 1) { UidTrafficStats.read() }
-        verify(exactly = 1) { notification.notifyStats(any()) }
-        logger.cancel()
+            assertEquals(505, controller.stats.value?.rxBytes)
+            assertEquals(606, controller.stats.value?.txBytes)
+            verify(exactly = 1) { TunInterfaceStats.readTunStats("tun0") }
+            verify(exactly = 1) { UidTrafficStats.read() }
+            verify(exactly = 1) { notification.notifyStats(any()) }
+        } finally {
+            logger.cancel()
+        }
     }
 
     @Test
@@ -132,15 +141,18 @@ class TunnelStatsLoggerCoverageTest {
         every { TunInterfaceStats.readTunStats("tun0") } returns null
         every { UidTrafficStats.read() } returns null
 
-        logger.start()
-        scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS * 2)
-        scope.runCurrent()
+        try {
+            logger.start()
+            scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS * 2)
+            scope.runCurrent()
 
-        assertNull(controller.stats.value)
-        verify(exactly = 2) { TunInterfaceStats.readTunStats("tun0") }
-        verify(exactly = 2) { UidTrafficStats.read() }
-        verify(exactly = 0) { notification.notifyStats(any()) }
-        logger.cancel()
+            assertNull(controller.stats.value)
+            verify(exactly = 2) { TunInterfaceStats.readTunStats("tun0") }
+            verify(exactly = 2) { UidTrafficStats.read() }
+            verify(exactly = 0) { notification.notifyStats(any()) }
+        } finally {
+            logger.cancel()
+        }
     }
 
     @Test
@@ -150,15 +162,18 @@ class TunnelStatsLoggerCoverageTest {
         val ref = AtomicReference<Job?>()
         val logger = logger(scope = scope, statsJobRef = ref)
 
-        logger.start()
-        val first = ref.get()
-        logger.start()
-        val second = ref.get()
+        try {
+            logger.start()
+            val first = ref.get()
+            logger.start()
+            val second = ref.get()
 
-        assertFalse(first === second)
-        assertFalse(first?.isActive == true)
-        assertTrue(second?.isActive == true)
-        logger.cancel()
+            assertFalse(first === second)
+            assertFalse(first?.isActive == true)
+            assertTrue(second?.isActive == true)
+        } finally {
+            logger.cancel()
+        }
     }
 
     @Test
@@ -178,13 +193,17 @@ class TunnelStatsLoggerCoverageTest {
         mockkObject(TunInterfaceStats)
         every { TunInterfaceStats.readTunStats("tun0") } throws IllegalStateException("stats failed")
 
-        logger.start()
-        scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
-        scope.runCurrent()
+        try {
+            logger.start()
+            scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            scope.runCurrent()
 
-        assertNull(controller.stats.value)
-        assertFalse(ref.get()?.isActive == true)
-        verify(exactly = 0) { notification.notifyStats(any()) }
+            assertNull(controller.stats.value)
+            assertFalse(ref.get()?.isActive == true)
+            verify(exactly = 0) { notification.notifyStats(any()) }
+        } finally {
+            logger.cancel()
+        }
     }
 
     @Test
@@ -204,13 +223,17 @@ class TunnelStatsLoggerCoverageTest {
         mockkObject(TunInterfaceStats)
         every { TunInterfaceStats.readTunStats(any()) } returns TunInterfaceStats.Snapshot(1, 2)
 
-        logger.start()
-        scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
-        scope.runCurrent()
+        try {
+            logger.start()
+            scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            scope.runCurrent()
 
-        assertNull(controller.stats.value)
-        verify(exactly = 0) { notification.notifyStats(any()) }
-        verify(exactly = 0) { TunInterfaceStats.readTunStats(any()) }
+            assertNull(controller.stats.value)
+            verify(exactly = 0) { notification.notifyStats(any()) }
+            verify(exactly = 0) { TunInterfaceStats.readTunStats(any()) }
+        } finally {
+            logger.cancel()
+        }
     }
 
     @Test

@@ -35,3 +35,15 @@ test
 - Source: daily/2026-05-18.md
 - Articles created: [[concepts/release-abi-sentinel-alignment]], [[concepts/byedpi-strategy-apply-favorites-separation]], [[concepts/urnetwork-main-toggle-settings-ownership]], [[concepts/tunnelstate-probing-null-engineid-contract]], [[connections/engine-ui-state-ownership-feedback-loop]]
 - Articles updated: [[concepts/byedpi-stale-serverfd-unconditional-forceclose]], [[concepts/warp-readiness-delayed-handshake-contract]], [[concepts/release-process]], [[concepts/urnetwork-guest-mode-relay-blocker]]
+## [2026-06-12T19:00:31+03:00] compile | 2026-05-19.md
+- Source: daily/2026-05-19.md
+- Articles created: [[concepts/urnetwork-peer-column-auto-mode]], [[concepts/byedpi-ui-mode-desync-feature-parity]], [[concepts/byedpi-reference-parity-scope-discipline]], [[connections/runtime-symptom-fix-vs-reference-proof-loop]]
+- Articles updated: [[concepts/speed-chart-bucket-alignment]], [[concepts/urnetwork-balance-optimistic-cache]], [[concepts/urnetwork-filterlocations-trigger]], [[concepts/byedpi-hev-pipeline-upstream-parity]], [[concepts/warp-awg-handle-zero-valid]], [[concepts/vpn-slot-conflict-detection]], [[concepts/viewmodel-polling-runtest-trap]]
+## [2026-06-12T19:07:27+03:00] compile | 2026-05-21.md
+- Source: daily/2026-05-21.md
+- Articles created: [[concepts/auto-mode-engine-inclusion-contract]], [[concepts/warp-register-error-hint-parser-boundary]], [[concepts/byedpi-youtube-device-verification-boundary]], [[connections/auto-mode-runtime-proof-feedback-loop]]
+- Articles updated: [[concepts/ontaskremoved-vpn-swipe-standard]], [[concepts/auto-mode-traffic-fail-blindspot]]
+## [2026-06-12T19:12:19+03:00] compile | 2026-05-22.md
+- Source: daily/2026-05-22.md
+- Articles created: [[concepts/urnetwork-offline-location-selection]], [[concepts/fptn-jni-fd-lifecycle-contract]], [[concepts/engine-switching-watchdog-force-stop]], [[concepts/about-screen-purpose-minimization]]
+- Articles updated: none
