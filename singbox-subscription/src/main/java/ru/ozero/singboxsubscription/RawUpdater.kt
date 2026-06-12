@@ -9,8 +9,10 @@ import javax.net.ssl.SSLHandshakeException
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
+import ru.ozero.singboxfmt.StandardV2RayBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
@@ -120,6 +122,15 @@ private fun ProxyProfile.stableIdentityKey(): String =
         protocolType.toString(),
         runCatching { KryoSerializer.deserialize<AbstractBean>(beanBlob) }
             .getOrNull()
-            ?.let { "${it.serverAddress}|${it.serverPort}" }
+            ?.let { "${it.serverAddress}|${it.serverPort}|${it.stableCredentialKey()}" }
             ?: beanBlob.contentHashCode().toString(),
     ).joinToString("|")
+
+private fun AbstractBean.stableCredentialKey(): String = when (this) {
+    is VLESSBean -> "uuid=${uuid.trim()}"
+    is VMessBean -> "uuid=${uuid.trim()}"
+    is TrojanBean -> "password=${password.trim()}"
+    is ShadowsocksBean -> "method=${method.trim()}|password=${password.trim()}"
+    is StandardV2RayBean -> "uuid=${uuid.trim()}"
+    else -> "blob=${KryoSerializer.serialize(this).contentHashCode()}"
+}

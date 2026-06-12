@@ -1,6 +1,7 @@
 package ru.ozero.commonvpn
 
 import android.net.VpnService
+import io.mockk.any
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -236,6 +237,40 @@ class TunBuilderHelperCoverageTest {
         verify(exactly = 1) { builder.addDnsServer("9.9.9.9") }
         verify(exactly = 1) { builder.addDisallowedApplication("ru.ozero.app") }
         verify(exactly = 1) { builder.addRoute("8.0.0.0", 7) }
+    }
+
+    @Test
+    fun `buildTunBuilder defaults dns to first public v4 and skips ipv6 when disabled`() {
+        val builder = builder()
+
+        helper(builder).buildTunBuilder(
+            splitConfig = SplitTunnelConfig(mode = SplitTunnelMode.ALL),
+            ipv6Enabled = false,
+            customDnsServers = emptyList(),
+        )
+
+        verify(exactly = 1) { builder.addDnsServer(TunBuilderHelper.TUN_DNS_SERVERS.first()) }
+        verify(exactly = 0) { builder.addAddress(TunBuilderHelper.TUN_ADDRESS_V6, any()) }
+        verify(exactly = 0) { builder.addRoute("::", 0) }
+    }
+
+    @Test
+    fun `applyEngineTunSpec skips invalid dns route and continues with valid route`() {
+        val builder = builder()
+        every { builder.addDnsServer("bad-dns") } throws IllegalArgumentException("dns")
+
+        helper(builder).applyEngineTunSpec(
+            spec = baseSpec(
+                dnsServers = listOf("bad-dns", "1.1.1.1"),
+                routeAllV4 = false,
+                routeCidrsV4 = listOf("8.8.8.0/24"),
+            ),
+            ipv6Enabled = false,
+        )
+
+        verify(exactly = 1) { builder.addDnsServer("bad-dns") }
+        verify(exactly = 1) { builder.addDnsServer("1.1.1.1") }
+        verify(exactly = 1) { builder.addRoute("8.8.8.0", 24) }
     }
 
     private fun helper(

@@ -255,7 +255,9 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
-    fun `handleEngineFailure without killswitch stops vpn and marks engine dead`() = runTest(UnconfinedTestDispatcher()) {
+    fun `handleEngineFailure without killswitch stops vpn and marks engine dead`() = runTest(
+        UnconfinedTestDispatcher(),
+    ) {
         val controller = connectedController(EngineId.BYEDPI)
         val stopCount = AtomicReference(0)
         val watchdog = watchdog(
@@ -271,6 +273,48 @@ class EngineWatchdogCoordinatorCoverageTest {
         assertFalse(handled)
         assertEquals(1, stopCount.get())
         assertIs<TunnelState.Failed>(controller.state.value)
+    }
+
+    @Test
+    fun `handleEngineFailure ignores inactive engine`() = runTest(UnconfinedTestDispatcher()) {
+        val controller = connectedController(EngineId.BYEDPI)
+        val stopCount = AtomicReference(0)
+        val watchdog = watchdog(
+            scope = this,
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+            stopCount = stopCount,
+        )
+
+        val handled = watchdog.handleEngineFailure(EngineId.WARP, "inactive")
+
+        assertFalse(handled)
+        assertEquals(0, stopCount.get())
+        assertIs<TunnelState.Connected>(controller.state.value)
+    }
+
+    @Test
+    fun `handleEngineFailure enters killswitch when tun missing and killswitch enabled`() = runTest(
+        UnconfinedTestDispatcher(),
+    ) {
+        val controller = connectedController(EngineId.BYEDPI)
+        val statsJob = Job()
+        val notification = mockk<OzeroNotificationFactory>(relaxed = true)
+        val watchdog = watchdog(
+            scope = this,
+            controller = controller,
+            tunFd = null,
+            statsJob = statsJob,
+            killswitch = true,
+            notificationFactory = notification,
+        )
+
+        val handled = watchdog.handleEngineFailure(EngineId.BYEDPI, "boom")
+
+        assertTrue(handled)
+        assertTrue(controller.killswitchActive.value)
+        assertTrue(statsJob.isCancelled)
     }
 
     private fun TestScope.watchdog(

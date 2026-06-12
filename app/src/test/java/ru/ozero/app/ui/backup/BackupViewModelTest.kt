@@ -127,6 +127,75 @@ class BackupViewModelTest {
         assertIs<BackupUiState.Idle>(vm.uiState.value)
     }
 
+    @Test
+    fun `export failure when output stream missing surfaces unknown error`() = runTest(dispatcher) {
+        val resolver = mockk<ContentResolver>()
+        every { resolver.openOutputStream(any()) } returns null
+        val context = mockk<Context> {
+            every { contentResolver } returns resolver
+        }
+
+        val vm = BackupViewModel(manager)
+        vm.export(context, backupUri(), BackupCategory.ALL)
+        advanceUntilIdle()
+
+        val state = assertIs<BackupUiState.Error>(vm.uiState.value)
+        assertTrue(state.message.contains("Cannot open output stream"))
+    }
+
+    @Test
+    fun `beginImport failure when input stream missing surfaces unknown error`() = runTest(dispatcher) {
+        val resolver = mockk<ContentResolver>()
+        every { resolver.openInputStream(any()) } returns null
+        val context = mockk<Context> {
+            every { contentResolver } returns resolver
+        }
+
+        val vm = BackupViewModel(manager)
+        vm.beginImport(context, backupUri())
+        advanceUntilIdle()
+
+        val state = assertIs<BackupUiState.Error>(vm.uiState.value)
+        assertTrue(state.message.contains("Cannot open input stream"))
+    }
+
+    @Test
+    fun `confirmImport failure clears pending and exposes error`() = runTest(dispatcher) {
+        val context = contextWithInput(byteArrayOf(9, 8, 7))
+        val data = sampleBackupData()
+
+        every { AppBackupSerializer.deserializeAuto(byteArrayOf(9, 8, 7)) } returns data
+        coEvery { manager.import(data, any()) } throws IllegalStateException("import boom")
+
+        val vm = BackupViewModel(manager)
+        vm.beginImport(context, backupUri())
+        advanceUntilIdle()
+
+        vm.confirmImport(setOf(BackupCategory.GENERAL_SETTINGS))
+        advanceUntilIdle()
+
+        val state = assertIs<BackupUiState.Error>(vm.uiState.value)
+        assertTrue(state.message.contains("import boom"))
+        vm.cancelImport()
+        assertIs<BackupUiState.Idle>(vm.uiState.value)
+    }
+
+    @Test
+    fun `dismissResult resets error and success states to idle`() = runTest(dispatcher) {
+        val context = contextWithOutput(java.io.ByteArrayOutputStream())
+        val uri = backupUri()
+
+        coEvery { manager.export(any()) } throws IllegalStateException("boom")
+
+        val vm = BackupViewModel(manager)
+        vm.export(context, uri, BackupCategory.ALL)
+        advanceUntilIdle()
+        assertIs<BackupUiState.Error>(vm.uiState.value)
+
+        vm.dismissResult()
+        assertIs<BackupUiState.Idle>(vm.uiState.value)
+    }
+
     private fun contextWithOutput(output: java.io.OutputStream): Context {
         val resolver = mockk<ContentResolver>()
         every { resolver.openOutputStream(any()) } returns output

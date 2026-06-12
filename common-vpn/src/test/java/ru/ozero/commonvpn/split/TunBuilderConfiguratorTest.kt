@@ -46,6 +46,45 @@ class TunBuilderConfiguratorTest {
     }
 
     @Test
+    fun allowlistIncludeSelfTrueSkipsKillAllFallbackAndAddsSelfOnlyOnce() {
+        val b = mockBuilder()
+        every { b.addAllowedApplication(any()) } returns b
+
+        configurator.apply(
+            b,
+            SplitTunnelConfig(
+                mode = SplitTunnelMode.ALLOWLIST,
+                allowlist = setOf("ru.ozero.app", "com.example.one"),
+            ),
+            excludeSelf = false,
+        )
+
+        verify(exactly = 1) { b.addAllowedApplication("com.example.one") }
+        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
+    }
+
+    @Test
+    fun allowlistIncludeSelfTrueContinuesWhenSelfAddFails() {
+        val b = mockBuilder()
+        every { b.addAllowedApplication("com.example.one") } returns b
+        every {
+            b.addAllowedApplication("ru.ozero.app")
+        } throws android.content.pm.PackageManager.NameNotFoundException()
+
+        configurator.apply(
+            b,
+            SplitTunnelConfig(
+                mode = SplitTunnelMode.ALLOWLIST,
+                allowlist = setOf("ru.ozero.app", "com.example.one"),
+            ),
+            excludeSelf = false,
+        )
+
+        verify(exactly = 1) { b.addAllowedApplication("com.example.one") }
+        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
+    }
+
+    @Test
     fun blocklistDoesNotAddIpv6Route() {
         val b = mockBuilder()
         every { b.addDisallowedApplication(any()) } returns b
@@ -104,6 +143,26 @@ class TunBuilderConfiguratorTest {
     }
 
     @Test
+    fun allowlistIgnoresPackageNotFoundAndContinuesWithOtherPackages() {
+        val b = mockBuilder()
+        every {
+            b.addAllowedApplication("missing.pkg")
+        } throws android.content.pm.PackageManager.NameNotFoundException()
+        every { b.addAllowedApplication("ok.pkg") } returns b
+
+        configurator.apply(
+            b,
+            SplitTunnelConfig(
+                mode = SplitTunnelMode.ALLOWLIST,
+                allowlist = setOf("missing.pkg", "ok.pkg"),
+            ),
+        )
+
+        verify(exactly = 1) { b.addAllowedApplication("missing.pkg") }
+        verify(exactly = 1) { b.addAllowedApplication("ok.pkg") }
+    }
+
+    @Test
     fun allowlistEmptySetIncludesOnlySelf() {
         val b = mockBuilder()
         every { b.addAllowedApplication(any()) } returns b
@@ -158,6 +217,24 @@ class TunBuilderConfiguratorTest {
     }
 
     @Test
+    fun blocklistExcludeSelfTrueContinuesWhenSelfAddFails() {
+        val b = mockBuilder()
+        every { b.addDisallowedApplication("ok.pkg") } returns b
+        every {
+            b.addDisallowedApplication("ru.ozero.app")
+        } throws android.content.pm.PackageManager.NameNotFoundException()
+
+        configurator.apply(
+            b,
+            SplitTunnelConfig(mode = SplitTunnelMode.BLOCKLIST, blocklist = setOf("ok.pkg")),
+            excludeSelf = true,
+        )
+
+        verify(exactly = 1) { b.addDisallowedApplication("ru.ozero.app") }
+        verify(exactly = 1) { b.addDisallowedApplication("ok.pkg") }
+    }
+
+    @Test
     fun allowlistExcludeSelfTrueWithOnlySelfAddsSelfAsKillAllFallback() {
         val b = mockBuilder()
         every { b.addAllowedApplication(any()) } returns b
@@ -174,6 +251,25 @@ class TunBuilderConfiguratorTest {
     }
 
     @Test
+    fun allowlistExcludeSelfTrueDoesNotFallbackWhenOtherPackagesSucceed() {
+        val b = mockBuilder()
+        every { b.addAllowedApplication(any()) } returns b
+
+        configurator.apply(
+            b,
+            SplitTunnelConfig(
+                mode = SplitTunnelMode.ALLOWLIST,
+                allowlist = setOf("ru.ozero.app", "com.example.one", "com.example.two"),
+            ),
+            excludeSelf = true,
+        )
+
+        verify(exactly = 1) { b.addAllowedApplication("com.example.one") }
+        verify(exactly = 1) { b.addAllowedApplication("com.example.two") }
+        verify(exactly = 0) { b.addAllowedApplication("ru.ozero.app") }
+    }
+
+    @Test
     fun allowlistExcludeSelfTrueWithEmptySetAddsSelfAsKillAllFallback() {
         val b = mockBuilder()
         every { b.addAllowedApplication(any()) } returns b
@@ -185,6 +281,36 @@ class TunBuilderConfiguratorTest {
         )
 
         verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
+    }
+
+    @Test
+    fun allowlistDefaultFallsBackToSelfWhenAllPackagesFail() {
+        val b = mockBuilder()
+        every { b.addAllowedApplication("bad.pkg") } throws android.content.pm.PackageManager.NameNotFoundException()
+        every { b.addAllowedApplication("ru.ozero.app") } returns b
+
+        configurator.apply(
+            b,
+            SplitTunnelConfig(mode = SplitTunnelMode.ALLOWLIST, allowlist = setOf("bad.pkg")),
+        )
+
+        verify(exactly = 1) { b.addAllowedApplication("bad.pkg") }
+        verify(exactly = 1) { b.addAllowedApplication("ru.ozero.app") }
+    }
+
+    @Test
+    fun allowlistExcludeSelfTrueWithAllPackagesFailStillSkipsSelfFallback() {
+        val b = mockBuilder()
+        every { b.addAllowedApplication("bad.pkg") } throws android.content.pm.PackageManager.NameNotFoundException()
+
+        configurator.apply(
+            b,
+            SplitTunnelConfig(mode = SplitTunnelMode.ALLOWLIST, allowlist = setOf("bad.pkg")),
+            excludeSelf = true,
+        )
+
+        verify(exactly = 1) { b.addAllowedApplication("bad.pkg") }
+        verify(exactly = 0) { b.addAllowedApplication("ru.ozero.app") }
     }
 
     @Test

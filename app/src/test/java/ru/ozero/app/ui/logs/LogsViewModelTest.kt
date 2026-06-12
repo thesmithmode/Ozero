@@ -5,6 +5,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -150,6 +151,39 @@ class LogsViewModelTest {
     }
 
     @Test
+    fun `LogsUiState filter all keeps all entries`() {
+        val state = LogsUiState(
+            entries = listOf(entry(tag = "A"), entry(tag = "B")),
+        )
+
+        assertEquals(2, state.filteredEntries.size)
+    }
+
+    @Test
+    fun `onTagFilter updates ui state tag filter`() = runTest(dispatcher) {
+        val job = backgroundScope.launch(dispatcher) { vm.uiState.collect { } }
+
+        vm.onTagFilter("App")
+        advanceUntilIdle()
+
+        assertEquals("App", vm.uiState.value.tagFilter)
+        assertEquals(FILTER_ALL, vm.uiState.value.levelFilter)
+        job.cancel()
+    }
+
+    @Test
+    fun `onLevelFilter updates ui state level filter`() = runTest(dispatcher) {
+        val job = backgroundScope.launch(dispatcher) { vm.uiState.collect { } }
+
+        vm.onLevelFilter(LogLevel.ERROR.name)
+        advanceUntilIdle()
+
+        assertEquals(LogLevel.ERROR.name, vm.uiState.value.levelFilter)
+        assertEquals(FILTER_ALL, vm.uiState.value.tagFilter)
+        job.cancel()
+    }
+
+    @Test
     fun `copyFiltered returns entries at or above selected level`() {
         initUnifiedLogger()
         UnifiedLogger.writeRawSync(logLine("INFO", "App", "visible info"))
@@ -161,6 +195,16 @@ class LogsViewModelTest {
         assertTrue(!result.contains("visible info"))
         assertTrue(result.contains("visible warn"))
         assertTrue(result.contains("visible error"))
+    }
+
+    @Test
+    fun `copyFiltered returns empty string when nothing matches`() {
+        initUnifiedLogger()
+        UnifiedLogger.writeRawSync(logLine("INFO", "App", "info only"))
+
+        val result = vm.copyFiltered(LogLevel.ERROR)
+
+        assertEquals("", result)
     }
 
     @Test
@@ -189,6 +233,30 @@ class LogsViewModelTest {
         advanceUntilIdle()
 
         assertNull(ready)
+    }
+
+    @Test
+    fun `createFilteredFile returns null when logger file is absent`() = runTest(dispatcher) {
+        var ready: File? = File(tempDir, "sentinel")
+
+        vm.createFilteredFile(LogLevel.ERROR) { ready = it }
+        advanceUntilIdle()
+
+        assertNull(ready)
+    }
+
+    @Test
+    fun `uiState reflects logger file path and size`() = runTest(dispatcher) {
+        initUnifiedLogger()
+        UnifiedLogger.writeRawSync(logLine("ERROR", "App", "line"))
+        val job = backgroundScope.launch(dispatcher) { vm.uiState.collect { } }
+
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertTrue(state.fileSize > 0)
+        assertTrue(state.filePath.isNotBlank())
+        job.cancel()
     }
 
     private fun entry(

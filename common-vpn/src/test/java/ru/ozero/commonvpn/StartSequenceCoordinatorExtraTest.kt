@@ -77,6 +77,178 @@ class StartSequenceCoordinatorExtraTest {
         assertFalse(fixture.stopRequested.get())
     }
 
+    @Test
+    fun `manual proxy without matching plugin requests stop`() = runTest {
+        val fixture = startFixture(
+            settings = SettingsModel(
+                trafficMode = TrafficMode.PROXY,
+                manualEngine = EngineId.SINGBOX,
+            ),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(1, fixture.stopRequested.get())
+        val state = fixture.tunnelController.state.value
+        assertTrue(
+            state is TunnelState.Failed ||
+                state is TunnelState.Idle,
+        )
+        verify(exactly = 1) { fixture.engineWatchdog.handleEngineFailure(any(), any()) }
+    }
+
+    @Test
+    fun `manual tun without matching plugin requests stop`() = runTest {
+        val fixture = startFixture(
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.SINGBOX,
+            ),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(1, fixture.stopRequested.get())
+        val state = fixture.tunnelController.state.value
+        assertTrue(
+            state is TunnelState.Failed ||
+                state is TunnelState.Idle,
+        )
+        verify(exactly = 1) { fixture.engineWatchdog.handleEngineFailure(any(), any()) }
+    }
+
+    @Test
+    fun `proxy auto mode with unsupported engine requests stop without start`() = runTest {
+        val first = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            capabilities = standaloneProxyCapabilities(providesLocalSocksWithoutUpstream = false),
+        )
+        val fixture = startFixture(
+            first,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.PROXY,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.BYEDPI),
+            ),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(0, first.startedConfigs.size)
+        assertEquals(1, fixture.stopRequested.get())
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.BYEDPI,
+                match {
+                    it.contains("no engine reachable")
+                },
+            )
+        }
+    }
+
+    @Test
+    fun `stopping state returns before settings read and without side effects`() = runTest {
+        val fixture = startFixture(
+            settings = SettingsModel(
+                trafficMode = TrafficMode.PROXY,
+                manualEngine = EngineId.WARP,
+            ),
+            stopping = true,
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(0, fixture.settingsRepository.reads)
+        assertEquals(0, fixture.stopRequested.get())
+        verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(any(), any()) }
+        assertIs<TunnelState.Idle>(fixture.tunnelController.state.value)
+    }
+
+    @Test
+    fun `empty auto priority in tun mode requests stop after settings read`() = runTest {
+        val fixture = startFixture(
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = null,
+                engineAutoPriority = emptyList(),
+            ),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(1, fixture.settingsRepository.reads)
+        assertEquals(1, fixture.stopRequested.get())
+        verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(any(), any()) }
+    }
+
+    @Test
+    fun `allowlist timeout falls back to empty set and still starts engine`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2121,
+            capabilities = tunnelCapabilities(),
+        )
+        val splitRules = DelayedSplitTunnelRulesProvider(allowlist = setOf("com.example.browser"))
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.BYEDPI,
+                splitMode = SplitTunnelMode.ALLOWLIST,
+            ),
+            splitTunnelRulesProvider = splitRules,
+        )
+        fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(1, splitRules.allowlistReads)
+        assertEquals(0, splitRules.blocklistReads)
+        assertEquals(1, engine.startedConfigs.size)
+        verify(exactly = 1) {
+            fixture.tunBuilderHelper.buildTunBuilder(
+                match { it.mode == SplitTunnelMode.ALLOWLIST && it.allowlist.isEmpty() && it.blocklist.isEmpty() },
+                false,
+                emptyList(),
+            )
+        }
+    }
+
+    @Test
+    fun `blocklist timeout falls back to empty set and still starts engine`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2122,
+            capabilities = tunnelCapabilities(),
+        )
+        val splitRules = DelayedSplitTunnelRulesProvider(blocklist = setOf("com.example.blocked"))
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.BYEDPI,
+                splitMode = SplitTunnelMode.BLOCKLIST,
+            ),
+            splitTunnelRulesProvider = splitRules,
+        )
+        fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(0, splitRules.allowlistReads)
+        assertEquals(1, splitRules.blocklistReads)
+        assertEquals(1, engine.startedConfigs.size)
+        verify(exactly = 1) {
+            fixture.tunBuilderHelper.buildTunBuilder(
+                match { it.mode == SplitTunnelMode.BLOCKLIST && it.allowlist.isEmpty() && it.blocklist.isEmpty() },
+                false,
+                emptyList(),
+            )
+        }
+    }
+
     private fun startFixture(
         vararg engines: FakeEnginePlugin,
         settings: SettingsModel,

@@ -63,4 +63,17 @@ class Base64BundleParserTest {
         val result = Base64BundleParser.parse(encoded)
         assertEquals(2, result.size)
     }
+
+    @Test
+    fun `should handle base64 text that requires padding restoration`() {
+        val encoded = encodeBase64(vless1).dropLast(1)
+        val result = Base64BundleParser.parse(encoded)
+        assertEquals(1, result.size)
+    }
+
+    @Test
+    fun `should return empty list for whitespace only input`() {
+        val result = Base64BundleParser.parse("   \n\t  ")
+        assertTrue(result.isEmpty())
+    }
 }

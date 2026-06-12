@@ -699,4 +699,30 @@ class RawShareLinksParserTest {
         assertEquals("/fallback", vmess.path)
         assertEquals("tcp", vmess.type)
     }
+
+    @Test
+    fun `should return empty for sing-box outbounds with blank server values`() {
+        val json = """
+            {
+              "outbounds": [
+                {
+                  "type": "vless",
+                  "tag": "Blank server",
+                  "server": "",
+                  "server_port": 443,
+                  "uuid": "12345678-1234-1234-1234-123456789abc"
+                },
+                {
+                  "type": "vmess",
+                  "tag": "Blank port",
+                  "server": "example.com",
+                  "server_port": 0,
+                  "uuid": "12345678-1234-1234-1234-123456789abc"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        assertTrue(RawShareLinksParser.parse(json).isEmpty())
+    }
 }

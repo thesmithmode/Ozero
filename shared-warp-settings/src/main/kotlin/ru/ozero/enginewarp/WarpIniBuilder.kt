@@ -148,8 +148,10 @@ private class RawWarpIniMerger(preserveRawIni: String) {
 
         existing.forEach { line ->
             val key = parseKeyValue(line)?.first
-            if (key == null || generatedByKey[key] == null) {
+            if (key == null) {
                 result.add(line)
+            } else if (generatedByKey[key] == null) {
+                if (key !in canonicalLabels) result.add(line)
             } else if (seen.add(key)) {
                 result.add("${canonicalLabel(key)} = ${generatedByKey[key]}")
             }

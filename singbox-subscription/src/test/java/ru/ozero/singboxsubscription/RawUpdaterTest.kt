@@ -418,4 +418,26 @@ class RawUpdaterTest {
         assertEquals(2, ids.toSet().size)
         assertTrue(profileDao.profiles.any { it.id == 77L })
     }
+
+    @Test
+    fun `should preserve duplicate server ids by credentials when provider reorders rows`() = runBlocking {
+        val duplicateA =
+            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup.example.com:443?type=tcp&security=none#First"
+        val duplicateB =
+            "vless://bbbbbbbb-2222-2222-2222-bbbbbbbbbbbb@dup.example.com:443?type=tcp&security=none#Second"
+        server.enqueue(MockResponse().setBody("$duplicateA\n$duplicateB"))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val firstByName = profileDao.profiles.associateBy { it.name }
+        val firstAId = firstByName.getValue("First").id
+        val firstBId = firstByName.getValue("Second").id
+
+        server.enqueue(MockResponse().setBody("$duplicateB\n$duplicateA"))
+        rawUpdater.refresh(g)
+        val secondByName = profileDao.profiles.associateBy { it.name }
+
+        assertEquals(firstAId, secondByName.getValue("First").id)
+        assertEquals(firstBId, secondByName.getValue("Second").id)
+    }
 }
