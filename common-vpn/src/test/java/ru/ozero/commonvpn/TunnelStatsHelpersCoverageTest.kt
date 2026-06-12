@@ -43,6 +43,17 @@ class TunnelStatsHelpersCoverageTest {
     }
 
     @Test
+    fun `parseProcNetDev ignores prefix lookalikes and trims leading whitespace`() {
+        val content = """
+              tun00: 1 2 0 0 0 0 0 0 2 0 0 0 0 0 0 0
+                  tun0: 123 2 0 0 0 0 0 0 456 0 0 0 0 0 0 0
+        """.trimIndent()
+
+        assertEquals(123L to 456L, TunInterfaceStats.parseProcNetDev(content, "tun0"))
+        assertNull(TunInterfaceStats.parseProcNetDev(content, "tun"))
+    }
+
+    @Test
     fun `parseTunInterfaces trims names and keeps only tun interfaces`() {
         val parsed = TunInterfaceStats.parseTunInterfaces(
             """
@@ -59,11 +70,39 @@ class TunnelStatsHelpersCoverageTest {
     }
 
     @Test
+    fun `parseTunInterfaces ignores empty names missing colons and non tun prefixes`() {
+        val parsed = TunInterfaceStats.parseTunInterfaces(
+            """
+                : no-name
+                no-colon
+                tuntap0: 1 2
+                atun0: 1 2
+                tun: 1 2
+                tunABC: 1 2
+            """.trimIndent(),
+        )
+
+        assertEquals(setOf("tuntap0", "tun", "tunABC"), parsed)
+    }
+
+    @Test
     fun `pickNewTunInterface prefers new highest tun suffix and falls back to highest existing`() {
         assertEquals("tun12", TunInterfaceStats.pickNewTunInterface(setOf("tun0"), setOf("tun0", "tun2", "tun12")))
         assertEquals("tun9", TunInterfaceStats.pickNewTunInterface(setOf("tun0", "tun9"), setOf("tun0", "tun9")))
         assertNull(TunInterfaceStats.pickNewTunInterface(setOf("tun0"), emptySet()))
         assertEquals("tunX", TunInterfaceStats.pickNewTunInterface(emptySet(), setOf("tunX", "tun0")))
+    }
+
+    @Test
+    fun `pickNewTunInterface treats non numeric suffix as zero`() {
+        assertEquals(
+            "tun10",
+            TunInterfaceStats.pickNewTunInterface(before = emptySet(), after = setOf("tunX", "tun10", "tun2")),
+        )
+        assertEquals(
+            "tun",
+            TunInterfaceStats.pickNewTunInterface(before = emptySet(), after = setOf("tun", "tunA")),
+        )
     }
 
     @Test

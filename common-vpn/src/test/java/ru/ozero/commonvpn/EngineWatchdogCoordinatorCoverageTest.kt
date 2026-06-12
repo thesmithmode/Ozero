@@ -234,6 +234,45 @@ class EngineWatchdogCoordinatorCoverageTest {
         health.shutdown()
     }
 
+    @Test
+    fun `handleEngineFailure ignores failures while stopping`() = runTest(UnconfinedTestDispatcher()) {
+        val controller = connectedController(EngineId.BYEDPI)
+        val stopCount = AtomicReference(0)
+        val watchdog = watchdog(
+            scope = this,
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+            stopping = true,
+            stopCount = stopCount,
+        )
+
+        val handled = watchdog.handleEngineFailure(EngineId.BYEDPI, "stopping")
+
+        assertFalse(handled)
+        assertEquals(0, stopCount.get())
+        assertIs<TunnelState.Connected>(controller.state.value)
+    }
+
+    @Test
+    fun `handleEngineFailure without killswitch stops vpn and marks engine dead`() = runTest(UnconfinedTestDispatcher()) {
+        val controller = connectedController(EngineId.BYEDPI)
+        val stopCount = AtomicReference(0)
+        val watchdog = watchdog(
+            scope = this,
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            killswitch = false,
+            stopCount = stopCount,
+        )
+
+        val handled = watchdog.handleEngineFailure(EngineId.BYEDPI, "boom")
+
+        assertFalse(handled)
+        assertEquals(1, stopCount.get())
+        assertIs<TunnelState.Failed>(controller.state.value)
+    }
+
     private fun TestScope.watchdog(
         scope: CoroutineScope = this,
         healthMonitor: HealthMonitor = HealthMonitor(),
@@ -244,6 +283,7 @@ class EngineWatchdogCoordinatorCoverageTest {
         tunFd: ParcelFileDescriptor?,
         statsJob: Job? = null,
         killswitch: Boolean,
+        stopping: Boolean = false,
         stopCount: AtomicReference<Int> = AtomicReference(0),
     ): EngineWatchdogCoordinator {
         coEvery { chain.stop() } returns Unit
@@ -258,7 +298,7 @@ class EngineWatchdogCoordinatorCoverageTest {
             tunFdRef = AtomicReference(tunFd),
             lockdownStartupFdRef = AtomicReference(null),
             statsJobRef = AtomicReference(statsJob),
-            stopping = AtomicBoolean(false),
+            stopping = AtomicBoolean(stopping),
             starting = AtomicBoolean(true),
             killswitchProvider = { killswitch },
             stopVpnRequest = { stopCount.updateAndGet { it + 1 } },

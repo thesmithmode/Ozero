@@ -87,6 +87,107 @@ class TunnelStatsLoggerCoverageTest {
     }
 
     @Test
+    fun `start falls back to uid stats when iface read returns null`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = TestScope(dispatcher)
+        val controller = connectedController()
+        val notification = mockk<OzeroNotificationFactory>(relaxed = true)
+        val logger = logger(
+            scope = scope,
+            controller = controller,
+            notification = notification,
+            iface = "tun0",
+        )
+        mockkObject(TunInterfaceStats)
+        mockkObject(UidTrafficStats)
+        every { TunInterfaceStats.readTunStats("tun0") } returns null
+        every { UidTrafficStats.read() } returns UidTrafficStats.Snapshot(rxBytes = 505, txBytes = 606)
+
+        logger.start()
+        scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+        scope.runCurrent()
+
+        assertEquals(505, controller.stats.value?.rxBytes)
+        assertEquals(606, controller.stats.value?.txBytes)
+        verify(exactly = 1) { TunInterfaceStats.readTunStats("tun0") }
+        verify(exactly = 1) { UidTrafficStats.read() }
+        verify(exactly = 1) { notification.notifyStats(any()) }
+        logger.cancel()
+    }
+
+    @Test
+    fun `start skips update and notification when both stats sources are absent`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = TestScope(dispatcher)
+        val controller = connectedController()
+        val notification = mockk<OzeroNotificationFactory>(relaxed = true)
+        val logger = logger(
+            scope = scope,
+            controller = controller,
+            notification = notification,
+            iface = "tun0",
+        )
+        mockkObject(TunInterfaceStats)
+        mockkObject(UidTrafficStats)
+        every { TunInterfaceStats.readTunStats("tun0") } returns null
+        every { UidTrafficStats.read() } returns null
+
+        logger.start()
+        scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS * 2)
+        scope.runCurrent()
+
+        assertNull(controller.stats.value)
+        verify(exactly = 2) { TunInterfaceStats.readTunStats("tun0") }
+        verify(exactly = 2) { UidTrafficStats.read() }
+        verify(exactly = 0) { notification.notifyStats(any()) }
+        logger.cancel()
+    }
+
+    @Test
+    fun `start cancels previous stats job before replacing it`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = TestScope(dispatcher)
+        val ref = AtomicReference<Job?>()
+        val logger = logger(scope = scope, statsJobRef = ref)
+
+        logger.start()
+        val first = ref.get()
+        logger.start()
+        val second = ref.get()
+
+        assertFalse(first === second)
+        assertFalse(first?.isActive == true)
+        assertTrue(second?.isActive == true)
+        logger.cancel()
+    }
+
+    @Test
+    fun `start catches non cancellation stats source exceptions`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = TestScope(dispatcher)
+        val controller = connectedController()
+        val notification = mockk<OzeroNotificationFactory>(relaxed = true)
+        val ref = AtomicReference<Job?>()
+        val logger = logger(
+            scope = scope,
+            controller = controller,
+            notification = notification,
+            statsJobRef = ref,
+            iface = "tun0",
+        )
+        mockkObject(TunInterfaceStats)
+        every { TunInterfaceStats.readTunStats("tun0") } throws IllegalStateException("stats failed")
+
+        logger.start()
+        scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+        scope.runCurrent()
+
+        assertNull(controller.stats.value)
+        assertFalse(ref.get()?.isActive == true)
+        verify(exactly = 0) { notification.notifyStats(any()) }
+    }
+
+    @Test
     fun `stop signal exits before stats read or notification`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val scope = TestScope(dispatcher)

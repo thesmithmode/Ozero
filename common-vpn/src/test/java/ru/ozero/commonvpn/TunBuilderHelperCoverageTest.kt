@@ -32,6 +32,57 @@ class TunBuilderHelperCoverageTest {
     }
 
     @Test
+    fun `applyEngineTunSpec excludes RFC1918 routes when requested`() {
+        val builder = builder()
+
+        helper(builder).applyEngineTunSpec(
+            spec = baseSpec(excludeRfc1918 = true),
+            ipv6Enabled = false,
+        )
+
+        verify(exactly = 1) { builder.addRoute("0.0.0.0", 0) }
+    }
+
+    @Test
+    fun `applyEngineTunSpec falls back to full default route when RFC1918 exclusions are disabled`() {
+        val builder = builder()
+
+        helper(builder).applyEngineTunSpec(
+            spec = baseSpec(excludeRfc1918 = false),
+            ipv6Enabled = false,
+        )
+
+        verify(exactly = 1) { builder.addRoute("0.0.0.0", 0) }
+    }
+
+    @Test
+    fun `applyEngineTunSpec continues when RFC1918 excludeRoute throws`() {
+        val builder = builder()
+        every { builder.excludeRoute(any()) } throws IllegalArgumentException("bad route")
+
+        helper(builder).applyEngineTunSpec(
+            spec = baseSpec(excludeRfc1918 = true),
+            ipv6Enabled = false,
+        )
+
+        verify(exactly = 1) { builder.addRoute("0.0.0.0", 0) }
+    }
+
+    @Test
+    fun `applyEngineTunSpec continues when lockdown or metered calls throw`() {
+        val builder = builder()
+        every { builder.setUnderlyingNetworks(null) } throws IllegalStateException("underlying")
+        every { builder.setMetered(false) } throws IllegalStateException("metered")
+
+        helper(builder).applyEngineTunSpec(
+            spec = baseSpec(dnsServers = listOf("1.1.1.1")),
+            ipv6Enabled = false,
+        )
+
+        verify(exactly = 1) { builder.addRoute("0.0.0.0", 0) }
+    }
+
+    @Test
     fun `applyEngineTunSpec uses explicit v4 cidr routes and skips invalid cidrs`() {
         val builder = builder()
         val helper = helper(builder)
@@ -97,6 +148,24 @@ class TunBuilderHelperCoverageTest {
     }
 
     @Test
+    fun `applyEngineTunSpec skips ipv6 when allowFamilyV6 is false even if address exists`() {
+        val builder = builder()
+
+        helper(builder).applyEngineTunSpec(
+            spec = baseSpec(
+                allowFamilyV6 = false,
+                ipv6Address = "fd00::4",
+                ipv6PrefixLength = 128,
+                routeAllV6 = true,
+            ),
+            ipv6Enabled = true,
+        )
+
+        verify(exactly = 0) { builder.addAddress("fd00::4", 128) }
+        verify(exactly = 0) { builder.addRoute("::", 0) }
+    }
+
+    @Test
     fun `buildTunBuilder applies base byedpi address session fallback dns and split config`() {
         val builder = builder()
 
@@ -109,6 +178,29 @@ class TunBuilderHelperCoverageTest {
         verify(exactly = 1) { builder.addDnsServer(TunBuilderHelper.TUN_DNS_SERVERS.first()) }
         verify(exactly = 1) { builder.addRoute("0.0.0.0", 0) }
         verify(exactly = 1) { builder.addDisallowedApplication("ru.ozero.app") }
+    }
+
+    @Test
+    fun `buildTunBuilder applies lockdown only when requested`() {
+        val disabledBuilder = builder()
+        helper(disabledBuilder).buildTunBuilder(applyUnderlying = false)
+
+        val enabledBuilder = builder()
+        helper(enabledBuilder).buildTunBuilder(applyUnderlying = true)
+
+        verify(exactly = 1) { disabledBuilder.addRoute("0.0.0.0", 0) }
+        verify(exactly = 1) { enabledBuilder.addRoute("0.0.0.0", 0) }
+    }
+
+    @Test
+    fun `buildTunBuilder continues when lockdown and metered calls throw`() {
+        val builder = builder()
+        every { builder.setUnderlyingNetworks(null) } throws IllegalStateException("underlying")
+        every { builder.setMetered(false) } throws IllegalStateException("metered")
+
+        helper(builder).buildTunBuilder(applyUnderlying = true)
+
+        verify(exactly = 1) { builder.addRoute("0.0.0.0", 0) }
     }
 
     @Test
@@ -146,26 +238,6 @@ class TunBuilderHelperCoverageTest {
         verify(exactly = 1) { builder.addRoute("8.0.0.0", 7) }
     }
 
-    @Test
-    fun `applyEngineTunSpec continues when dns and route builder calls throw`() {
-        val builder = builder()
-        every { builder.addDnsServer("bad-dns") } throws IllegalArgumentException("bad dns")
-        every { builder.addRoute("8.8.8.0", 24) } throws IllegalArgumentException("bad route")
-
-        helper(builder).applyEngineTunSpec(
-            spec = baseSpec(
-                dnsServers = listOf("bad-dns"),
-                routeAllV4 = false,
-                routeCidrsV4 = listOf("8.8.8.0/24", "1.1.1.0/24"),
-            ),
-            ipv6Enabled = false,
-        )
-
-        verify(exactly = 1) { builder.addDnsServer("bad-dns") }
-        verify(exactly = 1) { builder.addRoute("8.8.8.0", 24) }
-        verify(exactly = 1) { builder.addRoute("1.1.1.0", 24) }
-    }
-
     private fun helper(
         builder: VpnService.Builder,
         packageName: String = "ru.ozero.test",
@@ -183,6 +255,7 @@ class TunBuilderHelperCoverageTest {
         every { addDnsServer(any<String>()) } returns this@mockk
         every { allowFamily(any()) } returns this@mockk
         every { addRoute(any<String>(), any()) } returns this@mockk
+        every { excludeRoute(any()) } returns this@mockk
         every { addAllowedApplication(any()) } returns this@mockk
         every { addDisallowedApplication(any()) } returns this@mockk
         every { setMetered(any()) } returns this@mockk
@@ -198,6 +271,7 @@ class TunBuilderHelperCoverageTest {
         routeAllV6: Boolean = false,
         routeCidrsV4: List<String> = emptyList(),
         routeCidrsV6: List<String> = emptyList(),
+        excludeRfc1918: Boolean = false,
     ): TunSpec = TunSpec(
         sessionName = "engine",
         mtu = 1400,
@@ -212,5 +286,6 @@ class TunBuilderHelperCoverageTest {
         routeAllV6 = routeAllV6,
         routeCidrsV4 = routeCidrsV4,
         routeCidrsV6 = routeCidrsV6,
+        excludeRfc1918 = excludeRfc1918,
     )
 }

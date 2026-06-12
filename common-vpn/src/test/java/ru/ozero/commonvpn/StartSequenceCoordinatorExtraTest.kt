@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @Suppress("LargeClass")
@@ -50,6 +51,30 @@ class StartSequenceCoordinatorExtraTest {
         assertTrue(fixture.stopRequested.get())
         verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(any(), any()) }
         assertIs<TunnelState.Idle>(fixture.tunnelController.state.value)
+    }
+
+    @Test
+    fun `auto candidate without preflight is still accepted`() = runTest {
+        val first = FakeEnginePlugin(
+            id = EngineId.WARP,
+            preflightResult = null,
+            socksPort = 2120,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            first,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.PROXY,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.WARP),
+            ),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(1, first.startedConfigs.size)
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+        assertFalse(fixture.stopRequested.get())
     }
 
     private fun startFixture(
@@ -122,6 +147,18 @@ class StartSequenceCoordinatorExtraTest {
         val engineWatchdog: EngineWatchdogCoordinator,
         val settingsRepository: StaticSettingsRepository,
         val stopRequested: AtomicBoolean,
+    )
+
+    private fun standaloneProxyCapabilities(
+        providesLocalSocksWithoutUpstream: Boolean = true,
+    ): EngineCapabilities = EngineCapabilities(
+        supportsTcp = true,
+        supportsUdp = true,
+        supportsDoH = false,
+        localOnly = true,
+        requiresServer = false,
+        supportsUpstreamSocks = false,
+        providesLocalSocksWithoutUpstream = providesLocalSocksWithoutUpstream,
     )
 
     private class FakeEnginePlugin(
