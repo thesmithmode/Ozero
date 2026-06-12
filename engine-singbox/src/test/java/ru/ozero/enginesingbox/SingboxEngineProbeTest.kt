@@ -1,5 +1,9 @@
 package ru.ozero.enginesingbox
 
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.content.ServiceConnection
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.mutablePreferencesOf
@@ -11,6 +15,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
+import org.robolectric.RuntimeEnvironment
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.ExitNodeStrategy
@@ -411,11 +416,17 @@ class SingboxEngineProbeTest {
 
     private fun buildEngine(): SingboxEngine =
         SingboxEngine(
-            context = mockk(relaxed = true),
+            context = unboundContext(),
             dataStore = fakeDataStore(),
             profileDao = fakeProfileDao(),
             proxyChainDao = fakeProxyChainDao(),
         )
+
+    private fun unboundContext(): Context =
+        object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+            override fun bindService(service: Intent, conn: ServiceConnection, flags: Int): Boolean = false
+            override fun unbindService(conn: ServiceConnection) = Unit
+        }
 
     private fun makeVlessBlob(host: String = "proxy.example.com"): ByteArray =
         KryoSerializer.serialize(

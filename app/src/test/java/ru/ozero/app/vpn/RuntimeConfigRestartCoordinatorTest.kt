@@ -274,7 +274,7 @@ class RuntimeConfigRestartCoordinatorTest {
 
         assertEquals(2, calls)
         assertEquals(
-            listOf(
+            listOf<String?>(
                 OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG,
                 OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG,
             ),

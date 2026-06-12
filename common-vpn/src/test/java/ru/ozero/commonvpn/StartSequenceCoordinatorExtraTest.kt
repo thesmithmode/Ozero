@@ -6,7 +6,7 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -191,7 +191,7 @@ class StartSequenceCoordinatorExtraTest {
             socksPort = 2121,
             capabilities = tunnelCapabilities(),
         )
-        val splitRules = DelayedSplitTunnelRulesProvider(allowlist = setOf("com.example.browser"))
+        val splitRules = DelayedSplitTunnelRulesProvider()
         val fixture = startFixture(
             engine,
             settings = SettingsModel(
@@ -225,7 +225,7 @@ class StartSequenceCoordinatorExtraTest {
             socksPort = 2122,
             capabilities = tunnelCapabilities(),
         )
-        val splitRules = DelayedSplitTunnelRulesProvider(blocklist = setOf("com.example.blocked"))
+        val splitRules = DelayedSplitTunnelRulesProvider()
         val fixture = startFixture(
             engine,
             settings = SettingsModel(
@@ -367,10 +367,7 @@ class StartSequenceCoordinatorExtraTest {
         providesLocalSocksWithoutUpstream = false,
     )
 
-    private class DelayedSplitTunnelRulesProvider(
-        private val allowlist: Set<String> = emptySet(),
-        private val blocklist: Set<String> = emptySet(),
-    ) : SplitTunnelRulesProvider {
+    private class DelayedSplitTunnelRulesProvider : SplitTunnelRulesProvider {
         var allowlistReads = 0
             private set
         var blocklistReads = 0
@@ -378,14 +375,12 @@ class StartSequenceCoordinatorExtraTest {
 
         override suspend fun allowlistPackages(): Set<String> {
             allowlistReads++
-            delay(StartSequenceCoordinator.SETTINGS_READ_TIMEOUT_MS + 1)
-            return allowlist
+            awaitCancellation()
         }
 
         override suspend fun blocklistPackages(): Set<String> {
             blocklistReads++
-            delay(StartSequenceCoordinator.SETTINGS_READ_TIMEOUT_MS + 1)
-            return blocklist
+            awaitCancellation()
         }
     }
 

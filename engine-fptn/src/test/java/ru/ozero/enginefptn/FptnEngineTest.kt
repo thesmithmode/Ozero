@@ -143,7 +143,7 @@ class FptnEngineTest {
     }
 
     @Test
-    fun `start with valid token but no servers returns no server failure`() = runTest {
+    fun `start with empty server token returns invalid token before native load`() = runTest {
         val token = java.util.Base64.getEncoder().encodeToString(
             """{"version":1,"username":"u","password":"p","servers":[]}""".toByteArray(),
         )
@@ -151,7 +151,7 @@ class FptnEngineTest {
         val result = engine.start(EngineConfig.Fptn(token = "fptn:$token"), Upstream.None)
 
         val failure = assertIs<StartResult.Failure>(result)
-        assertEquals(FptnEngine.FPTN_NO_SERVER_AVAILABLE, failure.reason)
+        assertEquals(FptnEngine.FPTN_INVALID_TOKEN, failure.reason)
     }
 
     @Test
