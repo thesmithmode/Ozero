@@ -276,12 +276,6 @@ jobs:
     timeout-minutes: 25
     needs:
       - kotlin-style
-      - test-buildsrc
-      - test-common-vpn
-      - test-engine-warp
-      - test-engines-urnetwork-byedpi
-      - test-core-modules
-      - test-singbox-and-extra-modules
     if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
     permissions:
       contents: read
