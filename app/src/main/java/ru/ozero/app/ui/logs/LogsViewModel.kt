@@ -122,6 +122,10 @@ class LogsViewModel @Inject constructor(
         }
     }
 
+    internal fun closeForTest() {
+        onCleared()
+    }
+
     private fun fileEntriesFlow() = flow {
         var lastSize = -1L
         var cached = emptyList<LogEntry>()

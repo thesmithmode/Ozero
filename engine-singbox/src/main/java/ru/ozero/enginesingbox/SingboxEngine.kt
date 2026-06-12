@@ -510,7 +510,7 @@ class SingboxEngine @Inject constructor(
                 }
             }
             val component = ComponentName(context, "ru.ozero.singboxprocess.SingboxEngineService")
-            val intent = Intent().setComponent(component)
+            val intent = Intent().apply { this.component = component }
             val bound = context.bindService(intent, conn, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
             if (!bound) {
                 runCatching { context.unbindService(conn) }

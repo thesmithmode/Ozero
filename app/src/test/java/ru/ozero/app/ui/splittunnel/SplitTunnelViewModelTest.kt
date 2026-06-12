@@ -1,7 +1,6 @@
 ﻿package ru.ozero.app.ui.splittunnel
 
-import android.graphics.Bitmap
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -446,12 +445,12 @@ class SplitTunnelViewModelTest {
 
     @Test
     fun `loadIcon delegates to provider`() = runTest {
-        val icon = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        val icon = ImageBitmap(1, 1)
         val provider = IconProvidingAppListProvider(sample, icon)
         val vm = SplitTunnelViewModel(provider, dao, settings, tunnelController)
         advanceUntilIdle()
 
-        assertEquals(icon.asImageBitmap(), vm.loadIcon("com.user.foo"))
+        assertEquals(icon, vm.loadIcon("com.user.foo"))
     }
 
     @Test
@@ -546,7 +545,7 @@ class SplitTunnelViewModelTest {
 
     private class IconProvidingAppListProvider(
         apps: List<InstalledApp>,
-        private val icon: Bitmap,
+        private val icon: ImageBitmap,
     ) : AppListProvider {
         private val events = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
         private val currentApps = apps
@@ -554,7 +553,7 @@ class SplitTunnelViewModelTest {
         override suspend fun loadApps(): List<InstalledApp> = currentApps
         override suspend fun refreshApps(): List<InstalledApp> = currentApps
         override suspend fun loadIcon(packageName: String): androidx.compose.ui.graphics.ImageBitmap? =
-            if (packageName == "com.user.foo") icon.asImageBitmap() else null
+            if (packageName == "com.user.foo") icon else null
     }
 
     private class RefreshGatedAppListProvider(initialApps: List<InstalledApp>) : AppListProvider {

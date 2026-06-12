@@ -3,7 +3,9 @@ package ru.ozero.commonvpn.split
 import android.net.VpnService
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.unmockkAll
 import io.mockk.verify
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.settings.SplitTunnelMode
 
@@ -12,6 +14,11 @@ class TunBuilderConfiguratorTest {
     private val configurator = TunBuilderConfigurator(packageName = "ru.ozero.app")
 
     private fun mockBuilder(): VpnService.Builder = mockk(relaxed = true)
+
+    @AfterEach
+    fun tearDown() {
+        unmockkAll()
+    }
 
     @Test
     fun allModeAddsDefaultRouteV4Only() {

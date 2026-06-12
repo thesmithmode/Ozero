@@ -49,6 +49,7 @@ class LogsViewModelTest {
 
     @AfterEach
     fun tearDown() {
+        vm.closeForTest()
         LogFileStore.resetForTest()
         Dispatchers.resetMain()
         reader.shutdown()
