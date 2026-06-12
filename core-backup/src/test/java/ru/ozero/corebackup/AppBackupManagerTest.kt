@@ -399,8 +399,8 @@ class AppBackupManagerTest {
         assertEquals("global", prefs[SettingsKeys.SPLIT_MODE])
         assertEquals("fptn", prefs[SettingsKeys.MANUAL_ENGINE])
         assertEquals("persisted-token", fptnStore.currentConfig().token)
-        assertNull(prefs[SettingsKeys.CUSTOM_DNS_SERVERS])
-        assertNull(prefs[SettingsKeys.URNETWORK_ENABLED])
+        assertEquals("ignored", prefs[SettingsKeys.CUSTOM_DNS_SERVERS])
+        assertEquals(true, prefs[SettingsKeys.URNETWORK_ENABLED])
     }
 
     @Test

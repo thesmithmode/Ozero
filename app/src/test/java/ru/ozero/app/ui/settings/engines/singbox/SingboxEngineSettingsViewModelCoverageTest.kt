@@ -813,7 +813,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         harness.viewModel.onPing(1L)
         advanceUntilIdle()
 
-        assertEquals(listOf("Before.example.com"), harness.probeCalls)
+        assertEquals(listOf("Before.example.com"), harness.probeCalls.toList())
         assertEquals("After", harness.viewModel.state.value.groupProfiles.getValue(1L).single().name)
         assertTrue(harness.viewModel.state.value.testingProfileIds.isEmpty())
     }

@@ -174,15 +174,15 @@ class DnsMessageTest {
 
     @Test
     fun parseAAnswersStopsWhenQuestionNameExceedsLoopGuard() {
-        val body = ByteArray(12 + 129 * 2 + 4).also {
-            it[2] = 0x81.toByte()
-            it[3] = 0x80.toByte()
-            it[5] = 1.toByte()
-            it[7] = 1.toByte()
+        val body = ByteArray(12 + 129 * 2 + 4).also { body ->
+            body[2] = 0x81.toByte()
+            body[3] = 0x80.toByte()
+            body[5] = 1.toByte()
+            body[7] = 1.toByte()
             var offset = 12
             repeat(129) {
-                it[offset] = 1.toByte()
-                it[offset + 1] = 'a'.code.toByte()
+                body[offset] = 1.toByte()
+                body[offset + 1] = 'a'.code.toByte()
                 offset += 2
             }
         }

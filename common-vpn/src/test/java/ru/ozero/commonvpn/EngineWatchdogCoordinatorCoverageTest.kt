@@ -322,7 +322,7 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     private fun TestScope.watchdog(
-        scope: CoroutineScope = this,
+        scope: CoroutineScope = backgroundScope,
         healthMonitor: HealthMonitor = HealthMonitor(),
         plugins: Set<EnginePlugin> = emptySet(),
         chain: ChainOrchestrator = mockk(relaxed = true),
