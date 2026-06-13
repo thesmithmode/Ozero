@@ -144,6 +144,7 @@ class ProxyWarpAutoConfig(
         Log.i(TAG, "selected ${extracted.source}")
         return WarpConfParser.parse(extracted.text).mapCatching { config ->
             validateCloudflarePeer(config)
+            validateFullTunnelRoutes(config)
             RegisteredWarpConfig(config = config, rawIni = extracted.text)
         }
     }
@@ -161,6 +162,15 @@ class ProxyWarpAutoConfig(
                 "mirror peer host mismatch: '$host' " +
                     "expected '$CLOUDFLARE_WARP_PEER_HOST' or Cloudflare WARP IP — supply chain risk",
             )
+        }
+    }
+
+    private fun validateFullTunnelRoutes(config: WarpConfig) {
+        val hasFullTunnelV4 = config.allowedIps.any { it.trim() == "0.0.0.0/0" }
+        val hasFullTunnelV6 = config.interfaceAddressV6.isBlank() ||
+            config.allowedIps.any { it.trim() == "::/0" }
+        if (!hasFullTunnelV4 || !hasFullTunnelV6) {
+            throw IOException("mirror AllowedIPs must keep WARP full-tunnel routes")
         }
     }
 

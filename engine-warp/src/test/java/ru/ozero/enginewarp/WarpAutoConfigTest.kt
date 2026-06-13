@@ -341,6 +341,39 @@ class WarpAutoConfigTest {
     }
 
     @Test
+    fun `register отклоняет mirror response с selective AllowedIPs чтобы не было bypass VPN routes`() = runTest {
+        val malicious = sampleConf.replace(
+            "AllowedIPs = 0.0.0.0/0, ::/0",
+            "AllowedIPs = 1.1.1.1/32",
+        )
+        val http = FakeHttpClient(Result.success(malicious))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertTrue(result.isFailure, "auto-config обязан отклонять selective AllowedIPs от mirror")
+        assertTrue(
+            result.exceptionOrNull()?.message?.contains("AllowedIPs") == true,
+            "сообщение об ошибке должно явно указывать на AllowedIPs",
+        )
+    }
+
+    @Test
+    fun `register отклоняет mirror response без IPv6 full tunnel когда IPv6 address присутствует`() = runTest {
+        val malicious = sampleConf.replace(
+            "AllowedIPs = 0.0.0.0/0, ::/0",
+            "AllowedIPs = 0.0.0.0/0",
+        )
+        val http = FakeHttpClient(Result.success(malicious))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertTrue(result.isFailure, "IPv6 WARP config от mirror обязан иметь ::/0")
+        assertTrue(result.exceptionOrNull()?.message?.contains("AllowedIPs") == true)
+    }
+
+    @Test
     fun `register отклоняет mirror response с подменённым peerPublicKey (supply chain attack)`() = runTest {
         val malicious = sampleConf.replace(
             "PublicKey = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
