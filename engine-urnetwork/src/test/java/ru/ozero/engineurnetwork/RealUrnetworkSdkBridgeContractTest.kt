@@ -686,7 +686,7 @@ class RealUrnetworkSdkBridgeContractTest {
         val listenerBody = startBlock.substringAfter("addJwtRefreshListener {")
             .substringBefore("applyDeviceFields")
         assertTrue(
-            listenerBody.contains("bridgeScope.launch(Dispatchers.Main.immediate)"),
+            listenerBody.contains("bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable)"),
             "addJwtRefreshListener callback must marshal LocalState mutation onto the main thread.",
         )
         assertTrue(
@@ -708,7 +708,7 @@ class RealUrnetworkSdkBridgeContractTest {
         val listenerBody = ensureBlock.substringAfter("addJwtRefreshListener {")
             .substringBefore("applyDeviceFields")
         assertTrue(
-            listenerBody.contains("bridgeScope.launch(Dispatchers.Main.immediate)"),
+            listenerBody.contains("bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable)"),
             "ensureDevice addJwtRefreshListener callback must marshal LocalState mutation onto the main thread.",
         )
         assertTrue(

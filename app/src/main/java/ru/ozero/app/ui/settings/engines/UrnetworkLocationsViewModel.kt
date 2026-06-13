@@ -66,6 +66,7 @@ sealed interface UrnetworkSettingsUiState {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
+@Suppress("TooManyFunctions")
 class UrnetworkLocationsViewModel @Inject constructor(
     private val bridge: UrnetworkSdkBridge,
     private val settingsRepository: SettingsRepository,

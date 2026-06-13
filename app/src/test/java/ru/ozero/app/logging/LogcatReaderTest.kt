@@ -83,6 +83,7 @@ class LogcatReaderTest {
 
         reader.start()
         waitFor { buffer.entries.value.any { it.tag == "OzeroVpn" && it.message == "startVpn" } }
+        waitFor { BootFileLogger.read().contains("LOGCAT 04-27 10:32:18.421  1234  5678 I OzeroVpn: startVpn") }
         reader.stop()
         reader.shutdown()
 

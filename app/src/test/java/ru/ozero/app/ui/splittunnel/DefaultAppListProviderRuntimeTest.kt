@@ -182,6 +182,8 @@ class DefaultAppListProviderRuntimeTest {
         shadowPm.setApplicationIcon("pkg.broadcast", BitmapDrawable(context.resources, bitmap))
         val provider = DefaultAppListProvider(context)
         val collector = launch { provider.packageChanges.collect { } }
+        advanceUntilIdle()
+        shadowOf(Looper.getMainLooper()).idle()
 
         try {
             val firstApps = provider.loadApps()
@@ -220,6 +222,8 @@ class DefaultAppListProviderRuntimeTest {
         )
         val provider = DefaultAppListProvider(context)
         val collector = launch { provider.packageChanges.collect { } }
+        advanceUntilIdle()
+        shadowOf(Looper.getMainLooper()).idle()
 
         try {
             val firstIcon = provider.loadIcon("pkg.icon")

@@ -175,7 +175,7 @@ class RealUrnetworkSdkBridge(
             }
             runCatching {
                 d.addJwtRefreshListener { newJwt ->
-                    bridgeScope.launch(Dispatchers.Main.immediate) {
+                    bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable) {
                         runCatching { localState.byClientJwt = newJwt }
                             .onSuccess {
                                 PersistentLoggers.debug(TAG, "node start: credential refreshed - state updated")
@@ -503,7 +503,7 @@ class RealUrnetworkSdkBridge(
         }
         runCatching {
             device.addJwtRefreshListener { newJwt ->
-                bridgeScope.launch(Dispatchers.Main.immediate) {
+                bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable) {
                     runCatching {
                         localState.byClientJwt = newJwt
                     }.onSuccess {

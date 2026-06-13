@@ -249,7 +249,7 @@ class SingboxProbeServiceTest {
         }
 
     private class FakeProxyProfileDao : ProxyProfileDao {
-        val latencies = mutableMapOf<Long, Int>()
+        val latencies = ConcurrentHashMap<Long, Int>()
 
         override suspend fun updateLatency(id: Long, latency: Int) {
             latencies[id] = latency
