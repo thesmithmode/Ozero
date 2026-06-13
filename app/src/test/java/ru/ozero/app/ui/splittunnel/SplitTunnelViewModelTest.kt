@@ -4,7 +4,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -372,17 +374,110 @@ class SplitTunnelViewModelTest {
         assertEquals(listOf("com.user.foo"), state.apps.map { it.packageName })
     }
 
-    private class FakeAppListProvider(val apps: List<InstalledApp>) : AppListProvider {
-        override suspend fun loadApps(): List<InstalledApp> = apps
+    @Test
+    fun `refreshApps keeps content query and selected rules while refresh is in flight`() = runTest {
+        val refreshProvider = RefreshGatedAppListProvider(sample)
+        val vm = SplitTunnelViewModel(refreshProvider, dao, settings, tunnelController)
+        advanceUntilIdle()
+        vm.onQuery("foo")
+        dao.emit(listOf(AppSplitRule("com.user.foo", isExcluded = false)))
+        advanceUntilIdle()
+
+        vm.refreshApps()
+        advanceUntilIdle()
+
+        val inFlight = assertIs<SplitTunnelUiState.Content>(vm.uiState.value)
+        assertEquals("foo", inFlight.query)
+        assertEquals(1, inFlight.selectedCount)
+        assertEquals(listOf("com.user.foo"), inFlight.apps.map { it.packageName })
+
+        refreshProvider.completeRefresh(
+            listOf(
+                InstalledApp("com.user.foo", "Foo Updated", isSystem = false),
+                InstalledApp("com.user.baz", "Baz", isSystem = false),
+            ),
+        )
+        advanceUntilIdle()
+
+        val refreshed = assertIs<SplitTunnelUiState.Content>(vm.uiState.value)
+        assertEquals("foo", refreshed.query)
+        assertEquals(1, refreshed.selectedCount)
+        assertTrue(refreshed.apps.single { it.packageName == "com.user.foo" }.included)
+    }
+
+    @Test
+    fun `packageChanges triggers refreshApps without resetting current content`() = runTest {
+        val refreshProvider = RefreshGatedAppListProvider(sample)
+        val vm = SplitTunnelViewModel(refreshProvider, dao, settings, tunnelController)
+        advanceUntilIdle()
+        vm.onQuery("bar")
+        advanceUntilIdle()
+
+        refreshProvider.emitPackageChange()
+        advanceUntilIdle()
+
+        assertEquals(1, refreshProvider.refreshCalls)
+        val inFlight = assertIs<SplitTunnelUiState.Content>(vm.uiState.value)
+        assertEquals("bar", inFlight.query)
+        assertEquals(listOf("com.user.bar"), inFlight.apps.map { it.packageName })
+
+        refreshProvider.completeRefresh(
+            listOf(
+                InstalledApp("com.user.bar", "Bar Updated", isSystem = false),
+                InstalledApp("com.user.new", "New", isSystem = false),
+            ),
+        )
+        advanceUntilIdle()
+
+        val refreshed = assertIs<SplitTunnelUiState.Content>(vm.uiState.value)
+        assertEquals("bar", refreshed.query)
+        assertEquals(listOf("com.user.bar"), refreshed.apps.map { it.packageName })
+    }
+
+    private class FakeAppListProvider(apps: List<InstalledApp>) : AppListProvider {
+        private val events = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
+        private var currentApps = apps
+        var refreshCalls = 0
+        override val packageChanges: Flow<Unit> = events.asSharedFlow()
+        override suspend fun loadApps(): List<InstalledApp> = currentApps
+        override suspend fun refreshApps(): List<InstalledApp> {
+            refreshCalls += 1
+            return currentApps
+        }
         override suspend fun loadIcon(packageName: String): androidx.compose.ui.graphics.ImageBitmap? = null
     }
 
     private class GatedAppListProvider : AppListProvider {
         private val signal = CompletableDeferred<List<InstalledApp>>()
+        override val packageChanges: Flow<Unit> = MutableSharedFlow<Unit>()
         override suspend fun loadApps(): List<InstalledApp> = signal.await()
+        override suspend fun refreshApps(): List<InstalledApp> = signal.await()
         override suspend fun loadIcon(packageName: String): androidx.compose.ui.graphics.ImageBitmap? = null
         fun complete(apps: List<InstalledApp>) {
             signal.complete(apps)
+        }
+    }
+
+    private class RefreshGatedAppListProvider(initialApps: List<InstalledApp>) : AppListProvider {
+        private val events = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
+        private var currentApps = initialApps
+        private var refreshSignal = CompletableDeferred<List<InstalledApp>>()
+        var refreshCalls = 0
+        override val packageChanges: Flow<Unit> = events.asSharedFlow()
+        override suspend fun loadApps(): List<InstalledApp> = currentApps
+        override suspend fun refreshApps(): List<InstalledApp> {
+            refreshCalls += 1
+            val refreshed = refreshSignal.await()
+            currentApps = refreshed
+            refreshSignal = CompletableDeferred()
+            return refreshed
+        }
+        override suspend fun loadIcon(packageName: String): androidx.compose.ui.graphics.ImageBitmap? = null
+        fun completeRefresh(apps: List<InstalledApp>) {
+            refreshSignal.complete(apps)
+        }
+        fun emitPackageChange() {
+            events.tryEmit(Unit)
         }
     }
 

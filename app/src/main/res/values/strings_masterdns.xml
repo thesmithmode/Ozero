@@ -34,6 +34,8 @@
     <string name="masterdns_deploy_state_starting_container">Запуск контейнера…</string>
     <string name="masterdns_deploy_state_extracting_key">Извлечение ключа шифрования…</string>
     <string name="masterdns_deploy_state_done">Сервер развёрнут, конфигурация заполнена</string>
+    <string name="masterdns_deploy_error_port_busy_structured">Порт 53 уже занят: владелец %1$s, адрес %2$s, протокол %3$s. Освободите порт и попробуйте снова.</string>
+    <string name="masterdns_deploy_error_port_busy_details">Порт 53 уже занят на сервере: %1$s. Освободите конфликт и попробуйте снова.</string>
     <string name="masterdns_deploy_error_port_busy">Порт 53/UDP уже занят на сервере. Освободите порт и попробуйте снова.</string>
     <string name="masterdns_deploy_error_resources">Недостаточно ресурсов: нужно ≥512 МБ RAM и ≥1 ГБ дискового пространства.</string>
     <string name="masterdns_deploy_error_docker">Не удалось установить Docker. Проверьте доступ к интернету на сервере.</string>
@@ -44,6 +46,7 @@
     <string name="masterdns_deploy_error_sudo_no_home">Домашняя директория пользователя недоступна. Проверьте права доступа.</string>
     <string name="masterdns_deploy_error_sudo_not_in_group">Пользователь не в группе sudo/wheel. Добавьте: usermod -aG sudo пользователь.</string>
     <string name="masterdns_deploy_error_build">Ошибка сборки образа. Проверьте интернет-соединение сервера.</string>
+    <string name="masterdns_deploy_error_build_bin_missing">Не найден исполняемый файл MasterDNS в release-asset или выводе installer. Повторите позже; если ошибка повторяется, установите сервер вручную и пришлите лог деплоя.</string>
     <string name="masterdns_deploy_error_run">Не удалось запустить контейнер.</string>
     <string name="masterdns_deploy_error_key">Не удалось извлечь ключ шифрования из контейнера.</string>
     <string name="masterdns_deploy_error_auth">Ошибка аутентификации. Проверьте логин и пароль.</string>
@@ -55,4 +58,10 @@
     <string name="masterdns_deploy_state_removed">Сервер удалён</string>
     <string name="masterdns_deploy_error_remove">Не удалось удалить сервер.</string>
     <string name="masterdns_deploy_error_unexpected">Непредвиденная ошибка. Попробуйте снова.</string>
+    <string name="masterdns_amnezia_dns_conflict_title">Порт 53 занят Amnezia DNS</string>
+    <string name="masterdns_amnezia_dns_conflict_text">На сервере найден контейнер &quot;amnezia-dns&quot;, использующий DNS-порт 53. MasterDNS не может продолжить установку, пока этот контейнер активен. Можно отменить деплой или безопасно удалить только этот контейнер и продолжить установку.</string>
+    <string name="masterdns_amnezia_dns_conflict_cancel">Отменить деплой</string>
+    <string name="masterdns_amnezia_dns_conflict_remove_continue">Удалить amnezia-dns и продолжить</string>
+    <string name="masterdns_deploy_error_amnezia_dns_cancelled">Деплой отменён из-за контейнера amnezia-dns.</string>
+    <string name="masterdns_deploy_error_amnezia_dns_remove_failed">Не удалось удалить контейнер amnezia-dns.</string>
 </resources>

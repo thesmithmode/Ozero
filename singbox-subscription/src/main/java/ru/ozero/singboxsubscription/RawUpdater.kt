@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import javax.net.ssl.SSLHandshakeException
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
@@ -24,10 +25,14 @@ class RawUpdater(
 ) {
     suspend fun refresh(group: SubscriptionGroup): Result<Int> = withContext(Dispatchers.IO) {
         runCatching<Int> {
-            val request = Request.Builder().url(group.subscriptionUrl).build()
+            val request = Request.Builder()
+                .url(group.subscriptionUrl)
+                .header("User-Agent", USER_AGENT)
+                .header("Accept", "text/plain, application/json, application/yaml, text/yaml, */*")
+                .build()
             okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    error("HTTP ${response.code} for ${group.name}")
+                    error("Subscription HTTP ${response.code}")
                 }
                 val body = response.body?.string() ?: ""
                 val subInfo = SubscriptionInfoParser.parse(response.header("Subscription-Userinfo"))
@@ -60,11 +65,13 @@ class RawUpdater(
                     ),
                 )
 
-                Log.i(TAG, "refresh ok group=${group.name} servers=${profiles.size}")
+                Log.i(TAG, "refresh ok groupId=${group.id} servers=${profiles.size}")
                 profiles.size
             }
+        }.recoverCatching { e ->
+            throw normalizeError(e)
         }.onFailure { e ->
-            Log.w(TAG, "refresh failed group=${group.name}: ${e.message}")
+            Log.w(TAG, "refresh failed groupId=${group.id}: ${e.message}")
         }
     }
 
@@ -74,6 +81,14 @@ class RawUpdater(
         const val PROTOCOL_VMESS = 1
         const val PROTOCOL_TROJAN = 2
         const val PROTOCOL_SHADOWSOCKS = 3
+
+        private const val USER_AGENT = "Ozero/1 sing-box-subscription"
+
+        private fun normalizeError(e: Throwable): Throwable = when {
+            e is SSLHandshakeException && e.message?.contains("Chain validation failed", ignoreCase = true) == true ->
+                SSLHandshakeException("Subscription TLS certificate chain validation failed")
+            else -> e
+        }
 
         fun protocolTypeOf(bean: ru.ozero.singboxfmt.AbstractBean): Int = when (bean) {
             is ru.ozero.singboxfmt.VLESSBean -> PROTOCOL_VLESS

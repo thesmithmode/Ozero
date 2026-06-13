@@ -42,6 +42,41 @@ class MainScreenDockSentinelTest {
     }
 
     @Test
+    fun `expertDockTabs uses tab_tunneling while simple keeps tab_split_tunnel`() {
+        val simpleBody = extractFunBody(source, "simpleDockTabs")
+        val expertBody = extractFunBody(source, "expertDockTabs")
+        assertTrue(
+            simpleBody.contains("R.string.tab_split_tunnel") &&
+                !simpleBody.contains("R.string.tab_tunneling"),
+            "simpleDockTabs должен сохранить короткий split label, иначе простой dock снова переполнится.",
+        )
+        assertTrue(
+            expertBody.contains("R.string.tab_tunneling") &&
+                !expertBody.contains("R.string.tab_split_tunnel"),
+            "expertDockTabs должен использовать отдельный tab_tunneling label.",
+        )
+    }
+
+    @Test
+    fun `tab_tunneling resources exist for baseline locales`() {
+        val repoRoot = locateRepoRoot()
+        val expected = mapOf(
+            "values/strings.xml" to "Туннелирование",
+            "values-en/strings.xml" to "Tunneling",
+            "values-es/strings.xml" to "Túnel",
+            "values-pt/strings.xml" to "Túnel",
+        )
+        expected.forEach { (path, label) ->
+            val file = File(repoRoot, "app/src/main/res/$path")
+            assertTrue(file.isFile, "strings.xml не найден: ${file.absolutePath}")
+            assertTrue(
+                file.readText().contains("""<string name="tab_tunneling">$label</string>"""),
+                "tab_tunneling должен быть '$label' в $path",
+            )
+        }
+    }
+
+    @Test
     fun `SimpleMainContent использует simpleDockTabs а не expertDockTabs`() {
         val body = extractFunBody(source, "SimpleMainContent")
         assertTrue(

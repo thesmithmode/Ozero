@@ -479,7 +479,11 @@ class StartSequenceCoordinator(
         }
         Log.i(TAG, "chain result=$chainResult engineId=$engineId")
         if (chainResult !is ChainResult.Success) {
-            reportEngineFailure(engineId, chainResult?.toString() ?: "timeout", notifyFailure)
+            val reason = when (chainResult) {
+                is ChainResult.Failure -> chainResult.reason
+                else -> "timeout"
+            }
+            reportEngineFailure(engineId, reason, notifyFailure)
             return null
         }
         deps.tunnelController.onConnecting(engineId)
@@ -561,7 +565,10 @@ class StartSequenceCoordinator(
         PersistentLoggers.warn(TAG, "auto-mode: retry next candidate after $engineId failure")
         runCatching { state.tunFdRef.getAndSet(null)?.close() }
         runCatching { deps.chainOrchestrator.stop() }
-        deps.tunnelController.onDisconnecting()
+        val state = deps.tunnelController.state.value
+        if (state is TunnelState.Connected || state is TunnelState.Connecting || state is TunnelState.Probing) {
+            deps.tunnelController.onDisconnecting()
+        }
         deps.tunnelController.reset()
     }
 

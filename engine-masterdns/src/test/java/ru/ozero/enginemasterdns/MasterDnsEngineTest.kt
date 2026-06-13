@@ -30,7 +30,7 @@ class MasterDnsEngineTest {
         val engine = makeEngine(service = FakeService())
         val c = engine.capabilities
         assertTrue(c.supportsTcp)
-        assertFalse(c.supportsUdp)
+        assertTrue(c.supportsUdp)
         assertFalse(c.supportsDoH)
         assertFalse(c.localOnly)
         assertTrue(c.requiresServer)

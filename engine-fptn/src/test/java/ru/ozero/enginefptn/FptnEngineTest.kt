@@ -10,13 +10,17 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
+import java.io.File
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class FptnEngineTest {
 
@@ -74,14 +78,16 @@ class FptnEngineTest {
     @Test
     fun `start with unknown token prefix returns failure`() = runTest {
         val result = engine.start(EngineConfig.Fptn(token = "notfptn:abc"), Upstream.None)
-        assertIs<StartResult.Failure>(result)
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals(FptnEngine.FPTN_INVALID_TOKEN, failure.reason)
     }
 
     @Test
     fun `start with malformed base64 returns failure`() = runTest {
         every { Base64.decode(any<String>(), any<Int>()) } throws IllegalArgumentException("bad")
         val result = engine.start(EngineConfig.Fptn(token = "fptn:!!!"), Upstream.None)
-        assertIs<StartResult.Failure>(result)
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals(FptnEngine.FPTN_INVALID_TOKEN, failure.reason)
     }
 
     @Test
@@ -140,7 +146,7 @@ class FptnEngineTest {
     }
 
     @Test
-    fun `manual selected server is tried before remaining fallback candidates`() {
+    fun `manual selected server is the only candidate`() {
         val tokenData = tokenData(
             server("S1"),
             server("S2"),
@@ -152,7 +158,242 @@ class FptnEngineTest {
             tokenData,
         )
 
-        assertEquals(listOf("S2", "S1", "S3"), result.map { it.name })
+        assertEquals(listOf("S2"), result.map { it.name })
+    }
+
+    @Test
+    fun `manual missing selected server has no fallback candidates`() {
+        val tokenData = tokenData(
+            server("S1"),
+            server("S2"),
+        )
+
+        val result = engine.selectServerCandidates(
+            EngineConfig.Fptn(autoSelect = false, selectedServerName = "S9"),
+            tokenData,
+        )
+
+        assertEquals(emptyList(), result)
+    }
+
+    @Test
+    fun `autoSelect runtime server selection uses only first token server`() {
+        val tokenData = tokenData(
+            server("S1"),
+            server("S2"),
+            server("S3"),
+        )
+
+        val result = engine.selectServer(
+            EngineConfig.Fptn(autoSelect = true, selectedServerName = "S2"),
+            tokenData,
+        )
+
+        assertEquals("S1", result?.name)
+    }
+
+    @Test
+    fun `manual runtime server selection does not append fallback candidates`() {
+        val tokenData = tokenData(
+            server("S1"),
+            server("S2"),
+            server("S3"),
+        )
+
+        val result = engine.selectServer(
+            EngineConfig.Fptn(autoSelect = false, selectedServerName = "S2"),
+            tokenData,
+        )
+
+        assertEquals("S2", result?.name)
+    }
+
+    @Test
+    fun `start runtime path keeps auto fallback inside bounded budget`() {
+        val source = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginefptn/FptnEngine.kt",
+        ).readText()
+        val startBody = source.substringAfter("override suspend fun start(")
+            .substringBefore("override suspend fun attachTun(")
+
+        assertTrue(
+            startBody.contains("selectServerCandidates(fptn, tokenData)"),
+            "FPTN start must preserve the auto candidate list for multi-server fallback.",
+        )
+        assertTrue(
+            startBody.contains("authenticateFirstAvailable(") &&
+                startBody.contains("candidates = candidates"),
+            "FPTN auto start must try later token servers when earlier authentication fails.",
+        )
+        assertTrue(
+            startBody.contains("STARTUP_AUTH_BUDGET_MS") &&
+                source.contains("AUTO_AUTH_CANDIDATE_TIMEOUT_S") &&
+                source.contains("authTimeoutSeconds(") &&
+                source.contains("perCandidateMaxTimeoutS") &&
+                source.contains("deadlineMs"),
+            "FPTN fallback must preserve one bounded startup budget without a health preselect gate.",
+        )
+        assertFalse(
+            source.contains("AUTO_AUTH_MAX_CANDIDATES") ||
+                source.contains(".take(AUTO_AUTH_MAX_CANDIDATES)"),
+            "FPTN startup auth must not cap auto candidates to a health-preselected top list.",
+        )
+        assertFalse(
+            source.contains("listOf(selected) + data.servers.filterNot"),
+            "Manual FPTN selection must not silently append fallback candidates.",
+        )
+    }
+
+    @Test
+    fun `startup auth preserves selected token order before any health order`() {
+        val candidates = listOf(
+            server("France-1"),
+            server("France-2"),
+            server("France-3"),
+            server("France-4"),
+            server("France-5"),
+            server("Estonia-1"),
+        )
+
+        val ordered = fptnStartupAuthCandidates(candidates)
+
+        assertEquals(
+            listOf("France-1", "France-2", "France-3", "France-4", "France-5", "Estonia-1"),
+            ordered.map { it.name },
+        )
+    }
+
+    @Test
+    fun `startup auth does not cap auto candidates to health top three`() {
+        val candidates = (1..28).map { server("S$it") }
+
+        val ordered = fptnStartupAuthCandidates(candidates)
+
+        assertEquals(28, ordered.size)
+        assertEquals(listOf("S1", "S2", "S3", "S4", "S5"), ordered.take(5).map { it.name })
+        assertEquals("S28", ordered.last().name)
+    }
+
+    @Test
+    fun `auto auth candidate timeout stays at baseline five seconds`() {
+        assertEquals(5, fptnStartupAuthPerCandidateTimeoutS(candidateCount = 28))
+        assertEquals(15, fptnStartupAuthPerCandidateTimeoutS(candidateCount = 1))
+        assertFalse(fptnStartupAuthPerCandidateTimeoutS(candidateCount = 28) == 3)
+    }
+
+    @Test
+    fun `startup auth failure reason remains structured for candidate failures`() {
+        val reason = startupFptnFailureReason(
+            failures = listOf(
+                FptnEngine.FPTN_AUTH_TIMEOUT,
+                FptnEngine.FPTN_AUTH_TIMEOUT,
+                FptnEngine.FPTN_AUTH_TIMEOUT,
+            ),
+            candidateCount = 28,
+        )
+
+        assertEquals("${FptnEngine.FPTN_ALL_CANDIDATES_FAILED}: ${FptnEngine.FPTN_AUTH_TIMEOUT}", reason)
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            startupFptnFailureReason(listOf(FptnEngine.FPTN_TOKEN_REJECTED), candidateCount = 28),
+        )
+    }
+
+    @Test
+    fun `exit node strategy exposes resolved server ip and flag source`() {
+        val strategy = fptnExitNodeStrategy(
+            server("Berlin").copy(countryCode = "de"),
+            serverIp = "198.51.100.70",
+        )
+
+        val label = assertIs<ExitNodeStrategy.ProviderLabel>(strategy)
+        assertEquals("198.51.100.70", label.ip)
+        assertEquals("DE", label.countryCode)
+        assertTrue(label.label.isNotBlank())
+    }
+
+    @Test
+    fun `authentication fallback is cancellation cooperative`() {
+        val source = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginefptn/FptnEngine.kt",
+        ).readText()
+        val fallbackBody = source.substringAfter("private suspend fun authenticateFirstAvailable(")
+            .substringBefore("private suspend fun authenticate(")
+        val authenticateBody = source.substringAfter("private suspend fun authenticate(")
+            .substringBefore("private data class AuthenticatedServer")
+
+        assertTrue(
+            fallbackBody.contains("currentCoroutineContext().ensureActive()"),
+            "FPTN fallback loop must stop before trying more servers after lifecycle cancellation.",
+        )
+        assertTrue(
+            authenticateBody.contains("currentCoroutineContext().ensureActive()"),
+            "FPTN single-server authentication must observe cancellation around native calls.",
+        )
+        assertTrue(
+            authenticateBody.contains("catch (e: CancellationException)") &&
+                authenticateBody.contains("throw e"),
+            "FPTN authentication must not swallow coroutine cancellation as a generic auth failure.",
+        )
+    }
+
+    @Test
+    fun `websocket receives resolved server ip instead of token host`() {
+        val source = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginefptn/FptnEngine.kt",
+        ).readText()
+        val attachBody = source.substringAfter("override suspend fun attachTun(")
+            .substringBefore("override suspend fun awaitReady()")
+        val fallbackBody = source.substringAfter("private suspend fun authenticateFirstAvailable(")
+            .substringBefore("private suspend fun authenticate(")
+        val resolverBody = source.substringAfter("private suspend fun resolveServerIp(")
+            .substringBefore("private data class AuthenticatedServer")
+
+        assertTrue(
+            fallbackBody.contains("resolveServerIp(server)") &&
+                source.contains("val serverIp: String"),
+            "FPTN login success must carry a resolved IPv4 into the WebSocket layer.",
+        )
+        assertTrue(
+            resolverBody.contains("InetAddress.getAllByName(server.host)") &&
+                resolverBody.contains("Inet4Address"),
+            "FPTN must match upstream ResolveDomain before native WebSocket, which accepts IPv4.",
+        )
+        assertTrue(
+            attachBody.contains("serverIp = serverIp"),
+            "nativeCreate must receive resolved serverIp, not raw token host.",
+        )
+        assertFalse(
+            attachBody.contains("serverIp = server.host"),
+            "Raw token host can be a DNS name; C++ wrapper parses serverIp as IPv4Address.",
+        )
+    }
+
+    @Test
+    fun `auth failure classifier maps startup failure reasons`() {
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            classifyFptnAuthFailure(FptnNativeResponse(401, "", "")),
+        )
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            classifyFptnAuthFailure(FptnNativeResponse(403, "", "")),
+        )
+        assertEquals(
+            FptnEngine.FPTN_AUTH_TIMEOUT,
+            classifyFptnAuthFailure(FptnNativeResponse(608, "", "Operation timeout")),
+        )
+        assertEquals(
+            FptnEngine.FPTN_DNS_FAILED,
+            classifyFptnAuthFailure(error = "UnknownHostException resolve failed"),
+        )
+        assertEquals(
+            FptnEngine.FPTN_API_ERROR,
+            classifyFptnAuthFailure(FptnNativeResponse(500, "", "internal server error")),
+        )
     }
 
     @Test

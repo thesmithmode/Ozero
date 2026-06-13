@@ -15,13 +15,13 @@ object ConfigBuilder {
 
     private val SUPPORTED_TRANSPORTS = setOf("tcp", "ws", "grpc", "http", "h2", "httpupgrade", "")
 
-    fun buildSingboxConfig(bean: AbstractBean): String {
+    fun buildSingboxConfig(bean: AbstractBean, probeSocksPort: Int? = null): String {
         require(isSupportedBean(bean)) { "Unsupported transport: ${(bean as? StandardV2RayBean)?.type}" }
         val outbound = beanOutbound(bean, "proxy")
-        return buildFullConfig(listOf(outbound))
+        return buildFullConfig(listOf(outbound), probeSocksPort)
     }
 
-    fun buildSingboxAutoConfig(beans: List<AbstractBean>): String {
+    fun buildSingboxAutoConfig(beans: List<AbstractBean>, probeSocksPort: Int? = null): String {
         val supported = beans.filter { isSupportedBean(it) }
         require(supported.isNotEmpty()) { "no beans with supported transport types" }
         val proxyOutbounds = supported.mapIndexed { index, bean -> beanOutbound(bean, "proxy-$index") }
@@ -32,7 +32,7 @@ object ConfigBuilder {
             append(""""interval":"3m","tolerance":50,""")
             append(""""interrupt_exist_connections":true,"idle_timeout":"30m"}""")
         }
-        return buildFullConfig(listOf(urltest) + proxyOutbounds)
+        return buildFullConfig(listOf(urltest) + proxyOutbounds, probeSocksPort)
     }
 
     fun isSupportedBean(bean: AbstractBean): Boolean {
@@ -71,9 +71,10 @@ object ConfigBuilder {
     fun buildProfileChainConfig(
         selected: AbstractBean,
         wrappers: List<AbstractBean>,
+        probeSocksPort: Int? = null,
     ): String {
         val outbounds = profileChainOutbounds(selected, wrappers)
-        return buildFullConfig(outbounds)
+        return buildFullConfig(outbounds, probeSocksPort)
     }
 
     fun buildProfileChainProxyConfig(
@@ -110,12 +111,16 @@ object ConfigBuilder {
         else -> error("Unsupported bean type: ${bean::class.simpleName}")
     }
 
-    private fun buildFullConfig(proxyOutbounds: List<String>): String {
+    private fun buildFullConfig(proxyOutbounds: List<String>, probeSocksPort: Int? = null): String {
         val sb = StringBuilder()
         sb.append('{')
         sb.append(""""log":{"level":"warn","timestamp":true},""")
         sb.append(""""inbounds":[""")
         sb.append(tunInbound())
+        if (probeSocksPort != null && probeSocksPort > 0) {
+            sb.append(',')
+            sb.append(socksInbound(probeSocksPort))
+        }
         sb.append("""],""")
         sb.append(""""outbounds":[""")
         proxyOutbounds.forEachIndexed { i, outbound ->
@@ -298,13 +303,16 @@ private fun shadowsocksOutbound(bean: ShadowsocksBean, tag: String, detour: Stri
 }
 
 private fun buildTransport(bean: StandardV2RayBean): String? = when (bean.type) {
-    "ws" -> buildMap(
-        "type" to "ws",
-        "path" to (bean.path.ifEmpty { "/" }),
-        "headers" to if (bean.host.isNotEmpty()) """{"Host":${jsonString(bean.host)}}""" else "{}",
-        "max_early_data" to bean.maxEarlyData.toString(),
-        "early_data_header_name" to bean.earlyDataHeaderName,
-    )
+    "ws" -> {
+        val legacyEarlyData = bean.earlyDataHeaderName.toIntOrNull().takeIf { bean.maxEarlyData <= 0 }
+        buildMap(
+            "type" to "ws",
+            "path" to (bean.path.ifEmpty { "/" }),
+            "headers" to if (bean.host.isNotEmpty()) """{"Host":${jsonString(bean.host)}}""" else "{}",
+            "max_early_data" to (bean.maxEarlyData.takeIf { it > 0 } ?: legacyEarlyData ?: 0).toString(),
+            "early_data_header_name" to bean.earlyDataHeaderName.takeUnless { legacyEarlyData != null }.orEmpty(),
+        )
+    }
     "grpc" -> buildMap(
         "type" to "grpc",
         "service_name" to bean.grpcServiceName,
@@ -334,7 +342,7 @@ private fun buildTls(bean: StandardV2RayBean): String? {
 
     val sb = StringBuilder()
     sb.append("""{"enabled":true,""")
-    sb.append(""""server_name":${jsonString(bean.sni.ifEmpty { bean.serverAddress })},""")
+    sb.append(""""server_name":${jsonString(tlsServerName(bean))},""")
 
     if (bean.alpn.isNotEmpty()) {
         val alpns = bean.alpn.split(",").joinToString(",") { jsonString(it.trim()) }
@@ -363,14 +371,20 @@ private fun buildTls(bean: StandardV2RayBean): String? {
     return sb.toString()
 }
 
+private fun tlsServerName(bean: StandardV2RayBean): String {
+    if (bean.sni.isNotEmpty()) return bean.sni
+    val host = bean.host.trim()
+    return if (host.isNotEmpty() && "," !in host && ";" !in host) host else bean.serverAddress
+}
+
 private fun buildMap(vararg pairs: Pair<String, String>): String {
     val fields = pairs.filter { (_, v) -> v.isNotEmpty() && v != "0" && v != "[]" && v != "{}" }
         .joinToString(",") { (k, v) ->
-            val isLiteral = v.startsWith("{") ||
+            val isLiteral = k == "max_early_data" ||
+                v.startsWith("{") ||
                 v.startsWith("[") ||
                 v == "true" ||
-                v == "false" ||
-                v.all { c -> c.isDigit() }
+                v == "false"
             val value = if (isLiteral) {
                 v
             } else {

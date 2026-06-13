@@ -6,38 +6,41 @@ import kotlin.test.assertTrue
 
 class MainViewModelCancellationRethrowTest {
 
-    private val source by lazy {
-        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
-        val f = File(moduleRoot, "src/main/java/ru/ozero/app/ui/MainViewModel.kt")
-        assertTrue(f.exists(), "MainViewModel.kt не найден: $f")
-        f.readText()
+    private val mainSource by lazy {
+        source("src/main/java/ru/ozero/app/ui/MainViewModel.kt")
+    }
+
+    private val resolverSource by lazy {
+        source("src/main/java/ru/ozero/app/ui/ExitNodeResolver.kt")
     }
 
     @Test
-    fun `IP resolve init block использует collectLatest — race guard на старый IP после disconnect`() {
-        val initBlock = source.substringAfter("init {").substringBefore("fun refreshIpInfo")
+    fun `IP resolve init block uses collectLatest to cancel stale resolution`() {
+        val initBlock = mainSource.substringAfter("init {").substringBefore("fun refreshIpInfo")
         val ipResolveSection = initBlock.substringAfter("lastSessionKey: String?")
-            .substringBefore("private fun")
+            .substringBefore("fun onConnectClick")
         assertTrue(
             ipResolveSection.contains("tunnelController.state.collectLatest"),
-            "IP resolve init block обязан использовать collectLatest, не collect. " +
-                "Race: connect → 3s warmup + resolveIpInfoWithRetry в полёте → disconnect → state=Idle сбрасывает " +
-                "_ipInfo, старый callback дописывает Loaded поверх Idle. " +
-                "collectLatest cancel'ит in-flight resolve на новой emission.",
+            "IP resolve must use collectLatest so disconnect cancels in-flight exit-node resolution.",
         )
     }
 
     @Test
-    fun `Result_toState rethrows CancellationException в onFailure`() {
-        val body = source
+    fun `Result toState rethrows CancellationException`() {
+        val body = resolverSource
             .substringAfter("private fun Result<IpInfo>.toState")
-            .substringBefore("fun onConnectClick")
+            .substringBeforeLast("}")
         assertTrue(
             body.contains("if (it is kotlinx.coroutines.CancellationException) throw it") ||
                 body.contains("if (it is CancellationException) throw it"),
-            "Result.toState() обязан re-throw CancellationException в onFailure — иначе " +
-                "viewModelScope.cancel() превращается в IpInfoState.Error на финальной попытке. " +
-                "Body:\n$body",
+            "Result.toState() must rethrow CancellationException instead of converting cancellation to Error.",
         )
+    }
+
+    private fun source(path: String): String {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val file = File(moduleRoot, path)
+        assertTrue(file.exists(), "source not found: $file")
+        return file.readText()
     }
 }

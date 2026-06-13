@@ -5,5 +5,5 @@ data class FptnServer(
     val host: String,
     val port: Int,
     val md5Fingerprint: String,
-    val countryCode: String,
+    val countryCode: String?,
 )

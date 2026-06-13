@@ -469,7 +469,7 @@ class StrategyTestViewModelTest {
         settingsStore.stored = StrategyTestSettings(
             evolutionMode = true, evolutionMaxGenerations = 1, evolutionPopulationSize = 2,
         )
-        assets = FakeAssetSource(strategies = listOf("-cmd1", "-cmd2"), sites = listOf("s1"))
+        assets = FakeAssetSource(strategies = listOf("-K -An -s2", "-Ku -a1 -An"), sites = listOf("s1"))
         val vm = newVm(sites = listOf("s1"))
         advanceUntilIdle()
         vm.onStart()
@@ -482,7 +482,7 @@ class StrategyTestViewModelTest {
         settingsStore.stored = StrategyTestSettings(
             evolutionMode = true, evolutionMaxGenerations = 2, evolutionPopulationSize = 2,
         )
-        assets = FakeAssetSource(strategies = listOf("-cmd1"), sites = listOf("s1"))
+        assets = FakeAssetSource(strategies = listOf("-K -An -s2"), sites = listOf("s1"))
         val vm = newVm(sites = listOf("s1"))
         advanceUntilIdle()
         vm.onStart()
@@ -496,7 +496,7 @@ class StrategyTestViewModelTest {
             settingsStore.stored = StrategyTestSettings(
                 evolutionMode = true, evolutionMaxGenerations = 2, evolutionPopulationSize = 2,
             )
-            assets = FakeAssetSource(strategies = listOf("-cmd1"), sites = listOf("s1"))
+            assets = FakeAssetSource(strategies = listOf("-K -An -s2"), sites = listOf("s1"))
             val vm = newVm(sites = listOf("s1"))
             advanceUntilIdle()
             val before = vm.savedStrategies.value.size

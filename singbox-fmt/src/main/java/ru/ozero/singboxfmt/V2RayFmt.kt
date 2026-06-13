@@ -53,7 +53,8 @@ object V2RayFmt {
     private fun parseWsParams(bean: VLESSBean, parsed: UriCompat) {
         bean.host = parsed.getQueryParameter("host") ?: ""
         bean.path = parsed.getQueryParameter("path") ?: "/"
-        bean.earlyDataHeaderName = parsed.getQueryParameter("ed") ?: ""
+        bean.maxEarlyData = parsed.getQueryParameter("ed")?.toIntOrNull() ?: 0
+        bean.earlyDataHeaderName = parsed.getQueryParameter("eh") ?: ""
     }
 
     private fun parseHttpParams(bean: VLESSBean, parsed: UriCompat) {

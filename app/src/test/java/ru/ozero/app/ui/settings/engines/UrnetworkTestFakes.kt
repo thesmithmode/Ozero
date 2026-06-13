@@ -31,7 +31,12 @@ internal fun fakeUrnetworkConfigStoreWithJwt(jwt: String = "test-jwt"): Urnetwor
         ru.ozero.engineurnetwork.UrnetworkConfig(walletOverride = "0xWALLET", byClientJwt = jwt),
     )
 
-internal data class FakeLocationToken(override val countryCode: String?) : UrnetworkSdkBridge.LocationToken
+internal data class FakeLocationToken(
+    override val countryCode: String?,
+    override val region: String? = null,
+    override val city: String? = null,
+    override val bestAvailable: Boolean = false,
+) : UrnetworkSdkBridge.LocationToken
 
 internal class FakeUrnetworkBridge(
     private val connected: Boolean = false,

@@ -1,5 +1,6 @@
 package ru.ozero.enginebyedpi.strategy
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import ru.ozero.enginescore.EngineCapabilities
@@ -40,6 +41,7 @@ internal class AlwaysFailEngine : EnginePlugin {
 
 internal class CountingEngine : EnginePlugin {
     var startCount = 0
+    var stopCount = 0
     override val id = EngineId.BYEDPI
     override val capabilities = EngineCapabilities(
         supportsTcp = true, supportsUdp = false, supportsDoH = false,
@@ -50,7 +52,30 @@ internal class CountingEngine : EnginePlugin {
         startCount++
         return StartResult.Success(socksPort = 1080)
     }
-    override suspend fun stop() = Unit
+    override suspend fun stop() {
+        stopCount++
+    }
+    override suspend fun probe(): ru.ozero.enginescore.ProbeResult =
+        ru.ozero.enginescore.ProbeResult.Success(latencyMs = 0)
+}
+
+internal class HangingStartEngine : EnginePlugin {
+    var startCount = 0
+    var stopCount = 0
+    override val id = EngineId.BYEDPI
+    override val capabilities = EngineCapabilities(
+        supportsTcp = true, supportsUdp = false, supportsDoH = false,
+        localOnly = true, requiresServer = false, supportsUpstreamSocks = false,
+    )
+    override fun stats(): Flow<EngineStats> = MutableStateFlow(EngineStats())
+    override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
+        startCount++
+        delay(Long.MAX_VALUE)
+        return StartResult.Failure("unreachable")
+    }
+    override suspend fun stop() {
+        stopCount++
+    }
     override suspend fun probe(): ru.ozero.enginescore.ProbeResult =
         ru.ozero.enginescore.ProbeResult.Success(latencyMs = 0)
 }

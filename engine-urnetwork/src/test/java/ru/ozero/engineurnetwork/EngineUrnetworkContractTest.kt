@@ -8,6 +8,7 @@ import ru.ozero.engineurnetwork.auth.GuestJwtResult
 import ru.ozero.engineurnetwork.auth.UrnetworkAuthService
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import kotlin.test.assertEquals
@@ -243,6 +244,26 @@ class EngineUrnetworkContractTest {
     }
 
     @Test
+    fun `exitNodeStrategy returns AutoSelected when selectedLocation is null`() = runTest {
+        val (e, _, _) = engine()
+        val strategy = e.exitNodeStrategy(0)
+        assertIs<ExitNodeStrategy.AutoSelected>(strategy)
+    }
+
+    @Test
+    fun `exitNodeStrategy returns AutoSelected when selectedLocation is SDK best available token`() = runTest {
+        val bridge = FakeUrnetworkSdkBridge().also {
+            it.selectedLocationResult = object : UrnetworkSdkBridge.LocationToken {
+                override val countryCode = null
+                override val bestAvailable = true
+            }
+        }
+        val (e, _, _) = engine(bridge = bridge)
+        val strategy = e.exitNodeStrategy(0)
+        assertIs<ExitNodeStrategy.AutoSelected>(strategy)
+    }
+
+    @Test
     fun `ipProbeRoute возвращает StaticLocation с кодом когда selectedLocation валидный`() = runTest {
         val bridge = FakeUrnetworkSdkBridge().also {
             it.selectedLocationResult = object : UrnetworkSdkBridge.LocationToken {
@@ -259,6 +280,25 @@ class EngineUrnetworkContractTest {
         assertIs<ru.ozero.enginescore.IpProbeRoute.StaticLocation>(route)
         assertEquals("IN", route.countryCode)
         assertEquals("India", route.country)
+    }
+
+    @Test
+    fun `exitNodeStrategy returns LocationOnly when selectedLocation is valid`() = runTest {
+        val bridge = FakeUrnetworkSdkBridge().also {
+            it.selectedLocationResult = object : UrnetworkSdkBridge.LocationToken {
+                override val countryCode = "IN"
+            }
+            it.locationInfoResult = UrnetworkSdkBridge.LocationInfo(
+                country = "India",
+                countryCode = "IN",
+                name = "India",
+            )
+        }
+        val (e, _, _) = engine(bridge = bridge)
+        val strategy = e.exitNodeStrategy(0)
+        val location = assertIs<ExitNodeStrategy.LocationOnly>(strategy)
+        assertEquals("IN", location.countryCode)
+        assertEquals("India", location.country)
     }
 
     @Test

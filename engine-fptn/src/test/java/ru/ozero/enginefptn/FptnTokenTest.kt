@@ -125,6 +125,33 @@ class FptnTokenTest {
     }
 
     @Test
+    fun `should parse camel case countryCode`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"S","host":"h","port":1,"countryCode":"br"}]}"""
+        val result = FptnToken.parse("fptn:${encode(json)}")
+        assertNotNull(result)
+        assertEquals("BR", result.servers[0].countryCode)
+    }
+
+    @Test
+    fun `should keep country code null when token has no country metadata`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"S","host":"h","port":1}]}"""
+        val result = FptnToken.parse("fptn:${encode(json)}")
+        assertNotNull(result)
+        assertNull(result.servers[0].countryCode)
+    }
+
+    @Test
+    fun `should not keep invalid country code as question marks`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"S","host":"h","port":1,"country_code":"??"}]}"""
+        val result = FptnToken.parse("fptn:${encode(json)}")
+        assertNotNull(result)
+        assertNull(result.servers[0].countryCode)
+    }
+
+    @Test
     fun `toString should not expose username or password`() {
         val json = """{"username":"sensitive_user","password":"secret_pass",
             "servers":[{"name":"S","host":"h","port":1}]}"""

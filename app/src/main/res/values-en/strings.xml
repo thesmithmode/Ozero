@@ -32,6 +32,7 @@
     <string name="tab_settings">Settings</string>
     <string name="tab_servers">Params</string>
     <string name="tab_split_tunnel">Split Tunneling</string>
+    <string name="tab_tunneling">Tunneling</string>
     <string name="tab_diagnostics">Diagnostics</string>
     <string name="tab_stats">Stats</string>
     <string name="tab_subs">Subscription</string>
@@ -236,6 +237,10 @@
     <string name="evolution_population_label">Best strategies</string>
     <string name="evolution_initializing">Preparing population…</string>
     <string name="evolution_stagnating">Stuck — exploring new variants…</string>
+    <string name="evolution_phase_candidate_building">Building candidates</string>
+    <string name="evolution_phase_initial_population">Evaluating initial population</string>
+    <string name="evolution_phase_generation_fmt">Generation %1$d/%2$d</string>
+    <string name="evolution_phase_finished">Finished</string>
     <string name="saved_strategy_rename_title">Rename</string>
     <string name="saved_strategy_edit_title">Edit strategy</string>
     <string name="saved_strategy_add_title">Add strategy</string>

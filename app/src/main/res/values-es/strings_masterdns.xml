@@ -34,6 +34,8 @@
     <string name="masterdns_deploy_state_starting_container">Iniciando contenedor…</string>
     <string name="masterdns_deploy_state_extracting_key">Extrayendo clave de cifrado…</string>
     <string name="masterdns_deploy_state_done">Servidor desplegado, configuración completada</string>
+    <string name="masterdns_deploy_error_port_busy_structured">El puerto 53 ya está en uso: propietario %1$s, dirección %2$s, protocolo %3$s. Libere el puerto e inténtelo de nuevo.</string>
+    <string name="masterdns_deploy_error_port_busy_details">El puerto 53 ya está en uso en el servidor: %1$s. Libere el conflicto e inténtelo de nuevo.</string>
     <string name="masterdns_deploy_error_port_busy">El puerto 53/UDP ya está en uso. Libérelo e inténtelo de nuevo.</string>
     <string name="masterdns_deploy_error_resources">Recursos insuficientes: se necesitan ≥512 MB RAM y ≥1 GB de disco libre.</string>
     <string name="masterdns_deploy_error_docker">No se pudo instalar Docker. Compruebe el acceso a internet del servidor.</string>
@@ -44,6 +46,7 @@
     <string name="masterdns_deploy_error_sudo_no_home">El directorio home del usuario no es accesible. Verifique los permisos.</string>
     <string name="masterdns_deploy_error_sudo_not_in_group">El usuario no está en el grupo sudo/wheel. Añádalo: usermod -aG sudo usuario.</string>
     <string name="masterdns_deploy_error_build">Error al construir la imagen. Compruebe la conexión a internet del servidor.</string>
+    <string name="masterdns_deploy_error_build_bin_missing">No se encontró el binario del servidor MasterDNS en el asset de release ni en la salida del instalador. Inténtelo más tarde; si se repite, instale el servidor manualmente y comparta el registro del despliegue.</string>
     <string name="masterdns_deploy_error_run">No se pudo iniciar el contenedor.</string>
     <string name="masterdns_deploy_error_key">No se pudo extraer la clave de cifrado del contenedor.</string>
     <string name="masterdns_deploy_error_auth">Error de autenticación. Verifique el usuario y la contraseña.</string>
@@ -55,4 +58,10 @@
     <string name="masterdns_deploy_state_removed">Servidor eliminado</string>
     <string name="masterdns_deploy_error_remove">No se pudo eliminar el servidor.</string>
     <string name="masterdns_deploy_error_unexpected">Error inesperado. Inténtelo de nuevo.</string>
+    <string name="masterdns_amnezia_dns_conflict_title">El puerto 53 lo usa Amnezia DNS</string>
+    <string name="masterdns_amnezia_dns_conflict_text">En el servidor se encontró el contenedor &quot;amnezia-dns&quot;, que usa el puerto DNS 53. MasterDNS no puede continuar la instalación mientras este contenedor esté activo. Puedes cancelar el despliegue o eliminar de forma segura solo este contenedor y continuar la instalación.</string>
+    <string name="masterdns_amnezia_dns_conflict_cancel">Cancelar despliegue</string>
+    <string name="masterdns_amnezia_dns_conflict_remove_continue">Eliminar amnezia-dns y continuar</string>
+    <string name="masterdns_deploy_error_amnezia_dns_cancelled">El despliegue se canceló por el contenedor amnezia-dns.</string>
+    <string name="masterdns_deploy_error_amnezia_dns_remove_failed">No se pudo eliminar el contenedor amnezia-dns.</string>
 </resources>

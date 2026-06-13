@@ -8,16 +8,15 @@ import io.mockk.runs
 import io.mockk.unmockkObject
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertTimeoutPreemptively
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
@@ -27,9 +26,7 @@ import io.mockk.clearMocks
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import java.io.IOException
-import java.time.Duration
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -73,14 +70,14 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun `stopTimeout covers two native drain windows`() {
+    fun `stopTimeout covers bounded native drain window`() {
         assertTrue(
             engine.stopTimeoutMs() > EnginePlugin.DEFAULT_STOP_TIMEOUT_MS,
-            "ChainOrchestrator must not cancel ByeDPI stop while forceClose/emergencyReset drain is still running",
+            "ChainOrchestrator must not cancel ByeDPI stop before the bounded forceClose drain finishes",
         )
         assertTrue(
-            engine.stopTimeoutMs() >= ByeDpiEngine.STOP_GRACE_MS * 2,
-            "ByeDPI stop has first join and retry join; timeout must cover both before next start enters native guard",
+            engine.stopTimeoutMs() < 4_000L,
+            "ByeDPI stop timeout must stay below ShutdownCoordinator parallel stop budget",
         )
     }
 
@@ -289,17 +286,21 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun ipProbeRouteReturnsSocksWhenPortGivenExplicitly() = runTest {
+    fun ipProbeRouteReturnsDefaultWhenPortGivenExplicitly() = runTest {
         val route = engine.ipProbeRoute(socksPort = 1080)
-        assertIs<IpProbeRoute.Socks>(route)
-        assertEquals("127.0.0.1", route.host)
-        assertEquals(1080, route.port)
+        assertIs<IpProbeRoute.Default>(route)
     }
 
     @Test
-    fun ipProbeRouteReturnsDefaultBeforeStartWhenPortZero() = runTest {
+    fun ipProbeRouteReturnsUnavailableBeforeStartWhenPortZero() = runTest {
         val route = engine.ipProbeRoute(socksPort = 0)
-        assertIs<IpProbeRoute.Default>(route)
+        assertIs<IpProbeRoute.Unavailable>(route)
+    }
+
+    @Test
+    fun exitNodeStrategyReturnsDirectHttpWhenPortGivenExplicitly() = runTest {
+        val strategy = engine.exitNodeStrategy(socksPort = 1080)
+        assertIs<ExitNodeStrategy.DirectHttp>(strategy)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -531,95 +532,6 @@ class ByeDpiEngineTest {
         coVerify(atLeast = 1) { blockingProxy.stopProxy() }
         unmockkObject(ByeDpiProxy.Companion)
     }
-
-    @Test
-    fun `start uses fallback dispatcher when previous native job keeps proxy dispatcher occupied`() =
-        assertTimeoutPreemptively(Duration.ofSeconds(15)) {
-            val firstNativeEntered = CountDownLatch(1)
-            val firstNativeExit = CountDownLatch(1)
-            var calls = 0
-            val blockingProxy: ByeDpiProxy = mockk(relaxed = true)
-            mockkObject(ByeDpiProxy.Companion)
-            every { ByeDpiProxy.loadOnce() } just runs
-            every { ByeDpiProxy.libraryLoaded } returns true
-            every { blockingProxy.startProxy(any()) } answers {
-                if (calls++ == 0) {
-                    firstNativeEntered.countDown()
-                    firstNativeExit.await(10, TimeUnit.SECONDS)
-                    0
-                } else {
-                    0
-                }
-            }
-            every { blockingProxy.stopProxy() } returns 0
-            every { blockingProxy.forceClose() } returns 0
-            every { blockingProxy.emergencyReset() } returns 1
-            val eng = ByeDpiEngine(
-                blockingProxy,
-                socksProbe = { _, port, _ ->
-                    if (port == 1080) {
-                        assertTrue(firstNativeEntered.await(5, TimeUnit.SECONDS))
-                    }
-                    1L
-                },
-            )
-            runBlocking {
-                try {
-                    assertIs<StartResult.Success>(eng.start(EngineConfig.ByeDpi(socksPort = 1080)))
-                    assertIs<StartResult.Success>(eng.start(EngineConfig.ByeDpi(socksPort = 1081)))
-                } finally {
-                    firstNativeExit.countDown()
-                    unmockkObject(ByeDpiProxy.Companion)
-                }
-            }
-            verify(atLeast = 1) { blockingProxy.emergencyReset() }
-            verify(exactly = 2) { blockingProxy.startProxy(any()) }
-        }
-
-    @Test
-    fun `start after wedged stop uses fallback dispatcher even when job ref was cleared`() =
-        assertTimeoutPreemptively(Duration.ofSeconds(15)) {
-            val firstNativeEntered = CountDownLatch(1)
-            val firstNativeExit = CountDownLatch(1)
-            var calls = 0
-            val blockingProxy: ByeDpiProxy = mockk(relaxed = true)
-            mockkObject(ByeDpiProxy.Companion)
-            every { ByeDpiProxy.loadOnce() } just runs
-            every { ByeDpiProxy.libraryLoaded } returns true
-            every { blockingProxy.startProxy(any()) } answers {
-                if (calls++ == 0) {
-                    firstNativeEntered.countDown()
-                    firstNativeExit.await(10, TimeUnit.SECONDS)
-                    0
-                } else {
-                    0
-                }
-            }
-            every { blockingProxy.stopProxy() } returns 0
-            every { blockingProxy.forceClose() } returns 0
-            every { blockingProxy.emergencyReset() } returns 1
-            val eng = ByeDpiEngine(
-                blockingProxy,
-                socksProbe = { _, port, _ ->
-                    if (port == 1080) {
-                        assertTrue(firstNativeEntered.await(5, TimeUnit.SECONDS))
-                    }
-                    1L
-                },
-            )
-            runBlocking {
-                try {
-                    assertIs<StartResult.Success>(eng.start(EngineConfig.ByeDpi(socksPort = 1080)))
-                    eng.stop()
-                    assertIs<StartResult.Success>(eng.start(EngineConfig.ByeDpi(socksPort = 1081)))
-                } finally {
-                    firstNativeExit.countDown()
-                    unmockkObject(ByeDpiProxy.Companion)
-                }
-            }
-            verify(atLeast = 2) { blockingProxy.emergencyReset() }
-            verify(exactly = 2) { blockingProxy.startProxy(any()) }
-        }
 
     @Test
     fun `autoRotatePort skips ports occupied by another app — sentinel for port-conflict regression`() = runTest {

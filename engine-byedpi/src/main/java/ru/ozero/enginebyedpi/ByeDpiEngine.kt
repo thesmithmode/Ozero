@@ -17,15 +17,15 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
-import ru.ozero.enginescore.EnginePreflight
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.EnginePreflight
 import ru.ozero.enginescore.EngineStats
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
-import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.probe.Socks5HandshakeProbe
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
@@ -34,8 +34,6 @@ import java.net.ServerSocket
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 
 class ByeDpiEngine(
     private val proxy: ByeDpiProxyContract = ByeDpiProxy(),
@@ -43,7 +41,7 @@ class ByeDpiEngine(
     private val readyProbeTimeoutMs: Int = READY_PROBE_TIMEOUT_MS,
     private val readyTotalTimeoutMs: Long = READY_TIMEOUT_MS,
     private val portFreeChecker: (Int) -> Boolean = ::defaultPortFreeCheck,
-    testDispatcherOverride: CoroutineDispatcher? = null,
+    private val testDispatcherOverride: CoroutineDispatcher? = null,
 ) : EnginePlugin {
 
     override val id = EngineId.BYEDPI
@@ -61,11 +59,12 @@ class ByeDpiEngine(
 
     @Volatile private var activeSocksPort: Int = 0
     private val portCounter = AtomicInteger(0)
+    private val proxyGeneration = AtomicInteger(0)
     private val _stats = MutableStateFlow(EngineStats())
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val proxyDispatcher = Dispatchers.IO.limitedParallelism(1)
-    private val proxyScope = CoroutineScope(SupervisorJob() + (testDispatcherOverride ?: proxyDispatcher))
+    private var proxyDispatcher: CoroutineDispatcher = newProxyDispatcher()
+    private var proxyScope = CoroutineScope(SupervisorJob() + (testDispatcherOverride ?: proxyDispatcher))
     private val proxyJobRef = AtomicReference<Job?>(null)
     private val nativeMayBeWedged = AtomicBoolean(false)
 
@@ -101,6 +100,7 @@ class ByeDpiEngine(
         Log.i(TAG, "start socksPort=$resolvedPort args=${resolvedConfig.args}")
         val oldJob = proxyJobRef.getAndSet(null)
         val hadKnownWedge = nativeMayBeWedged.getAndSet(false)
+        var rotateBeforeLaunch = hadKnownWedge
         if (oldJob != null) {
             if (oldJob.isActive) {
                 PersistentLoggers.warn(TAG, "start: предыдущий прокси ещё активен — останавливаю")
@@ -113,24 +113,25 @@ class ByeDpiEngine(
             if (oldJob.isActive) {
                 withTimeoutOrNull(STOP_GRACE_MS) { oldJob.join() }
                 if (oldJob.isActive) {
-                    nativeMayBeWedged.set(true)
+                    rotateBeforeLaunch = true
                     oldJob.cancel()
                 }
             }
             PersistentLoggers.debug(TAG, "start: barrier pre-drain oldJob.isActive=${oldJob.isActive}")
         }
 
-        val startContext = if (oldJob != null || hadKnownWedge) {
-            dispatcherContextAfterNativeDrain()
-        } else {
-            EmptyCoroutineContext
+        if (rotateBeforeLaunch) {
+            rotateProxyLane("start: previous proxy lane wedged")
+        } else if (oldJob != null) {
+            drainOrRotateProxyLane()
         }
         val args = buildArgs(resolvedConfig)
         PersistentLoggers.debug(
             TAG,
             "jniStartProxy argv=[${args.joinToString(" ")}] (native префиксует argv[0]=\"byedpi\")",
         )
-        val proxyJob = proxyScope.launch(startContext) {
+        val generation = proxyGeneration.incrementAndGet()
+        val proxyJob = proxyScope.launch {
             PersistentLoggers.debug(TAG, "launch entered port=$resolvedPort")
             val code = startProxyWithRecovery(args)
             PersistentLoggers.debug(TAG, "startProxy returned code=$code port=$resolvedPort")
@@ -142,7 +143,7 @@ class ByeDpiEngine(
                 )
                 else -> PersistentLoggers.error(TAG, "jniStartProxy завершился с кодом $code")
             }
-            activeSocksPort = 0
+            if (proxyGeneration.get() == generation) activeSocksPort = 0
         }
         proxyJobRef.set(proxyJob)
 
@@ -163,6 +164,7 @@ class ByeDpiEngine(
             if (proxyJob.isActive) {
                 nativeMayBeWedged.set(true)
                 proxyJob.cancel()
+                rotateProxyLane("start failure: proxyJob did not finish")
             }
             proxyJobRef.compareAndSet(proxyJob, null)
             StartResult.Failure(reason = "byedpi не открыл socks порт $resolvedPort")
@@ -177,21 +179,24 @@ class ByeDpiEngine(
         return ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { it.localPort }
     }
 
-    private suspend fun dispatcherContextAfterNativeDrain(): CoroutineContext {
+    private suspend fun drainOrRotateProxyLane() {
         val drained = withTimeoutOrNull(STOP_GRACE_MS) {
             withContext(proxyDispatcher) {}
             true
         }
-        if (drained != null) return EmptyCoroutineContext
-        PersistentLoggers.warn(TAG, "start: dispatcher drain timeout — native thread may still be active")
-        val priorGuardState = safeJniCall(fallback = 0, tag = "emergencyReset after dispatcher drain timeout threw") {
-            proxy.emergencyReset()
-        }
-        PersistentLoggers.error(
-            TAG,
-            "byedpi dispatcher stuck — emergencyReset выполнен (prior guard=$priorGuardState); start via IO",
-        )
-        return Dispatchers.IO
+        if (drained != null) return
+        PersistentLoggers.warn(TAG, "start: dispatcher drain timeout — rotating ByeDPI proxy lane")
+        rotateProxyLane("start: dispatcher drain timeout")
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun newProxyDispatcher(): CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1)
+
+    private fun rotateProxyLane(reason: String) {
+        proxyDispatcher = newProxyDispatcher()
+        proxyScope = CoroutineScope(SupervisorJob() + (testDispatcherOverride ?: proxyDispatcher))
+        nativeMayBeWedged.set(false)
+        PersistentLoggers.warn(TAG, "$reason — new ByeDPI proxy lane")
     }
 
     private fun startProxyWithRecovery(args: Array<String>): Int {
@@ -254,27 +259,20 @@ class ByeDpiEngine(
             runCatching { proxy.forceClose() }
                 .onFailure { PersistentLoggers.warn(TAG, "jniForceClose исключение: ${it.message}") }
             val job = proxyJobRef.getAndSet(null)
+            proxyGeneration.incrementAndGet()
             if (job != null) {
                 val completed = withTimeoutOrNull(STOP_GRACE_MS) {
                     job.join()
                     true
                 }
                 if (completed == null) {
-                    PersistentLoggers.warn(TAG, "proxyJob не завершился за ${STOP_GRACE_MS}ms — escalate")
-                    runCatching { proxy.forceClose() }
-                    runCatching { proxy.emergencyReset() }
-                        .onSuccess { PersistentLoggers.warn(TAG, "emergencyReset в stop (prior guard=$it)") }
-                    val retriedJoin = withTimeoutOrNull(STOP_GRACE_MS) {
-                        job.join()
-                        true
-                    }
-                    if (retriedJoin == null) {
-                        PersistentLoggers.error(TAG, "proxyJob не завершился после emergencyReset — cancel")
-                        nativeMayBeWedged.set(true)
-                        job.cancel()
-                    } else {
-                        nativeMayBeWedged.set(false)
-                    }
+                    PersistentLoggers.warn(
+                        TAG,
+                        "proxyJob не завершился за ${STOP_GRACE_MS}ms — cancel and defer lane drain",
+                    )
+                    nativeMayBeWedged.set(true)
+                    job.cancel()
+                    rotateProxyLane("stop: proxyJob did not finish within ${STOP_GRACE_MS}ms")
                 } else {
                     nativeMayBeWedged.set(false)
                 }
@@ -304,9 +302,13 @@ class ByeDpiEngine(
 
     override fun preflight(): EnginePreflight = ByeDpiPreflight()
 
-    override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute {
+    override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
         val port = if (socksPort > 0) socksPort else activeSocksPort
-        return if (port > 0) IpProbeRoute.Socks("127.0.0.1", port) else IpProbeRoute.Default
+        return if (port > 0) {
+            ExitNodeStrategy.DirectHttp
+        } else {
+            ExitNodeStrategy.Unavailable("ByeDPI SOCKS endpoint unavailable")
+        }
     }
 
     // Native inserts argv[0]="byedpi"; Kotlin prepending program-name makes getopt drop --ip.
@@ -341,8 +343,7 @@ class ByeDpiEngine(
         const val READY_RETRY_MS = 100L
         const val STOP_GRACE_MS = 1_500L
 
-        // Covers both stop joins so ChainOrchestrator does not release mutex before native cleanup.
-        const val BYEDPI_STOP_TIMEOUT_MS = 5_000L
+        const val BYEDPI_STOP_TIMEOUT_MS = 2_500L
         const val AUTO_ROTATE_PORT = 0
         const val PORT_ROTATION_BASE = 49_152
         const val PORT_ROTATION_RANGE = 256

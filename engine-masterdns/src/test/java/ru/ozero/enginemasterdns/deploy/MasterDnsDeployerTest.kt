@@ -22,7 +22,7 @@ class MasterDnsDeployerTest {
     }
 
     private fun setupHappyPath() {
-        transport.setResponse("ss -uln", MasterDnsDockerScripts.MARKER_PORT_FREE)
+        transport.setResponse("bind_probe", MasterDnsDockerScripts.MARKER_PORT_FREE)
         transport.setResponse("free -m", "512 1024")
         transport.setResponse("apt-get", MasterDnsDockerScripts.MARKER_DOCKER_OK)
         transport.setResponse("Dockerfile", MasterDnsDockerScripts.MARKER_BUILD_OK)
@@ -60,13 +60,131 @@ class MasterDnsDeployerTest {
 
     @Test
     fun `should return Error when port 53 is busy`() = runTest {
-        transport.setResponse("ss -uln", MasterDnsDockerScripts.MARKER_PORT_BUSY)
+        transport.setResponse("bind_probe", MasterDnsDockerScripts.MARKER_PORT_BUSY)
 
         val states = deployer.deploy(credentials()).toList()
 
         assertInstanceOf(MasterDnsDeployState.Error::class.java, states.last())
         val error = states.last() as MasterDnsDeployState.Error
-        assertTrue(error.message == "port_53_busy")
+        assertTrue(error.message.startsWith("port_53_busy"))
+    }
+
+    @Test
+    fun `should emit AmneziaDnsConflict when amnezia-dns publishes udp 53`() = runTest {
+        transport.setResponse(
+            "docker inspect amnezia-dns",
+            "AMNEZIA_DNS_CONFLICT|proto=udp|addr=0.0.0.0",
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val conflict = states.last() as MasterDnsDeployState.AmneziaDnsConflict
+        assertEquals("udp", conflict.protocol)
+        assertEquals("0.0.0.0", conflict.address)
+        assertFalse(transport.executedCommands.any { it.contains("docker stop amnezia-dns") })
+        assertFalse(transport.executedCommands.any { it.contains("docker rm amnezia-dns") })
+    }
+
+    @Test
+    fun `cancel path does not stop or remove amnezia-dns`() = runTest {
+        transport.setResponse(
+            "docker inspect amnezia-dns",
+            "AMNEZIA_DNS_CONFLICT|proto=udp|addr=0.0.0.0",
+        )
+
+        deployer.deploy(credentials()).toList()
+
+        assertFalse(transport.executedCommands.any { it.contains("docker stop amnezia-dns") })
+        assertFalse(transport.executedCommands.any { it.contains("docker rm amnezia-dns") })
+    }
+
+    @Test
+    fun `remove path calls only inspect stop rm for amnezia-dns before continuing`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED)
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        assertInstanceOf(MasterDnsDeployState.Done::class.java, states.last())
+        val amneziaCommands = transport.executedCommands.filter { it.contains("amnezia-dns") }
+        assertTrue(
+            amneziaCommands.all {
+                it.contains("docker inspect amnezia-dns") ||
+                    it.contains("docker stop amnezia-dns") ||
+                    it.contains("docker rm amnezia-dns")
+            },
+        )
+        assertFalse(amneziaCommands.any { it.contains("system prune") })
+        assertFalse(
+            amneziaCommands.any { it.contains("volume rm") || it.contains("network rm") || it.contains("rmi") },
+        )
+    }
+
+    @Test
+    fun `remove path stops when amnezia-dns removal script reports failure`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVE_FAILED)
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("amnezia_dns_remove_failed", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("bind_probe") })
+        assertFalse(transport.executedCommands.any { it.contains("apt-get") })
+        assertFalse(transport.executedCommands.any { it.contains("docker run -d") })
+    }
+
+    @Test
+    fun `should emit PortBusy when port 53 check emits structured owner`() = runTest {
+        transport.setResponse("bind_probe", "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=docker:adguardhome")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val portBusy = states.last() as MasterDnsDeployState.PortBusy
+        assertEquals("udp", portBusy.protocol)
+        assertEquals("0.0.0.0:53", portBusy.address)
+        assertEquals("docker:adguardhome", portBusy.owner)
+    }
+
+    @Test
+    fun `should map legacy name field to PortBusy owner`() = runTest {
+        transport.setResponse("bind_probe", "PORT_BUSY|proto=udp|addr=0.0.0.0|name=docker-proxy")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val portBusy = states.last() as MasterDnsDeployState.PortBusy
+        assertEquals("udp", portBusy.protocol)
+        assertEquals("0.0.0.0", portBusy.address)
+        assertEquals("docker-proxy", portBusy.owner)
+    }
+
+    @Test
+    fun `should stop before docker run when bind probe reports port conflict without process owner`() = runTest {
+        transport.setResponse("bind_probe", "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=bind_probe:exit_98")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val portBusy = states.last() as MasterDnsDeployState.PortBusy
+        assertEquals("udp", portBusy.protocol)
+        assertEquals("0.0.0.0:53", portBusy.address)
+        assertEquals("bind_probe:exit_98", portBusy.owner)
+        assertFalse(transport.executedCommands.any { it.contains("docker run -d") })
+    }
+
+    @Test
+    fun `should recheck port after docker install before docker build and run`() = runTest {
+        transport.setResponses(
+            "bind_probe",
+            listOf(
+                MasterDnsDockerScripts.MARKER_PORT_FREE,
+                "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=docker:adguardhome",
+            ),
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val portBusy = states.last() as MasterDnsDeployState.PortBusy
+        assertEquals("docker:adguardhome", portBusy.owner)
+        assertFalse(transport.executedCommands.any { it.contains("Dockerfile") })
+        assertFalse(transport.executedCommands.any { it.contains("docker run -d") })
     }
 
     @Test
@@ -175,6 +293,21 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `should return bin missing build error when docker build reports missing server binary`() = runTest {
+        transport.setResponse(
+            "Dockerfile",
+            "ERR_BUILD|reason=bin_missing|ERR_BUILD_BIN_MISSING|candidates=none\n" +
+                "--- docker-build.log tail -80 ---\nno release asset produced a server binary",
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertTrue(error.message.startsWith("build_failed/bin_missing|ERR_BUILD|reason=bin_missing"))
+        assertTrue(error.message.contains("candidates=none"))
+    }
+
+    @Test
     fun `should return Error when container run fails`() = runTest {
         transport.setResponse("docker run -d", MasterDnsDockerScripts.MARKER_ERR_RUN)
 
@@ -185,6 +318,22 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `should keep real run failure diagnostics in error message`() = runTest {
+        transport.setResponse(
+            "docker run -d",
+            "ERR_RUN|phase=docker_run|exit=127|state=created|exit=127|" +
+                "error=exec \"/usr/local/bin/masterdnsvpn-server\": stat no such file or directory|logs=",
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertTrue(error.message.startsWith("run_failed|phase=docker_run|exit=127|state=created"))
+        assertTrue(error.message.contains("masterdnsvpn-server"))
+        assertTrue(error.message.contains("no such file or directory"))
+    }
+
+    @Test
     fun `should return Error when key extraction returns empty`() = runTest {
         transport.setResponse("encrypt_key", "")
 
@@ -192,6 +341,18 @@ class MasterDnsDeployerTest {
 
         val error = states.last() as MasterDnsDeployState.Error
         assertEquals("key_extraction_failed", error.message)
+    }
+
+    @Test
+    fun `should execute retrying readEncryptKey script during key extraction`() = runTest {
+        deployer.deploy(credentials()).toList()
+
+        assertTrue(
+            transport.executedCommands.any {
+                it.contains("seq 1 10") &&
+                    it.contains("docker exec masterdns-ozero cat /etc/masterdnsvpn/encrypt_key.txt")
+            },
+        )
     }
 
     @Test
@@ -264,13 +425,15 @@ class MasterDnsDeployerTest {
     }
 
     @Test
-    fun `deployMasterDns script captures docker build exit code not bare pipe`() {
+    fun `deployMasterDns script captures docker build exit code without bare pipe`() {
         assertFalse(
             MasterDnsDockerScripts.deployMasterDns.contains("| tail") &&
                 !MasterDnsDockerScripts.deployMasterDns.contains("PIPESTATUS"),
             "deployMasterDns must use PIPESTATUS to capture docker build exit code — bare pipe loses it",
         )
-        assertTrue(MasterDnsDockerScripts.deployMasterDns.contains("PIPESTATUS"))
+        assertTrue(MasterDnsDockerScripts.deployMasterDns.contains("build_rc=\$"))
+        assertTrue(MasterDnsDockerScripts.deployMasterDns.contains("head -40"))
+        assertTrue(MasterDnsDockerScripts.deployMasterDns.contains("tail -80"))
     }
 
     @Test

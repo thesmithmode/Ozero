@@ -8,7 +8,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginesingbox.ISingboxEngineProcess
 import ru.ozero.enginesingbox.ISingboxProtector
 import ru.ozero.enginesingbox.ISingboxStatusCallback
@@ -54,9 +55,26 @@ class SingboxEngineService : Service() {
         }
 
         override fun stop() {
-            serviceScope.launch {
-                runCatching { SingboxRuntime.stop() }
-                    .onFailure { PersistentLoggers.error(TAG, "stop failed: ${it.message}", it) }
+            stopAndWait(DEFAULT_STOP_TIMEOUT_MS)
+        }
+
+        override fun stopAndWait(timeoutMs: Long): Boolean = stopRuntimeAndWait(timeoutMs)
+
+        override fun runtimeRunning(): Boolean = SingboxRuntime.isRunning()
+
+        private fun stopRuntimeAndWait(timeoutMs: Long): Boolean {
+            val boundedTimeoutMs = timeoutMs.coerceAtLeast(1L)
+            return runCatching {
+                runBlocking {
+                    withTimeoutOrNull(boundedTimeoutMs) {
+                        SingboxRuntime.stop()
+                        true
+                    } == true
+                }
+            }.onFailure {
+                PersistentLoggers.error(TAG, "stop failed: ${it.message}", it)
+            }.getOrDefault(false).also { stopped ->
+                if (!stopped) PersistentLoggers.warn(TAG, "stop timed out after ${boundedTimeoutMs}ms")
             }
         }
 
@@ -71,9 +89,7 @@ class SingboxEngineService : Service() {
                     activeConnections = status.connectionsIn + status.connectionsOut,
                 )
             } else {
-                SingboxStats(
-                    activeConnections = if (SingboxRuntime.isRunning()) 1 else 0,
-                )
+                SingboxStats()
             }
         }
 
@@ -103,19 +119,14 @@ class SingboxEngineService : Service() {
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onDestroy() {
-        val latch = java.util.concurrent.CountDownLatch(1)
-        serviceScope.launch {
-            runCatching { SingboxRuntime.stop() }
-            latch.countDown()
-        }
-        latch.await(DESTROY_STOP_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
+        binder.stopAndWait(DEFAULT_STOP_TIMEOUT_MS)
         serviceScope.cancel()
         super.onDestroy()
     }
 
     companion object {
         private const val TAG = "SingboxEngineService"
-        private const val DESTROY_STOP_TIMEOUT_S = 3L
+        private const val DEFAULT_STOP_TIMEOUT_MS = 3_000L
         private const val NO_TUN_FD = -1
     }
 }

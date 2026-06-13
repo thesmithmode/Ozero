@@ -10,6 +10,7 @@ import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EnginePreflight
 import ru.ozero.enginescore.EngineStats
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
@@ -27,14 +28,18 @@ class MasterDnsEngine(
 
     override val capabilities: EngineCapabilities = EngineCapabilities(
         supportsTcp = true,
-        supportsUdp = false,
+        supportsUdp = true,
         supportsDoH = false,
         localOnly = false,
         requiresServer = true,
         supportsUpstreamSocks = true,
     )
 
-    @Volatile private var service: MasterDnsClientServiceContract? = null
+    @Volatile
+    private var service: MasterDnsClientServiceContract? = null
+
+    @Volatile
+    private var activeSocksPort: Int = 0
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
         val toml = configTomlProvider().trim()
@@ -64,17 +69,21 @@ class MasterDnsEngine(
         } ?: run {
             activeService.stop()
             return StartResult.Failure(
-                "masterdns start timeout after ${startTimeoutMs}ms — subprocess stuck in Starting",
+                "masterdns start timeout after ${startTimeoutMs}ms - subprocess stuck in Starting",
             )
         }
         return when (terminal) {
-            is MasterDnsClientState.Running -> StartResult.Success(terminal.port)
+            is MasterDnsClientState.Running -> {
+                activeSocksPort = terminal.port
+                StartResult.Success(terminal.port)
+            }
             is MasterDnsClientState.Error -> StartResult.Failure(terminal.message)
             else -> StartResult.Failure("unexpected state $terminal")
         }
     }
 
     override suspend fun stop() {
+        activeSocksPort = 0
         service?.stop()
         service = null
     }
@@ -83,6 +92,15 @@ class MasterDnsEngine(
         ProbeResult.Failure("masterdns probe not implemented")
 
     override fun stats(): Flow<EngineStats> = flowOf(EngineStats())
+
+    override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
+        val port = activeSocksPort.takeIf { it > 0 } ?: socksPort.takeIf { it > 0 }
+        return if (port != null) {
+            ExitNodeStrategy.ViaSocks("127.0.0.1", port)
+        } else {
+            ExitNodeStrategy.Unavailable("MasterDNS SOCKS endpoint unavailable")
+        }
+    }
 
     override fun preflight(): EnginePreflight = MasterDnsPreflight(resolversProvider)
 

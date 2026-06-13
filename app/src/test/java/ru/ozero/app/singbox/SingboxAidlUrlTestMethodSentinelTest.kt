@@ -26,22 +26,33 @@ class SingboxAidlUrlTestMethodSentinelTest {
     }
 
     @Test
-    fun `should SingboxEngineService implement urlTest returning -1 stub`() {
+    fun `should urlTest stub remain explicit failure until wired to routed probe`() {
         val root = locateRepoRoot()
         val service = File(
             root,
             "singbox-process/src/main/java/ru/ozero/singboxprocess/SingboxEngineService.kt",
         )
+        val engine = File(
+            root,
+            "engine-singbox/src/main/java/ru/ozero/enginesingbox/SingboxEngine.kt",
+        )
         assertTrue(service.isFile, "SingboxEngineService.kt must exist")
-        val content = service.readText()
+        assertTrue(engine.isFile, "SingboxEngine.kt must exist")
+        val serviceContent = service.readText()
+        val engineContent = engine.readText()
 
         assertTrue(
-            content.contains("urlTest"),
+            serviceContent.contains("urlTest"),
             "SingboxEngineService must implement urlTest",
         )
         assertTrue(
-            content.contains("-1"),
-            "SingboxEngineService.urlTest stub must return -1 (P1 stub, full impl in P5)",
+            serviceContent.contains("override fun urlTest(profileId: Long): Long = -1"),
+            "SingboxEngineService.urlTest stub must return -1 as an explicit failure until it is wired to routed probe",
+        )
+        assertTrue(
+            !engineContent.contains("urlTest(") &&
+                engineContent.contains("routedProbe.probeLatencyMs"),
+            "SingboxEngine.probe must use routed HTTP probe and must not treat urlTest=-1 stub as success",
         )
     }
 

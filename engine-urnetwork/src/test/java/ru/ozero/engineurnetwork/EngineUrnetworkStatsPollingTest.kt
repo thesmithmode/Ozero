@@ -120,7 +120,7 @@ class EngineUrnetworkStatsPollingTest {
     }
 
     @Test
-    fun `connected status keeps stats active while peer count is still zero`() = runTest {
+    fun `connected status keeps stats label without masking zero peer count`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val bridge = FakeBridge(initialPeerCount = 0, connectionStatusValue = "CONNECTED")
@@ -137,7 +137,7 @@ class EngineUrnetworkStatsPollingTest {
         )
         engine.start(baseConfig, Upstream.None)
         runCurrent()
-        assertEquals(1, engine.stats().first().activeConnections)
+        assertEquals(0, engine.stats().first().activeConnections)
         assertEquals("connected", engine.statsLabel(engine.stats().first()))
         scope.cancel()
     }

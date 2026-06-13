@@ -185,6 +185,47 @@ class ConfigBuilderVLESSTest {
     }
 
     @Test
+    fun `should normalize legacy numeric websocket early data header into max early data`() {
+        val bean = makeBean(type = "ws").apply {
+            earlyDataHeaderName = "2048"
+        }
+        val json = ConfigBuilder.buildSingboxConfig(bean)
+
+        assertContains(json, "\"max_early_data\":2048")
+        assertFalse(
+            json.contains("\"early_data_header_name\":2048"),
+            "numeric early_data_header_name bricks sing-box checkConfig",
+        )
+    }
+
+    @Test
+    fun `should emit numeric websocket early data header name as string when it is explicit`() {
+        val bean = makeBean(type = "ws").apply {
+            maxEarlyData = 2048
+            earlyDataHeaderName = "1"
+        }
+        val json = ConfigBuilder.buildSingboxConfig(bean)
+
+        assertContains(json, "\"max_early_data\":2048")
+        assertContains(json, "\"early_data_header_name\":\"1\"")
+        assertFalse(
+            json.contains("\"early_data_header_name\":1"),
+            "sing-box expects early_data_header_name to be a JSON string",
+        )
+    }
+
+    @Test
+    fun `tls server name falls back to websocket host before server address`() {
+        val bean = makeBean(host = "203.0.113.10", type = "ws", security = "tls").apply {
+            this.host = "front.example.com"
+        }
+        val json = ConfigBuilder.buildSingboxConfig(bean)
+
+        assertContains(json, "\"server_name\":\"front.example.com\"")
+        assertFalse(json.contains("\"server_name\":\"203.0.113.10\""))
+    }
+
+    @Test
     fun `should include gRPC transport for grpc type`() {
         val bean = makeBean(type = "grpc").apply {
             grpcServiceName = "myservice"

@@ -1,11 +1,16 @@
 package ru.ozero.enginebyedpi.strategy
 
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.StartResult
@@ -44,6 +49,9 @@ class EvolutionEngine(
         val maxMutationRate: Float = 0.72f,
         val explorationRate: Double = 0.25,
         val survivorExplorationRate: Double = 0.2,
+        val evaluationTimeoutMs: Long = 0L,
+        val stopTimeoutMs: Long = 2_000L,
+        val maxReductionEvaluations: Int = 3,
     )
 
     data class GenerationResult(
@@ -62,6 +70,20 @@ class EvolutionEngine(
         val startFailed: Boolean = false,
     )
 
+    private data class BestState(
+        val chromosome: Chromosome,
+        val fitness: Double,
+        val successRate: Double,
+        val changed: Boolean = false,
+    )
+
+    private data class ReductionStep(
+        val chromosome: Chromosome,
+        val remainingBudget: Int,
+        val improved: Boolean,
+        val budgetExhausted: Boolean = false,
+    )
+
     private val portCounter = AtomicInteger(0)
 
     private fun nextRotatedSocksPort(): Int {
@@ -73,6 +95,7 @@ class EvolutionEngine(
         seedStrategies: List<String>,
         onGeneration: (GenerationResult) -> Unit,
         onChromosomeEval: (index: Int, total: Int, command: String) -> Unit = { _, _, _ -> },
+        onCommandEvaluated: (command: String) -> Unit = {},
     ): Chromosome {
         var population = buildInitialPopulation(seedStrategies)
         var best: Chromosome = population.firstOrNull() ?: return emptyList()
@@ -88,28 +111,27 @@ class EvolutionEngine(
         for (generation in 1..settings.maxGenerations) {
             if (!currentCoroutineContext().isActive) break
 
-            val scored = evaluatePopulation(population, onChromosomeEval, evalCache)
+            val scored = evaluatePopulation(population, onChromosomeEval, onCommandEvaluated, evalCache)
             val fitnessPairs = scored.map { (ch, er) -> ch to er.fitness }
             val successRatePairs = scored.map { (ch, er) -> ch to er.successRate }
             val genBest = scored.maxByOrNull { it.second.fitness }
+            var bestImproved = false
             if (genBest != null && genBest.second.fitness > bestFitness) {
                 bestFitness = genBest.second.fitness
                 bestSuccessRate = genBest.second.successRate
                 best = genBest.first
                 stagnationCount = 0
+                bestImproved = true
             } else {
                 stagnationCount++
             }
             mutationRate = adaptMutationRate(mutationRate, stagnationCount)
-            val reducedBest = reduceChromosome(best, evalCache)
-            if (reducedBest != best) {
-                val reducedResult = evalCache.getOrPut(reducedBest) { evaluate(reducedBest) }
-                if (reducedResult.fitness >= bestFitness) {
-                    best = reducedBest
-                    bestFitness = reducedResult.fitness
-                    bestSuccessRate = reducedResult.successRate
-                    stagnationCount = 0
-                }
+            if (bestImproved) {
+                val reduced = reduceBestIfUseful(best, bestFitness, bestSuccessRate, evalCache)
+                best = reduced.chromosome
+                bestFitness = reduced.fitness
+                bestSuccessRate = reduced.successRate
+                if (reduced.changed) stagnationCount = 0
             }
             onGeneration(
                 GenerationResult(
@@ -288,19 +310,21 @@ class EvolutionEngine(
     private suspend fun evaluatePopulation(
         population: List<Chromosome>,
         onChromosomeEval: (index: Int, total: Int, command: String) -> Unit = { _, _, _ -> },
+        onCommandEvaluated: (command: String) -> Unit = {},
         evalCache: MutableMap<Chromosome, EvalResult> = HashMap(),
     ): List<Pair<Chromosome, EvalResult>> {
         val results = population.mapIndexed { index, chromosome ->
             if (!currentCoroutineContext().isActive) return@mapIndexed chromosome to EvalResult(0.0, 0.0)
-            onChromosomeEval(index, population.size, chromosome.toCommand())
+            val command = chromosome.toCommand()
+            onChromosomeEval(index, population.size, command)
             val evalResult = evalCache.getOrPut(chromosome) {
-                val command = chromosome.toCommand()
                 val computed = evaluate(chromosome)
                 if (command.isNotBlank() && !computed.startFailed) {
                     fitnessCachePersistent?.put(command, computed.fitness)
                 }
                 computed
             }
+            if (command.isNotBlank() && !evalResult.startFailed) onCommandEvaluated(command)
             chromosome to evalResult
         }
         results.forEach { (chromosome, evalResult) ->
@@ -309,72 +333,140 @@ class EvolutionEngine(
         return results
     }
 
+    private suspend fun reduceBestIfUseful(
+        current: Chromosome,
+        currentFitness: Double,
+        currentSuccessRate: Double,
+        evalCache: MutableMap<Chromosome, EvalResult>,
+    ): BestState {
+        if (currentFitness <= 0.0) {
+            return BestState(current, currentFitness, currentSuccessRate)
+        }
+        if (!ByeDpiArgvValidator.isValid(current.toCommand())) {
+            return BestState(current, currentFitness, currentSuccessRate)
+        }
+        val reduced = reduceChromosome(current, evalCache, settings.maxReductionEvaluations)
+        if (reduced == current) return BestState(current, currentFitness, currentSuccessRate)
+        val reducedResult = evalCache.getOrPut(reduced) { evaluate(reduced) }
+        if (reducedResult.fitness < currentFitness) return BestState(current, currentFitness, currentSuccessRate)
+        return BestState(
+            chromosome = reduced,
+            fitness = reducedResult.fitness,
+            successRate = reducedResult.successRate,
+            changed = true,
+        )
+    }
+
     private suspend fun reduceChromosome(
         chromosome: Chromosome,
         evalCache: MutableMap<Chromosome, EvalResult>,
+        maxReductionEvaluations: Int,
     ): Chromosome {
-        if (chromosome.size <= 1) return chromosome
-        val baseline = evalCache.getOrPut(chromosome) { evaluate(chromosome) }
+        if (chromosome.size <= 1 || maxReductionEvaluations <= 0) return chromosome
+        val baselineFitness = evalCache.getOrPut(chromosome) { evaluate(chromosome) }.fitness
         var current = chromosome
-        var improved = true
-        while (improved && current.size > 1) {
-            improved = false
-            for (idx in current.indices) {
-                if (!currentCoroutineContext().isActive) return current
-                val candidate = current.toMutableList().also { it.removeAt(idx) }.toList()
-                val candidateEval = evalCache.getOrPut(candidate) { evaluate(candidate) }
-                if (candidateEval.fitness >= baseline.fitness * REDUCTION_TOLERANCE) {
-                    current = candidate
-                    improved = true
-                    break
-                }
-            }
+        var remaining = maxReductionEvaluations
+        while (current.size > 1 && currentCoroutineContext().isActive) {
+            val step = nextReductionStep(current, baselineFitness, evalCache, remaining)
+            if (step.budgetExhausted || !step.improved) return current
+            current = step.chromosome
+            remaining = step.remainingBudget
         }
         return current
+    }
+
+    private suspend fun nextReductionStep(
+        current: Chromosome,
+        baselineFitness: Double,
+        evalCache: MutableMap<Chromosome, EvalResult>,
+        remainingBudget: Int,
+    ): ReductionStep {
+        var budget = remainingBudget
+        for (idx in current.indices) {
+            if (!currentCoroutineContext().isActive) {
+                return ReductionStep(current, budget, improved = false, budgetExhausted = true)
+            }
+            val candidate = current.toMutableList().also { it.removeAt(idx) }.toList()
+            val needsEvaluation = candidate !in evalCache
+            if (needsEvaluation && budget <= 0) {
+                return ReductionStep(current, budget, improved = false, budgetExhausted = true)
+            }
+            if (needsEvaluation) budget--
+            val candidateEval = evalCache.getOrPut(candidate) { evaluate(candidate) }
+            if (candidateEval.fitness >= baselineFitness * REDUCTION_TOLERANCE) {
+                return ReductionStep(candidate, budget, improved = true)
+            }
+        }
+        return ReductionStep(current, budget, improved = false)
     }
 
     private suspend fun evaluate(chromosome: Chromosome): EvalResult {
         if (sites.isEmpty() || chromosome.isEmpty()) return EvalResult(0.0, 0.0)
         val command = chromosome.toCommand()
-        val port = nextRotatedSocksPort()
-        val started = byeDpiEngine.start(
-            config = EngineConfig.ByeDpi(args = command, socksPort = port),
-            upstream = Upstream.None,
-        )
-        if (started !is StartResult.Success) {
+        if (!ByeDpiArgvValidator.isValid(command)) {
             return EvalResult(0.0, 0.0, startFailed = true)
         }
+        val port = nextRotatedSocksPort()
+        var startAttempted = false
         return try {
-            val probe = probeFactory(port, settings.timeoutMs)
-            val semaphore = Semaphore(settings.concurrentProbes.coerceAtLeast(1))
-            val probeResults = coroutineScope {
-                sites.map { site ->
-                    async {
-                        semaphore.withPermit {
-                            runCatching { probe.probe(site) }.getOrNull()
+            withTimeout(effectiveEvaluationTimeoutMs()) {
+                startAttempted = true
+                val started = byeDpiEngine.start(
+                    config = EngineConfig.ByeDpi(args = command, socksPort = port),
+                    upstream = Upstream.None,
+                )
+                if (started !is StartResult.Success) {
+                    return@withTimeout EvalResult(0.0, 0.0, startFailed = true)
+                }
+                val probe = probeFactory(port, settings.timeoutMs)
+                val semaphore = Semaphore(settings.concurrentProbes.coerceAtLeast(1))
+                val probeResults = coroutineScope {
+                    sites.map { site ->
+                        async {
+                            semaphore.withPermit {
+                                runCatching { probe.probe(site) }.getOrNull()
+                            }
+                        }
+                    }.map { it.await() }
+                }
+                val probeScores = probeResults.map { computeProbeScore(it) }
+                val avgScore = probeScores.average()
+                if (avgScore <= 0.0) return@withTimeout EvalResult(0.0, 0.0)
+                val successCount = probeResults.count { it?.success == true }
+                val successRate = successCount.toDouble() / sites.size
+                val avgLatencyMs = probeResults
+                    .filter { it?.success == true || (it?.responseCode ?: -1) in 100..599 }
+                    .mapNotNull { it?.durationMs }
+                    .let { if (it.isEmpty()) settings.latencyClampMs else it.average() }
+                val fitness = computeFitness(avgScore, avgLatencyMs)
+                EvalResult(fitness = fitness, successRate = successRate)
+            }
+        } catch (_: TimeoutCancellationException) {
+            EvalResult(0.0, 0.0, startFailed = true)
+        } finally {
+            if (startAttempted) {
+                withContext(NonCancellable) {
+                    runCatching {
+                        withTimeoutOrNull(settings.stopTimeoutMs) {
+                            byeDpiEngine.stop()
                         }
                     }
-                }.map { it.await() }
+                }
             }
-            val probeScores = probeResults.map { computeProbeScore(it) }
-            val avgScore = probeScores.average()
-            if (avgScore <= 0.0) return EvalResult(0.0, 0.0)
-            val successCount = probeResults.count { it?.success == true }
-            val successRate = successCount.toDouble() / sites.size
-            val avgLatencyMs = probeResults
-                .filter { it?.success == true || (it?.responseCode ?: -1) in 100..599 }
-                .mapNotNull { it?.durationMs }
-                .let { if (it.isEmpty()) settings.latencyClampMs else it.average() }
-            val fitness = computeFitness(avgScore, avgLatencyMs)
-            EvalResult(fitness = fitness, successRate = successRate)
-        } finally {
-            runCatching { byeDpiEngine.stop() }
         }
+    }
+
+    private fun effectiveEvaluationTimeoutMs(): Long {
+        if (settings.evaluationTimeoutMs > 0L) return settings.evaluationTimeoutMs
+        val concurrent = settings.concurrentProbes.coerceAtLeast(1)
+        val batches = ((sites.size + concurrent - 1) / concurrent).coerceAtLeast(1)
+        return EVALUATION_START_BUFFER_MS + settings.timeoutMs.coerceAtLeast(0L) * batches
     }
 
     private companion object {
         const val SCORE_HTTP_PARTIAL = 0.6
         const val SCORE_HTTP_HEADERS = 0.3
+        const val EVALUATION_START_BUFFER_MS = 7_000L
         const val ADAPTIVE_SEED_RATIO = 0.2
         const val ADAPTIVE_MEMORY_RATIO = 0.5
         const val REDUCTION_TOLERANCE = 0.995

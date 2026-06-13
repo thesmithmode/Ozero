@@ -16,6 +16,7 @@ import os
 os.environ["CODEX_INVOKED_BY"] = "memory_flush"
 
 import asyncio
+import hashlib
 import json
 import logging
 import sys
@@ -30,6 +31,9 @@ DAILY_DIR = ROOT / "daily"
 SCRIPTS_DIR = ROOT / "scripts"
 STATE_FILE = SCRIPTS_DIR / "last-flush.json"
 LOG_FILE = SCRIPTS_DIR / "flush.log"
+STOP_FLUSH_THROTTLE_SECONDS = 2 * 60 * 60
+COMPILE_TRIGGER_THROTTLE_SECONDS = 2 * 60 * 60
+RECENT_CONTEXT_HASH_TTL_SECONDS = 7 * 24 * 60 * 60
 
 # Set up file-based logging so we can verify the background process ran.
 # The parent process sends stdout/stderr to DEVNULL (to avoid the inherited
@@ -53,6 +57,29 @@ def load_flush_state() -> dict:
 
 def save_flush_state(state: dict) -> None:
     STATE_FILE.write_text(json.dumps(state), encoding="utf-8")
+
+
+def context_source(context_file: Path) -> str:
+    if context_file.name.startswith("session-flush-"):
+        return "stop"
+    if context_file.name.startswith("flush-context-"):
+        return "pre-compact"
+    return "unknown"
+
+
+def context_hash(context: str) -> str:
+    return hashlib.sha256(context.encode("utf-8")).hexdigest()[:16]
+
+
+def recent_context_hashes(state: dict, now_ts: float) -> dict:
+    recent = state.get("recent_context_hashes", {})
+    if not isinstance(recent, dict):
+        return {}
+    return {
+        str(key): float(value)
+        for key, value in recent.items()
+        if isinstance(value, (int, float)) and now_ts - float(value) < RECENT_CONTEXT_HASH_TTL_SECONDS
+    }
 
 
 def append_to_daily_log(content: str, section: str = "Session") -> None:
@@ -149,6 +176,14 @@ def maybe_trigger_compilation() -> None:
     if not compile_script.exists():
         return
 
+    state = load_flush_state()
+    last_compile_trigger = state.get("last_compile_trigger", {})
+    if isinstance(last_compile_trigger, dict):
+        last_ts = last_compile_trigger.get("timestamp", 0)
+        if isinstance(last_ts, (int, float)) and time.time() - float(last_ts) < COMPILE_TRIGGER_THROTTLE_SECONDS:
+            logging.info("Skipping compile trigger: throttled")
+            return
+
     logging.info("End-of-day compilation triggered (after %d:00)", COMPILE_AFTER_HOUR)
 
     cmd = ["uv", "run", "--directory", str(ROOT), "python", str(compile_script)]
@@ -162,6 +197,8 @@ def maybe_trigger_compilation() -> None:
     try:
         log_handle = open(str(SCRIPTS_DIR / "compile.log"), "a")
         _sp.Popen(cmd, stdout=log_handle, stderr=_sp.STDOUT, cwd=str(ROOT), **kwargs)
+        state["last_compile_trigger"] = {"timestamp": time.time(), "date": now.strftime("%Y-%m-%d")}
+        save_flush_state(state)
     except Exception as e:
         logging.error("Failed to spawn compile.py: %s", e)
 
@@ -180,20 +217,40 @@ def main():
         logging.error("Context file not found: %s", context_file)
         return
 
-    # Deduplication: skip if same session was flushed within 60 seconds
-    state = load_flush_state()
-    if (
-        state.get("session_id") == session_id
-        and time.time() - state.get("timestamp", 0) < 60
-    ):
-        logging.info("Skipping duplicate flush for session %s", session_id)
-        context_file.unlink(missing_ok=True)
-        return
-
     # Read pre-extracted context
     context = context_file.read_text(encoding="utf-8").strip()
     if not context:
         logging.info("Context file is empty, skipping")
+        context_file.unlink(missing_ok=True)
+        return
+
+    state = load_flush_state()
+    now_ts = time.time()
+    source = context_source(context_file)
+    content_hash = context_hash(context)
+    recent_hashes = recent_context_hashes(state, now_ts)
+
+    if content_hash in recent_hashes:
+        logging.info("Skipping duplicate context for session %s (%s)", session_id, source)
+        state["recent_context_hashes"] = recent_hashes
+        save_flush_state(state)
+        context_file.unlink(missing_ok=True)
+        return
+
+    stop_flushes = state.get("stop_flushes", {})
+    if not isinstance(stop_flushes, dict):
+        stop_flushes = {}
+    last_stop_flush = stop_flushes.get(session_id, {})
+    if (
+        source == "stop"
+        and isinstance(last_stop_flush, dict)
+        and isinstance(last_stop_flush.get("timestamp"), (int, float))
+        and now_ts - float(last_stop_flush["timestamp"]) < STOP_FLUSH_THROTTLE_SECONDS
+    ):
+        logging.info("Skipping Stop flush for session %s: throttled", session_id)
+        state["recent_context_hashes"] = recent_hashes
+        state["stop_flushes"] = stop_flushes
+        save_flush_state(state)
         context_file.unlink(missing_ok=True)
         return
 
@@ -215,8 +272,20 @@ def main():
         logging.info("Result: saved to daily log (%d chars)", len(response))
         append_to_daily_log(response, "Session")
 
-    # Update dedup state
-    save_flush_state({"session_id": session_id, "timestamp": time.time()})
+    # Update dedup and throttle state.
+    now_ts = time.time()
+    recent_hashes[content_hash] = now_ts
+    state["recent_context_hashes"] = recent_hashes
+    state["last_flush"] = {
+        "session_id": session_id,
+        "timestamp": now_ts,
+        "context_hash": content_hash,
+        "source": source,
+    }
+    if source == "stop":
+        stop_flushes[session_id] = {"timestamp": now_ts, "context_hash": content_hash}
+        state["stop_flushes"] = stop_flushes
+    save_flush_state(state)
 
     # Clean up context file
     context_file.unlink(missing_ok=True)

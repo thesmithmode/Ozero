@@ -23,7 +23,7 @@ import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
-import ru.ozero.enginescore.IpProbeRoute
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
@@ -96,9 +96,9 @@ class EngineWarp(
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         if (config is EngineConfig.WarpProxy) return startProxy(config, upstream)
-        require(config is EngineConfig.Warp) { "EngineWarp требует EngineConfig.Warp" }
+        require(config is EngineConfig.Warp) { "EngineWarp requires EngineConfig.Warp" }
         require(upstream is Upstream.None) {
-            "EngineWarp не принимает upstream — supportsUpstreamSocks=false"
+            "EngineWarp does not accept upstream - supportsUpstreamSocks=false"
         }
         val cached = resolvedConfig
         val cachedIni = if (activeSocksPort > 0) null else resolvedIni
@@ -106,7 +106,7 @@ class EngineWarp(
             ResolvedWarp(cached, cachedIni, "cached")
         } else {
             resolveActive() ?: return StartResult.Failure(
-                reason = "WARP config resolve failed (auto-register не сработал)",
+                reason = "WARP config resolve failed (auto-register unavailable)",
             )
         }
         resolvedConfig = resolved.config
@@ -151,7 +151,7 @@ class EngineWarp(
     }
 
     override suspend fun stop() {
-        Log.i(TAG, "stop — detaching tun")
+        Log.i(TAG, "stop - detaching tun")
         statsJobRef.getAndSet(null)?.cancel()
         connectedSinceRef.set(0L)
         _stats.value = EngineStats()
@@ -174,18 +174,18 @@ class EngineWarp(
     override suspend fun recover(): EnginePlugin.RecoverResult {
         val uapiPath = uapiPathProvider()
         val state = uapiStateReader(uapiPath, TUNNEL_NAME)
-            ?: return EnginePlugin.RecoverResult.Failed("UAPI недоступен — handshake state не читается")
+            ?: return EnginePlugin.RecoverResult.Failed("UAPI unavailable - handshake state unreadable")
         val ageS = state.handshakeAgeSeconds
         if (ageS != null && ageS < handshakeStaleThresholdSec) {
             consecutiveRecoverFails = 0
-            PersistentLoggers.debug(TAG, "recover: handshake age=${ageS}s — OK, без дей��твий")
+            PersistentLoggers.debug(TAG, "recover: handshake age=${ageS}s - OK, no action")
             return EnginePlugin.RecoverResult.Success
         }
         consecutiveRecoverFails++
         if (consecutiveRecoverFails < RECOVER_PASSIVE_ATTEMPTS) {
             PersistentLoggers.warn(
                 TAG,
-                "recover: handshake stale (age=$ageS) — passive attempt " +
+                "recover: handshake stale (age=$ageS) - passive attempt " +
                     "$consecutiveRecoverFails/$RECOVER_PASSIVE_ATTEMPTS",
             )
             return EnginePlugin.RecoverResult.Failed("handshake stale age=${ageS ?: "never"}s")
@@ -193,10 +193,10 @@ class EngineWarp(
         val fd = savedTunFd
         val ini = resolvedIni
         if (fd < 0 || ini == null) {
-            PersistentLoggers.warn(TAG, "recover: reattach impossible — fd=$fd ini=${ini != null}")
+            PersistentLoggers.warn(TAG, "recover: reattach impossible - fd=$fd ini=${ini != null}")
             return EnginePlugin.RecoverResult.Failed("handshake stale, reattach unavailable")
         }
-        PersistentLoggers.warn(TAG, "recover: handshake stale age=$ageS — reattach attempt")
+        PersistentLoggers.warn(TAG, "recover: handshake stale age=$ageS - reattach attempt")
         statsJobRef.getAndSet(null)?.cancel()
         networkCallback?.let { cb ->
             networkCallback = null
@@ -227,7 +227,7 @@ class EngineWarp(
         } ?: false
         consecutiveRecoverFails = 0
         return if (handshakeOk) {
-            PersistentLoggers.info(TAG, "recover: reattach success — handshake established")
+            PersistentLoggers.info(TAG, "recover: reattach success - handshake established")
             EnginePlugin.RecoverResult.Success
         } else {
             PersistentLoggers.warn(TAG, "recover: reattach done but handshake pending")
@@ -255,7 +255,7 @@ class EngineWarp(
                 EnginePlugin.ReadyResult.Ready
             } else {
                 val reason = "WARP proxy SOCKS timeout ${warpReadyTimeoutMs}ms (127.0.0.1:$socksPort)"
-                PersistentLoggers.warn(TAG, "awaitReady timeout — $reason")
+                PersistentLoggers.warn(TAG, "awaitReady timeout - $reason")
                 EnginePlugin.ReadyResult.Timeout(reason)
             }
         }
@@ -279,27 +279,28 @@ class EngineWarp(
                 "rx=${state.rxBytes} tx=${state.txBytes} peers=${state.peersSeen} " +
                     "lastHsAge=${state.handshakeAgeSeconds ?: "never"}"
             } else {
-                "uapi unreachable — tunnel handle invalid or socket missing; " +
+                "uapi unreachable - tunnel handle invalid or socket missing; " +
                     "dirListing=${WarpSocketDiagnostics.listSocketCandidates(uapiPath)}"
             }
             val reason = "WARP: WireGuard handshake timeout ${warpReadyTimeoutMs}ms ($diag)"
-            PersistentLoggers.warn(TAG, "awaitReady timeout — $reason — proceeding")
+            PersistentLoggers.warn(TAG, "awaitReady timeout - $reason - proceeding")
             EnginePlugin.ReadyResult.Timeout(reason)
         }
     }
 
     override suspend fun probe(): ProbeResult {
         if (activeSocksPort > 0) return proxyProbe()
-        return ProbeResult.Failure(reason = "WARP не предоставляет SOCKS-интерфейс")
+        return ProbeResult.Failure(reason = "WARP does not provide a SOCKS endpoint")
     }
 
-    override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute {
-        if (activeSocksPort > 0) return IpProbeRoute.Socks("127.0.0.1", activeSocksPort)
+    override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
+        val port = activeSocksPort.takeIf { it > 0 } ?: socksPort.takeIf { it > 0 }
+        if (port != null) return ExitNodeStrategy.ViaSocks("127.0.0.1", port)
         val connected = resolvedConfig?.peerEndpoint?.isNotBlank() == true
         return if (connected) {
-            IpProbeRoute.StaticLocation(country = "Cloudflare WARP", countryCode = null)
+            ExitNodeStrategy.ProviderLabel("Cloudflare WARP")
         } else {
-            IpProbeRoute.Unavailable("WARP не подключён")
+            ExitNodeStrategy.Unavailable("WARP not connected")
         }
     }
 
@@ -320,13 +321,17 @@ class EngineWarp(
         val v4Prefix = cfg.interfaceAddressV4.substringAfter('/', missingDelimiterValue = "32")
             .toIntOrNull() ?: 32
         val ipv6Allowed = cfg.interfaceAddressV6.isNotBlank() && ipv6EnabledProvider()
-        val v6Addr = cfg.interfaceAddressV6.substringBefore('/').takeIf { it.isNotBlank() && ipv6Allowed }
+        val v6Addr = if (ipv6Allowed) {
+            cfg.interfaceAddressV6.substringBefore('/').takeIf { it.isNotBlank() }
+        } else {
+            WARP_IPV6_BLACKHOLE_ADDRESS
+        }
         val v6Prefix = cfg.interfaceAddressV6.substringAfter('/', missingDelimiterValue = "128")
             .toIntOrNull() ?: 128
         val allowedV4 = cfg.allowedIps.filter { it.isIpv4Cidr() }
         val allowedV6 = cfg.allowedIps.filter { it.isIpv6Cidr() && ipv6Allowed }
         val routeAllV4 = allowedV4.any { it.isFullTunnelV4() }
-        val routeAllV6 = v6Addr != null && allowedV6.any { it.isFullTunnelV6() }
+        val routeAllV6 = v6Addr != null && (!ipv6Allowed || allowedV6.any { it.isFullTunnelV6() })
         return TunSpec(
             sessionName = "WARP",
             mtu = cfg.mtu,
@@ -337,7 +342,7 @@ class EngineWarp(
             allowFamilyV4 = true,
             allowFamilyV6 = v6Addr != null,
             ipv6Address = v6Addr,
-            ipv6PrefixLength = v6Prefix,
+            ipv6PrefixLength = if (ipv6Allowed) v6Prefix else WARP_IPV6_BLACKHOLE_PREFIX,
             excludeRfc1918 = false,
             routeAllV4 = routeAllV4,
             routeAllV6 = routeAllV6,
@@ -348,7 +353,7 @@ class EngineWarp(
 
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
         val ini = resolvedIni ?: return TunAttachResult.Failure(
-            reason = "attachTun до start — нет ini config",
+            reason = "attachTun before start - no ini config",
         )
         savedTunFd = tunFd
         val uapiPath = uapiPathProvider()
@@ -411,7 +416,7 @@ class EngineWarp(
                             PersistentLoggers.trace(
                                 TAG,
                                 "warp stats tx=${state.txBytes}B rx=${state.rxBytes}B " +
-                                    "Δtx=${dTx}B Δrx=${dRx}B hsAge=${ageS ?: "never"}s",
+                                    "deltaTx=${dTx}B deltaRx=${dRx}B hsAge=${ageS ?: "never"}s",
                             )
                             prevRx = state.rxBytes
                             prevTx = state.txBytes
@@ -427,15 +432,15 @@ class EngineWarp(
                         if (consecutiveNullReads == UAPI_NULL_DEGRADED_THRESHOLD) {
                             PersistentLoggers.warn(
                                 TAG,
-                                "warp UAPI null x$consecutiveNullReads — пометили activeConnections=0 " +
-                                    "(peer watchdog подберёт через ${PEER_WATCHDOG_HINT_S}s)",
+                                "warp UAPI null x$consecutiveNullReads - activeConnections=0 " +
+                                    "(peer watchdog handles this after ${PEER_WATCHDOG_HINT_S}s)",
                             )
                         }
                         if (tick % STATS_LOG_EVERY == 0) {
                             PersistentLoggers.warn(
                                 TAG,
-                                "warp stats unavailable — UAPI socket read returned null " +
-                                    "(uapi=$uapiPath/$TUNNEL_NAME) — handle invalid или socket путь не найден",
+                                "warp stats unavailable - UAPI socket read returned null " +
+                                    "(uapi=$uapiPath/$TUNNEL_NAME) - handle invalid or socket path missing",
                             )
                         }
                     }
@@ -465,7 +470,7 @@ class EngineWarp(
             }
             buildResolved(effectiveConfig, slot.rawIniOverride, source = "slot")
         } else {
-            PersistentLoggers.debug(TAG, "no active config — autoConfig.register")
+            PersistentLoggers.debug(TAG, "no active config - autoConfig.register")
             val regResult = autoConfig.register()
             val fresh = regResult.getOrElse { t ->
                 PersistentLoggers.error(TAG, "register failed: ${t.message}")
@@ -478,7 +483,7 @@ class EngineWarp(
                     if (t is WarpConfigDuplicateException) {
                         runCatching { configStore.setActive(t.existingSlotId) }
                             .onSuccess {
-                                Log.i(TAG, "auto-register duplicate — activated existing slot ${t.existingSlotId}")
+                                Log.i(TAG, "auto-register duplicate - activated existing slot ${t.existingSlotId}")
                             }
                             .onFailure { e -> PersistentLoggers.warn(TAG, "setActive duplicate failed: ${e.message}") }
                     } else {
@@ -547,7 +552,7 @@ class EngineWarp(
         val host = ep.substring(0, sep)
         val port = ep.substring(sep + 1)
         if (host.isBlank() || isLikelyIpAddress(host)) return cfg
-        val provider = resolvedConfig?.doHProvider ?: DoHProvider.SYSTEM
+        val provider = cfg.doHProvider
         Log.i(TAG, "resolveEndpointHost host=$host provider=${provider.name}")
         for (attempt in 0..2) {
             val resolved = if (provider.isSystem) {
@@ -555,10 +560,10 @@ class EngineWarp(
                     runCatching { java.net.InetAddress.getByName(host).hostAddress }.getOrNull()
                 }
             } else {
-                withContext(Dispatchers.IO) { resolveViaDoH(host, provider.url) }
+                withContext(Dispatchers.IO) { resolveViaDoH(host, bootstrapSafeDohUrl(provider)) }
             }
             if (!resolved.isNullOrBlank()) {
-                Log.i(TAG, "endpoint resolved $host → $resolved via ${provider.name} (attempt ${attempt + 1})")
+                Log.i(TAG, "endpoint resolved $host -> $resolved via ${provider.name} (attempt ${attempt + 1})")
                 return cfg.copy(peerEndpoint = "$resolved:$port")
             }
             if (attempt < 2) delay(200L shl attempt)
@@ -566,6 +571,18 @@ class EngineWarp(
         PersistentLoggers.warn(TAG, "endpoint resolve failed after 3 attempts for $host via ${provider.name}")
         return cfg
     }
+
+    private fun bootstrapSafeDohUrl(provider: DoHProvider): String =
+        provider.url.takeIf { provider.supportsJsonQueryApi() && isIpLiteralDohUrl(it) } ?: BOOTSTRAP_DOH_URL
+
+    private fun DoHProvider.supportsJsonQueryApi(): Boolean = this !in setOf(
+        DoHProvider.GOOGLE_8888,
+        DoHProvider.GOOGLE_8844,
+    )
+
+    private fun isIpLiteralDohUrl(dohUrl: String): Boolean = runCatching {
+        isLikelyIpAddress(java.net.URL(dohUrl).host)
+    }.getOrDefault(false)
 
     private fun resolveViaDoH(host: String, dohUrl: String): String? = runCatching {
         val url = java.net.URL("$dohUrl?name=$host&type=A")
@@ -626,6 +643,9 @@ class EngineWarp(
         const val TUNNEL_NAME = "ozero-warp"
         const val DOH_CONNECT_TIMEOUT_MS = 3_000
         const val DOH_READ_TIMEOUT_MS = 3_000
+        const val BOOTSTRAP_DOH_URL = "https://1.1.1.1/dns-query"
+        const val WARP_IPV6_BLACKHOLE_ADDRESS = "fd00::1"
+        const val WARP_IPV6_BLACKHOLE_PREFIX = 128
         const val WARP_READY_TIMEOUT_MS = 10_000L
         const val WARP_READY_POLL_MS = 100L
         const val SOCKS_PROBE_TIMEOUT_MS = 300

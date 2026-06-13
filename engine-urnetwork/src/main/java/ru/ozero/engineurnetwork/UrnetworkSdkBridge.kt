@@ -48,6 +48,11 @@ interface UrnetworkSdkBridge {
 
     fun connectionStatus(): String? = null
 
+    fun runtimeSnapshot(): RuntimeSnapshot = RuntimeSnapshot(
+        connectionStatus = runCatching { connectionStatus() }.getOrNull(),
+        peers = runCatching { peerCount() }.getOrDefault(0),
+    )
+
     fun peerCount(): Int
 
     fun unpaidByteCount(): Long
@@ -83,6 +88,8 @@ interface UrnetworkSdkBridge {
             get() = null
         val city: String?
             get() = null
+        val bestAvailable: Boolean
+            get() = false
     }
 
     data class LocationInfo(
@@ -106,6 +113,14 @@ interface UrnetworkSdkBridge {
         val usedBytes: Long,
         val plan: String?,
         val store: String?,
+    )
+
+    data class RuntimeSnapshot(
+        val connectionStatus: String? = null,
+        val peers: Int = 0,
+        val providerStateAdded: Long = 0L,
+        val tunnelStarted: Boolean = false,
+        val connectIssued: Boolean = false,
     )
 
     sealed class StartResult {

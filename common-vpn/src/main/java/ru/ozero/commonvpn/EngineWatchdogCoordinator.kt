@@ -66,6 +66,7 @@ class EngineWatchdogCoordinator(
     fun startPeerWatchdog(engineId: EngineId) {
         peerWatchJobRef.getAndSet(null)?.cancel()
         val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return
+        val peerWatchdogPolicy = plugin.peerWatchdogPolicy()
         val job = scope.launch {
             try {
                 var zeroPeersPolls = 0
@@ -78,12 +79,13 @@ class EngineWatchdogCoordinator(
                         zeroPeersPolls = 0
                         continue
                     }
-                    if (!hadPeers) continue
+                    val timeoutMs = peerWatchdogPolicy.timeoutMs
+                    if (!hadPeers && !peerWatchdogPolicy.recoverBeforeFirstPeer) continue
                     zeroPeersPolls += 1
-                    if (zeroPeersPolls * PEER_WATCHDOG_POLL_MS < PEER_WATCHDOG_TIMEOUT_MS) continue
+                    if (zeroPeersPolls * PEER_WATCHDOG_POLL_MS < timeoutMs) continue
                     PersistentLoggers.warn(
                         TAG,
-                        "peer watchdog: 0 peers ${PEER_WATCHDOG_TIMEOUT_MS / 1000}s → recover",
+                        "peer watchdog: 0 peers ${timeoutMs / 1000}s → recover",
                     )
                     val result = runCatching { plugin.recover() }.getOrElse { t ->
                         EnginePlugin.RecoverResult.Failed("recover threw: ${t.message}")

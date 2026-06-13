@@ -83,6 +83,30 @@ class DomainListManagerTest {
     }
 
     @Test
+    fun `getActiveDomains adds media probe when youtube page probe is active`() {
+        val lists = listOf(
+            DomainList(id = "yt", name = "YT", domains = listOf("youtube.com"), isActive = true),
+        )
+        val domains = manager.getActiveDomains(lists)
+        assertTrue(domains.contains("youtube.com"))
+        assertTrue(domains.contains("manifest.googlevideo.com"))
+    }
+
+    @Test
+    fun `getActiveDomains does not duplicate existing youtube media probe`() {
+        val lists = listOf(
+            DomainList(
+                id = "yt",
+                name = "YT",
+                domains = listOf("youtube.com", "manifest.googlevideo.com"),
+                isActive = true,
+            ),
+        )
+        val domains = manager.getActiveDomains(lists)
+        assertEquals(1, domains.count { it == "manifest.googlevideo.com" })
+    }
+
+    @Test
     fun `getActiveDomains returns empty when all inactive`() {
         val lists = listOf(
             DomainList(id = "a", name = "A", domains = listOf("x.com"), isActive = false),
@@ -158,6 +182,12 @@ class DomainListManagerTest {
         val lists = listOf(builtIn1)
         manager.save(lists)
         assertEquals(lists, store.saved)
+    }
+
+    @Test
+    fun `googlevideo built-in is active by default`() {
+        val googlevideo = DomainListManager.BUILT_IN_CONFIGS.first { it.first == "googlevideo" }
+        assertTrue(googlevideo.third)
     }
 
     private class FakeStore : DomainListStore {

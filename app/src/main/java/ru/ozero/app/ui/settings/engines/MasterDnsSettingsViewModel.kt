@@ -35,6 +35,7 @@ class MasterDnsSettingsViewModel @Inject constructor(
     private val deployState = MutableStateFlow<MasterDnsDeployState>(MasterDnsDeployState.Idle)
     private val deployLog = MutableStateFlow<List<String>>(emptyList())
     private var deployJob: Job? = null
+    private var pendingDeploy: PendingDeploy? = null
 
     val state: StateFlow<MasterDnsSettingsState> = combine(
         store.config(),
@@ -68,35 +69,12 @@ class MasterDnsSettingsViewModel @Inject constructor(
 
     fun onDeployClick(host: String, port: Int, login: String, password: CharArray) {
         if (deployJob?.isActive == true) return
-        val credentials = MasterDnsDeployCredentials(
-            host = host,
-            port = port,
-            login = login,
-            password = password,
-        )
+        pendingDeploy?.clear()
+        pendingDeploy = PendingDeploy(host, port, login, password.copyOf())
+        password.fill('\u0000')
         deployLog.value = emptyList()
         appendLog("→ Подключение к $host:$port")
-        deployJob = viewModelScope.launch {
-            runCatching {
-                deployer.deploy(credentials).collect { deployStep ->
-                    deployState.value = deployStep
-                    logFor(deployStep, host = host)?.let(::appendLog)
-                    if (deployStep is MasterDnsDeployState.Done) {
-                        runCatching {
-                            store.setConfigToml(deployStep.configToml)
-                            store.setServerIp(host)
-                            store.setServerPort(port)
-                            store.setResolvers(listOf("$host:$MASTERDNS_DNS_PORT"))
-                        }.onFailure { PersistentLoggers.error(TAG, "deploy persist failed: ${it.message}", it) }
-                        appendLog("✓ Резолверы и client_config записаны автоматически")
-                    }
-                }
-            }.onFailure {
-                PersistentLoggers.error(TAG, "deploy flow threw: ${it.message}", it)
-                deployState.value = MasterDnsDeployState.Error("unexpected_error")
-                appendLog("✗ Неожиданная ошибка: ${it.message}")
-            }
-        }
+        startDeployJob(host) { deployer.deploy(it) }
     }
 
     fun onUndeployClick(host: String, port: Int, login: String, password: CharArray) {
@@ -105,8 +83,9 @@ class MasterDnsSettingsViewModel @Inject constructor(
             host = host,
             port = port,
             login = login,
-            password = password,
+            password = password.copyOf(),
         )
+        password.fill('\u0000')
         deployLog.value = emptyList()
         appendLog("→ Подключение к $host:$port (удаление)")
         deployJob = viewModelScope.launch {
@@ -129,11 +108,74 @@ class MasterDnsSettingsViewModel @Inject constructor(
         }
     }
 
+    fun onAmneziaDnsConflictCancel() {
+        deployJob?.cancel()
+        deployJob = null
+        clearPendingDeploy()
+        deployState.value = MasterDnsDeployState.Error("amnezia_dns_cancelled")
+        appendLog("✗ Деплой отменён: найден контейнер amnezia-dns на порту 53")
+    }
+
+    fun onAmneziaDnsRemoveAndContinue() {
+        if (deployJob?.isActive == true) return
+        val pending = pendingDeploy ?: return
+        appendLog("→ Удаление только контейнера amnezia-dns и повторная проверка порта 53")
+        startDeployJob(pending.host) { deployer.removeAmneziaDnsAndContinue(it) }
+        clearPendingDeploy()
+    }
+
     fun onDeployReset() {
         deployJob?.cancel()
         deployJob = null
+        clearPendingDeploy()
         deployState.value = MasterDnsDeployState.Idle
         deployLog.value = emptyList()
+    }
+
+    private fun startDeployJob(
+        host: String,
+        deployFlow: (MasterDnsDeployCredentials) -> kotlinx.coroutines.flow.Flow<MasterDnsDeployState>,
+    ) {
+        val pending = pendingDeploy ?: return
+        val credentials = pending.credentials()
+        deployJob = viewModelScope.launch {
+            runCatching {
+                deployFlow(credentials).collect { deployStep ->
+                    deployState.value = deployStep
+                    logFor(deployStep, host = host)?.let(::appendLog)
+                    if (deployStep is MasterDnsDeployState.Done) {
+                        persistDeployResult(host, pending.port, deployStep.configToml)
+                    }
+                    if (
+                        deployStep is MasterDnsDeployState.Done ||
+                        deployStep is MasterDnsDeployState.Error ||
+                        deployStep is MasterDnsDeployState.PortBusy
+                    ) {
+                        clearPendingDeploy()
+                    }
+                }
+            }.onFailure {
+                PersistentLoggers.error(TAG, "deploy flow threw: ${it.message}", it)
+                deployState.value = MasterDnsDeployState.Error("unexpected_error")
+                appendLog("✗ Неожиданная ошибка: ${it.message}")
+                clearPendingDeploy()
+            }
+        }
+    }
+
+    private suspend fun persistDeployResult(host: String, port: Int, configToml: String) {
+        runCatching {
+            store.setConfigToml(configToml)
+            store.setServerIp(host)
+            store.setServerPort(port)
+            store.setResolvers(listOf("$host:$MASTERDNS_DNS_PORT"))
+        }.onFailure { PersistentLoggers.error(TAG, "deploy persist failed: ${it.message}", it) }
+        appendLog("✓ Резолверы и client_config записаны автоматически")
+    }
+
+    private fun clearPendingDeploy() {
+        pendingDeploy?.clear()
+        pendingDeploy = null
     }
 
     private fun appendLog(line: String) {
@@ -154,11 +196,27 @@ class MasterDnsSettingsViewModel @Inject constructor(
             "→ Запуск контейнера на 53/udp, генерация encrypt_key, открытие firewall"
         is MasterDnsDeployState.ExtractingKey ->
             "→ Извлечение encrypt_key из контейнера"
+        is MasterDnsDeployState.AmneziaDnsConflict ->
+            "✗ Порт 53 занят amnezia-dns (${step.protocol}, ${step.address})"
         is MasterDnsDeployState.Done -> "✓ Сервер развёрнут"
         is MasterDnsDeployState.Removing -> "→ Удаление контейнера и образа"
         is MasterDnsDeployState.Removed -> "✓ Сервер полностью удалён"
+        is MasterDnsDeployState.PortBusy -> "✗ Порт ${step.protocol}/${step.address} занят: ${step.owner}"
         is MasterDnsDeployState.Error -> "✗ Ошибка: ${step.message}"
         is MasterDnsDeployState.Idle -> null
+    }
+
+    private data class PendingDeploy(
+        val host: String,
+        val port: Int,
+        val login: String,
+        val password: CharArray,
+    ) {
+        fun credentials(): MasterDnsDeployCredentials = MasterDnsDeployCredentials(host, port, login, password.copyOf())
+
+        fun clear() {
+            password.fill('\u0000')
+        }
     }
 
     private companion object {

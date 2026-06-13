@@ -7,182 +7,84 @@ import kotlin.test.assertTrue
 
 class MainViewModelIpInfoChannelTest {
 
-    private val source by lazy {
-        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
-        val f = File(moduleRoot, "src/main/java/ru/ozero/app/ui/MainViewModel.kt")
-        assertTrue(f.exists(), "MainViewModel.kt не найден: $f")
-        f.readText()
+    private val mainSource by lazy {
+        source("src/main/java/ru/ozero/app/ui/MainViewModel.kt")
+    }
+
+    private val resolverSource by lazy {
+        source("src/main/java/ru/ozero/app/ui/ExitNodeResolver.kt")
     }
 
     @Test
-    fun `IP_INFO_WARMUP_MS короткий — IP-карточка показывается быстро после старта VPN (T5 fix)`() {
+    fun `IP_INFO_WARMUP_MS stays short`() {
         val regex = Regex("IP_INFO_WARMUP_MS\\s*=\\s*(\\d[\\d_]*)L")
-        val m = regex.find(source) ?: error("IP_INFO_WARMUP_MS не найден")
-        val warmupMs = m.groupValues[1].replace("_", "").toLong()
-        assertTrue(
-            warmupMs in 100L..1_000L,
-            "IP_INFO_WARMUP_MS должен быть в диапазоне [100..1000]ms — T5 fix: плашка обязана появиться " +
-                "сразу после старта VPN, не через 2-3 секунды. URnetwork location reактивно обновляется " +
-                "через URNETWORK_LOCATION_POLL_MS polling, поэтому первый fetch может быть стартовым stub. " +
-                "Fact=$warmupMs",
-        )
+        val ms = regex.find(mainSource)?.groupValues?.get(1)?.replace("_", "")?.toLong()
+            ?: error("IP_INFO_WARMUP_MS not found")
+        assertTrue(ms in 100L..1_000L, "IP card must resolve shortly after connect. Fact=$ms")
     }
 
     @Test
-    fun `URNETWORK_LOCATION_POLL_MS определён для реактивного обновления выходного узла`() {
+    fun `URnetwork location polling stays subscribed and bounded`() {
         val regex = Regex("URNETWORK_LOCATION_POLL_MS\\s*=\\s*(\\d[\\d_]*)L")
-        val m = regex.find(source) ?: error("URNETWORK_LOCATION_POLL_MS не найден")
-        val pollMs = m.groupValues[1].replace("_", "").toLong()
-        assertTrue(
-            pollMs in 2_000L..10_000L,
-            "URNETWORK_LOCATION_POLL_MS обязан быть 2s–10s: реже — UX деградирует, " +
-                "чаще — батарея. Fact=$pollMs",
-        )
+        val ms = regex.find(mainSource)?.groupValues?.get(1)?.replace("_", "")?.toLong()
+            ?: error("URNETWORK_LOCATION_POLL_MS not found")
+        assertTrue(ms in 2_000L..10_000L, "URnetwork location poll must stay in 2s..10s. Fact=$ms")
+        assertTrue(mainSource.contains("flatMapLatest"))
+        assertTrue(mainSource.contains("SharingStarted.WhileSubscribed"))
+        assertTrue(mainSource.contains("urnetworkLocationOverride"))
     }
 
     @Test
-    fun `MainViewModel содержит polling-flow для URnetwork location через flatMapLatest + WhileSubscribed`() {
-        assertTrue(
-            source.contains("flatMapLatest"),
-            "MainViewModel обязан использовать flatMapLatest для URnetwork location polling — " +
-                "отменяет предыдущий цикл при смене движка.",
-        )
-        assertTrue(
-            source.contains("URNETWORK_LOCATION_POLL_MS"),
-            "Polling-цикл обязан использовать URNETWORK_LOCATION_POLL_MS.",
-        )
-        assertTrue(
-            source.contains("WhileSubscribed"),
-            "Polling обязан запускаться только при наличии подписчика — SharingStarted.WhileSubscribed. " +
-                "Иначе while(true) в init блокирует runTest auto-advanceUntilIdle (CI hang).",
-        )
-        assertTrue(
-            source.contains("urnetworkLocationOverride"),
-            "Override-flow обязан называться urnetworkLocationOverride — комбинируется с _ipInfo.",
-        )
+    fun `MainViewModel delegates exit-node policy to engines and resolver`() {
+        assertTrue(mainSource.contains("Set<@JvmSuppressWildcards EnginePlugin>"))
+        assertTrue(mainSource.contains("plugin.exitNodeStrategy("))
+        assertTrue(mainSource.contains("exitNodeResolver.resolve(strategy)"))
+        assertFalse(mainSource.contains("IpProbeRoute"), "MainViewModel must not know route internals")
     }
 
     @Test
-    fun `IP_INFO_RETRY_ATTEMPTS не меньше 2`() {
-        val regex = Regex("IP_INFO_RETRY_ATTEMPTS\\s*=\\s*(\\d+)")
-        val m = regex.find(source) ?: error("IP_INFO_RETRY_ATTEMPTS не определён")
-        val attempts = m.groupValues[1].toInt()
-        assertTrue(
-            attempts >= 2,
-            "IP_INFO_RETRY_ATTEMPTS обязан быть >= 2 — flaky сеть требует retry. Fact=$attempts",
-        )
-    }
-
-    @Test
-    fun `resolveIpInfoWithRetry задерживает между retries`() {
-        val body = source.substringAfter("private suspend fun resolveIpInfoWithRetry")
+    fun `resolve retry keeps delay between attempts`() {
+        val body = mainSource.substringAfter("private suspend fun resolveIpInfoWithRetry")
             .substringBefore("private suspend fun resolveOnce")
-        assertTrue(
-            body.contains("delay(IP_INFO_RETRY_DELAY_MS)"),
-            "resolveIpInfoWithRetry обязан задерживать между retries.",
-        )
+        assertTrue(body.contains("delay(IP_INFO_RETRY_DELAY_MS)"))
     }
 
     @Test
-    fun `resolveOnce роутит SOCKS-engine через IpProbeRoute_Socks + fetchVia`() {
-        val body = source.substringAfter("private suspend fun resolveOnce")
-            .substringBefore("private fun Result<IpInfo>.toState")
-        assertTrue(
-            body.contains("IpProbeRoute.Socks"),
-            "resolveOnce обязан различать SOCKS-engine через IpProbeRoute.Socks. Body:\n$body",
-        )
-        assertTrue(
-            body.contains("ipInfoProvider.fetchVia("),
-            "SOCKS-route обязан использовать fetchVia(host, port) — иначе IP-fetch " +
-                "идёт мимо SOCKS прокси. Body:\n$body",
-        )
-        assertTrue(
-            body.contains("ipInfoProvider.fetch().toState()") ||
-                body.contains("ipInfoProvider.fetch()"),
-            "Default-route обязан использовать fetch() напрямую (WARP full-tun). Body:\n$body",
-        )
+    fun `ExitNodeResolver handles all strategies`() {
+        assertTrue(resolverSource.contains("ExitNodeStrategy.DirectHttp"))
+        assertTrue(resolverSource.contains("ExitNodeStrategy.ViaSocks"))
+        assertTrue(resolverSource.contains("ExitNodeStrategy.LocationOnly"))
+        assertTrue(resolverSource.contains("ExitNodeStrategy.ProviderLabel"))
+        assertTrue(resolverSource.contains("ExitNodeStrategy.AutoSelected"))
+        assertTrue(resolverSource.contains("ExitNodeStrategy.Unavailable"))
+        assertTrue(resolverSource.contains("ipInfoProvider.fetchVia("))
     }
 
     @Test
-    fun `resolveOnce обрабатывает все четыре варианта IpProbeRoute`() {
-        val body = source.substringAfter("private suspend fun resolveOnce")
-            .substringBefore("private fun Result<IpInfo>.toState")
-        assertTrue(
-            body.contains("IpProbeRoute.Default"),
-            "resolveOnce обязан явно обрабатывать IpProbeRoute.Default → fetch(). Body:\n$body",
-        )
-        assertTrue(
-            body.contains("IpProbeRoute.Socks"),
-            "resolveOnce обязан явно обрабатывать IpProbeRoute.Socks → fetchVia(). Body:\n$body",
-        )
-        assertTrue(
-            body.contains("IpProbeRoute.StaticLocation"),
-            "resolveOnce обязан явно обрабатывать IpProbeRoute.StaticLocation — " +
-                "URnetwork даёт страну без HTTP probe. Body:\n$body",
-        )
-        assertTrue(
-            body.contains("IpProbeRoute.Unavailable"),
-            "resolveOnce обязан явно обрабатывать IpProbeRoute.Unavailable → IpInfoState.Error. " +
-                "Body:\n$body",
-        )
-    }
-
-    @Test
-    fun `resolveOnce Socks-route после fetchVia failure делает direct fetch — fallback на реальный IP, не Error`() {
-        val body = source.substringAfter("is IpProbeRoute.Socks ->")
-            .substringBefore("is IpProbeRoute.StaticLocation")
-        assertTrue(
-            body.contains("fetchVia("),
-            "Socks branch обязан вызвать fetchVia(host, port). Body:\n$body",
-        )
-        assertTrue(
+    fun `ViaSocks failure does not fall back to direct device IP`() {
+        val body = resolverSource.substringAfter("is ExitNodeStrategy.ViaSocks ->")
+            .substringBefore("is ExitNodeStrategy.LocationOnly")
+        assertTrue(body.contains("fetchVia("), "ViaSocks must call fetchVia(host, port)")
+        assertFalse(
             body.contains("ipInfoProvider.fetch()"),
-            "Socks branch после fetchVia failure обязан вызвать ipInfoProvider.fetch() — " +
-                "fallback на direct fetch показывает реальный IP вместо Error при ECONNREFUSED. Body:\n$body",
-        )
-        assertTrue(
-            body.contains("isSuccess") || body.contains("fold("),
-            "Socks branch обязан явно проверять успех fetchVia (isSuccess/fold), " +
-                "иначе fallback не активируется. Body:\n$body",
+            "ViaSocks failure must become Error, not direct fetch with real device IP",
         )
     }
 
     @Test
-    fun `resolveOnce не использует fetchViaSocketFactory — bindSocketToNetwork даёт EPERM на VPN net`() {
-        val body = source.substringAfter("private suspend fun resolveOnce")
-            .substringBefore("private fun Result<IpInfo>.toState")
-        assertFalse(
-            body.contains("fetchViaSocketFactory"),
-            "resolveOnce обязан НЕ использовать fetchViaSocketFactory: " +
-                "Network.socketFactory.createSocket() для VPN-network вызывает bindSocketToNetwork " +
-                "и получает EPERM (Operation not permitted) — system-only привилегия. " +
-                "Engine сам решает IpProbeRoute (Default/Socks/StaticLocation/Unavailable).",
+    fun `resolver rethrows cancellation and avoids VPN socketFactory binding`() {
+        assertTrue(
+            resolverSource.contains("if (it is kotlinx.coroutines.CancellationException) throw it") ||
+                resolverSource.contains("if (it is CancellationException) throw it"),
         )
+        assertFalse(mainSource.contains("fetchViaSocketFactory"))
+        assertFalse(resolverSource.contains("fetchViaSocketFactory"))
     }
 
-    @Test
-    fun `MainViewModel не зависит от VpnNetworkLocator`() {
-        assertFalse(
-            source.contains("VpnNetworkLocator"),
-            "MainViewModel обязан НЕ инъектить VpnNetworkLocator: bind на VPN network даёт EPERM. " +
-                "IP-probe routing делегирован в plugin.ipProbeRoute() — engine выбирает стратегию.",
-        )
-    }
-
-    @Test
-    fun `MainViewModel принимает Set EnginePlugin через DI`() {
-        assertTrue(
-            source.contains("Set<@JvmSuppressWildcards EnginePlugin>") ||
-                source.contains("Set<EnginePlugin>"),
-            "MainViewModel обязан получать Set<EnginePlugin> через @Inject — " +
-                "IP-routing делегируется в plugin.ipProbeRoute(). " +
-                "Без @JvmSuppressWildcards Hilt не свяжет multibinding с Kotlin Set.",
-        )
-        assertTrue(
-            source.contains("plugin.ipProbeRoute(") ||
-                source.contains(".ipProbeRoute("),
-            "MainViewModel обязан звать plugin.ipProbeRoute(socksPort) — " +
-                "engine сам решает Default/Socks/StaticLocation/Unavailable.",
-        )
+    private fun source(path: String): String {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val file = File(moduleRoot, path)
+        assertTrue(file.exists(), "source not found: $file")
+        return file.readText()
     }
 }

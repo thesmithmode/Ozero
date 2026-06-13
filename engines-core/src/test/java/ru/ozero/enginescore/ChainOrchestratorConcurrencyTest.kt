@@ -1,5 +1,6 @@
 package ru.ozero.enginescore
 
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
@@ -7,6 +8,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 
 class ChainOrchestratorConcurrencyTest {
 
@@ -80,6 +82,22 @@ class ChainOrchestratorConcurrencyTest {
         assertEquals(1, plugin.stopCount, "stop should execute safely, engines only stopped once due to mutex")
     }
 
+    @Test
+    fun stopTimeout_releasesMutexForNextEngineStart() = runTest(StandardTestDispatcher()) {
+        val wedgedByeDpi = WedgedStopPlugin(EngineId.BYEDPI)
+        val nextEngine = CountingPlugin(EngineId.WARP)
+        val orch = ChainOrchestrator(setOf(wedgedByeDpi, nextEngine))
+
+        orch.start(listOf(ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080))))
+        orch.stop()
+
+        val result = orch.start(listOf(ChainStep(EngineId.WARP, EngineConfig.Warp)))
+
+        assertIs<ChainResult.Success>(result)
+        assertEquals(1, nextEngine.startCount)
+        assertEquals(1, wedgedByeDpi.stopCount)
+    }
+
     private class CountingPlugin(
         override val id: EngineId,
     ) : EnginePlugin {
@@ -96,6 +114,29 @@ class ChainOrchestratorConcurrencyTest {
 
         override suspend fun stop() {
             stopCount++
+        }
+
+        override suspend fun probe(): ProbeResult = ProbeResult.Failure("not used")
+
+        override fun stats(): Flow<EngineStats> = flowOf(EngineStats())
+    }
+
+    private class WedgedStopPlugin(
+        override val id: EngineId,
+    ) : EnginePlugin {
+        override val capabilities =
+            EngineCapabilities(true, false, false, false, false, true)
+
+        var stopCount = 0
+
+        override fun stopTimeoutMs(): Long = 1L
+
+        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult =
+            StartResult.Success(socksPort = 1080)
+
+        override suspend fun stop() {
+            stopCount++
+            awaitCancellation()
         }
 
         override suspend fun probe(): ProbeResult = ProbeResult.Failure("not used")

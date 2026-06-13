@@ -99,6 +99,18 @@ class V2RayFmtParseVLESSTest {
     }
 
     @Test
+    fun `should parseVLESS map ws ed to maxEarlyData and keep header separate`() {
+        assertTrue(
+            fmtSource.contains("maxEarlyData") && fmtSource.contains("\"ed\""),
+            "parseVLESS must map numeric ws 'ed' query to maxEarlyData, not early_data_header_name",
+        )
+        assertTrue(
+            fmtSource.contains("\"eh\"") && fmtSource.contains("earlyDataHeaderName"),
+            "parseVLESS must keep early_data_header_name as a separate string header parameter",
+        )
+    }
+
+    @Test
     fun `should parseVLESS handle grpc serviceName`() {
         assertTrue(
             fmtSource.contains("\"grpc\"") && fmtSource.contains("serviceName"),

@@ -5,19 +5,21 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginesingbox.SingboxEngine
+import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import java.net.InetAddress
 import java.net.ServerSocket
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -35,31 +37,14 @@ class SingboxProbeServiceTest {
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
 
-        ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
-            val accept = async(Dispatchers.IO) {
-                server.accept().use { }
-            }
-            val profile = ProxyProfile(
-                id = 7L,
-                groupId = 1L,
-                name = "local",
-                beanBlob = KryoSerializer.serialize(
-                    VLESSBean().apply {
-                        serverAddress = "127.0.0.1"
-                        serverPort = server.localPort
-                    },
-                ),
-                protocolType = SingboxEngine.PROTOCOL_VLESS,
-            )
+        val profile = makeProfile(id = 7L, host = "probe.example", port = 443)
+        val probe = FakeProfileProbe(mapOf("probe.example:443" to 24))
 
-            SingboxProbeService(dao, dataStore).probeAndAutoSelect(listOf(profile), this)
-
-            accept.await()
-        }
+        SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(listOf(profile))
 
         assertEquals(SingboxEngine.SELECTED_AUTO, prefsFlow.value[selectedProfileKey])
         assertNull(prefsFlow.value[beanKey])
-        assertTrue((dao.latencies[7L] ?: -1) >= 0)
+        assertEquals(24, dao.latencies[7L])
     }
 
     @Test
@@ -68,45 +53,98 @@ class SingboxProbeServiceTest {
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
 
-        ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
-            val accept = async(Dispatchers.IO) {
-                server.accept().use { }
-            }
-            val unsupported = ProxyProfile(
-                id = 8L,
-                groupId = 1L,
-                name = "unsupported",
-                beanBlob = KryoSerializer.serialize(
-                    VLESSBean().apply {
-                        serverAddress = "127.0.0.1"
-                        serverPort = server.localPort
-                        type = "splithttp"
-                    },
-                ),
-                protocolType = SingboxEngine.PROTOCOL_VLESS,
-            )
-            val supported = ProxyProfile(
-                id = 7L,
-                groupId = 1L,
-                name = "supported",
-                beanBlob = KryoSerializer.serialize(
-                    VLESSBean().apply {
-                        serverAddress = "127.0.0.1"
-                        serverPort = server.localPort
-                        type = "tcp"
-                    },
-                ),
-                protocolType = SingboxEngine.PROTOCOL_VLESS,
-            )
+        val unsupported = makeProfile(id = 8L, host = "unsupported.example", port = 443, type = "splithttp")
+        val supported = makeProfile(id = 7L, host = "supported.example", port = 443)
+        val probe = FakeProfileProbe(mapOf("supported.example:443" to 9))
 
-            SingboxProbeService(dao, dataStore).probeAndAutoSelect(listOf(unsupported, supported), this)
-
-            accept.await()
-        }
+        SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(listOf(unsupported, supported))
 
         assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[8L])
         assertEquals(7L, prefsFlow.value[selectedProfileKey])
     }
+
+    @Test
+    fun `probeAndAutoSelect rejects tcp-only fake when routed probe fails`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+
+        ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
+            val tcpOnly = makeProfile(id = 7L, host = "127.0.0.1", port = server.localPort)
+
+            SingboxProbeService(dao, dataStore, FakeProfileProbe(emptyMap()))
+                .probeAndAutoSelect(listOf(tcpOnly))
+        }
+
+        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[7L])
+        assertNull(prefsFlow.value[selectedProfileKey])
+    }
+
+    @Test
+    fun `probeAndAutoSelect does not overwrite latency when singbox runtime is busy`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val profile = makeProfile(id = 7L, host = "busy.example", port = 443)
+
+        SingboxProbeService(
+            dao,
+            dataStore,
+            FakeProfileProbe(mapOf("busy.example:443" to LATENCY_SKIPPED_ACTIVE_RUNTIME)),
+        )
+            .probeAndAutoSelect(listOf(profile))
+
+        assertNull(dao.latencies[7L])
+        assertNull(prefsFlow.value[selectedProfileKey])
+    }
+
+    @Test
+    fun `probeAndAutoSelect limits active profile probes and reports per profile testing state`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val profiles = (1L..25L).map { id -> makeProfile(id = id, host = "probe-$id.example", port = 443) }
+        val testingNow = AtomicInteger(0)
+        val maxTestingNow = AtomicInteger(0)
+        val testedIds = ConcurrentHashMap.newKeySet<Long>()
+
+        SingboxProbeService(dao, dataStore, TrackingProfileProbe())
+            .probeAndAutoSelect(profiles) { profileId, isTesting ->
+                if (isTesting) {
+                    testedIds.add(profileId)
+                    val current = testingNow.incrementAndGet()
+                    maxTestingNow.updateAndGet { previous -> maxOf(previous, current) }
+                } else {
+                    testingNow.decrementAndGet()
+                }
+            }
+
+        assertEquals(profiles.map { it.id }.toSet(), testedIds)
+        assertTrue(
+            maxTestingNow.get() <= SingboxProbeService.MAX_CONCURRENT_PROFILE_PROBES,
+            "profile testing UI state must never show more than 10 active probes",
+        )
+    }
+
+    private fun makeProfile(
+        id: Long,
+        host: String,
+        port: Int,
+        type: String = "tcp",
+    ): ProxyProfile =
+        ProxyProfile(
+            id = id,
+            groupId = 1L,
+            name = host,
+            beanBlob = KryoSerializer.serialize(
+                VLESSBean().apply {
+                    serverAddress = host
+                    serverPort = port
+                    this.type = type
+                },
+            ),
+            protocolType = SingboxEngine.PROTOCOL_VLESS,
+        )
 
     private fun flowDataStore(prefsFlow: MutableStateFlow<Preferences>): DataStore<Preferences> =
         object : DataStore<Preferences> {
@@ -137,5 +175,19 @@ class SingboxProbeServiceTest {
         override suspend fun countByGroupId(groupId: Long): Int = 0
         override suspend fun update(profile: ProxyProfile) = Unit
         override suspend fun delete(profile: ProxyProfile) = Unit
+    }
+
+    private class FakeProfileProbe(
+        private val latenciesByAddress: Map<String, Int>,
+    ) : SingboxProfileProbe {
+        override suspend fun probeLatencyMs(bean: AbstractBean): Int =
+            latenciesByAddress[bean.displayAddress()] ?: SingboxProbeService.LATENCY_FAILED
+    }
+
+    private class TrackingProfileProbe : SingboxProfileProbe {
+        override suspend fun probeLatencyMs(bean: AbstractBean): Int {
+            delay(10)
+            return 1
+        }
     }
 }

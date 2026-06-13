@@ -10,7 +10,12 @@ import kotlin.test.assertTrue
 
 class EvolutionEngineTest {
 
-    private val seeds = listOf("-winner -cmd", "-loser1", "-loser2", "-loser3")
+    private val seeds = listOf(
+        "-K -An -s2 -d1",
+        "-Ku -a1 -An",
+        "-K -r1+s -An",
+        "-K -s1 -q1",
+    )
 
     @Test
     fun `evolve reaches 100% fitness in first generation when winner exists`() = runTest {
@@ -236,6 +241,73 @@ class EvolutionEngineTest {
         )
         evolutionEngine.evolve(seedStrategies = seeds, onGeneration = {})
         assertTrue(engine.startCount < 4 * 2, "cache should skip re-evaluation: starts=${engine.startCount}")
+    }
+
+    @Test
+    fun `invalid chromosomes are skipped before native start`() = runTest {
+        val engine = CountingEngine()
+        val invalidSeeds = listOf("google.com -Qr -a1")
+        val pool = GenePool(invalidSeeds)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 1,
+                maxGenerations = 1,
+                targetFitness = 1.0,
+            ),
+        )
+        evolutionEngine.evolve(seedStrategies = invalidSeeds, onGeneration = {})
+        assertEquals(0, engine.startCount, "invalid argv must not reach native ByeDPI start")
+        assertEquals(0, engine.stopCount, "skip-before-start must not call stop when no start attempt happened")
+    }
+
+    @Test
+    fun `start timeout still stops engine after start attempt`() = runTest {
+        val engine = HangingStartEngine()
+        val validSeeds = listOf("-K -An -s2 -d1 -a1")
+        val pool = GenePool(validSeeds)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 1,
+                maxGenerations = 1,
+                evaluationTimeoutMs = 50L,
+                stopTimeoutMs = 50L,
+            ),
+        )
+        evolutionEngine.evolve(seedStrategies = validSeeds, onGeneration = {})
+        assertEquals(1, engine.startCount)
+        assertEquals(1, engine.stopCount, "stop must run in NonCancellable cleanup after a timed-out start")
+    }
+
+    @Test
+    fun `reduceChromosome respects evaluation budget`() = runTest {
+        val engine = CountingEngine()
+        val validSeeds = listOf("-K -An -s2 -d1 -a1")
+        val pool = GenePool(validSeeds)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = engine,
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 1,
+                maxGenerations = 1,
+                targetFitness = 1.01,
+                maxReductionEvaluations = 1,
+            ),
+        )
+        evolutionEngine.evolve(seedStrategies = validSeeds, onGeneration = {})
+        assertTrue(engine.startCount <= 2, "population eval plus one reduction eval expected, got ${engine.startCount}")
     }
 
     @Test

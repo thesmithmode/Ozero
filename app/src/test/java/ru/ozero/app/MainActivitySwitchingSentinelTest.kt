@@ -48,4 +48,51 @@ class MainActivitySwitchingSentinelTest {
                 "Обязан читать tunnelController.switching.value?.to как pendingTarget. Block:\n$block",
         )
     }
+
+    @Test
+    fun `restartVpnIfConnected waits for stop before start`() {
+        val block = source.substringAfter("private suspend fun restartVpnIfConnected")
+            .substringBefore("private fun observeLiveEngineSettingsChanges")
+        val stoppedIdx = block.indexOf("val stopped = withTimeoutOrNull(RESTART_STOP_TIMEOUT_MS)")
+        val guardIdx = block.indexOf("if (stopped == null)")
+        val startIdx = block.indexOf("vpnIntentLauncher.start()")
+        assertTrue(
+            stoppedIdx >= 0 && guardIdx in stoppedIdx until startIdx,
+            "restart must not send ACTION_START until stop published Idle/Failed. Block:\n$block",
+        )
+    }
+
+    @Test
+    fun `coalesced restart settle wait ignores stale Idle after start`() {
+        val block = source.substringAfter("if (restartPending) {")
+            .substringBefore("} while (restartPending)")
+        assertTrue(
+            block.contains("TunnelState.Connected") &&
+                block.contains("TunnelState.Failed") &&
+                !block.contains("TunnelState.Idle"),
+            "coalesced restart must not treat stale Idle from the previous stop as post-start settlement. " +
+                "Block:\n$block",
+        )
+    }
+
+    @Test
+    fun `singbox profile changes restart only stable connected singbox`() {
+        val observerBlock = source.substringAfter("private fun observeSingboxProfileChanges")
+            .substringBefore("private suspend fun restartSingboxIfStableConnected")
+        assertTrue(
+            observerBlock.contains("restartSingboxIfStableConnected") &&
+                !observerBlock.contains("restartVpnIfConnected("),
+            "singbox profile observer must not call generic restart directly because Connecting/Probing profile writes can self-restart",
+        )
+
+        val helperBlock = source.substringAfter("private suspend fun restartSingboxIfStableConnected")
+            .substringBefore("private companion object")
+        assertTrue(
+            helperBlock.contains("TunnelState.Connected") &&
+                helperBlock.contains("EngineId.SINGBOX") &&
+                !helperBlock.contains("TunnelState.Connecting") &&
+                !helperBlock.contains("TunnelState.Probing"),
+            "singbox profile restart must be allowed only after stable Connected(SINGBOX), not during Connecting/Probing",
+        )
+    }
 }

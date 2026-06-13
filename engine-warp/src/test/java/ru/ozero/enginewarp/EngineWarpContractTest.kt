@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.IpProbeRoute
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
@@ -188,6 +189,30 @@ class EngineWarpContractTest {
     }
 
     @Test
+    fun `exitNodeStrategy after start returns ProviderLabel and not DirectHttp`() = runTest {
+        val (e, _, _) = engine(activeConfig = sampleConfig)
+        e.start(EngineConfig.Warp, Upstream.None)
+        val strategy = e.exitNodeStrategy(socksPort = 0)
+        val label = assertIs<ExitNodeStrategy.ProviderLabel>(strategy)
+        assertEquals("Cloudflare WARP", label.label)
+        assertFalse(strategy is ExitNodeStrategy.DirectHttp)
+    }
+
+    @Test
+    fun `exitNodeStrategy in proxy mode returns ViaSocks for real exit IP probe`() = runTest {
+        val bridge = FakeWarpSdkBridge(proxyResult = WarpSdkBridge.ProxyResult.Success)
+        val (e, _, _) = engine(activeConfig = sampleConfig, bridge = bridge)
+        val result = e.start(EngineConfig.WarpProxy(socksPort = 10991), Upstream.None)
+
+        assertIs<StartResult.Success>(result)
+        val strategy = e.exitNodeStrategy(socksPort = 0)
+        val socks = assertIs<ExitNodeStrategy.ViaSocks>(strategy)
+        assertEquals("127.0.0.1", socks.host)
+        assertEquals(10991, socks.port)
+        assertEquals(1, bridge.startProxyCalls)
+    }
+
+    @Test
     fun `ipProbeRoute не возвращает Default — иначе fetch покажет реальный IP вместо WARP`() = runTest {
         val (e, _, _) = engine(activeConfig = sampleConfig)
         e.start(EngineConfig.Warp, Upstream.None)
@@ -255,12 +280,14 @@ class EngineWarpContractTest {
     }
 
     @Test
-    fun `tunSpec без IPv6 → allowFamilyV6=false`() = runTest {
+    fun `tunSpec без IPv6 → IPv6 blackhole route без AWG IPv6`() = runTest {
         val noV6 = sampleConfig.copy(interfaceAddressV6 = "")
         val (e, _, _) = engine(activeConfig = noV6)
         val spec = e.tunSpec()!!
-        assertEquals(false, spec.allowFamilyV6)
-        assertNull(spec.ipv6Address)
+        assertTrue(spec.allowFamilyV6)
+        assertEquals(EngineWarp.WARP_IPV6_BLACKHOLE_ADDRESS, spec.ipv6Address)
+        assertEquals(EngineWarp.WARP_IPV6_BLACKHOLE_PREFIX, spec.ipv6PrefixLength)
+        assertTrue(spec.routeAllV6)
     }
 
     @Test
@@ -317,22 +344,26 @@ class EngineWarpContractTest {
     }
 
     @Test
-    fun `tunSpec — конфиг без IPv6 → allowFamilyV6=false, ipv6Address=null`() = runTest {
+    fun `tunSpec — конфиг без IPv6 → IPv6 fail-closed blackhole`() = runTest {
         val noV6Config = sampleConfig.copy(interfaceAddressV6 = "")
         val (e, _, _) = engineIpv6(ipv6Enabled = false, activeConfig = noV6Config)
         e.start(EngineConfig.Warp, Upstream.None)
         val spec = e.tunSpec() ?: error("tunSpec null")
-        assertFalse(spec.allowFamilyV6, "allowFamilyV6 must be false — config has no IPv6")
-        assertNull(spec.ipv6Address, "ipv6Address must be null — config has no IPv6")
+        assertTrue(spec.allowFamilyV6, "allowFamilyV6 must stay enabled so Android routes IPv6 into WARP TUN")
+        assertEquals(EngineWarp.WARP_IPV6_BLACKHOLE_ADDRESS, spec.ipv6Address)
+        assertEquals(EngineWarp.WARP_IPV6_BLACKHOLE_PREFIX, spec.ipv6PrefixLength)
+        assertTrue(spec.routeAllV6, "IPv6 must fail closed instead of bypassing WARP on dual-stack networks")
     }
 
     @Test
-    fun `tunSpec — конфиг с IPv6 и ipv6Enabled=false → allowFamilyV6=false`() = runTest {
+    fun `tunSpec — конфиг с IPv6 и ipv6Enabled=false → IPv6 fail-closed blackhole`() = runTest {
         val (e, _, _) = engineIpv6(ipv6Enabled = false)
         e.start(EngineConfig.Warp, Upstream.None)
         val spec = e.tunSpec() ?: error("tunSpec null")
-        assertFalse(spec.allowFamilyV6, "allowFamilyV6 must be false — user disabled IPv6")
-        assertNull(spec.ipv6Address, "ipv6Address must be null — user disabled IPv6")
+        assertTrue(spec.allowFamilyV6, "allowFamilyV6 must stay enabled so Android cannot bypass WARP over IPv6")
+        assertEquals(EngineWarp.WARP_IPV6_BLACKHOLE_ADDRESS, spec.ipv6Address)
+        assertEquals(EngineWarp.WARP_IPV6_BLACKHOLE_PREFIX, spec.ipv6PrefixLength)
+        assertTrue(spec.routeAllV6, "Disabled WARP IPv6 must become a TUN blackhole, not direct network bypass")
     }
 
     @Test
@@ -652,12 +683,15 @@ class EngineWarpContractTest {
 
     private class FakeWarpSdkBridge(
         private val attachResult: WarpSdkBridge.AttachResult = WarpSdkBridge.AttachResult.Success,
+        private val proxyResult: WarpSdkBridge.ProxyResult = WarpSdkBridge.ProxyResult.Failed("proxy disabled"),
     ) : WarpSdkBridge {
         var attachCalls: Int = 0
+        var startProxyCalls: Int = 0
         var detachCalls: Int = 0
         var lastFd: Int = -1
         var lastIni: String? = null
         var lastUapi: String? = null
+        var lastProxyPort: Int = -1
         private var running = false
 
         override suspend fun attachTun(
@@ -673,6 +707,19 @@ class EngineWarpContractTest {
             lastUapi = uapiPath
             if (attachResult is WarpSdkBridge.AttachResult.Success) running = true
             return attachResult
+        }
+
+        override suspend fun startProxy(
+            tunnelName: String,
+            iniConfig: String,
+            uapiPath: String,
+            socksPort: Int,
+            protector: ru.ozero.enginescore.VpnSocketProtector,
+        ): WarpSdkBridge.ProxyResult {
+            startProxyCalls++
+            lastProxyPort = socksPort
+            if (proxyResult is WarpSdkBridge.ProxyResult.Success) running = true
+            return proxyResult
         }
 
         override suspend fun detachTun() {

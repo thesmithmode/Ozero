@@ -2,8 +2,15 @@ name: CI
 
 on:
   push:
+    branches-ignore:
+      - main
+  pull_request:
     branches:
-      - '**'
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
   workflow_dispatch:
 
 concurrency:
@@ -15,7 +22,7 @@ jobs:
     name: ktlint + detekt
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ github.ref != 'refs/heads/main' }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && github.ref != 'refs/heads/main') }}
     permissions:
       contents: read
 
@@ -45,7 +52,7 @@ jobs:
     name: Python + shell + Dockerfile
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ github.ref != 'refs/heads/main' }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && github.ref != 'refs/heads/main') }}
     permissions:
       contents: read
 
@@ -90,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -113,6 +120,9 @@ jobs:
       - name: buildSrc unit tests
         run: ./gradlew :buildSrc:test --stacktrace --continue
 
+      - name: Verify tests were discovered
+        run: python3 scripts/verify-junit-nonzero.py buildSrc
+
       - name: Upload buildSrc test reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -126,7 +136,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -244,7 +254,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -342,6 +352,9 @@ jobs:
       - name: testDebugUnitTest + coverage
         run: ./gradlew :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
 
+      - name: Verify tests were discovered
+        run: python3 scripts/verify-junit-nonzero.py app
+
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
@@ -363,7 +376,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -389,6 +402,9 @@ jobs:
       - name: testDebugUnitTest + coverage
         run: ./gradlew :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport :common-vpn:jacocoTestCoverageVerification --stacktrace --continue
 
+      - name: Verify tests were discovered
+        run: python3 scripts/verify-junit-nonzero.py common-vpn
+
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
@@ -410,7 +426,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -436,6 +452,9 @@ jobs:
       - name: testDebugUnitTest + coverage
         run: ./gradlew :engine-warp:testDebugUnitTest :engine-warp:jacocoTestReport :engine-warp:jacocoTestCoverageVerification --stacktrace --continue
 
+      - name: Verify tests were discovered
+        run: python3 scripts/verify-junit-nonzero.py engine-warp
+
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
@@ -457,7 +476,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -526,6 +545,9 @@ jobs:
           :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification
           --stacktrace --continue
 
+      - name: Verify tests were discovered
+        run: python3 scripts/verify-junit-nonzero.py engine-urnetwork engine-byedpi engine-fptn
+
       - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -553,7 +575,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -625,6 +647,11 @@ jobs:
           :common-net:testDebugUnitTest :common-net:jacocoTestReport :common-net:jacocoTestCoverageVerification
           --stacktrace --continue
 
+      - name: Verify tests were discovered
+        run: >
+          python3 scripts/verify-junit-nonzero.py
+          core-storage core-backup engines-core common-dns common-crypto common-net
+
       - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -658,7 +685,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: kotlin-style
-    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/') }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     permissions:
       contents: read
 
@@ -728,6 +755,12 @@ jobs:
           :singbox-subscription:testDebugUnitTest :singbox-subscription:jacocoTestReport :singbox-subscription:jacocoTestCoverageVerification
           :shared-warp-settings:test :shared-warp-settings:jacocoTestReport :shared-warp-settings:jacocoTestCoverageVerification
           --stacktrace --continue
+
+      - name: Verify tests were discovered
+        run: >
+          python3 scripts/verify-junit-nonzero.py
+          engine-masterdns engine-singbox singbox-process singbox-core singbox-fmt singbox-config
+          singbox-room singbox-subscription shared-warp-settings
 
       - name: Upload coverage reports
         if: always()

@@ -57,8 +57,8 @@ class EngineWarpSourceSentinelTest {
             "stats poll обязан вызывать PersistentLoggers.trace с \"warp stats\" prefix — boot.log readable, не info/warn",
         )
         assertTrue(
-            body.contains("Δtx") && body.contains("Δrx"),
-            "stats log обязан содержать дельту (Δtx/Δrx) для outage diagnostics, не только absolute",
+            body.contains("deltaTx") && body.contains("deltaRx"),
+            "stats log must contain traffic deltas (deltaTx/deltaRx), not only absolute counters.",
         )
     }
 
@@ -104,6 +104,9 @@ class EngineWarpSourceSentinelTest {
     fun `anchors — все функции-границы существуют в источнике`() {
         listOf(
             "private suspend fun resolveEndpointHost",
+            "private fun bootstrapSafeDohUrl",
+            "private fun DoHProvider.supportsJsonQueryApi",
+            "private fun isIpLiteralDohUrl",
             "private fun resolveViaDoH",
             "private suspend fun buildResolved(",
         ).forEach { anchor ->
@@ -134,6 +137,61 @@ class EngineWarpSourceSentinelTest {
             body.contains("withContext(Dispatchers.IO)"),
             "InetAddress.getByName — blocking call, обязан быть в withContext(Dispatchers.IO). " +
                 "Без этого блокирует Dispatchers.Default при system DNS lookup.",
+        )
+    }
+
+    @Test
+    fun `resolveEndpointHost использует DoH provider текущего конфига`() {
+        val body = source.substringAfter("private suspend fun resolveEndpointHost")
+            .substringBefore("private fun resolveViaDoH")
+        assertTrue(
+            body.contains("val provider = cfg.doHProvider"),
+            "Endpoint hostname resolve обязан брать DoH provider из текущего WARP slot config. " +
+                "Иначе первый resolve уходит через system DNS и может раскрыть локального DNS провайдера.",
+        )
+        assertFalse(
+            body.contains("resolvedConfig?.doHProvider"),
+            "resolvedConfig содержит предыдущий slot или null на первом старте — " +
+                "его нельзя использовать для DNS policy.",
+        )
+    }
+
+    @Test
+    fun `resolveEndpointHost не резолвит hostname DoH provider через system DNS`() {
+        val body = source.substringAfter("private suspend fun resolveEndpointHost")
+            .substringBefore("private fun bootstrapSafeDohUrl")
+        assertTrue(
+            body.contains("resolveViaDoH(host, bootstrapSafeDohUrl(provider))"),
+            "Hostname-backed DoH providers нельзя передавать напрямую в URL.openConnection — " +
+                "это сначала резолвит DoH hostname через system DNS.",
+        )
+        assertFalse(
+            body.contains("resolveViaDoH(host, provider.url)"),
+            "provider.url может быть hostname-backed (MALW/GEOHIDE), что создаёт bootstrap DNS leak.",
+        )
+    }
+
+    @Test
+    fun `bootstrapSafeDohUrl пропускает только IP literal JSON-compatible DoH URL`() {
+        val body = source.substringAfter("private fun bootstrapSafeDohUrl")
+            .substringBefore("private fun resolveViaDoH")
+        assertTrue(
+            body.contains("supportsJsonQueryApi()") && body.contains("isIpLiteralDohUrl"),
+            "bootstrapSafeDohUrl обязан проверять host DoH URL без DNS lookup и JSON API совместимость.",
+        )
+        assertTrue(
+            body.contains("BOOTSTRAP_DOH_URL"),
+            "Hostname-backed или RFC8484-only DoH providers должны уходить на pinned JSON bootstrap DoH.",
+        )
+    }
+
+    @Test
+    fun `Google IP DoH providers не используются напрямую для JSON query API`() {
+        val body = source.substringAfter("private fun DoHProvider.supportsJsonQueryApi")
+            .substringBefore("private fun isIpLiteralDohUrl")
+        assertTrue(
+            body.contains("DoHProvider.GOOGLE_8888") && body.contains("DoHProvider.GOOGLE_8844"),
+            "Google /dns-query endpoint RFC8484 wire-format, а resolveViaDoH читает JSON name/type API.",
         )
     }
 
