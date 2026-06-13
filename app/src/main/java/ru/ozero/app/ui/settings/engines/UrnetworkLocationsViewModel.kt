@@ -405,12 +405,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
 
     private fun shouldKeepReadyWithoutConfigCache(current: UrnetworkSettingsUiState.Ready): Boolean {
         if (bridge.isDeviceAvailable() || bridge.isRunning()) return true
-        return current.providePaused && !hasCachedLocations(
-            current.countries,
-            current.regions,
-            current.cities,
-            current.bestMatches,
-        )
+        return shouldKeepPausedReadyWithoutConfigCache(current)
     }
 
     private fun handleNullVcFallback() {
@@ -512,6 +507,16 @@ private fun hasCachedLocations(
     cities: List<UrnetworkLocationItem>,
     bestMatches: List<UrnetworkLocationItem>,
 ): Boolean = countries.isNotEmpty() || regions.isNotEmpty() || cities.isNotEmpty() || bestMatches.isNotEmpty()
+
+private fun shouldKeepPausedReadyWithoutConfigCache(
+    current: UrnetworkSettingsUiState.Ready,
+): Boolean = current.providePaused &&
+    !hasCachedLocations(
+        current.countries,
+        current.regions,
+        current.cities,
+        current.bestMatches,
+    )
 
 private fun com.bringyour.sdk.ConnectLocationList?.toLocationItems(): List<UrnetworkLocationItem> =
     buildList {

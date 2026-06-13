@@ -72,6 +72,7 @@ class DefaultAppListProviderRuntimeCoverageTest {
         val collector = launch { provider.packageChanges.collect { } }
 
         try {
+            advanceUntilIdle()
             provider.loadApps()
             shadowPm.installPackage(packageInfo("pkg.added", "Added", system = false))
             context.sendBroadcast(
