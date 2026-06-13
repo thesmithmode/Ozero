@@ -4,8 +4,9 @@ aliases: [i18n-extraction, hardcoded-cyrillic, vm-string-resources, compose-stri
 tags: [android, i18n, compose, viewmodel, kotlin, gotcha]
 sources:
   - "daily/2026-05-15.md"
+  - daily/2026-05-31.md
 created: 2026-05-15
-updated: 2026-05-15
+updated: 2026-06-13
 ---
 
 # Android i18n: Extracting Hardcoded Strings from ViewModels and Compose
@@ -19,6 +20,7 @@ Hardcoded string literals in ViewModels and Compose screens silently bypass Andr
 - `progressText`, validation messages, and engine settings labels are high-risk categories for hardcoded strings: they are written in the primary dev language and rarely updated when adding locale support
 - The `translate.md` rule mandates parity across ru/en/es/pt; any new string key added to `values/strings.xml` must appear in all four locale files before the PR is merged
 - WarpEngineSettingsScreen callers must use `stringResource()` for all visible text; passing raw Kotlin string constants from ViewModel state fails localization
+- New visible strategy-scan phase labels must follow the same `ru/en/es/pt` resource parity rule; hardcoded Russian text in Compose is a review finding, not a harmless implementation shortcut
 
 ## Details
 
@@ -56,6 +58,8 @@ After extracting strings to `values/strings.xml`, identical keys must exist in `
 
 The ar/de/fr/hi/ja/zh-rCN gap (180+ keys) represents stale partial translations from an earlier stage of the project. These are lower priority (not in the mandatory set per `translate.md`) but create a user-facing gap for speakers of those languages.
 
+The 2026-05-31 stabilization added strategy-scan UI phases while the reviewer noted hardcoded Russian strings as a risk. That finding extends the original ViewModel/Compose rule to operational screens added during engine stabilization: progress phases, cancel labels, expert-dock labels, and diagnostic statuses are still user-visible UI and must be represented in Android string resources for every mandatory locale.
+
 ### CI Enforcement
 
 There is no automated compile-time check for missing `stringResource()` usage (unlike missing string keys, which `./gradlew lintDebug` would catch as `MissingTranslation`). The i18n audit is currently manual. Adding a custom lint rule or CI step that fails on Cyrillic string literals in `*.kt` Compose source files would make this systematic.
@@ -65,8 +69,10 @@ There is no automated compile-time check for missing `stringResource()` usage (u
 - [[concepts/per-engine-ui]] - Each engine settings screen is a Compose screen; per-engine screens are highest risk for hardcoded strings added during engine development
 - [[concepts/hilt-viewmodel-split-too-many-functions]] - ViewModel decomposition; extracting string emission into the right layer is part of the same discipline
 - [[concepts/android-xml-string-escaping]] - Related: string resources must also be properly escaped in XML; both articles address the `values/strings.xml` layer
+- [[concepts/byedpi-strategy-scan-isolated-structured-argv]] - Strategy scan UI phases created the 2026-05-31 localization risk
 
 ## Sources
 
 - [[daily/2026-05-15.md]] - Session 14:10: T-43 VM Cyrillic extraction (WarpEngineSettingsScreen callers, progressText, VALIDATION_REQUIRED_FIELDS); T-44 Compose screens (7 screens, interrupted); es/pt 332-line parity commit; 17 keys missing in es/pt, 180+ in ar/de/fr/hi/ja/zh-rCN
 - [[daily/2026-05-15.md]] - Session 15:02: T-43 result reviewed and extended by hand; T-44 delegated to subagent but interrupted before completion
+- [[daily/2026-05-31]]: sessions 12:27, 13:07, and 14:26 record new strategy-scan phase strings and the review risk that hardcoded Russian UI text violates the baseline locale policy.

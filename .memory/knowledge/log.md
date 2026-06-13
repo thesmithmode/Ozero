@@ -55,3 +55,11 @@ test
 - Source: daily/2026-05-26.md
 - Articles created: [[connections/singbox-ui-ci-diagnostic-feedback-loop]]
 - Articles updated: [[concepts/singbox-crash-tombstone-diagnosis]], [[concepts/singbox-dns-outbound-deprecated]], [[concepts/singbox-ping-abstractbean-deserialization]], [[concepts/pingJob-viewmodel-cancellation]], [[concepts/detekt-toomany-functions-semantics]], [[concepts/warp-amber-flash-sentinel]]
+## [2026-06-13T18:48:56+03:00] compile | 2026-05-29.md
+- Source: daily/2026-05-29.md
+- Articles created: [[connections/multi-engine-lifecycle-exitnode-regression-loop]]
+- Articles updated: [[concepts/byedpi-wedged-lane-restart-isolation]], [[concepts/fptn-cancellation-cooperative-auth-lifecycle]], [[concepts/fptn-upstream-dns-websocket-boundary]], [[concepts/urnetwork-startup-readiness-runtime-peer-grace]], [[concepts/urnetwork-relay-provideenabled-sol-contract]], [[concepts/singbox-exit-ip-probe-chain-socks]], [[concepts/exit-node-strategy-resolver-contract]]
+## [2026-06-13T18:54:19+03:00] compile | 2026-05-31.md
+- Source: daily/2026-05-31.md
+- Articles created: [[connections/multi-engine-stabilization-ci-review-loop]]
+- Articles updated: [[concepts/android-i18n-vm-compose-extraction]], [[concepts/dev-push-ci-visible-full-run-contract]], [[concepts/local-gradle-validation-ban-ci-only]], [[connections/fail-closed-security-ci-trust-boundary]]
