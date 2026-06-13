@@ -2,7 +2,7 @@
 import glob
 import os
 import sys
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 
 
 def count_testcases(module_path: str) -> int:

@@ -199,7 +199,9 @@ jobs:
           --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: python3 scripts/verify-junit-nonzero.py app common-vpn engine-urnetwork
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py app common-vpn engine-urnetwork
 
       - name: Upload coverage reports
         if: always()
@@ -252,7 +254,9 @@ jobs:
         run: ./gradlew :buildSrc:test :buildSrc:jacocoTestReport :buildSrc:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: python3 scripts/verify-junit-nonzero.py buildSrc
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py buildSrc
 
       - name: Upload buildSrc test reports
         if: always()
@@ -494,7 +498,9 @@ jobs:
         run: ./gradlew :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: python3 scripts/verify-junit-nonzero.py app
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py app
 
       - name: Upload coverage report
         if: always()
@@ -545,7 +551,9 @@ jobs:
         run: ./gradlew :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport :common-vpn:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: python3 scripts/verify-junit-nonzero.py common-vpn
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py common-vpn
 
       - name: Upload coverage report
         if: always()
@@ -596,7 +604,9 @@ jobs:
         run: ./gradlew :engine-warp:testDebugUnitTest :engine-warp:jacocoTestReport :engine-warp:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: python3 scripts/verify-junit-nonzero.py engine-warp
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py engine-warp
 
       - name: Upload coverage report
         if: always()
@@ -690,7 +700,9 @@ jobs:
           --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: python3 scripts/verify-junit-nonzero.py engine-urnetwork engine-byedpi engine-fptn
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py engine-urnetwork engine-byedpi engine-fptn
 
       - name: Upload coverage reports
         if: always()
@@ -793,8 +805,9 @@ jobs:
           --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: >
-          python3 scripts/verify-junit-nonzero.py
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py \
           core-storage core-backup engines-core common-dns common-crypto common-net
 
       - name: Upload coverage reports
@@ -903,9 +916,10 @@ jobs:
           --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: >
-          python3 scripts/verify-junit-nonzero.py
-          engine-masterdns engine-singbox singbox-process singbox-core singbox-fmt singbox-config
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py \
+          engine-masterdns engine-singbox singbox-process singbox-core singbox-fmt singbox-config \
           singbox-room singbox-subscription shared-warp-settings
 
       - name: Upload coverage reports
