@@ -569,6 +569,12 @@ class RuntimeConfigRestartCoordinatorTest {
         assertFalse(coalescedBlock.contains("return false"))
     }
 
+    private fun readSource(path: String): String =
+        java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            path,
+        ).readText()
+
     private fun coordinator(
         context: Context,
         tunnelController: TunnelController,
