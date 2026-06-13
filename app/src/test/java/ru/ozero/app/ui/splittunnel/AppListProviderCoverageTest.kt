@@ -15,22 +15,27 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class AppListProviderCoverageTest {
 
     private val dispatcher = StandardTestDispatcher()
 
-    @BeforeEach
+    @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
     }
 
-    @AfterEach
+    @After
     fun tearDown() {
         Dispatchers.resetMain()
     }

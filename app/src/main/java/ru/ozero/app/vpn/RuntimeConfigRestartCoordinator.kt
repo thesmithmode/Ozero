@@ -91,7 +91,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         val fromEngine = when (current) {
             is TunnelState.Connected -> current.engineId
             is TunnelState.Connecting -> current.engineId
-            is TunnelState.Probing -> current.engineId
+            is TunnelState.Probing -> current.engineId ?: return false
             else -> return false
         }
         AppLogger.i(TAG, reason)
@@ -113,7 +113,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
             }
             val restarted = withTimeoutOrNull(RESTART_START_TIMEOUT_MS) {
                 tunnelController.state.first {
-                    it is TunnelState.Probing ||
+                    (it is TunnelState.Probing && it.engineId != null) ||
                         it is TunnelState.Connecting ||
                         it is TunnelState.Connected ||
                         it is TunnelState.Failed

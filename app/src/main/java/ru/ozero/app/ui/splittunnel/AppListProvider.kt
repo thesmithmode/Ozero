@@ -53,22 +53,33 @@ class DefaultAppListProvider @Inject constructor(
                 trySend(Unit)
             }
         }
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_PACKAGE_ADDED)
-            addAction(Intent.ACTION_PACKAGE_REMOVED)
-            addAction(Intent.ACTION_PACKAGE_CHANGED)
-            addAction(Intent.ACTION_PACKAGE_REPLACED)
+        val dataFilter = packageChangeFilter().apply {
             addDataScheme("package")
         }
+        val noDataFilter = packageChangeFilter()
         val appContext = context.applicationContext
         ContextCompat.registerReceiver(
             appContext,
             receiver,
-            filter,
+            dataFilter,
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        ContextCompat.registerReceiver(
+            appContext,
+            receiver,
+            noDataFilter,
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         awaitClose { runCatching { appContext.unregisterReceiver(receiver) } }
     }
+
+    private fun packageChangeFilter(): IntentFilter =
+        IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_CHANGED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+        }
 
     override suspend fun loadApps(): List<InstalledApp> {
         listCache?.let { return it }

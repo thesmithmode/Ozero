@@ -131,7 +131,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
                             UrnetworkSettingsUiState.Loading ->
                                 if (hasBootstrapJwt) current else UrnetworkSettingsUiState.NotConnected
                             is UrnetworkSettingsUiState.Ready ->
-                                if (bridge.isDeviceAvailable() || bridge.isRunning()) {
+                                if (bridge.isDeviceAvailable() || bridge.isRunning() || current.providePaused) {
                                     current.copy(selectedLocation = current.selectedLocation ?: selectedLocationForUi())
                                 } else {
                                     UrnetworkSettingsUiState.NotConnected
@@ -513,11 +513,7 @@ private fun com.bringyour.sdk.ConnectLocationList?.toLocationItems(): List<Urnet
                 UrnetworkLocationItem(
                     location = SdkLocationToken(loc),
                     name = loc.name ?: loc.country ?: "Unknown",
-                    nameRu = if (code.length == 2) {
-                        Locale("", code).getDisplayCountry(Locale("ru"))
-                    } else {
-                        ""
-                    },
+                    nameRu = countryNameRu(code),
                     countryCode = code,
                     flag = countryCodeToFlag(code),
                     providerCount = loc.providerCount,
@@ -532,7 +528,7 @@ private fun UrnetworkCachedLocation.toLocationItem(): UrnetworkLocationItem =
     UrnetworkLocationItem(
         location = this,
         name = name,
-        nameRu = Locale("", countryCode.orEmpty()).getDisplayCountry(Locale("ru")),
+        nameRu = countryNameRu(countryCode.orEmpty()),
         countryCode = countryCode.orEmpty(),
         flag = countryCodeToFlag(countryCode.orEmpty()),
         providerCount = providerCount,
@@ -551,9 +547,19 @@ private fun UrnetworkLocationItem.toCachedLocation(): UrnetworkCachedLocation =
         isStrongPrivacy = isStrongPrivacy,
     )
 
+private fun countryNameRu(code: String): String {
+    val normalized = normalizedCountryCode(code) ?: return ""
+    return Locale("", normalized).getDisplayCountry(Locale("ru"))
+}
+
 private fun countryCodeToFlag(code: String): String {
-    if (code.length != 2) return ""
-    val first = code[0].uppercaseChar().code - 'A'.code + 0x1F1E6
-    val second = code[1].uppercaseChar().code - 'A'.code + 0x1F1E6
+    val normalized = normalizedCountryCode(code) ?: return ""
+    val first = normalized[0].code - 'A'.code + 0x1F1E6
+    val second = normalized[1].code - 'A'.code + 0x1F1E6
     return String(intArrayOf(first, second), 0, 2)
+}
+
+private fun normalizedCountryCode(code: String): String? {
+    val normalized = code.uppercase(Locale.ROOT)
+    return normalized.takeIf { it.length == 2 && it.all { ch -> ch in 'A'..'Z' } }
 }

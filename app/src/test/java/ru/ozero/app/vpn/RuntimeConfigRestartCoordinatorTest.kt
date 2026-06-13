@@ -506,7 +506,7 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Test
-    fun `restart aborts queued work when exception happens during queued processing`() = runTest {
+    fun `restart aborts queued work after exception and ignores disconnecting next state`() = runTest {
         val startServiceActions = mutableListOf<String?>()
         val tunnelController = TunnelController()
         tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
@@ -526,8 +526,8 @@ class RuntimeConfigRestartCoordinatorTest {
         val second = runCatching { coordinator.restartVpnIfRunning("second") }
 
         assertTrue(first.isFailure)
-        assertTrue(second.isFailure)
-        assertEquals(2, startServiceActions.size)
+        assertEquals(false, second.getOrThrow())
+        assertEquals(1, startServiceActions.size)
         assertTrue(coordinator.restartQueue().isEmpty())
         assertFalse(coordinator.restartInProgress())
     }
