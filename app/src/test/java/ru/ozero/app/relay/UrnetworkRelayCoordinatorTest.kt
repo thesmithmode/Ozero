@@ -7,7 +7,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -26,7 +27,6 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalCoroutinesApi::class)
 class UrnetworkRelayCoordinatorTest {
 
-    private val dispatcher = UnconfinedTestDispatcher()
     private lateinit var coordinatorScope: CoroutineScope
 
     private lateinit var tunnelStateFlow: MutableStateFlow<TunnelState>
@@ -58,7 +58,7 @@ class UrnetworkRelayCoordinatorTest {
         configStore.inject { it.copy(byClientJwt = value) }
     }
 
-    private fun relayTest(block: suspend TestScope.() -> Unit) = runTest(dispatcher) {
+    private fun relayTest(block: suspend TestScope.() -> Unit) = runTest(UnconfinedTestDispatcher()) {
         coordinatorScope = backgroundScope
         coordinator = UrnetworkRelayCoordinator(
             bridge = bridge,
@@ -229,7 +229,8 @@ class UrnetworkRelayCoordinatorTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        advanceUntilIdle()
+        advanceTimeBy(35_000L)
+        runCurrent()
 
         assertEquals(0, bridge.connectBestAvailableCalls)
         assertEquals(3, bridge.startCalls, "retry 3 attempts")
@@ -278,7 +279,8 @@ class UrnetworkRelayCoordinatorTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        advanceUntilIdle()
+        advanceTimeBy(35_000L)
+        runCurrent()
 
         assertEquals(0, bridge.attachTunCalls)
     }

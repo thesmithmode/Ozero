@@ -44,7 +44,10 @@ class OzeroVpnServiceRuntimeRestartTest {
         val restartBody = source
             .substringAfter("private fun restartVpn()")
             .substringBefore("private fun logActiveExternalVpn()")
-        assertTrue(restartBody.contains("!runtimeConfigRestartCancelled.get()"))
+        assertTrue(restartBody.contains("val restartCancelled = runtimeConfigRestartCancelled.get()"))
+        assertTrue(restartBody.contains("!restartCancelled"))
         assertTrue(restartBody.contains("runtimeConfigRestartCancelled.set(false)"))
+        assertTrue(restartBody.contains("if (restartCancelled)"))
+        assertTrue(restartBody.contains("stopSelf(latestStartId.get())"))
     }
 }

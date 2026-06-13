@@ -921,6 +921,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
                 profileDao = profileDao,
                 dataStore = dataStore(),
                 profileProbe = RecordingProfileProbe(probeCalls),
+                probeDispatcher = Dispatchers.Main,
             )
             viewModel = SingboxEngineSettingsViewModel(
                 appContext = appContext,

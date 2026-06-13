@@ -359,8 +359,9 @@ class OzeroVpnService : android.net.VpnService() {
             shutdownJobRef.get()?.let { job ->
                 runCatching { withTimeoutOrNull(SHUTDOWN_JOIN_TIMEOUT_MS) { job.join() } }
             }
+            val restartCancelled = runtimeConfigRestartCancelled.get()
             if (
-                !runtimeConfigRestartCancelled.get() &&
+                !restartCancelled &&
                 !stopping.get() &&
                 notificationFactory.enterForeground(this@OzeroVpnService)
             ) {
@@ -368,6 +369,9 @@ class OzeroVpnService : android.net.VpnService() {
             } else {
                 runtimeConfigRestartInProgress.set(false)
                 runtimeConfigRestartCancelled.set(false)
+                if (restartCancelled) {
+                    stopSelf(latestStartId.get())
+                }
             }
         }
     }

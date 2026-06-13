@@ -517,6 +517,10 @@ class MainViewModelTest {
         tunnelController.onDisconnecting()
         tunnelController.reset()
         runCurrent()
+        assertEquals(PowerDiscState.Switching, viewModel.powerDiscState.value)
+
+        tunnelController.onSwitchingFinished("test")
+        runCurrent()
         assertEquals(PowerDiscState.Off, viewModel.powerDiscState.value)
     }
 

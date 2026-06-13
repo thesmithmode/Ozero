@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.byteArrayPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -45,6 +46,7 @@ class SingboxProbeService internal constructor(
     private val profileDao: ProxyProfileDao,
     @SingboxPrefs private val dataStore: DataStore<Preferences>,
     private val profileProbe: SingboxProfileProbe,
+    private val probeDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
     @Inject
@@ -76,7 +78,7 @@ class SingboxProbeService internal constructor(
         val workerCount = minOf(MAX_CONCURRENT_PROFILE_PROBES, probeCandidates.size)
         coroutineScope {
             List(workerCount) {
-                async(Dispatchers.IO) {
+                async(probeDispatcher) {
                     while (true) {
                         val index = nextIndex.getAndIncrement()
                         if (index >= probeCandidates.size) break

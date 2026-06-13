@@ -43,7 +43,7 @@ class EngineWatchdogCoordinatorCoverageTest {
         val statsJob = Job()
         val controller = connectedController(EngineId.BYEDPI)
         val watchdog = watchdog(
-            scope = this,
+            scope = backgroundScope,
             healthMonitor = health,
             chain = chain,
             notificationFactory = notification,
@@ -70,7 +70,7 @@ class EngineWatchdogCoordinatorCoverageTest {
         val stopCount = AtomicReference(0)
         val controller = connectedController(EngineId.BYEDPI)
         val watchdog = watchdog(
-            scope = this,
+            scope = backgroundScope,
             healthMonitor = health,
             controller = controller,
             tunFd = mockk(relaxed = true),
@@ -94,7 +94,7 @@ class EngineWatchdogCoordinatorCoverageTest {
         val health = degradingHealthMonitor()
         val plugin = FakeWatchdogPlugin()
         val watchdog = watchdog(
-            scope = this,
+            scope = backgroundScope,
             healthMonitor = health,
             plugins = setOf(plugin),
             controller = connectedController(plugin.id),
@@ -121,7 +121,7 @@ class EngineWatchdogCoordinatorCoverageTest {
             recoverResults = listOf(EnginePlugin.RecoverResult.Success),
         )
         val watchdog = watchdog(
-            scope = this,
+            scope = backgroundScope,
             plugins = setOf(plugin),
             controller = connectedController(plugin.id),
             tunFd = mockk(relaxed = true),
@@ -145,7 +145,7 @@ class EngineWatchdogCoordinatorCoverageTest {
             recoverResults = listOf(EnginePlugin.RecoverResult.NotSupported),
         )
         val watchdog = watchdog(
-            scope = this,
+            scope = backgroundScope,
             plugins = setOf(plugin),
             controller = connectedController(plugin.id),
             tunFd = mockk(relaxed = true),
@@ -172,7 +172,7 @@ class EngineWatchdogCoordinatorCoverageTest {
             onEngineStarted(plugin.id, socksPort = 1080)
         }
         val watchdog = watchdog(
-            scope = this,
+            scope = backgroundScope,
             plugins = setOf(plugin),
             controller = controller,
             tunFd = mockk(relaxed = true),
@@ -195,7 +195,7 @@ class EngineWatchdogCoordinatorCoverageTest {
         val plugin = FakeWatchdogPlugin(recoverResults = listOf(EnginePlugin.RecoverResult.Success))
         val controller = connectedController(plugin.id)
         val watchdog = watchdog(
-            scope = this,
+            scope = backgroundScope,
             plugins = setOf(plugin),
             controller = controller,
             tunFd = mockk(relaxed = true),
@@ -217,7 +217,7 @@ class EngineWatchdogCoordinatorCoverageTest {
         val health = degradingHealthMonitor()
         val controller = connectedController(EngineId.BYEDPI)
         val watchdog = watchdog(
-            scope = this,
+            scope = backgroundScope,
             healthMonitor = health,
             controller = controller,
             tunFd = mockk(relaxed = true),
@@ -239,7 +239,7 @@ class EngineWatchdogCoordinatorCoverageTest {
         val controller = connectedController(EngineId.BYEDPI)
         val stopCount = AtomicReference(0)
         val watchdog = watchdog(
-            scope = this,
+            scope = backgroundScope,
             controller = controller,
             tunFd = mockk(relaxed = true),
             killswitch = true,
@@ -261,7 +261,7 @@ class EngineWatchdogCoordinatorCoverageTest {
         val controller = connectedController(EngineId.BYEDPI)
         val stopCount = AtomicReference(0)
         val watchdog = watchdog(
-            scope = this,
+            scope = backgroundScope,
             controller = controller,
             tunFd = mockk(relaxed = true),
             killswitch = false,
@@ -280,7 +280,7 @@ class EngineWatchdogCoordinatorCoverageTest {
         val controller = connectedController(EngineId.BYEDPI)
         val stopCount = AtomicReference(0)
         val watchdog = watchdog(
-            scope = this,
+            scope = backgroundScope,
             controller = controller,
             tunFd = mockk(relaxed = true),
             killswitch = true,
@@ -303,7 +303,7 @@ class EngineWatchdogCoordinatorCoverageTest {
         val notification = mockk<OzeroNotificationFactory>(relaxed = true)
         val stopCount = AtomicReference(0)
         val watchdog = watchdog(
-            scope = this,
+            scope = backgroundScope,
             controller = controller,
             tunFd = null,
             statsJob = statsJob,
