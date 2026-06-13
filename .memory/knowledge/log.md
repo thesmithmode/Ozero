@@ -63,3 +63,7 @@ test
 - Source: daily/2026-05-31.md
 - Articles created: [[connections/multi-engine-stabilization-ci-review-loop]]
 - Articles updated: [[concepts/android-i18n-vm-compose-extraction]], [[concepts/dev-push-ci-visible-full-run-contract]], [[concepts/local-gradle-validation-ban-ci-only]], [[connections/fail-closed-security-ci-trust-boundary]]
+## [2026-06-13T18:59:18+03:00] compile | 2026-06-03.md
+- Source: daily/2026-06-03.md
+- Articles created: [[concepts/current-ci-run-grounding-before-fix]], [[concepts/startsequence-startup-tun-killswitch-regression]], [[concepts/powershell-replace-literal-newline-trap]], [[concepts/bug-by-bug-red-ci-stabilization]], [[connections/runtime-restart-ci-stabilization-feedback-loop]]
+- Articles updated: [[concepts/engine-settings-restart-startup-runtime-match]], [[concepts/warp-raw-ini-preserve-unmodeled-peer-fields]], [[concepts/singbox-selected-profile-row-fingerprint]], [[concepts/dev-ci-kotlin-style-cascade]], [[concepts/singbox-subscription-branch-coverage-edges]]

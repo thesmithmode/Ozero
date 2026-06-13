@@ -23,7 +23,7 @@ The daily log specifically notes that subscription refresh or profile edit can u
 - [[engine-runtime-config-restart-observer-stateflow-tests]]
 - [[post-release-app-test-harness-regression-map]]
 - [[runtime-restart-application-scope-observer]]
-- [[singbox-selected-profile-row-fingerprint]]
+- [[singbox-probe-socks-port-lifecycle]]
 ## Sources
 - `daily/2026-06-03.md`: recorded that the Singbox fingerprint must use the selected profile row's current `beanBlob`, not only the cached `BEAN_KEY`.
 - `daily/2026-06-03.md`: stated that DAO row updates can leave selected-id and cached-bean keys unchanged, making row payload part of the runtime contract.
