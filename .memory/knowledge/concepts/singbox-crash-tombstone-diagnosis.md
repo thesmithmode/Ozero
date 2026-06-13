@@ -5,7 +5,7 @@ tags: [singbox, android, crash, jni, sigabrt, debugging]
 sources:
   - "daily/2026-05-26.md"
 created: 2026-05-26
-updated: 2026-05-26
+updated: 2026-06-13
 ---
 
 # Sing-box Crash Tombstone Diagnosis
@@ -81,6 +81,7 @@ True runtime crashes (SIGSEGV from GC corruption, JNI ref leaks, or Go runtime s
 - [[concepts/singbox-splithttp-unsupported]] - Config parse failure: `splithttp` transport not in current libbox.so
 - [[concepts/singbox-engine-design]] - Engine architecture context: process isolation, GoRuntimeGuard, config pipeline
 - [[concepts/go-runtime-process-isolation]] - Why `:engine_singbox` crashes don't bring down the main process
+- [[connections/singbox-ui-ci-diagnostic-feedback-loop]] - Cross-layer loop linking tombstones, parser fixes, ping UI, and CI grounding
 
 ## Sources
 

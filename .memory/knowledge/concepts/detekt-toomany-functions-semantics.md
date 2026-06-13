@@ -5,7 +5,7 @@ tags: [detekt, android, kotlin, ci, code-quality]
 sources:
   - "daily/2026-05-26.md"
 created: 2026-05-26
-updated: 2026-05-26
+updated: 2026-06-13
 ---
 
 # detekt TooManyFunctions Threshold Semantics
@@ -66,6 +66,7 @@ See [[concepts/hilt-viewmodel-split-too-many-functions]] for the decomposition p
 - [[concepts/hiltviewmodel-toomanyfunctions-decomposition]] - Decomposition pattern for oversized ViewModels
 - [[concepts/ci-workflow-discipline]] - CI enforcement context: detekt failure blocks merge
 - [[concepts/detekt-ratchet-desync-after-refactor]] - Related: detekt thresholds drifting after refactors
+- [[connections/singbox-ui-ci-diagnostic-feedback-loop]] - Same daily incident connected detekt fixes with branch and CI watcher grounding
 
 ## Sources
 

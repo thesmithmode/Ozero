@@ -51,3 +51,7 @@ test
 - Source: daily/2026-05-23.md
 - Articles created: [[concepts/fptn-android-native-build-pipeline]], [[connections/native-release-runtime-regression-proof-loop]]
 - Articles updated: [[concepts/fptn-engine-protocol]], [[concepts/fptn-sni-bypass-method]], [[concepts/android-ndk-cxx-static-linking]], [[concepts/urnetwork-provide-secret-keys-identity]], [[concepts/urnetwork-jwt-bootstrapper]], [[concepts/warp-uapi-stale-socket-cleanup]], [[concepts/masterdns-deploy-hardening]], [[concepts/gradle-configuration-cache-agp-bug]], [[concepts/proguard-release-drift]], [[concepts/versioncode-git-history-rewrite-regression]]
+## [2026-06-13T18:42:42+03:00] compile | 2026-05-26.md
+- Source: daily/2026-05-26.md
+- Articles created: [[connections/singbox-ui-ci-diagnostic-feedback-loop]]
+- Articles updated: [[concepts/singbox-crash-tombstone-diagnosis]], [[concepts/singbox-dns-outbound-deprecated]], [[concepts/singbox-ping-abstractbean-deserialization]], [[concepts/pingJob-viewmodel-cancellation]], [[concepts/detekt-toomany-functions-semantics]], [[concepts/warp-amber-flash-sentinel]]

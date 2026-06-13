@@ -131,7 +131,16 @@ class UrnetworkLocationsViewModel @Inject constructor(
                             UrnetworkSettingsUiState.Loading ->
                                 if (hasBootstrapJwt) current else UrnetworkSettingsUiState.NotConnected
                             is UrnetworkSettingsUiState.Ready ->
-                                if (bridge.isDeviceAvailable() || bridge.isRunning() || current.providePaused) {
+                                if (
+                                    bridge.isDeviceAvailable() ||
+                                    bridge.isRunning() ||
+                                    current.providePaused && !hasCachedLocations(
+                                        current.countries,
+                                        current.regions,
+                                        current.cities,
+                                        current.bestMatches,
+                                    )
+                                ) {
                                     current.copy(selectedLocation = current.selectedLocation ?: selectedLocationForUi())
                                 } else {
                                     UrnetworkSettingsUiState.NotConnected

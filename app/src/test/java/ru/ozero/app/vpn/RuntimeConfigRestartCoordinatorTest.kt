@@ -344,6 +344,7 @@ class RuntimeConfigRestartCoordinatorTest {
         }
         runCurrent()
         tunnelController.setState(TunnelState.Disconnecting)
+        runCurrent()
         tunnelController.setState(TunnelState.Connected(EngineId.SINGBOX, 2080))
         restarted.join()
 
