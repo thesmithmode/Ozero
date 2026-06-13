@@ -7,8 +7,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
@@ -64,7 +65,7 @@ class LogsViewModelTest {
     fun `clear() обновляет refresh timestamp до большего значения`() = runTest(dispatcher) {
         val before = vm.refresh.value
         vm.clear()
-        advanceUntilIdle()
+        runCurrent()
         assertTrue(
             vm.refresh.value > before,
             "clear() обязан увеличивать refresh — UI наблюдает StateFlow для триггера re-poll, " +
@@ -85,7 +86,7 @@ class LogsViewModelTest {
         )
         assertEquals(1, buffer.size())
         vm.clear()
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(
             0,
             buffer.size(),
@@ -164,24 +165,32 @@ class LogsViewModelTest {
     fun `onTagFilter updates ui state tag filter`() = runTest(dispatcher) {
         val job = backgroundScope.launch(dispatcher) { vm.uiState.collect { } }
 
-        vm.onTagFilter("App")
-        advanceUntilIdle()
+        try {
+            runCurrent()
+            vm.onTagFilter("App")
+            runCurrent()
 
-        assertEquals("App", vm.uiState.value.tagFilter)
-        assertEquals(FILTER_ALL, vm.uiState.value.levelFilter)
-        job.cancel()
+            assertEquals("App", vm.uiState.value.tagFilter)
+            assertEquals(FILTER_ALL, vm.uiState.value.levelFilter)
+        } finally {
+            job.cancel()
+        }
     }
 
     @Test
     fun `onLevelFilter updates ui state level filter`() = runTest(dispatcher) {
         val job = backgroundScope.launch(dispatcher) { vm.uiState.collect { } }
 
-        vm.onLevelFilter(LogLevel.ERROR.name)
-        advanceUntilIdle()
+        try {
+            runCurrent()
+            vm.onLevelFilter(LogLevel.ERROR.name)
+            runCurrent()
 
-        assertEquals(LogLevel.ERROR.name, vm.uiState.value.levelFilter)
-        assertEquals(FILTER_ALL, vm.uiState.value.tagFilter)
-        job.cancel()
+            assertEquals(LogLevel.ERROR.name, vm.uiState.value.levelFilter)
+            assertEquals(FILTER_ALL, vm.uiState.value.tagFilter)
+        } finally {
+            job.cancel()
+        }
     }
 
     @Test
@@ -216,7 +225,7 @@ class LogsViewModelTest {
         var ready: File? = null
 
         vm.createFilteredFile(LogLevel.ERROR) { ready = it }
-        advanceUntilIdle()
+        runCurrent()
 
         val out = assertNotNull(ready)
         assertEquals("ozero_error.log", out.name)
@@ -231,7 +240,7 @@ class LogsViewModelTest {
         var ready: File? = File(tempDir, "sentinel")
 
         vm.createFilteredFile(LogLevel.ERROR) { ready = it }
-        advanceUntilIdle()
+        runCurrent()
 
         assertNull(ready)
     }
@@ -241,7 +250,7 @@ class LogsViewModelTest {
         var ready: File? = File(tempDir, "sentinel")
 
         vm.createFilteredFile(LogLevel.ERROR) { ready = it }
-        advanceUntilIdle()
+        runCurrent()
 
         assertNull(ready)
     }
@@ -252,12 +261,17 @@ class LogsViewModelTest {
         UnifiedLogger.writeRawSync(logLine("ERROR", "App", "line"))
         val job = backgroundScope.launch(dispatcher) { vm.uiState.collect { } }
 
-        advanceUntilIdle()
+        try {
+            runCurrent()
+            advanceTimeBy(501L)
+            runCurrent()
 
-        val state = vm.uiState.value
-        assertTrue(state.fileSize > 0)
-        assertTrue(state.filePath.isNotBlank())
-        job.cancel()
+            val state = vm.uiState.value
+            assertTrue(state.fileSize > 0)
+            assertTrue(state.filePath.isNotBlank())
+        } finally {
+            job.cancel()
+        }
     }
 
     private fun entry(

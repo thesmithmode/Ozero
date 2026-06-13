@@ -5,10 +5,9 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import io.mockk.verify
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -33,8 +32,7 @@ class TunnelStatsLoggerCoverageTest {
 
     @Test
     fun `start reads iface stats updates controller and notifies`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = TestScope(dispatcher)
+        val scope = backgroundScope
         val controller = connectedController()
         val notification = mockk<OzeroNotificationFactory>(relaxed = true)
         val logger = logger(
@@ -53,22 +51,21 @@ class TunnelStatsLoggerCoverageTest {
 
         try {
             logger.start()
-            scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
-            scope.runCurrent()
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
 
             assertEquals(101, controller.stats.value?.rxBytes)
             assertEquals(202, controller.stats.value?.txBytes)
             verify(exactly = 1) { notification.notifyStats(any()) }
             verify(exactly = 0) { UidTrafficStats.read() }
         } finally {
-            stopLogger(logger, scope)
+            stopLogger(logger)
         }
     }
 
     @Test
     fun `start falls back to uid stats when iface is absent or unreadable`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = TestScope(dispatcher)
+        val scope = backgroundScope
         val controller = connectedController()
         val notification = mockk<OzeroNotificationFactory>(relaxed = true)
         val logger = logger(
@@ -82,21 +79,20 @@ class TunnelStatsLoggerCoverageTest {
 
         try {
             logger.start()
-            scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
-            scope.runCurrent()
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
 
             assertEquals(303, controller.stats.value?.rxBytes)
             assertEquals(404, controller.stats.value?.txBytes)
             verify(exactly = 1) { notification.notifyStats(any()) }
         } finally {
-            stopLogger(logger, scope)
+            stopLogger(logger)
         }
     }
 
     @Test
     fun `start falls back to uid stats when iface read returns null`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = TestScope(dispatcher)
+        val scope = backgroundScope
         val controller = connectedController()
         val notification = mockk<OzeroNotificationFactory>(relaxed = true)
         val logger = logger(
@@ -112,8 +108,8 @@ class TunnelStatsLoggerCoverageTest {
 
         try {
             logger.start()
-            scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
-            scope.runCurrent()
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
 
             assertEquals(505, controller.stats.value?.rxBytes)
             assertEquals(606, controller.stats.value?.txBytes)
@@ -121,14 +117,13 @@ class TunnelStatsLoggerCoverageTest {
             verify(exactly = 1) { UidTrafficStats.read() }
             verify(exactly = 1) { notification.notifyStats(any()) }
         } finally {
-            stopLogger(logger, scope)
+            stopLogger(logger)
         }
     }
 
     @Test
     fun `start skips update and notification when both stats sources are absent`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = TestScope(dispatcher)
+        val scope = backgroundScope
         val controller = connectedController()
         val notification = mockk<OzeroNotificationFactory>(relaxed = true)
         val logger = logger(
@@ -144,22 +139,21 @@ class TunnelStatsLoggerCoverageTest {
 
         try {
             logger.start()
-            scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS * 2)
-            scope.runCurrent()
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS * 2)
+            runCurrent()
 
             assertNull(controller.stats.value)
             verify(exactly = 2) { TunInterfaceStats.readTunStats("tun0") }
             verify(exactly = 2) { UidTrafficStats.read() }
             verify(exactly = 0) { notification.notifyStats(any()) }
         } finally {
-            stopLogger(logger, scope)
+            stopLogger(logger)
         }
     }
 
     @Test
     fun `start cancels previous stats job before replacing it`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = TestScope(dispatcher)
+        val scope = backgroundScope
         val ref = AtomicReference<Job?>()
         val logger = logger(scope = scope, statsJobRef = ref)
 
@@ -173,14 +167,13 @@ class TunnelStatsLoggerCoverageTest {
             assertFalse(first?.isActive == true)
             assertTrue(second?.isActive == true)
         } finally {
-            stopLogger(logger, scope)
+            stopLogger(logger)
         }
     }
 
     @Test
     fun `start catches non cancellation stats source exceptions`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = TestScope(dispatcher)
+        val scope = backgroundScope
         val controller = connectedController()
         val notification = mockk<OzeroNotificationFactory>(relaxed = true)
         val ref = AtomicReference<Job?>()
@@ -196,21 +189,20 @@ class TunnelStatsLoggerCoverageTest {
 
         try {
             logger.start()
-            scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
-            scope.runCurrent()
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
 
             assertNull(controller.stats.value)
             assertFalse(ref.get()?.isActive == true)
             verify(exactly = 0) { notification.notifyStats(any()) }
         } finally {
-            stopLogger(logger, scope)
+            stopLogger(logger)
         }
     }
 
     @Test
     fun `stop signal exits before stats read or notification`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = TestScope(dispatcher)
+        val scope = backgroundScope
         val notification = mockk<OzeroNotificationFactory>(relaxed = true)
         val stopSignal = AtomicBoolean(true)
         val controller = connectedController()
@@ -226,21 +218,20 @@ class TunnelStatsLoggerCoverageTest {
 
         try {
             logger.start()
-            scope.advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
-            scope.runCurrent()
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
 
             assertNull(controller.stats.value)
             verify(exactly = 0) { notification.notifyStats(any()) }
             verify(exactly = 0) { TunInterfaceStats.readTunStats(any()) }
         } finally {
-            stopLogger(logger, scope)
+            stopLogger(logger)
         }
     }
 
     @Test
     fun `cancel clears and cancels active stats job`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = TestScope(dispatcher)
+        val scope = backgroundScope
         val ref = AtomicReference<Job?>()
         val logger = logger(scope = scope, statsJobRef = ref)
 
@@ -249,21 +240,19 @@ class TunnelStatsLoggerCoverageTest {
         assertTrue(job?.isActive == true)
 
         logger.cancel()
-        scope.runCurrent()
-        scope.cancel()
+        runCurrent()
 
         assertNull(ref.get())
         assertFalse(job?.isActive == true)
     }
 
-    private fun stopLogger(logger: TunnelStatsLogger, scope: TestScope) {
+    private fun TestScope.stopLogger(logger: TunnelStatsLogger) {
         logger.cancel()
-        scope.runCurrent()
-        scope.cancel()
+        runCurrent()
     }
 
     private fun logger(
-        scope: TestScope,
+        scope: CoroutineScope,
         controller: TunnelController = connectedController(),
         notification: OzeroNotificationFactory = mockk(relaxed = true),
         iface: String? = null,

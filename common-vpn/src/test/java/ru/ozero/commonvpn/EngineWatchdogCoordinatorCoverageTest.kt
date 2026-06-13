@@ -10,8 +10,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -36,7 +36,7 @@ import kotlin.test.assertTrue
 class EngineWatchdogCoordinatorCoverageTest {
 
     @Test
-    fun `health degraded with killswitch and tun enters killswitch mode`() = runTest(UnconfinedTestDispatcher()) {
+    fun `health degraded with killswitch and tun enters killswitch mode`() = runTest {
         val health = degradingHealthMonitor()
         val chain = mockk<ChainOrchestrator>(relaxed = true)
         val notification = mockk<OzeroNotificationFactory>(relaxed = true)
@@ -53,19 +53,23 @@ class EngineWatchdogCoordinatorCoverageTest {
             killswitch = true,
         )
 
-        watchdog.startHealthKillswitchWatcher(EngineId.BYEDPI)
-        health.start(1080)
-        advanceTimeBy(1)
+        try {
+            watchdog.startHealthKillswitchWatcher(EngineId.BYEDPI)
+            health.start(1080)
+            advanceTimeBy(1)
+            runCurrent()
 
-        assertTrue(controller.killswitchActive.value)
-        assertTrue(statsJob.isCancelled)
-        verify(exactly = 1) { notification.notifyStats(any()) }
-        watchdog.cancelWatchers()
-        health.shutdown()
+            assertTrue(controller.killswitchActive.value)
+            assertTrue(statsJob.isCancelled)
+            verify(exactly = 1) { notification.notifyStats(any()) }
+        } finally {
+            watchdog.cancelWatchers()
+            health.shutdown()
+        }
     }
 
     @Test
-    fun `degraded health without killswitch keeps connection`() = runTest(UnconfinedTestDispatcher()) {
+    fun `degraded health without killswitch keeps connection`() = runTest {
         val health = degradingHealthMonitor()
         val stopCount = AtomicReference(0)
         val controller = connectedController(EngineId.BYEDPI)
@@ -78,19 +82,23 @@ class EngineWatchdogCoordinatorCoverageTest {
             stopCount = stopCount,
         )
 
-        watchdog.startHealthKillswitchWatcher(EngineId.BYEDPI)
-        health.start(1080)
-        advanceTimeBy(1)
+        try {
+            watchdog.startHealthKillswitchWatcher(EngineId.BYEDPI)
+            health.start(1080)
+            advanceTimeBy(1)
+            runCurrent()
 
-        assertFalse(controller.killswitchActive.value)
-        assertEquals(0, stopCount.get())
-        assertIs<TunnelState.Connected>(controller.state.value)
-        watchdog.cancelWatchers()
-        health.shutdown()
+            assertFalse(controller.killswitchActive.value)
+            assertEquals(0, stopCount.get())
+            assertIs<TunnelState.Connected>(controller.state.value)
+        } finally {
+            watchdog.cancelWatchers()
+            health.shutdown()
+        }
     }
 
     @Test
-    fun `cancelWatchers cancels health peer and stagnation jobs`() = runTest(UnconfinedTestDispatcher()) {
+    fun `cancelWatchers cancels health peer and stagnation jobs`() = runTest {
         val health = degradingHealthMonitor()
         val plugin = FakeWatchdogPlugin()
         val watchdog = watchdog(
@@ -102,20 +110,26 @@ class EngineWatchdogCoordinatorCoverageTest {
             killswitch = true,
         )
 
-        watchdog.startHealthKillswitchWatcher(plugin.id)
-        watchdog.startPeerWatchdog(plugin.id)
-        watchdog.startStagnationWatchdog(plugin.id)
-        watchdog.cancelWatchers()
-        health.start(1080)
-        advanceTimeBy(1)
-        advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
+        try {
+            watchdog.startHealthKillswitchWatcher(plugin.id)
+            watchdog.startPeerWatchdog(plugin.id)
+            watchdog.startStagnationWatchdog(plugin.id)
+            watchdog.cancelWatchers()
+            health.start(1080)
+            advanceTimeBy(1)
+            runCurrent()
+            advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
+            runCurrent()
 
-        assertEquals(0, plugin.recoverCalls)
-        health.shutdown()
+            assertEquals(0, plugin.recoverCalls)
+        } finally {
+            watchdog.cancelWatchers()
+            health.shutdown()
+        }
     }
 
     @Test
-    fun `peer watchdog recovers after peers disappear after first peer`() = runTest(UnconfinedTestDispatcher()) {
+    fun `peer watchdog recovers after peers disappear after first peer`() = runTest {
         val plugin = FakeWatchdogPlugin(
             stats = listOf(EngineStats(activeConnections = 1), EngineStats(activeConnections = 0)),
             recoverResults = listOf(EnginePlugin.RecoverResult.Success),
@@ -128,18 +142,21 @@ class EngineWatchdogCoordinatorCoverageTest {
             killswitch = true,
         )
 
-        watchdog.startPeerWatchdog(plugin.id)
-        advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
-        runCurrent()
-        advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_TIMEOUT_MS)
-        runCurrent()
-        watchdog.cancelWatchers()
+        try {
+            watchdog.startPeerWatchdog(plugin.id)
+            advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
+            runCurrent()
+            advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_TIMEOUT_MS)
+            runCurrent()
+        } finally {
+            watchdog.cancelWatchers()
+        }
 
         assertEquals(1, plugin.recoverCalls)
     }
 
     @Test
-    fun `peer watchdog not supported stops retrying after threshold`() = runTest(UnconfinedTestDispatcher()) {
+    fun `peer watchdog not supported stops retrying after threshold`() = runTest {
         val plugin = FakeWatchdogPlugin(
             stats = listOf(EngineStats(activeConnections = 1), EngineStats(activeConnections = 0)),
             recoverResults = listOf(EnginePlugin.RecoverResult.NotSupported),
@@ -152,18 +169,21 @@ class EngineWatchdogCoordinatorCoverageTest {
             killswitch = true,
         )
 
-        watchdog.startPeerWatchdog(plugin.id)
-        advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
-        runCurrent()
-        advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_TIMEOUT_MS * 2)
-        runCurrent()
-        watchdog.cancelWatchers()
+        try {
+            watchdog.startPeerWatchdog(plugin.id)
+            advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
+            runCurrent()
+            advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_TIMEOUT_MS * 2)
+            runCurrent()
+        } finally {
+            watchdog.cancelWatchers()
+        }
 
         assertEquals(1, plugin.recoverCalls)
     }
 
     @Test
-    fun `stagnation watchdog recovers after consecutive stagnant polls`() = runTest(UnconfinedTestDispatcher()) {
+    fun `stagnation watchdog recovers after consecutive stagnant polls`() = runTest {
         val plugin = FakeWatchdogPlugin(recoverResults = listOf(EnginePlugin.RecoverResult.Success))
         var clock = 1_000L
         val controller = TunnelController(StatsStagnationMonitor(nowMs = { clock })).apply {
@@ -179,19 +199,22 @@ class EngineWatchdogCoordinatorCoverageTest {
             killswitch = true,
         )
 
-        controller.updateStats(stats(txBytes = 100, rxBytes = 100, timestampMs = 1))
-        clock += StatsStagnationMonitor.STAGNATION_THRESHOLD_MS
-        controller.updateStats(stats(txBytes = 100, rxBytes = 100, timestampMs = 2))
-        watchdog.startStagnationWatchdog(plugin.id)
-        advanceTimeBy(EngineWatchdogCoordinator.STAGNATION_RECOVER_THRESHOLD_MS)
-        runCurrent()
-        watchdog.cancelWatchers()
+        try {
+            controller.updateStats(stats(txBytes = 100, rxBytes = 100, timestampMs = 1))
+            clock += StatsStagnationMonitor.STAGNATION_THRESHOLD_MS
+            controller.updateStats(stats(txBytes = 100, rxBytes = 100, timestampMs = 2))
+            watchdog.startStagnationWatchdog(plugin.id)
+            advanceTimeBy(EngineWatchdogCoordinator.STAGNATION_RECOVER_THRESHOLD_MS)
+            runCurrent()
+        } finally {
+            watchdog.cancelWatchers()
+        }
 
         assertEquals(1, plugin.recoverCalls)
     }
 
     @Test
-    fun `stagnation watchdog resets when traffic changes`() = runTest(UnconfinedTestDispatcher()) {
+    fun `stagnation watchdog resets when traffic changes`() = runTest {
         val plugin = FakeWatchdogPlugin(recoverResults = listOf(EnginePlugin.RecoverResult.Success))
         val controller = connectedController(plugin.id)
         val watchdog = watchdog(
@@ -202,18 +225,23 @@ class EngineWatchdogCoordinatorCoverageTest {
             killswitch = true,
         )
 
-        watchdog.startStagnationWatchdog(plugin.id)
-        controller.updateStats(stats(txBytes = 100, rxBytes = 100, timestampMs = 1))
-        advanceTimeBy(EngineWatchdogCoordinator.STAGNATION_POLL_MS)
-        controller.updateStats(stats(txBytes = 101, rxBytes = 100, timestampMs = 2))
-        advanceTimeBy(EngineWatchdogCoordinator.STAGNATION_POLL_MS)
+        try {
+            watchdog.startStagnationWatchdog(plugin.id)
+            controller.updateStats(stats(txBytes = 100, rxBytes = 100, timestampMs = 1))
+            advanceTimeBy(EngineWatchdogCoordinator.STAGNATION_POLL_MS)
+            runCurrent()
+            controller.updateStats(stats(txBytes = 101, rxBytes = 100, timestampMs = 2))
+            advanceTimeBy(EngineWatchdogCoordinator.STAGNATION_POLL_MS)
+            runCurrent()
 
-        assertEquals(0, plugin.recoverCalls)
-        watchdog.cancelWatchers()
+            assertEquals(0, plugin.recoverCalls)
+        } finally {
+            watchdog.cancelWatchers()
+        }
     }
 
     @Test
-    fun `starting replacement watcher cancels previous health watcher`() = runTest(UnconfinedTestDispatcher()) {
+    fun `starting replacement watcher cancels previous health watcher`() = runTest {
         val health = degradingHealthMonitor()
         val controller = connectedController(EngineId.BYEDPI)
         val watchdog = watchdog(
@@ -224,18 +252,22 @@ class EngineWatchdogCoordinatorCoverageTest {
             killswitch = true,
         )
 
-        watchdog.startHealthKillswitchWatcher(EngineId.BYEDPI)
-        watchdog.startHealthKillswitchWatcher(EngineId.BYEDPI)
-        health.start(1080)
-        advanceTimeBy(1)
+        try {
+            watchdog.startHealthKillswitchWatcher(EngineId.BYEDPI)
+            watchdog.startHealthKillswitchWatcher(EngineId.BYEDPI)
+            health.start(1080)
+            advanceTimeBy(1)
+            runCurrent()
 
-        assertTrue(controller.killswitchActive.value)
-        watchdog.cancelWatchers()
-        health.shutdown()
+            assertTrue(controller.killswitchActive.value)
+        } finally {
+            watchdog.cancelWatchers()
+            health.shutdown()
+        }
     }
 
     @Test
-    fun `handleEngineFailure ignores failures while stopping`() = runTest(UnconfinedTestDispatcher()) {
+    fun `handleEngineFailure ignores failures while stopping`() = runTest {
         val controller = connectedController(EngineId.BYEDPI)
         val stopCount = AtomicReference(0)
         val watchdog = watchdog(
@@ -255,9 +287,7 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
-    fun `handleEngineFailure without killswitch stops vpn and marks engine dead`() = runTest(
-        UnconfinedTestDispatcher(),
-    ) {
+    fun `handleEngineFailure without killswitch stops vpn and marks engine dead`() = runTest {
         val controller = connectedController(EngineId.BYEDPI)
         val stopCount = AtomicReference(0)
         val watchdog = watchdog(
@@ -276,7 +306,7 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
-    fun `handleEngineFailure ignores inactive engine`() = runTest(UnconfinedTestDispatcher()) {
+    fun `handleEngineFailure ignores inactive engine`() = runTest {
         val controller = connectedController(EngineId.BYEDPI)
         val stopCount = AtomicReference(0)
         val watchdog = watchdog(
@@ -295,9 +325,7 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
-    fun `handleEngineFailure stops vpn when tun missing and killswitch enabled`() = runTest(
-        UnconfinedTestDispatcher(),
-    ) {
+    fun `handleEngineFailure stops vpn when tun missing and killswitch enabled`() = runTest {
         val controller = connectedController(EngineId.BYEDPI)
         val statsJob = Job()
         val notification = mockk<OzeroNotificationFactory>(relaxed = true)
@@ -362,7 +390,7 @@ class EngineWatchdogCoordinatorCoverageTest {
     private fun TestScope.degradingHealthMonitor(): HealthMonitor = HealthMonitor(
         intervalMs = 1,
         failuresBeforeDegraded = 1,
-        dispatcher = UnconfinedTestDispatcher(testScheduler),
+        dispatcher = StandardTestDispatcher(testScheduler),
         probe = { _, _, _ -> error("down") },
     )
 
