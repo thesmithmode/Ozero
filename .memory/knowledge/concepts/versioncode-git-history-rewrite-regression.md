@@ -4,8 +4,9 @@ aliases: [versioncode-regression, history-rewrite-versioncode]
 tags: [android, release, git, versioncode]
 sources:
   - "daily/2026-05-25.md"
+  - "daily/2026-05-23.md"
 created: 2026-05-25
-updated: 2026-05-25
+updated: 2026-06-12
 ---
 
 # versionCode Regression After Git History Rewrite
@@ -27,6 +28,8 @@ When `versionCode` is computed from `git rev-list --count HEAD`, any operation t
 The Ozero v0.2.1 APK produced "пакет недействителен" on install. Initial investigation ruled out V1 signing (red herring — CERT.RSA present but V1=false in `apksigner verify`), R8 stripping, and INDEX.LIST artifacts. The real cause: versionCode 618 < 1155 from v0.2.0.
 
 The regression was introduced by a prior session that rewrote git history to remove AI authorship (`rebase+amend+force-push`). This reduced `git rev-list --count HEAD` from ~1155 to ~618. The tag `v0.2.0` pointed to a commit no longer in the linear history after force-push, making `git describe` fall back to `v0.1.11` — so both versionCode and versionName regressed simultaneously.
+
+The same trap can happen without rewriting history if release CI uses a shallow checkout. In v0.2.0 release work, `actions/checkout` without `fetch-depth: 0` made the release job see only one commit, so `git rev-list --count HEAD` returned `1` and the APK could not upgrade over the previous installed build. The fix belongs in `release.yml`, not as user advice to uninstall the old APK: updates must be monotonic and install over the prior version.
 
 ### Defense Pattern
 
@@ -55,6 +58,8 @@ The ktlint fix was also required: multi-line expression with `providers.exec { .
 ### Related Context
 
 After any git history rewrite operation, verify that versionCode remains monotonically increasing before creating a release tag. The `apksigner verify` V1=false output in this incident was a misleading red herring — V1 signing presence does not affect the "package invalid" error from a versionCode downgrade.
+
+Release workflows that compute versionCode from git history must use `actions/checkout` with `fetch-depth: 0`; a shallow clone can cause the same downgrade class even when history was not rewritten.
 
 ## Related Concepts
 

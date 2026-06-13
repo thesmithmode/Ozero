@@ -5,7 +5,7 @@ tags: [urnetwork, jwt, relay, architecture, coordinator-pattern, migration]
 sources:
   - "daily/2026-05-23.md"
 created: 2026-05-23
-updated: 2026-05-23
+updated: 2026-06-12
 ---
 
 # URnetwork JWT Bootstrapper: Extract, Session-Flag, Migration Pre-Check Bug
@@ -35,6 +35,8 @@ User selects ByeDPI/WARP → EngineUrnetwork.start() never called
 ```
 
 This gap existed since commit `194d7701` (2026-05-17, when RelayCoordinator was added). It was NOT a regression of the `cc9e3c67` provideSecretKeys fix or `0ef16e3a` walletAuth fix — those fixed different root causes (mesh identity and server-side guest blocking respectively).
+
+The investigation also corrected stale memory: "walletAuth resolved" did not mean "relay works for all first-run users." WalletAuth solved the server-side rejection of guest identities, but a new user running WARP or FPTN still had no trigger that would acquire a client JWT before the coordinator checked DataStore.
 
 ### Extract Architecture (commit e6bac9eb)
 

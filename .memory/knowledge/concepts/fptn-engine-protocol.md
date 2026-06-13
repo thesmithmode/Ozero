@@ -6,7 +6,7 @@ sources:
   - "daily/2026-05-22.md"
   - "daily/2026-05-23.md"
 created: 2026-05-22
-updated: 2026-05-23
+updated: 2026-06-12
 ---
 
 # FPTN Engine Protocol Architecture

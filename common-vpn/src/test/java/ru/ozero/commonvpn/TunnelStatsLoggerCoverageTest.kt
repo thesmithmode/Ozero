@@ -7,6 +7,7 @@ import io.mockk.unmockkObject
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -60,7 +61,7 @@ class TunnelStatsLoggerCoverageTest {
             verify(exactly = 1) { notification.notifyStats(any()) }
             verify(exactly = 0) { UidTrafficStats.read() }
         } finally {
-            logger.cancel()
+            stopLogger(logger, scope)
         }
     }
 
@@ -88,7 +89,7 @@ class TunnelStatsLoggerCoverageTest {
             assertEquals(404, controller.stats.value?.txBytes)
             verify(exactly = 1) { notification.notifyStats(any()) }
         } finally {
-            logger.cancel()
+            stopLogger(logger, scope)
         }
     }
 
@@ -120,7 +121,7 @@ class TunnelStatsLoggerCoverageTest {
             verify(exactly = 1) { UidTrafficStats.read() }
             verify(exactly = 1) { notification.notifyStats(any()) }
         } finally {
-            logger.cancel()
+            stopLogger(logger, scope)
         }
     }
 
@@ -151,7 +152,7 @@ class TunnelStatsLoggerCoverageTest {
             verify(exactly = 2) { UidTrafficStats.read() }
             verify(exactly = 0) { notification.notifyStats(any()) }
         } finally {
-            logger.cancel()
+            stopLogger(logger, scope)
         }
     }
 
@@ -172,7 +173,7 @@ class TunnelStatsLoggerCoverageTest {
             assertFalse(first?.isActive == true)
             assertTrue(second?.isActive == true)
         } finally {
-            logger.cancel()
+            stopLogger(logger, scope)
         }
     }
 
@@ -202,7 +203,7 @@ class TunnelStatsLoggerCoverageTest {
             assertFalse(ref.get()?.isActive == true)
             verify(exactly = 0) { notification.notifyStats(any()) }
         } finally {
-            logger.cancel()
+            stopLogger(logger, scope)
         }
     }
 
@@ -232,7 +233,7 @@ class TunnelStatsLoggerCoverageTest {
             verify(exactly = 0) { notification.notifyStats(any()) }
             verify(exactly = 0) { TunInterfaceStats.readTunStats(any()) }
         } finally {
-            logger.cancel()
+            stopLogger(logger, scope)
         }
     }
 
@@ -248,9 +249,17 @@ class TunnelStatsLoggerCoverageTest {
         assertTrue(job?.isActive == true)
 
         logger.cancel()
+        scope.runCurrent()
+        scope.cancel()
 
         assertNull(ref.get())
         assertFalse(job?.isActive == true)
+    }
+
+    private fun stopLogger(logger: TunnelStatsLogger, scope: TestScope) {
+        logger.cancel()
+        scope.runCurrent()
+        scope.cancel()
     }
 
     private fun logger(

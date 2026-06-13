@@ -5,7 +5,7 @@ tags: [android, ndk, native, conan, fptn, cmake]
 sources:
   - "daily/2026-05-23.md"
 created: 2026-05-23
-updated: 2026-05-23
+updated: 2026-06-12
 ---
 
 # Android NDK: c++_static Required for Third-Party .so (clns-7 Namespace)

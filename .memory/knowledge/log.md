@@ -47,3 +47,7 @@ test
 - Source: daily/2026-05-22.md
 - Articles created: [[concepts/urnetwork-offline-location-selection]], [[concepts/fptn-jni-fd-lifecycle-contract]], [[concepts/engine-switching-watchdog-force-stop]], [[concepts/about-screen-purpose-minimization]]
 - Articles updated: none
+## [2026-06-12T19:17:08+03:00] compile | 2026-05-23.md
+- Source: daily/2026-05-23.md
+- Articles created: [[concepts/fptn-android-native-build-pipeline]], [[connections/native-release-runtime-regression-proof-loop]]
+- Articles updated: [[concepts/fptn-engine-protocol]], [[concepts/fptn-sni-bypass-method]], [[concepts/android-ndk-cxx-static-linking]], [[concepts/urnetwork-provide-secret-keys-identity]], [[concepts/urnetwork-jwt-bootstrapper]], [[concepts/warp-uapi-stale-socket-cleanup]], [[concepts/masterdns-deploy-hardening]], [[concepts/gradle-configuration-cache-agp-bug]], [[concepts/proguard-release-drift]], [[concepts/versioncode-git-history-rewrite-regression]]

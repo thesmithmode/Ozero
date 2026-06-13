@@ -11,6 +11,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -45,6 +46,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
     private val sortOrderKey = intPreferencesKey("singbox_sort_order")
     private val dispatcher = StandardTestDispatcher()
+    private val stateCollectionJobs = mutableListOf<Job>()
 
     @BeforeEach
     fun setUp() {
@@ -53,6 +55,8 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
     @AfterEach
     fun tearDown() {
+        stateCollectionJobs.forEach { it.cancel() }
+        stateCollectionJobs.clear()
         Dispatchers.resetMain()
     }
 
@@ -810,6 +814,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         advanceUntilIdle()
 
         harness.profilesFlow.value = listOf(profile(id = 121L, groupId = 1L, name = "After", userOrder = 0))
+        advanceUntilIdle()
         harness.viewModel.onPing(1L)
         advanceUntilIdle()
 
@@ -928,7 +933,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         }
 
         fun startStateCollection() {
-            CoroutineScope(Dispatchers.Main).launch {
+            stateCollectionJobs += CoroutineScope(Dispatchers.Main).launch {
                 viewModel.state.collect { }
             }
         }

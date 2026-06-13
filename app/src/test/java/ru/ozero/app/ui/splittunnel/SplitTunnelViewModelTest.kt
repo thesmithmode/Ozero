@@ -1,6 +1,7 @@
 ﻿package ru.ozero.app.ui.splittunnel
 
 import androidx.compose.ui.graphics.ImageBitmap
+import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -445,7 +446,7 @@ class SplitTunnelViewModelTest {
 
     @Test
     fun `loadIcon delegates to provider`() = runTest {
-        val icon = ImageBitmap(1, 1)
+        val icon = mockk<ImageBitmap>()
         val provider = IconProvidingAppListProvider(sample, icon)
         val vm = SplitTunnelViewModel(provider, dao, settings, tunnelController)
         advanceUntilIdle()
