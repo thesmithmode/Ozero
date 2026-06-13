@@ -267,6 +267,21 @@ class RawShareLinksParserTest {
     }
 
     @Test
+    fun `should parse fallback authority before path when raw query contains braces`() {
+        val uri = "vless://12345678-1234-1234-1234-123456789abc@example.com:443/ws" +
+            "?type=ws&path=/ws&extra={bad-but-common}#WS"
+
+        val result = RawShareLinksParser.parse(uri)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as VLESSBean
+        assertEquals("example.com", bean.serverAddress)
+        assertEquals(443, bean.serverPort)
+        assertEquals("ws", bean.type)
+        assertEquals("/ws", bean.path)
+    }
+
+    @Test
     fun `should infer reality from clash reality opts`() {
         val yaml = """
             proxies:

@@ -440,4 +440,28 @@ class RawUpdaterTest {
         assertEquals(firstAId, secondByName.getValue("First").id)
         assertEquals(firstBId, secondByName.getValue("Second").id)
     }
+
+    @Test
+    fun `should preserve duplicate server ids by transport when provider reorders rows`() = runBlocking {
+        val ws =
+            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup.example.com:443" +
+                "?type=ws&security=tls&sni=ws.example.com&host=front.example.com&path=/ws#WS"
+        val grpc =
+            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup.example.com:443" +
+                "?type=grpc&security=tls&sni=grpc.example.com&serviceName=grpc-svc#GRPC"
+        server.enqueue(MockResponse().setBody("$ws\n$grpc"))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val firstByName = profileDao.profiles.associateBy { it.name }
+        val wsId = firstByName.getValue("WS").id
+        val grpcId = firstByName.getValue("GRPC").id
+
+        server.enqueue(MockResponse().setBody("$grpc\n$ws"))
+        rawUpdater.refresh(g)
+        val secondByName = profileDao.profiles.associateBy { it.name }
+
+        assertEquals(wsId, secondByName.getValue("WS").id)
+        assertEquals(grpcId, secondByName.getValue("GRPC").id)
+    }
 }

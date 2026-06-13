@@ -25,9 +25,13 @@ internal class UriCompat private constructor(private val raw: String) {
         private fun UriCompat.parseAuthorityFallback(): ParsedAuthority? {
             val schemeEnd = raw.indexOf("://")
             if (schemeEnd < 0) return null
-            val queryStart = raw.indexOf('?', startIndex = schemeEnd + 3).let { if (it < 0) Int.MAX_VALUE else it }
-            val fragmentStart = raw.indexOf('#', startIndex = schemeEnd + 3).let { if (it < 0) Int.MAX_VALUE else it }
-            val authorityEnd = minOf(queryStart, fragmentStart, raw.length)
+            val pathStart = raw.indexOf('/', startIndex = schemeEnd + 3)
+                .let { if (it < 0) Int.MAX_VALUE else it }
+            val queryStart = raw.indexOf('?', startIndex = schemeEnd + 3)
+                .let { if (it < 0) Int.MAX_VALUE else it }
+            val fragmentStart = raw.indexOf('#', startIndex = schemeEnd + 3)
+                .let { if (it < 0) Int.MAX_VALUE else it }
+            val authorityEnd = minOf(pathStart, queryStart, fragmentStart, raw.length)
             if (authorityEnd <= schemeEnd + 3) return null
 
             val authority = raw.substring(schemeEnd + 3, authorityEnd)

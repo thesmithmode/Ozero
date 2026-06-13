@@ -53,12 +53,24 @@ class RawUpdater(
                     )
                 }
                 val existingProfiles = profileDao.getByGroupId(group.id)
-                val existingByStableIdentity = existingProfiles
-                    .groupBy { it.stableIdentityKey() }
+                val incomingBaseKeyCounts = profiles
+                    .groupingBy { it.stableBaseIdentityKey() }
+                    .eachCount()
+                val existingByBaseIdentity = existingProfiles
+                    .groupBy { it.stableBaseIdentityKey() }
+                    .mapValues { (_, matches) -> matches.toMutableList() }
+                val existingByFullIdentity = existingProfiles
+                    .groupBy { it.stableFullIdentityKey() }
                     .mapValues { (_, matches) -> matches.toMutableList() }
                 val profilesWithStableIds = profiles.map { profile ->
-                    val stableKey = profile.stableIdentityKey()
-                    val matched = existingByStableIdentity[stableKey]?.removeFirstOrNull()
+                    val baseKey = profile.stableBaseIdentityKey()
+                    val useFullKey = (incomingBaseKeyCounts[baseKey] ?: 0) > 1 ||
+                        ((existingByBaseIdentity[baseKey]?.size ?: 0) > 1)
+                    val matched = if (useFullKey) {
+                        existingByFullIdentity[profile.stableFullIdentityKey()]?.removeFirstOrNull()
+                    } else {
+                        existingByBaseIdentity[baseKey]?.removeFirstOrNull()
+                    }
                     if (matched != null) {
                         profile.copy(id = matched.id)
                     } else {
@@ -116,7 +128,7 @@ class RawUpdater(
     }
 }
 
-private fun ProxyProfile.stableIdentityKey(): String =
+private fun ProxyProfile.stableBaseIdentityKey(): String =
     listOf(
         groupId.toString(),
         protocolType.toString(),
@@ -126,6 +138,15 @@ private fun ProxyProfile.stableIdentityKey(): String =
             ?: beanBlob.contentHashCode().toString(),
     ).joinToString("|")
 
+private fun ProxyProfile.stableFullIdentityKey(): String =
+    listOf(
+        stableBaseIdentityKey(),
+        runCatching { KryoSerializer.deserialize<AbstractBean>(beanBlob) }
+            .getOrNull()
+            ?.stableRuntimeKey()
+            ?: "",
+    ).joinToString("|")
+
 private fun AbstractBean.stableCredentialKey(): String = when (this) {
     is VLESSBean -> "uuid=${uuid.trim()}"
     is VMessBean -> "uuid=${uuid.trim()}"
@@ -133,4 +154,25 @@ private fun AbstractBean.stableCredentialKey(): String = when (this) {
     is ShadowsocksBean -> "method=${method.trim()}|password=${password.trim()}"
     is StandardV2RayBean -> "uuid=${uuid.trim()}"
     else -> "blob=${KryoSerializer.serialize(this).contentHashCode()}"
+}
+
+private fun AbstractBean.stableRuntimeKey(): String = when (this) {
+    is StandardV2RayBean -> listOf(
+        "type=${type.trim()}",
+        "security=${security.trim()}",
+        "sni=${sni.trim()}",
+        "host=${host.trim()}",
+        "path=${path.trim()}",
+        "grpcServiceName=${grpcServiceName.trim()}",
+        "splithttpMode=${splithttpMode.trim()}",
+        "headerType=${headerType.trim()}",
+        "mKcpSeed=${mKcpSeed.trim()}",
+        "quicSecurity=${quicSecurity.trim()}",
+        "quicKey=${quicKey.trim()}",
+        "alpn=${alpn.trim()}",
+        "utlsFingerprint=${utlsFingerprint.trim()}",
+        "realityPublicKey=${realityPublicKey.trim()}",
+        "realityShortId=${realityShortId.trim()}",
+    ).joinToString("|")
+    else -> ""
 }
