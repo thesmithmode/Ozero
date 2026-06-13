@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -63,7 +64,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `sort order defaults to BY_LATENCY when preference is absent`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         assertEquals(SortOrder.BY_LATENCY, harness.viewModel.state.value.sortOrder)
@@ -79,7 +80,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
                 profile(id = 12L, groupId = 1L, name = "alpha", userOrder = 0, latencyMs = 10),
             ),
         )
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onGroupExpand(1L)
@@ -98,7 +99,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
                 profile(id = 22L, groupId = 1L, name = "alpha", userOrder = 0, latencyMs = 100),
             ),
         )
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onGroupExpand(1L)
@@ -115,7 +116,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `add group dialog show and hide preserve then reset fields`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onAddGroupFieldChanged(name = "Custom", url = "https://example.com")
@@ -138,7 +139,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `empty add group url sets validation error and skips insert`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onAddGroupFieldChanged(name = "New group", url = "   ")
@@ -152,7 +153,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `blank add group name uses generated default name`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onAddGroupFieldChanged(name = "   ", url = " https://example.com/sub ")
@@ -171,7 +172,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `explicit add group name is trimmed and user order follows current groups`() = runTest {
         val harness = Harness(initialGroups = listOf(group(id = 7L, userOrder = 0)))
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onAddGroupFieldChanged(name = "  Work  ", url = " https://example.com/work ")
@@ -186,7 +187,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `manual links dialog show and hide preserve then reset fields`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onShowAddMenu(true)
@@ -211,7 +212,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `empty manual links input sets validation error and invalid input clears on edit`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onManualLinksFieldChanged(input = "   ")
@@ -231,7 +232,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `invalid manual links input sets parse error and skips insert`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onManualLinksFieldChanged(input = "not-a-link")
@@ -246,7 +247,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `blank manual links group name uses generated default name and server fallback`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onManualLinksFieldChanged(
@@ -279,7 +280,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
                 chainStep(profileId = 20L, userOrder = 2),
             ),
         )
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         assertEquals(listOf(10L, 20L), harness.viewModel.state.value.chainProfileIds)
@@ -298,7 +299,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
                 profile(id = 3L, groupId = 1L, name = "Three", userOrder = 2),
             ),
         )
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onChainProfileAdd(profile(id = 3L, groupId = 1L, name = "Three", userOrder = 2))
@@ -325,7 +326,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
                 profile(id = 3L, groupId = 1L, name = "Three", userOrder = 2),
             ),
         )
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onChainProfileRemove(2L)
@@ -352,7 +353,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
                 profile(id = 3L, groupId = 1L, name = "Three", userOrder = 2),
             ),
         )
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onChainProfileMove(1L, -10)
@@ -378,7 +379,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
                 profile(id = 3L, groupId = 1L, name = "Three", userOrder = 2),
             ),
         )
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onChainProfileMove(2L, -1)
@@ -393,7 +394,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     fun `onProfileSelect persists selected profile id and bean blob`() = runTest {
         val profile = profile(id = 41L, groupId = 1L, name = "Chosen", userOrder = 0)
         val harness = Harness(initialProfiles = listOf(profile))
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onProfileSelect(profile)
@@ -409,7 +410,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     fun `onSetAutoSelect toggles selected profile preference and clears bean`() = runTest {
         val profile = profile(id = 51L, groupId = 1L, name = "Chosen", userOrder = 0)
         val harness = Harness(initialProfiles = listOf(profile))
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onProfileSelect(profile)
@@ -433,7 +434,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
             initialGroups = listOf(group(id = 1L, userOrder = 0)),
             initialProfiles = listOf(profile(id = 61L, groupId = 1L, name = "Ping", userOrder = 0)),
         )
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onPing(groupId = 1L)
@@ -451,7 +452,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `onDeleteGroup removes group from source and state`() = runTest {
         val harness = Harness(initialGroups = listOf(group(id = 1L, userOrder = 0)))
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onDeleteGroup(group(id = 1L, userOrder = 0))
@@ -464,7 +465,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `onCancel can clear only ping state and keep refresh marker`() = runTest {
         val harness = Harness(initialGroups = listOf(group(id = 1L, userOrder = 0)))
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onRefresh(1L)
@@ -486,7 +487,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         """.trimIndent()
         every { harness.appContext.assets.open("singbox/preset_groups.json") } returns
             ByteArrayInputStream(json.toByteArray())
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onRestoreDefaults()
@@ -508,7 +509,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     fun `restore defaults stores error when preset asset is missing`() = runTest {
         val harness = Harness()
         every { harness.appContext.assets.open("singbox/preset_groups.json") } throws IllegalStateException("missing")
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onRestoreDefaults()
@@ -521,7 +522,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `import from file with invalid text opens manual dialog with filename default`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onImportFromFile("not a proxy link", "Imported.txt")
@@ -537,7 +538,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     fun `import from file invalid text without filename uses blank group name and truncates input`() = runTest {
         val harness = Harness()
         val text = "x".repeat(2_100)
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onImportFromFile(text, null)
@@ -552,7 +553,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `import from file creates group and profiles from valid links`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onImportFromFile(
@@ -569,7 +570,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `onPing ignores empty groups and clears previous pinging state`() = runTest {
         val harness = Harness(initialGroups = listOf(group(id = 1L, userOrder = 0)))
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onPing(groupId = 1L)
@@ -586,7 +587,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
             initialProfiles = listOf(profile(id = 71L, groupId = 1L, name = "Existing", userOrder = 0)),
         )
         coEvery { harness.rawUpdater.refresh(any()) } returns Result.success(1)
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onGroupExpand(1L)
@@ -606,7 +607,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     fun `onGroupExpand refreshes empty group and records updater error`() = runTest {
         val harness = Harness(initialGroups = listOf(group(id = 1L, userOrder = 0)))
         coEvery { harness.rawUpdater.refresh(any()) } returns Result.failure(IllegalStateException("network down"))
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onGroupExpand(1L)
@@ -623,7 +624,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         val harness = Harness(
             initialGroups = listOf(group(id = 1L, userOrder = 0), group(id = 2L, userOrder = 1)),
         )
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onRefresh()
@@ -641,7 +642,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
             initialProfiles = listOf(profile(id = 91L, groupId = 1L, name = "Visible", userOrder = 0)),
         )
         coEvery { harness.rawUpdater.refresh(any()) } throws IllegalArgumentException("bad payload")
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onGroupExpand(1L)
@@ -657,7 +658,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `manual import maps all supported protocols to protocol types`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onImportFromFile(
@@ -678,7 +679,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `onAutoSelectBest skips probe when no profiles exist`() = runTest {
         val harness = Harness(initialGroups = listOf(group(id = 1L, userOrder = 0)))
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onAutoSelectBest()
@@ -697,12 +698,13 @@ class SingboxEngineSettingsViewModelCoverageTest {
                 profile(id = 201L, groupId = 2L, name = "Two", userOrder = 0),
             ),
         )
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
         harness.viewModel.onGroupExpand(1L)
         advanceUntilIdle()
 
         harness.viewModel.onAutoSelectBest()
+        runCurrent()
         advanceUntilIdle()
 
         assertEquals(listOf("One.example.com", "Two.example.com"), harness.probeCalls.sorted())
@@ -713,7 +715,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `add group field updates are partial and preserve previous values`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onAddGroupFieldChanged(name = "First")
@@ -727,7 +729,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `manual links group name update preserves parse error and input update clears it`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onManualLinksFieldChanged(input = "broken")
@@ -748,7 +750,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `add menu toggles independently from dialogs`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onShowAddMenu(true)
@@ -769,7 +771,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     @Test
     fun `expanding or refreshing missing group is no-op`() = runTest {
         val harness = Harness()
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onGroupExpand(99L)
@@ -791,7 +793,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
                 profile(id = 222L, groupId = 2L, name = "Two", userOrder = 0),
             ),
         )
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
         harness.viewModel.onPing()
@@ -808,7 +810,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
             initialGroups = listOf(group(id = 1L, userOrder = 0)),
             initialProfiles = listOf(profile(id = 121L, groupId = 1L, name = "Before", userOrder = 0)),
         )
-        harness.startStateCollection()
+        harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
         harness.viewModel.onGroupExpand(1L)
         advanceUntilIdle()
@@ -932,8 +934,8 @@ class SingboxEngineSettingsViewModelCoverageTest {
             )
         }
 
-        fun startStateCollection() {
-            stateCollectionJobs += CoroutineScope(Dispatchers.Main).launch {
+        fun startStateCollection(scope: CoroutineScope) {
+            stateCollectionJobs += scope.launch(Dispatchers.Main) {
                 viewModel.state.collect { }
             }
         }

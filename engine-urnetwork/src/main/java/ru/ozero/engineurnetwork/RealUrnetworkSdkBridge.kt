@@ -19,11 +19,12 @@ import com.bringyour.sdk.WindowSizeSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -155,7 +156,7 @@ class RealUrnetworkSdkBridge(
                 } else {
                     var sub: Sub? = null
                     sub = d.addProvideSecretKeysListener { generated ->
-                        bridgeScope.launch(Dispatchers.Main.immediate) {
+                        bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable) {
                             runCatching { localState.provideSecretKeys = generated }
                                 .onSuccess {
                                     PersistentLoggers.debug(TAG, "node start: session keys generated and persisted")
@@ -489,7 +490,7 @@ class RealUrnetworkSdkBridge(
             } else {
                 var sub: Sub? = null
                 sub = device.addProvideSecretKeysListener { generated ->
-                    bridgeScope.launch(Dispatchers.Main.immediate) {
+                    bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable) {
                         runCatching { localState.provideSecretKeys = generated }
                             .onSuccess { Log.i(TAG, "ensureDevice: provideSecretKeys generated and persisted") }
                             .onFailure { PersistentLoggers.warn(TAG, "ensureDevice: persist keys: ${it.message}") }

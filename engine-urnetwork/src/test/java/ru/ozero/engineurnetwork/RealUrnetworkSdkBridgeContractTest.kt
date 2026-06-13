@@ -641,6 +641,10 @@ class RealUrnetworkSdkBridgeContractTest {
         val listenerBody = startBlock.substringAfter("addProvideSecretKeysListener {")
             .substringBefore("d.initProvideSecretKeys()")
         assertTrue(
+            listenerBody.contains("Dispatchers.Main.immediate + NonCancellable"),
+            "provideSecretKeys persistence in runStartOnMain must survive normal stop/switch cancellation.",
+        )
+        assertTrue(
             listenerBody.contains("localState.provideSecretKeys = "),
             "Listener в runStartOnMain обязан сохранять ключи через localState.provideSecretKeys — " +
                 "без этого provider identity сбрасывается на каждом рестарте → 0 раздачи.",
@@ -661,6 +665,12 @@ class RealUrnetworkSdkBridgeContractTest {
         assertTrue(
             listenerIdx < initIdx,
             "addProvideSecretKeysListener обязан регистрироваться ДО device.initProvideSecretKeys().",
+        )
+        val listenerBody = ensureBlock.substringAfter("addProvideSecretKeysListener {")
+            .substringBefore("device.initProvideSecretKeys()")
+        assertTrue(
+            listenerBody.contains("Dispatchers.Main.immediate + NonCancellable"),
+            "provideSecretKeys persistence in ensureDeviceOnMain must survive normal stop/switch cancellation.",
         )
     }
 

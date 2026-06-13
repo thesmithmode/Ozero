@@ -111,9 +111,6 @@ class TunnelController(
         prevTimestampMs = 0L
         smoothedBpsIn = 0.0
         smoothedBpsOut = 0.0
-        _switching.value = null
-        switchingWatchdogJob?.cancel()
-        switchingWatchdogJob = null
         stagnationMonitor.reset()
         transition(TunnelState.Idle)
     }

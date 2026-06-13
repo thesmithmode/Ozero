@@ -4,8 +4,6 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -35,19 +33,33 @@ class UrnetworkRelayCoordinatorTest {
     private lateinit var configStore: InMemoryUrnetworkConfigStore
     private lateinit var bridge: FakeBridge
     private lateinit var bootstrapper: FakeJwtBootstrapper
+    private lateinit var tunnelController: TunnelController
     private lateinit var coordinator: UrnetworkRelayCoordinator
 
     @BeforeEach
     fun setUp() {
-        coordinatorScope = CoroutineScope(dispatcher + SupervisorJob())
         tunnelStateFlow = MutableStateFlow(TunnelState.Idle)
         configStore = InMemoryUrnetworkConfigStore(UrnetworkConfig(walletOverride = "test-wallet"))
         bridge = FakeBridge()
         bootstrapper = FakeJwtBootstrapper()
 
-        val tunnelController = mockk<TunnelController>()
+        tunnelController = mockk()
         every { tunnelController.state } returns tunnelStateFlow
+    }
 
+    @AfterEach
+    fun tearDown() {
+        if (::coordinator.isInitialized) {
+            coordinator.stop()
+        }
+    }
+
+    private fun setByClientJwt(value: String?) {
+        configStore.inject { it.copy(byClientJwt = value) }
+    }
+
+    private fun relayTest(block: suspend TestScope.() -> Unit) = runTest(dispatcher) {
+        coordinatorScope = backgroundScope
         coordinator = UrnetworkRelayCoordinator(
             bridge = bridge,
             configStore = configStore,
@@ -57,24 +69,10 @@ class UrnetworkRelayCoordinatorTest {
             scope = coordinatorScope,
         )
         coordinator.start()
-    }
-
-    @AfterEach
-    fun tearDown() {
-        coordinator.stop()
-        coordinatorScope.cancel()
-    }
-
-    private fun setByClientJwt(value: String?) {
-        configStore.inject { it.copy(byClientJwt = value) }
-    }
-
-    private fun relayTest(block: suspend TestScope.() -> Unit) = runTest(dispatcher) {
         try {
             block()
         } finally {
             coordinator.stop()
-            coordinatorScope.cancel()
         }
     }
 

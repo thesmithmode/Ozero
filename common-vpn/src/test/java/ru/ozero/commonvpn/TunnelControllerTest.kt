@@ -1,8 +1,6 @@
 package ru.ozero.commonvpn
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
@@ -531,10 +529,9 @@ class TunnelControllerTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun switchingWatchdogAutoClearsOnTimeout() = runTest {
-        val testScope = TestScope(StandardTestDispatcher(testScheduler))
         val timeoutMs = 12_000L
         val ctl = TunnelController(
-            watchdogScope = testScope,
+            watchdogScope = backgroundScope,
             switchingTimeoutMs = timeoutMs,
         )
         ctl.onProbing()
@@ -542,19 +539,18 @@ class TunnelControllerTest {
         ctl.onEngineStarted(EngineId.BYEDPI, 1080)
         ctl.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.URNETWORK)
         assertNotNull(ctl.switching.value, "switching должен быть установлен сразу")
-        testScope.testScheduler.advanceTimeBy(timeoutMs - 1)
+        testScheduler.advanceTimeBy(timeoutMs - 1)
         assertNotNull(ctl.switching.value, "watchdog не должен срабатывать до таймаута")
-        testScope.testScheduler.advanceTimeBy(2)
+        testScheduler.advanceTimeBy(2)
         assertNull(ctl.switching.value, "watchdog обязан auto-clear switching после ${timeoutMs}ms")
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun switchingWatchdogCancelledOnTerminalTransition() = runTest {
-        val testScope = TestScope(StandardTestDispatcher(testScheduler))
         val timeoutMs = 12_000L
         val ctl = TunnelController(
-            watchdogScope = testScope,
+            watchdogScope = backgroundScope,
             switchingTimeoutMs = timeoutMs,
         )
         ctl.onProbing()
@@ -567,44 +563,42 @@ class TunnelControllerTest {
         ctl.onConnecting(EngineId.URNETWORK)
         ctl.onEngineStarted(EngineId.URNETWORK, 1080)
         assertNull(ctl.switching.value, "terminal transition обязан очистить switching")
-        testScope.testScheduler.advanceTimeBy(timeoutMs + 1)
+        testScheduler.advanceTimeBy(timeoutMs + 1)
         assertNull(ctl.switching.value, "повторный watchdog после terminal не должен реактивировать switching")
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun switchingWatchdogCancelledOnExplicitFinish() = runTest {
-        val testScope = TestScope(StandardTestDispatcher(testScheduler))
         val timeoutMs = 12_000L
         val ctl = TunnelController(
-            watchdogScope = testScope,
+            watchdogScope = backgroundScope,
             switchingTimeoutMs = timeoutMs,
         )
         ctl.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.WARP)
         ctl.onSwitchingFinished("explicit")
         assertNull(ctl.switching.value)
-        testScope.testScheduler.advanceTimeBy(timeoutMs + 1)
+        testScheduler.advanceTimeBy(timeoutMs + 1)
         assertNull(ctl.switching.value, "после explicit finish watchdog не должен реактивироваться")
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun switchingWatchdogRestartsOnNewSwitching() = runTest {
-        val testScope = TestScope(StandardTestDispatcher(testScheduler))
         val timeoutMs = 12_000L
         val ctl = TunnelController(
-            watchdogScope = testScope,
+            watchdogScope = backgroundScope,
             switchingTimeoutMs = timeoutMs,
         )
         ctl.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.URNETWORK)
-        testScope.testScheduler.advanceTimeBy(6_000L)
+        testScheduler.advanceTimeBy(6_000L)
         ctl.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.WARP)
-        testScope.testScheduler.advanceTimeBy(7_000L)
+        testScheduler.advanceTimeBy(7_000L)
         assertNotNull(
             ctl.switching.value,
             "новый onSwitchingStarted перезапускает watchdog — старый timer должен быть отменён",
         )
-        testScope.testScheduler.advanceTimeBy(timeoutMs)
+        testScheduler.advanceTimeBy(timeoutMs)
         assertNull(ctl.switching.value, "новый watchdog должен сработать на новом таймауте")
     }
 

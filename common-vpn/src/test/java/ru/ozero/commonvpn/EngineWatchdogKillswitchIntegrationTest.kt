@@ -5,7 +5,6 @@ import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -67,7 +66,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             val lockdownFd = mockk<ParcelFileDescriptor>(relaxed = true)
             val watchdog = buildWatchdog(
                 controller = controller,
-                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                scope = backgroundScope,
                 killswitch = true,
                 tunFd = null,
                 lockdownStartupFd = lockdownFd,
@@ -97,7 +96,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             val stopVpnCount = AtomicReference(0)
             val watchdog = buildWatchdog(
                 controller = controller,
-                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                scope = backgroundScope,
                 killswitch = true,
                 tunFd = null,
                 stopVpnInvocations = stopVpnCount,
@@ -124,7 +123,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             val fakeFd = mockk<ParcelFileDescriptor>(relaxed = true)
             val watchdog = buildWatchdog(
                 controller = controller,
-                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                scope = backgroundScope,
                 killswitch = true,
                 tunFd = fakeFd,
                 stopVpnInvocations = stopVpnCount,
@@ -163,7 +162,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             val fakeFd = mockk<ParcelFileDescriptor>(relaxed = true)
             val watchdog = buildWatchdog(
                 controller = controller,
-                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                scope = backgroundScope,
                 killswitch = true,
                 tunFd = fakeFd,
                 stopping = true,
@@ -199,7 +198,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             val fakeFd = mockk<ParcelFileDescriptor>(relaxed = true)
             val watchdog = buildWatchdog(
                 controller = controller,
-                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                scope = backgroundScope,
                 killswitch = true,
                 tunFd = fakeFd,
                 stopVpnInvocations = stopVpnCount,
@@ -223,7 +222,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             val stopVpnCount = AtomicReference(0)
             val watchdog = buildWatchdog(
                 controller = controller,
-                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                scope = backgroundScope,
                 killswitch = false,
                 tunFd = null,
                 stopVpnInvocations = stopVpnCount,
@@ -249,7 +248,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             val stopVpnCount = AtomicReference(0)
             val watchdog = buildWatchdog(
                 controller = controller,
-                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                scope = backgroundScope,
                 killswitch = false,
                 tunFd = null,
                 stopVpnInvocations = stopVpnCount,
@@ -276,7 +275,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             val fakeFd = mockk<ParcelFileDescriptor>(relaxed = true)
             val watchdog = buildWatchdog(
                 controller = controller,
-                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                scope = backgroundScope,
                 killswitch = false,
                 tunFd = fakeFd,
                 stopVpnInvocations = stopVpnCount,
@@ -310,7 +309,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             val stopVpnCount = AtomicReference(0)
             val watchdog = buildWatchdog(
                 controller = controller,
-                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                scope = backgroundScope,
                 killswitch = true,
                 tunFd = null,
                 stopVpnInvocations = stopVpnCount,
@@ -341,7 +340,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             val fakeFd = mockk<ParcelFileDescriptor>(relaxed = true)
             val watchdog = buildWatchdog(
                 controller = controller,
-                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                scope = backgroundScope,
                 killswitch = true,
                 tunFd = fakeFd,
                 stopVpnInvocations = stopVpnCount,
