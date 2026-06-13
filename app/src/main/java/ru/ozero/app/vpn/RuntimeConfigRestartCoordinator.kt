@@ -52,7 +52,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         }
         if (!shouldProcess) {
             AppLogger.d(TAG, "runtime config restart request coalesced")
-            return false
+            return true
         }
         var completed = false
         while (true) {

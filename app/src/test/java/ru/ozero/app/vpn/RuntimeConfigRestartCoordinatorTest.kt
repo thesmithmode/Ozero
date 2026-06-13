@@ -264,7 +264,7 @@ class RuntimeConfigRestartCoordinatorTest {
         }
         runCurrent()
         val secondRestart = launch {
-            assertFalse(coordinator.restartVpnIfRunning("second-request"))
+            assertTrue(coordinator.restartVpnIfRunning("second-request"))
         }
         runCurrent()
         allowRestartStart.complete(Unit)
@@ -305,7 +305,7 @@ class RuntimeConfigRestartCoordinatorTest {
         advanceTimeBy(11_001)
         firstRestart.join()
 
-        assertFalse(secondResult)
+        assertTrue(secondResult)
         assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
         assertTrue(coordinator.restartQueue().isEmpty())
         assertFalse(coordinator.restartInProgress())
@@ -381,7 +381,7 @@ class RuntimeConfigRestartCoordinatorTest {
         }
         runCurrent()
         val secondRestart = launch {
-            assertFalse(coordinator.restartVpnIfRunning("second-request"))
+            assertTrue(coordinator.restartVpnIfRunning("second-request"))
         }
         runCurrent()
         allowRestartStart.complete(Unit)
@@ -418,7 +418,7 @@ class RuntimeConfigRestartCoordinatorTest {
         }
         runCurrent()
         val secondRestart = launch {
-            assertFalse(coordinator.restartVpnIfRunning("second-request"))
+            assertTrue(coordinator.restartVpnIfRunning("second-request"))
         }
         runCurrent()
         allowFirstStart.complete(Unit)
@@ -493,7 +493,7 @@ class RuntimeConfigRestartCoordinatorTest {
 
         val first = launch { assertTrue(coordinator.restartVpnIfRunning("first")) }
         runCurrent()
-        val second = launch { assertFalse(coordinator.restartVpnIfRunning("second")) }
+        val second = launch { assertTrue(coordinator.restartVpnIfRunning("second")) }
         runCurrent()
         allowStop.complete(Unit)
         runCurrent()
@@ -557,6 +557,16 @@ class RuntimeConfigRestartCoordinatorTest {
         assertTrue(coordinator.restartQueue().isEmpty())
         assertFalse(coordinator.restartInProgress())
         assertEquals(TunnelState.Connected(EngineId.SINGBOX, 2080), tunnelController.state.first())
+    }
+
+    @Test
+    fun `coalesced restart branch returns accepted so observer can advance baseline`() {
+        val source = readSource("src/main/java/ru/ozero/app/vpn/RuntimeConfigRestartCoordinator.kt")
+        val coalescedBlock = source.substringAfter("if (!shouldProcess)")
+            .substringBefore("var completed = false")
+
+        assertTrue(coalescedBlock.contains("return true"))
+        assertFalse(coalescedBlock.contains("return false"))
     }
 
     private fun coordinator(
