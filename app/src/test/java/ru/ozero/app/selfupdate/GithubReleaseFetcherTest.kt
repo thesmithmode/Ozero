@@ -36,6 +36,38 @@ class GithubReleaseFetcherTest {
     }
 
     @Test
+    fun parsesPositiveVersionCodeField() {
+        val json = """
+            {"tag_name":"v1.0.0","version_code":42,
+             "assets":[
+               {"name":"o.apk","browser_download_url":"https://example.com/o.apk"},
+               {"name":"o.apk.sig","browser_download_url":"https://example.com/o.apk.sig"}
+             ]}
+        """.trimIndent()
+
+        val r = fetcher.parse(json)
+
+        assertNotNull(r)
+        assertEquals(42L, r.versionCode)
+    }
+
+    @Test
+    fun parsesVersionCodeFromBodyWhenFieldIsMissingOrZero() {
+        val json = """
+            {"tag_name":"v1.0.0","version_code":0,"body":"notes\nversion_code: 77\nend",
+             "assets":[
+               {"name":"o.apk","browser_download_url":"https://example.com/o.apk"},
+               {"name":"o.apk.sig","browser_download_url":"https://example.com/o.apk.sig"}
+             ]}
+        """.trimIndent()
+
+        val r = fetcher.parse(json)
+
+        assertNotNull(r)
+        assertEquals(77L, r.versionCode)
+    }
+
+    @Test
     fun parsesPrereleaseFlag() {
         val json = """
             {"tag_name":"v0.3.0-rc1","prerelease":true,
@@ -75,6 +107,29 @@ class GithubReleaseFetcherTest {
             {"tag_name":"v1.0.0","assets":[
               {"name":"o-arm64.apk","browser_download_url":"https://e.com/a1.apk"},
               {"name":"o-x86.apk","browser_download_url":"https://e.com/a2.apk"},
+              {"name":"o.apk.sig","browser_download_url":"https://e.com/s.sig"}
+            ]}
+        """.trimIndent()
+        assertNull(fetcher.parse(json))
+    }
+
+    @Test
+    fun rejectsMultipleSignatures() {
+        val json = """
+            {"tag_name":"v1.0.0","assets":[
+              {"name":"o.apk","browser_download_url":"https://e.com/a.apk"},
+              {"name":"o.apk.sig","browser_download_url":"https://e.com/s1.sig"},
+              {"name":"o2.apk.sig","browser_download_url":"https://e.com/s2.sig"}
+            ]}
+        """.trimIndent()
+        assertNull(fetcher.parse(json))
+    }
+
+    @Test
+    fun rejectsNonHttpsDownloadUrls() {
+        val json = """
+            {"tag_name":"v1.0.0","assets":[
+              {"name":"o.apk","browser_download_url":"http://e.com/a.apk"},
               {"name":"o.apk.sig","browser_download_url":"https://e.com/s.sig"}
             ]}
         """.trimIndent()

@@ -155,6 +155,7 @@ class RawShareLinksParserEdgeTest {
         val json = """
             {
               "outbounds": [
+                "not-an-object",
                 { "type": "direct", "tag": "skip", "server": "skip.example.com" },
                 {
                   "type": "vless",
@@ -168,7 +169,21 @@ class RawShareLinksParserEdgeTest {
                   "tag": "keep-vmess",
                   "server": "vmess.example.com",
                   "server_port": 443,
-                  "uuid": "12345678-1234-1234-1234-123456789abc"
+                  "uuid": "12345678-1234-1234-1234-123456789abc",
+                  "transport": {
+                    "type": "xhttp",
+                    "path": "/x",
+                    "headers": { "Host": "front.example.com" },
+                    "max_early_data": 7,
+                    "early_data_header_name": "Early"
+                  },
+                  "tls": {
+                    "enabled": true,
+                    "server_name": "vmess-sni.example.com",
+                    "alpn": ["h2", "", "http/1.1"],
+                    "insecure": true,
+                    "utls": { "fingerprint": "firefox" }
+                  }
                 },
                 {
                   "type": "vless",
@@ -212,6 +227,18 @@ class RawShareLinksParserEdgeTest {
         assertEquals("VLESSBean", result[2]::class.simpleName)
         assertEquals("VLESSBean", result[3]::class.simpleName)
 
+        val vmess = result[1] as VMessBean
+        assertEquals("splithttp", vmess.type)
+        assertEquals("/x", vmess.path)
+        assertEquals("front.example.com", vmess.host)
+        assertEquals(7, vmess.maxEarlyData)
+        assertEquals("Early", vmess.earlyDataHeaderName)
+        assertEquals("tls", vmess.security)
+        assertEquals("vmess-sni.example.com", vmess.sni)
+        assertEquals("h2,http/1.1", vmess.alpn)
+        assertTrue(vmess.allowInsecure)
+        assertEquals("firefox", vmess.utlsFingerprint)
+
         val vlessNoUtls = result[2] as VLESSBean
         assertEquals("reality", vlessNoUtls.security)
         assertEquals("public-key", vlessNoUtls.realityPublicKey)
@@ -221,5 +248,46 @@ class RawShareLinksParserEdgeTest {
         val vlessRealityDisabled = result[3] as VLESSBean
         assertEquals("tls", vlessRealityDisabled.security)
         assertEquals("chrome", vlessRealityDisabled.realityFingerprint)
+    }
+
+    @Test
+    fun `should parse sing-box grpc transport and shadowsocks plugin fields`() {
+        val json = """
+            {
+              "outbounds": [
+                {
+                  "type": "trojan",
+                  "tag": "grpc-trojan",
+                  "server": "trojan.example.com",
+                  "server_port": 443,
+                  "password": "secret",
+                  "transport": {
+                    "type": "grpc",
+                    "service_name": "svc"
+                  }
+                },
+                {
+                  "type": "shadowsocks",
+                  "tag": "ss",
+                  "server": "ss.example.com",
+                  "server_port": 8388,
+                  "method": "aes-128-gcm",
+                  "password": "pwd",
+                  "plugin": "v2ray-plugin",
+                  "plugin_opts": "tls;host=front.example.com"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(json)
+
+        assertEquals(2, result.size)
+        val trojan = result[0] as TrojanBean
+        assertEquals("grpc", trojan.type)
+        assertEquals("svc", trojan.grpcServiceName)
+        val ss = result[1] as ShadowsocksBean
+        assertEquals("v2ray-plugin", ss.plugin)
+        assertEquals("tls;host=front.example.com", ss.pluginOpts)
     }
 }

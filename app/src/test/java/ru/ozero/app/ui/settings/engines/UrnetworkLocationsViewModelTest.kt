@@ -779,6 +779,134 @@ class UrnetworkLocationsViewModelTest {
         assertIs<UrnetworkSettingsUiState.NotConnected>(v.uiState.value)
     }
 
+    @Test
+    fun `isUrnetworkActive follows only URnetwork connecting and connected states`() = runTest {
+        val tunnel = idleTunnel()
+        val v = vm(tunnel = tunnel)
+        advanceUntilIdle()
+        assertEquals(false, v.isUrnetworkActive.value)
+
+        tunnel.onConnecting(ru.ozero.enginescore.EngineId.BYEDPI)
+        advanceUntilIdle()
+        assertEquals(false, v.isUrnetworkActive.value)
+
+        tunnel.onConnecting(ru.ozero.enginescore.EngineId.URNETWORK)
+        advanceUntilIdle()
+        assertEquals(true, v.isUrnetworkActive.value)
+
+        tunnel.onEngineStarted(ru.ozero.enginescore.EngineId.URNETWORK, 1080)
+        advanceUntilIdle()
+        assertEquals(true, v.isUrnetworkActive.value)
+
+        tunnel.onDisconnecting()
+        advanceUntilIdle()
+        assertEquals(false, v.isUrnetworkActive.value)
+    }
+
+    @Test
+    fun `stored region and city resolve to exact cached location`() = runTest {
+        val store = ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                byClientJwt = "test-jwt",
+                selectedLocation = UrnetworkLocationSelection(
+                    countryCode = "DE",
+                    region = "Bavaria",
+                    city = "Munich",
+                ),
+                cachedCountries = listOf(UrnetworkCachedLocation(name = "Germany", countryCode = "DE")),
+                cachedRegions = listOf(
+                    UrnetworkCachedLocation(name = "Bavaria", countryCode = "DE", region = "Bavaria"),
+                ),
+                cachedCities = listOf(
+                    UrnetworkCachedLocation(
+                        name = "Munich",
+                        countryCode = "DE",
+                        region = "Bavaria",
+                        city = "Munich",
+                    ),
+                ),
+            ),
+        )
+        val v = UrnetworkLocationsViewModel(
+            FakeUrnetworkBridge(deviceAvailable = true, initialLocation = null),
+            FakeSettingsRepo(),
+            store,
+            idleTunnel(),
+        )
+        advanceUntilIdle()
+
+        val state = assertIs<UrnetworkSettingsUiState.Ready>(awaitReadyState(v))
+        assertEquals("Bavaria", state.selectedLocation?.region)
+        assertEquals("Munich", state.selectedLocation?.city)
+    }
+
+    @Test
+    fun `ready config update keeps current sdk selected location`() = runTest {
+        val store = ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                byClientJwt = "test-jwt",
+                cachedCountries = listOf(UrnetworkCachedLocation(name = "Germany", countryCode = "DE")),
+            ),
+        )
+        val v = UrnetworkLocationsViewModel(
+            FakeUrnetworkBridge(deviceAvailable = true, initialLocation = FakeLocationToken("US")),
+            FakeSettingsRepo(),
+            store,
+            idleTunnel(),
+        )
+        advanceUntilIdle()
+        assertEquals("US", awaitReadyState(v).selectedLocation?.countryCode)
+
+        store.update {
+            it.copy(
+                selectedLocation = UrnetworkLocationSelection(countryCode = "DE", region = null, city = null),
+                cachedCountries = listOf(UrnetworkCachedLocation(name = "Germany", countryCode = "DE")),
+            )
+        }
+        advanceUntilIdle()
+
+        assertEquals("US", awaitReadyState(v).selectedLocation?.countryCode)
+    }
+
+    @Test
+    fun `inactive available device builds paused ready state without cache`() = runTest {
+        val tunnel = activeTunnel()
+        val v = UrnetworkLocationsViewModel(
+            FakeUrnetworkBridge(connected = false, deviceAvailable = true),
+            FakeSettingsRepo(),
+            fakeUrnetworkConfigStore(),
+            tunnel,
+        )
+        advanceUntilIdle()
+
+        tunnel.onDisconnecting()
+        advanceUntilIdle()
+
+        val state = assertIs<UrnetworkSettingsUiState.Ready>(v.uiState.value)
+        assertTrue(state.providePaused)
+        assertTrue(state.countries.isEmpty())
+    }
+
+    @Test
+    fun `switching indicator clears when peers appear before timeout`() = runTest {
+        val bridge = FakeUrnetworkBridge(
+            connected = true,
+            initialLocation = FakeLocationToken("US"),
+            peerCountValue = 1,
+        )
+        val v = vm(bridge = bridge, tunnel = activeTunnel())
+        runCurrent()
+
+        v.selectLocation(FakeLocationToken("DE"))
+        runCurrent()
+
+        assertEquals(true, v.switchingCountry.value)
+        advanceTimeBy(1_600L)
+        runCurrent()
+        assertEquals(false, v.switchingCountry.value)
+        assertTrue(bridge.peerCountCallCount.get() > 0)
+    }
+
     private suspend fun TestScope.awaitReadyState(v: UrnetworkLocationsViewModel): UrnetworkSettingsUiState.Ready {
         repeat(10) {
             val state = v.uiState.value

@@ -71,6 +71,7 @@ class ClashYamlParserBranchCoverageTest {
     fun `parse covers aliases defaults unknown types and shadowsocks map method`() {
         val yaml = """
             proxies:
+              - plain-string-entry
               - name: unsupported
                 type: tuic
                 server: tuic.example.com
@@ -80,10 +81,16 @@ class ClashYamlParserBranchCoverageTest {
                 server: alias.example.com
                 port: 443
                 uuid: uuid
-                net: h2
-                security: tls
+                net: xhttp
+                reality: 1
+                reality-opts:
+                  public-key: reality-key
+                  short-id: ab
                 servername: sni.example.com
                 client-fingerprint: chrome
+                httpupgrade-opts:
+                  path: /upgrade
+                  host: upgrade.example.com
               - name: shadowsocks-map-method
                 type: shadowsocks
                 server: ss.example.com
@@ -98,12 +105,47 @@ class ClashYamlParserBranchCoverageTest {
 
         assertEquals(2, parsed.size)
         val vless = parsed[0] as VLESSBean
-        assertEquals("http", vless.type)
-        assertEquals("tls", vless.security)
+        assertEquals("splithttp", vless.type)
+        assertEquals("reality", vless.security)
+        assertEquals("reality-key", vless.realityPublicKey)
+        assertEquals("ab", vless.realityShortId)
         assertEquals("sni.example.com", vless.sni)
         assertEquals("chrome", vless.realityFingerprint)
         val ss = parsed[1] as ShadowsocksBean
         assertEquals("aes-128-gcm", ss.method)
         assertEquals("secret", ss.password)
+    }
+
+    @Test
+    fun `parse infers httpupgrade transport and string fallback cipher map`() {
+        val yaml = """
+            proxies:
+              - name: upgrade
+                type: trojan
+                server: upgrade.example.com
+                port: 443
+                password: secret
+                httpupgrade-opts:
+                  path: /u
+                  host: front.example.com
+              - name: ss-map-fallback
+                type: ss
+                server: ss.example.com
+                port: 8388
+                cipher:
+                  mode: cfb
+                  rounds: 2
+                password: secret
+        """.trimIndent()
+
+        val parsed = ClashYamlParser.parse(yaml)
+
+        assertEquals(2, parsed.size)
+        val upgrade = parsed[0] as TrojanBean
+        assertEquals("httpupgrade", upgrade.type)
+        assertEquals("/u", upgrade.path)
+        assertEquals("front.example.com", upgrade.host)
+        val ss = parsed[1] as ShadowsocksBean
+        assertEquals("mode=cfb,rounds=2", ss.method)
     }
 }

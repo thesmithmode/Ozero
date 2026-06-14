@@ -64,6 +64,31 @@ class SingboxProbeServiceTest {
     }
 
     @Test
+    fun `probeAndAutoSelect marks corrupted bean as failed and never calls probe`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val corrupted = ProxyProfile(
+            id = 17L,
+            groupId = 1L,
+            name = "corrupted",
+            beanBlob = byteArrayOf(1, 2, 3),
+            protocolType = SingboxEngine.PROTOCOL_VLESS,
+        )
+        val probe = CountingProfileProbe()
+        val events = mutableListOf<Pair<Long, Boolean>>()
+
+        SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(listOf(corrupted)) { id, testing ->
+            events += id to testing
+        }
+
+        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[17L])
+        assertEquals(0, probe.calls.get())
+        assertTrue(events.isEmpty())
+        assertNull(prefsFlow.value[selectedProfileKey])
+    }
+
+    @Test
     fun `probeAndAutoSelect rejects tcp-only fake when routed probe fails`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
@@ -181,6 +206,25 @@ class SingboxProbeServiceTest {
     }
 
     @Test
+    fun `probeAndAutoSelect ignores negative latency when another profile succeeds`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val failed = makeProfile(id = 1L, host = "failed.example", port = 443)
+        val successful = makeProfile(id = 2L, host = "ok.example", port = 443)
+
+        SingboxProbeService(
+            dao,
+            dataStore,
+            FakeProfileProbe(mapOf("failed.example:443" to -5, "ok.example:443" to 33)),
+        ).probeAndAutoSelect(listOf(failed, successful))
+
+        assertEquals(-5, dao.latencies[1L])
+        assertEquals(33, dao.latencies[2L])
+        assertEquals(2L, prefsFlow.value[selectedProfileKey])
+    }
+
+    @Test
     fun `probeAndAutoSelect selects fastest successful profile and writes bean blob`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
@@ -278,6 +322,14 @@ class SingboxProbeServiceTest {
     private class TrackingProfileProbe : SingboxProfileProbe {
         override suspend fun probeLatencyMs(bean: AbstractBean): Int {
             delay(10)
+            return 1
+        }
+    }
+
+    private class CountingProfileProbe : SingboxProfileProbe {
+        val calls = AtomicInteger(0)
+        override suspend fun probeLatencyMs(bean: AbstractBean): Int {
+            calls.incrementAndGet()
             return 1
         }
     }
