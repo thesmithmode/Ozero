@@ -47,4 +47,17 @@ class AppLoggerTest {
         assertTrue(entries[1].message.contains("IllegalStateException: outer"))
         assertTrue(entries[1].message.contains("caused by IllegalArgumentException: inner"))
     }
+
+    @Test
+    fun `error throwable without cause omits caused by suffix`() {
+        val buffer = LogBuffer()
+        AppLogger.attach(buffer)
+
+        AppLogger.e("ErrorTag", "failed", IllegalStateException("outer"))
+
+        val entry = buffer.entries.value.single()
+        assertEquals(LogLevel.ERROR, entry.level)
+        assertTrue(entry.message.contains("IllegalStateException: outer"))
+        assertTrue(!entry.message.contains("caused by"))
+    }
 }
