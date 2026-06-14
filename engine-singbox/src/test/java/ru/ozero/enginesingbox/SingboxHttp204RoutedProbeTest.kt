@@ -28,7 +28,7 @@ class SingboxHttp204RoutedProbeTest {
 
     @Test
     fun `routed probe succeeds after HTTP 204 through SOCKS`() = runTest {
-        Socks204Server().use { socks ->
+        SocksHttpServer(statusCode = 204, reason = "No Content").use { socks ->
             val probe = SingboxHttp204RoutedProbe(
                 probeUrl = URL("http://127.0.0.1/generate_204"),
                 timeoutMs = 1_000,
@@ -37,6 +37,21 @@ class SingboxHttp204RoutedProbeTest {
             val latency = probe.probeLatencyMs(socks.port)
 
             assertTrue(latency >= 0)
+            assertTrue(socks.requestText.startsWith("GET /generate_204 "))
+        }
+    }
+
+    @Test
+    fun `routed probe rejects non 204 response through SOCKS`() = runTest {
+        SocksHttpServer(statusCode = 200, reason = "OK").use { socks ->
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("http://127.0.0.1/generate_204"),
+                timeoutMs = 1_000,
+            )
+
+            val latency = probe.probeLatencyMs(socks.port)
+
+            assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
             assertTrue(socks.requestText.startsWith("GET /generate_204 "))
         }
     }
@@ -58,7 +73,10 @@ class SingboxHttp204RoutedProbeTest {
         }
     }
 
-    private class Socks204Server : AutoCloseable {
+    private class SocksHttpServer(
+        private val statusCode: Int,
+        private val reason: String,
+    ) : AutoCloseable {
         private val server = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
         private val worker = thread(start = true, isDaemon = true) {
             runCatching {
@@ -97,7 +115,7 @@ class SingboxHttp204RoutedProbeTest {
 
             requestText = input.readHttpHeaders()
             output.write(
-                "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                "HTTP/1.1 $statusCode $reason\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
                     .toByteArray(StandardCharsets.US_ASCII),
             )
             output.flush()

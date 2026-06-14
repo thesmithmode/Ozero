@@ -111,7 +111,7 @@ class RealUrnetworkAuthService(
             }
         val api = space.api
             ?: return@withContext DeviceWalletJwtResult.Error("api null after runtime init")
-        val walletAuth = UrnetworkWalletAuthMapper.buildWalletAuth(identity)
+        val walletAuth = UrnetworkWalletAuthMapper.buildWalletAuth(identity)?.toSdkArgs()
             ?: return@withContext DeviceWalletJwtResult.Error("identity sign failed")
         when (val r = authLoginWithWallet(api, walletAuth)) {
             is LoginOutcome.Existing -> DeviceWalletJwtResult.Success(r.byJwt, isNewNetwork = false)
@@ -165,7 +165,7 @@ internal object UrnetworkWalletAuthMapper {
     suspend fun buildWalletAuth(
         identity: UrnetworkDeviceIdentity,
         encodeSignature: (ByteArray) -> String = { raw -> Base64.encodeToString(raw, Base64.NO_WRAP) },
-    ): WalletAuthArgs? {
+    ): WalletAuthPayload? {
         val pubkey = runCatching { identity.pubkeyBase58() }
             .getOrElse {
                 PersistentLoggers.warn(TAG, "identity.pubkeyBase58 threw: ${it.message}")
@@ -179,12 +179,12 @@ internal object UrnetworkWalletAuthMapper {
             PersistentLoggers.warn(TAG, "identity.sign threw: ${it.message}")
             return null
         }
-        return WalletAuthArgs().apply {
-            publicKey = pubkey
-            this.message = message
-            this.signature = signature
-            blockchain = WALLET_BLOCKCHAIN_SOLANA
-        }
+        return WalletAuthPayload(
+            publicKey = pubkey,
+            message = message,
+            signature = signature,
+            blockchain = WALLET_BLOCKCHAIN_SOLANA,
+        )
     }
 
     fun mapLoginOutcome(result: AuthLoginResult?, err: Exception?): LoginOutcome = when {
@@ -221,6 +221,20 @@ internal object UrnetworkWalletAuthMapper {
     const val WALLET_BLOCKCHAIN_SOLANA = "solana"
     const val WALLET_MESSAGE_PREFIX = "ozero-auth-v1:"
     private const val TAG = "RealUrnetworkAuthService"
+}
+
+internal data class WalletAuthPayload(
+    val publicKey: String,
+    val message: String,
+    val signature: String,
+    val blockchain: String,
+) {
+    fun toSdkArgs(): WalletAuthArgs = WalletAuthArgs().also {
+        it.publicKey = publicKey
+        it.message = message
+        it.signature = signature
+        it.blockchain = blockchain
+    }
 }
 
 internal sealed class LoginOutcome {

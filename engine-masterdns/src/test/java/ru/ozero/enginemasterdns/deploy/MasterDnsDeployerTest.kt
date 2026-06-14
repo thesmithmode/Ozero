@@ -504,6 +504,121 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `remove and continue clears credentials when connect fails`() = runTest {
+        transport.connectShouldFail = true
+        val creds = credentials("super_secret_p@ssw0rd")
+
+        val states = deployer.removeAmneziaDnsAndContinue(creds).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("connection_failed", error.message)
+        assertTrue(creds.password.all { it == '\u0000' })
+        assertTrue(transport.closeCalled)
+    }
+
+    @Test
+    fun `remove and continue stops when preflight fails after successful removal`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED)
+        transport.setResponse("sudo -K", MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_ALLOWED)
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("sudo_not_allowed", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("apt-get") })
+    }
+
+    @Test
+    fun `remove and continue stops when docker install fails after successful removal`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED)
+        transport.setResponse("apt-get", MasterDnsDockerScripts.MARKER_ERR_DOCKER)
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("docker_install_failed", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("Dockerfile") })
+    }
+
+    @Test
+    fun `remove and continue stops when post docker port check fails`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED)
+        transport.setResponses(
+            "bind_probe",
+            listOf(
+                MasterDnsDockerScripts.MARKER_PORT_FREE,
+                "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=docker:adguardhome",
+            ),
+        )
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        val portBusy = states.last() as MasterDnsDeployState.PortBusy
+        assertEquals("docker:adguardhome", portBusy.owner)
+        assertFalse(transport.executedCommands.any { it.contains("Dockerfile") })
+    }
+
+    @Test
+    fun `remove and continue stops when build fails after successful removal`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED)
+        transport.setResponse("Dockerfile", MasterDnsDockerScripts.MARKER_ERR_BUILD)
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("build_failed", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("docker exec masterdns-ozero cat") })
+    }
+
+    @Test
+    fun `remove and continue stops when key extraction fails after successful removal`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED)
+        transport.setResponse(readEncryptKeyCommand, "")
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("key_extraction_failed", error.message)
+    }
+
+    @Test
+    fun `malformed resources output maps missing numbers to insufficient resources`() = runTest {
+        transport.setResponse("free -m", "n/a")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("insufficient_resources", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("apt-get") })
+    }
+
+    @Test
+    fun `firewall ok marker completes without warning path`() = runTest {
+        transport.setResponse("ufw", "FW_OK")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        assertInstanceOf(MasterDnsDeployState.Done::class.java, states.last())
+    }
+
+    @Test
+    fun `long bin missing diagnostics are truncated and sanitized`() = runTest {
+        val longSecret = "x".repeat(900)
+        transport.setResponse(
+            "Dockerfile",
+            "ERR_BUILD|reason=bin_missing|password=$longSecret|token=$longSecret|candidate=/tmp/bin",
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertTrue(error.message.length < 780)
+        assertTrue(error.message.contains("password=<redacted>"))
+        assertTrue(error.message.contains("token=<redacted>"))
+        assertFalse(error.message.contains(longSecret))
+    }
+
+    @Test
     fun `should not include password in any executed command`() = runTest {
         val password = "super_secret_p@ssw0rd"
         deployer.deploy(credentials(password)).toList()

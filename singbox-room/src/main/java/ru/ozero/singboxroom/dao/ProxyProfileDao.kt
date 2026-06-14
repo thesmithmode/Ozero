@@ -33,9 +33,17 @@ interface ProxyProfileDao {
     @Query("DELETE FROM proxy_profiles WHERE groupId = :groupId")
     suspend fun deleteByGroupId(groupId: Long)
 
+    @Query("DELETE FROM proxy_profiles WHERE groupId = :groupId AND id NOT IN (:ids)")
+    suspend fun deleteByGroupIdExcept(groupId: Long, ids: List<Long>)
+
     @Transaction
     suspend fun replaceForGroup(groupId: Long, profiles: List<ProxyProfile>) {
-        deleteByGroupId(groupId)
+        val stableIds = profiles.mapNotNull { profile -> profile.id.takeIf { it != 0L } }
+        if (stableIds.isEmpty()) {
+            deleteByGroupId(groupId)
+        } else {
+            deleteByGroupIdExcept(groupId, stableIds)
+        }
         insertAll(profiles)
     }
 
