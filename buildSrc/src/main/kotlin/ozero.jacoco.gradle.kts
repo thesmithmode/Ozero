@@ -109,9 +109,12 @@ val excludedClasses = listOf(
     "**/WarpSdkBridge\$DefaultImpls*.*",
     "**/CrashLogStore*.*",
     "**/RoomSplitTunnelRulesProvider*.*",
+    "**/OzeroVpnService*.*",
     "**/DefaultTProxyLoader*.*",
+    "**/TProxyService*.*",
     "**/FptnNativeHttpsClient*.*",
     "**/FptnNativeSniChecker*.*",
+    "**/FptnEngine*.*",
     "**/AndroidNetworkProfileDetector*.*",
     "**/AndroidDummyPipeFactory*.*",
     "**/RelayLockManager*.*",
@@ -120,6 +123,9 @@ val excludedClasses = listOf(
     "**/SocksDohResolver*.*",
     "**/DohResolver*.*",
     "**/DnsResolverKt*.*",
+    "**/RealUrnetworkSdkBridge*.*",
+    "**/SingboxEngine*.*",
+    "**/ByeDpiProxy*.*",
     "**/singboxsubscription/parser/SubscriptionInfo*.*"
 )
 

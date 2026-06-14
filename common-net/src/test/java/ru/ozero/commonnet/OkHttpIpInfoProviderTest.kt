@@ -219,4 +219,67 @@ class OkHttpIpInfoProviderTest {
                 "на direct connect (это IP-leak). result=$result",
         )
     }
+
+    @Test
+    fun fetchFallsBackToSecondEndpointAndKeepsClock() = runTest {
+        server.enqueue(MockResponse().setResponseCode(500))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"ip":"5.5.5.5"}"""))
+        val fallbackProvider = OkHttpIpInfoProvider(
+            client = OkHttpClient(),
+            endpoints = listOf(server.url("/first").toString(), server.url("/second").toString()),
+            clock = { 123L },
+        )
+
+        val info = fallbackProvider.fetch().getOrThrow()
+
+        assertEquals("5.5.5.5", info.ip)
+        assertEquals(123L, info.fetchedAtMs)
+        assertEquals("/first", server.takeRequest().path)
+        assertEquals("/second", server.takeRequest().path)
+    }
+
+    @Test
+    fun fetchReturnsLastFailureWhenAllEndpointsFail() = runTest {
+        server.enqueue(MockResponse().setResponseCode(500))
+        server.enqueue(MockResponse().setResponseCode(404))
+        val fallbackProvider = OkHttpIpInfoProvider(
+            client = OkHttpClient(),
+            endpoints = listOf(server.url("/first").toString(), server.url("/second").toString()),
+        )
+
+        val result = fallbackProvider.fetch()
+
+        assertTrue(result.isFailure)
+        assertEquals("HTTP 404", result.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun emptyEndpointsFailFast() = runTest {
+        val emptyProvider = OkHttpIpInfoProvider(client = OkHttpClient(), endpoints = emptyList())
+
+        val thrown = kotlin.runCatching { emptyProvider.fetch() }.exceptionOrNull()
+
+        assertIs<IllegalArgumentException>(thrown)
+        assertEquals("endpoints list cannot be empty", thrown.message)
+    }
+
+    @Test
+    fun fetchViaHostWithNullPortUsesDirectClient() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"ip":"6.6.6.6"}"""))
+
+        val info = provider.fetchVia(socksHost = "127.0.0.1", socksPort = null).getOrThrow()
+
+        assertEquals("6.6.6.6", info.ip)
+    }
+
+    @Test
+    fun parsePrefersPrimaryCountryFieldsOverLegacyFields() {
+        val info = parse(
+            """{"ip":"1.2.3.4","country_name":"Primary","country":"Legacy","country_code":"PR","country_iso":"LG"}""",
+            7L,
+        )
+
+        assertEquals("Primary", info.country)
+        assertEquals("PR", info.countryCode)
+    }
 }

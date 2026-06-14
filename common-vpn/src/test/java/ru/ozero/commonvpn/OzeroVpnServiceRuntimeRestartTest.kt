@@ -47,7 +47,22 @@ class OzeroVpnServiceRuntimeRestartTest {
         assertTrue(restartBody.contains("val restartCancelled = runtimeConfigRestartCancelled.get()"))
         assertTrue(restartBody.contains("!restartCancelled"))
         assertTrue(restartBody.contains("runtimeConfigRestartCancelled.set(false)"))
-        assertTrue(restartBody.contains("if (restartCancelled)"))
         assertTrue(restartBody.contains("stopSelf(latestStartId.get())"))
+    }
+
+    @Test
+    fun `runtime restart stops service on every aborted relaunch path`() {
+        val restartBody = source
+            .substringAfter("private fun restartVpn()")
+            .substringBefore("private fun logActiveExternalVpn()")
+        val abortBody = restartBody.substringAfter("} else {")
+
+        assertTrue(abortBody.contains("runtimeConfigRestartInProgress.set(false)"))
+        assertTrue(abortBody.contains("runtimeConfigRestartCancelled.set(false)"))
+        assertTrue(abortBody.contains("stopSelf(latestStartId.get())"))
+        assertTrue(
+            !abortBody.contains("if (restartCancelled)"),
+            "stopSelf должен выполняться при любом abort restart: cancel, stopping или enterForeground=false",
+        )
     }
 }

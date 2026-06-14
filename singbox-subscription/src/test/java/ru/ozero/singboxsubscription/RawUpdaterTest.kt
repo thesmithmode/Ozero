@@ -534,6 +534,78 @@ class RawUpdaterTest {
     }
 
     @Test
+    fun `should preserve duplicate Shadowsocks ids by plugin when provider reorders rows`() = runBlocking {
+        val pluginA =
+            """
+            {
+              "outbounds": [
+                {
+                  "type": "shadowsocks",
+                  "tag": "Plugin A",
+                  "server": "ss-plugin.example.com",
+                  "server_port": 8388,
+                  "method": "aes-128-gcm",
+                  "password": "same-password",
+                  "plugin": "obfs-local",
+                  "plugin_opts": "obfs=http"
+                },
+                {
+                  "type": "shadowsocks",
+                  "tag": "Plugin B",
+                  "server": "ss-plugin.example.com",
+                  "server_port": 8388,
+                  "method": "aes-128-gcm",
+                  "password": "same-password",
+                  "plugin": "v2ray-plugin",
+                  "plugin_opts": "mode=websocket"
+                }
+              ]
+            }
+            """.trimIndent()
+        val pluginB =
+            """
+            {
+              "outbounds": [
+                {
+                  "type": "shadowsocks",
+                  "tag": "Plugin B",
+                  "server": "ss-plugin.example.com",
+                  "server_port": 8388,
+                  "method": "aes-128-gcm",
+                  "password": "same-password",
+                  "plugin": "v2ray-plugin",
+                  "plugin_opts": "mode=websocket"
+                },
+                {
+                  "type": "shadowsocks",
+                  "tag": "Plugin A",
+                  "server": "ss-plugin.example.com",
+                  "server_port": 8388,
+                  "method": "aes-128-gcm",
+                  "password": "same-password",
+                  "plugin": "obfs-local",
+                  "plugin_opts": "obfs=http"
+                }
+              ]
+            }
+            """.trimIndent()
+        server.enqueue(MockResponse().setBody(pluginA))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val firstByName = profileDao.profiles.associateBy { it.name }
+        val pluginAId = firstByName.getValue("Plugin A").id
+        val pluginBId = firstByName.getValue("Plugin B").id
+
+        server.enqueue(MockResponse().setBody(pluginB))
+        rawUpdater.refresh(g)
+        val secondByName = profileDao.profiles.associateBy { it.name }
+
+        assertEquals(pluginAId, secondByName.getValue("Plugin A").id)
+        assertEquals(pluginBId, secondByName.getValue("Plugin B").id)
+    }
+
+    @Test
     fun `should not match corrupted existing blob to incoming valid profile`() = runBlocking {
         server.enqueue(MockResponse().setBody(vless1))
         val g = group()

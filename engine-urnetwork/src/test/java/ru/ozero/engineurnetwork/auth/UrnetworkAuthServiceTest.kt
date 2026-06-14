@@ -77,6 +77,30 @@ class UrnetworkAuthServiceTest {
         assertTrue(err.message.contains("not implemented"))
     }
 
+    @Test
+    fun `DeviceWalletJwtResult Success carries jwt and new network flag`() {
+        val existing = DeviceWalletJwtResult.Success(byJwt = "wallet.jwt", isNewNetwork = false)
+        val created = DeviceWalletJwtResult.Success(byJwt = "created.jwt", isNewNetwork = true)
+
+        assertEquals("wallet.jwt", existing.byJwt)
+        assertEquals(false, existing.isNewNetwork)
+        assertEquals("created.jwt", created.byJwt)
+        assertEquals(true, created.isNewNetwork)
+    }
+
+    @Test
+    fun `UrnetworkDeviceIdentity defaults do not export or import seed`() = runTest {
+        val identity = object : UrnetworkDeviceIdentity {
+            override suspend fun pubkeyBase58(): String = "pub"
+            override suspend fun sign(message: ByteArray): ByteArray = message.reversedArray()
+        }
+
+        assertEquals(null, identity.exportSeedForBackup())
+        assertEquals(false, identity.importSeedFromBackup(byteArrayOf(1, 2, 3)))
+        assertEquals("pub", identity.pubkeyBase58())
+        assertEquals(listOf(3, 2, 1), identity.sign(byteArrayOf(1, 2, 3)).map { it.toInt() })
+    }
+
     private class FakeUrnetworkAuthService(
         private val jwt: String = "fake.jwt",
         private val clientJwt: String = "fake.cjwt",

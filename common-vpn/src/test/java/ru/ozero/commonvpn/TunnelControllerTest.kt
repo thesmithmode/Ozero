@@ -670,4 +670,101 @@ class TunnelControllerTest {
             "успешный старт старого движка не должен подменять UI state текущего движка",
         )
     }
+
+    @Test
+    fun targetedProbingAcceptsMatchingEngineOnly() {
+        controller.onProbing(EngineId.WARP)
+        controller.onConnecting(EngineId.WARP)
+
+        assertEquals(TunnelState.Connecting(EngineId.WARP), controller.state.value)
+    }
+
+    @Test
+    fun targetedProbingRejectsStaleEngineStartAndFailure() {
+        controller.onProbing(EngineId.URNETWORK)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onEngineDied(EngineId.BYEDPI, "old failure")
+
+        assertEquals(TunnelState.Probing(EngineId.URNETWORK), controller.state.value)
+    }
+
+    @Test
+    fun failedCanMoveToDisconnectingAndThenIdle() {
+        controller.onProbing()
+        controller.onEngineDied(EngineId.BYEDPI, "crash")
+        controller.onDisconnecting()
+
+        assertIs<TunnelState.Disconnecting>(controller.state.value)
+
+        controller.reset()
+
+        assertIs<TunnelState.Idle>(controller.state.value)
+    }
+
+    @Test
+    fun disconnectingCanMoveToFailedForOwnShutdownError() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onDisconnecting()
+        controller.onKillswitchEngaged(EngineId.BYEDPI, "shutdown failed")
+
+        val state = controller.state.value
+        assertIs<TunnelState.Failed>(state)
+        assertEquals("shutdown failed", state.reason)
+    }
+
+    @Test
+    fun switchingWithNullTargetClearsOnAnyConnectedEngine() {
+        controller.onSwitchingStarted(from = EngineId.BYEDPI, to = null)
+        assertNotNull(controller.switching.value)
+
+        controller.onProbing()
+        controller.onConnecting(EngineId.WARP)
+        controller.onEngineStarted(EngineId.WARP, 1080)
+
+        assertNull(controller.switching.value)
+    }
+
+    @Test
+    fun duplicateSwitchingFinishedOnNullMarkerIsNoOp() {
+        controller.onSwitchingFinished("already empty")
+        controller.onSwitchingFinished("still empty")
+
+        assertNull(controller.switching.value)
+    }
+
+    @Test
+    fun engineStartedResetsPreviousStatsAndStagnation() {
+        var clock = 1_000L
+        val mon = StatsStagnationMonitor(thresholdMs = 10L, nowMs = { clock })
+        val ctl = TunnelController(stagnationMonitor = mon)
+        ctl.onProbing()
+        ctl.onConnecting(EngineId.BYEDPI)
+        ctl.onEngineStarted(EngineId.BYEDPI, 1080)
+        ctl.updateStats(TunnelStats(0, 100, 0, 200, clock))
+        clock += 11L
+        ctl.updateStats(TunnelStats(0, 100, 0, 200, clock))
+        assertEquals(true, ctl.stagnant.value)
+
+        ctl.onDisconnecting()
+        ctl.reset()
+        ctl.onProbing()
+        ctl.onConnecting(EngineId.WARP)
+        ctl.onEngineStarted(EngineId.WARP, 1081)
+        ctl.updateStats(TunnelStats(0, 100, 0, 200, clock + 1))
+
+        assertEquals(false, ctl.stagnant.value)
+        assertEquals(0.0, ctl.stats.value?.bpsIn)
+        assertEquals(0.0, ctl.stats.value?.bpsOut)
+    }
+
+    @Test
+    fun invalidFailedToConnectedIsIgnored() {
+        controller.onProbing()
+        controller.onEngineDied(EngineId.BYEDPI, "crash")
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+
+        assertIs<TunnelState.Failed>(controller.state.value)
+    }
 }

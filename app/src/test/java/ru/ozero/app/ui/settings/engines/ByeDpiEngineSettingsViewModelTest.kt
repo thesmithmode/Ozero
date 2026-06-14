@@ -251,13 +251,13 @@ class ByeDpiEngineSettingsViewModelTest {
     @Test
     fun `model update does not overwrite unsaved useUiMode change`() = runTest(dispatcher) {
         advanceUntilIdle()
-        vm.onToggleUiMode(true)
-        repo.emit(SettingsModel.DEFAULT.copy(byedpiUseUiMode = false))
+        vm.onToggleUiMode(false)
+        repo.emit(SettingsModel.DEFAULT.copy(byedpiUseUiMode = true))
         advanceUntilIdle()
 
         val state = vm.uiState.value as ByeDpiSettingsUiState.Content
-        assertTrue(state.useUiMode)
-        assertFalse(state.savedUseUiMode)
+        assertFalse(state.useUiMode)
+        assertTrue(state.savedUseUiMode)
     }
 
     @Test

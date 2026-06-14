@@ -154,6 +154,80 @@ class WarpSettingsModelTest {
         assertFalse(hasRequiredFields(valid.copy(endpoint = "")))
         assertFalse(hasRequiredFields(valid.copy(addressV4 = "")))
     }
+
+    @Test
+    fun `buildNextWarpSlotName treats zero negative and padded names as used integers`() {
+        val slots = listOf(
+            slot(name = "Ozero-0"),
+            slot(name = "Ozero--1"),
+            slot(name = "Ozero-01"),
+            slot(name = "Ozero-2"),
+            slot(name = "Ozero- 3"),
+        )
+
+        assertEquals("Ozero-3", buildNextWarpSlotName(slots))
+    }
+
+    @Test
+    fun `parseDnsServers trims blanks and falls back to defaults`() {
+        assertEquals(listOf("1.1.1.1", "8.8.8.8"), parseDnsServers(" 1.1.1.1, ,8.8.8.8 "))
+        assertEquals(WarpConfig.DEFAULT_DNS, parseDnsServers(""))
+        assertEquals(WarpConfig.DEFAULT_DNS, parseDnsServers(" , , "))
+    }
+
+    @Test
+    fun `hasRequiredFields rejects whitespace-only required fields`() {
+        val valid = draftFromSlot(slot(config = sampleConfig()))
+
+        assertFalse(hasRequiredFields(valid.copy(privateKey = "   ")))
+        assertFalse(hasRequiredFields(valid.copy(peerPublicKey = "\t")))
+        assertFalse(hasRequiredFields(valid.copy(endpoint = "\n")))
+        assertFalse(hasRequiredFields(valid.copy(addressV4 = " ")))
+    }
+
+    @Test
+    fun `toWarpConfig maps all numeric draft fields`() {
+        val draft = draftFromSlot(slot(config = sampleConfig())).copy(
+            mtu = "1300",
+            keepalive = "25",
+            jc = "8",
+            jmin = "12",
+            jmax = "24",
+            s1 = "36",
+            s2 = "48",
+            h1 = "111",
+            h2 = "222",
+            h3 = "333",
+            h4 = "444",
+            doHProvider = DoHProvider.GOOGLE_8888,
+        )
+
+        val config = draft.toWarpConfig()
+
+        assertEquals(1300, config.mtu)
+        assertEquals(25, config.keepaliveSeconds)
+        assertEquals(8, config.awgParams.junkPacketCount)
+        assertEquals(12, config.awgParams.junkPacketMinSize)
+        assertEquals(24, config.awgParams.junkPacketMaxSize)
+        assertEquals(36, config.awgParams.initPacketJunkSize)
+        assertEquals(48, config.awgParams.responsePacketJunkSize)
+        assertEquals(111L, config.awgParams.initPacketMagicHeader)
+        assertEquals(222L, config.awgParams.responsePacketMagicHeader)
+        assertEquals(333L, config.awgParams.cookieReplyMagicHeader)
+        assertEquals(444L, config.awgParams.transportMagicHeader)
+        assertEquals(DoHProvider.GOOGLE_8888, config.doHProvider)
+    }
+
+    @Test
+    fun `draftFromConfig uses supplied slot id and name defaults`() {
+        val defaultDraft = draftFromConfig(sampleConfig())
+        val customDraft = draftFromConfig(sampleConfig(), slotId = "slot-9", name = "Custom")
+
+        assertEquals("", defaultDraft.slotId)
+        assertEquals("WARP", defaultDraft.name)
+        assertEquals("slot-9", customDraft.slotId)
+        assertEquals("Custom", customDraft.name)
+    }
 }
 
 class WarpConfParserTest {

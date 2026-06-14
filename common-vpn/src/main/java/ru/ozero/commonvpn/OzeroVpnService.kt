@@ -369,9 +369,7 @@ class OzeroVpnService : android.net.VpnService() {
             } else {
                 runtimeConfigRestartInProgress.set(false)
                 runtimeConfigRestartCancelled.set(false)
-                if (restartCancelled) {
-                    stopSelf(latestStartId.get())
-                }
+                stopSelf(latestStartId.get())
             }
         }
     }

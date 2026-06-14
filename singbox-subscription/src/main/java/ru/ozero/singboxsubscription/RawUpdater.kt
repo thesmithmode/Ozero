@@ -162,6 +162,10 @@ private fun AbstractBean.stableRuntimeKey(): String = when (this) {
         "flow=${flow.trim()}",
     ).joinToString("|")
     is StandardV2RayBean -> standardV2RayRuntimeKey()
+    is ShadowsocksBean -> listOf(
+        "plugin=${plugin.trim()}",
+        "pluginOpts=${pluginOpts.trim()}",
+    ).joinToString("|")
     else -> ""
 }
 

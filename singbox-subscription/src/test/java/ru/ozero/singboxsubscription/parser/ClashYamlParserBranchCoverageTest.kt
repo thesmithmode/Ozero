@@ -148,4 +148,79 @@ class ClashYamlParserBranchCoverageTest {
         val ss = parsed[1] as ShadowsocksBean
         assertEquals("mode=cfb,rounds=2", ss.method)
     }
+
+    @Test
+    fun `parse covers scalar alpn boolean false tls and numeric shadowsocks fields`() {
+        val yaml = """
+            proxies:
+              - name: vmess-scalar-alpn
+                type: vmess
+                server: vmess.example.com
+                port: 443
+                uuid: uuid
+                network: h2
+                tls: false
+                alpn: h2
+                skip-cert-verify: yes
+                fingerprint: firefox
+              - name: ss-number-cipher
+                type: ss
+                server: ss-number.example.com
+                port: 8388
+                cipher: 2022
+                password: 12345
+              - name: ss-boolean-cipher
+                type: ss
+                server: ss-bool.example.com
+                port: 8388
+                cipher: true
+                password: false
+        """.trimIndent()
+
+        val parsed = ClashYamlParser.parse(yaml)
+
+        assertEquals(3, parsed.size)
+        val vmess = parsed[0] as VMessBean
+        assertEquals("http", vmess.type)
+        assertEquals("none", vmess.security)
+        assertEquals("h2", vmess.alpn)
+        assertTrue(vmess.allowInsecure)
+        assertEquals("firefox", vmess.utlsFingerprint)
+        assertEquals("2022", (parsed[1] as ShadowsocksBean).method)
+        assertEquals("12345", (parsed[1] as ShadowsocksBean).password)
+        assertEquals("true", (parsed[2] as ShadowsocksBean).method)
+        assertEquals("false", (parsed[2] as ShadowsocksBean).password)
+    }
+
+    @Test
+    fun `parse covers explicit security and grpc direct serviceName aliases`() {
+        val yaml = """
+            proxies:
+              - name: vless-explicit-security
+                type: vless
+                server: vless.example.com
+                port: "443"
+                uuid: uuid
+                security: xtls
+                net: grpc
+                serviceName: direct-svc
+                allowInsecure: 1
+              - name: trojan-default-tls
+                type: trojan
+                server: trojan.example.com
+                port: 443
+                password: secret
+        """.trimIndent()
+
+        val parsed = ClashYamlParser.parse(yaml)
+
+        assertEquals(2, parsed.size)
+        val vless = parsed[0] as VLESSBean
+        assertEquals("xtls", vless.security)
+        assertEquals("grpc", vless.type)
+        assertEquals("direct-svc", vless.grpcServiceName)
+        assertTrue(vless.allowInsecure)
+        val trojan = parsed[1] as TrojanBean
+        assertEquals("tls", trojan.security)
+    }
 }

@@ -790,6 +790,8 @@ class UrnetworkLocationsViewModelTest {
         advanceUntilIdle()
         assertEquals(false, v.isUrnetworkActive.value)
 
+        tunnel.onProbing()
+        advanceUntilIdle()
         tunnel.onConnecting(ru.ozero.enginescore.EngineId.URNETWORK)
         advanceUntilIdle()
         assertEquals(true, v.isUrnetworkActive.value)
