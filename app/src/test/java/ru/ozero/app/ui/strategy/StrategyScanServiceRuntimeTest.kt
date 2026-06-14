@@ -4,11 +4,11 @@ import android.app.Application
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
-import androidx.test.core.app.ApplicationProvider
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -29,7 +29,7 @@ class StrategyScanServiceRuntimeTest {
 
     @Test
     fun `start command creates notification channel and stays non sticky`() {
-        val context = ApplicationProvider.getApplicationContext<Application>()
+        val context = RuntimeEnvironment.getApplication()
         val service = Robolectric.buildService(StrategyScanService::class.java).create().get()
 
         val result = service.onStartCommand(Intent(context, StrategyScanService::class.java), 0, 1)
@@ -41,7 +41,7 @@ class StrategyScanServiceRuntimeTest {
 
     @Test
     fun `stop action is non sticky and can be followed by destroy`() {
-        val context = ApplicationProvider.getApplicationContext<Application>()
+        val context = RuntimeEnvironment.getApplication()
         val service = Robolectric.buildService(StrategyScanService::class.java).create().get()
         val intent = Intent(context, StrategyScanService::class.java).setAction(StrategyScanService.ACTION_STOP)
 

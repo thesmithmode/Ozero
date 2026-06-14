@@ -111,7 +111,7 @@ class RealUrnetworkAuthService(
             }
         val api = space.api
             ?: return@withContext DeviceWalletJwtResult.Error("api null after runtime init")
-        val walletAuth = buildWalletAuth(identity)
+        val walletAuth = UrnetworkWalletAuthMapper.buildWalletAuth(identity)
             ?: return@withContext DeviceWalletJwtResult.Error("identity sign failed")
         when (val r = authLoginWithWallet(api, walletAuth)) {
             is LoginOutcome.Existing -> DeviceWalletJwtResult.Success(r.byJwt, isNewNetwork = false)
@@ -120,7 +120,49 @@ class RealUrnetworkAuthService(
         }
     }
 
-    private suspend fun buildWalletAuth(identity: UrnetworkDeviceIdentity): WalletAuthArgs? {
+    private suspend fun authLoginWithWallet(api: Api, walletAuth: WalletAuthArgs): LoginOutcome =
+        suspendCancellableCoroutine { cont ->
+            val args = AuthLoginArgs().apply { this.walletAuth = walletAuth }
+            val callback = AuthLoginCallback { result: AuthLoginResult?, err: Exception? ->
+                cont.resume(UrnetworkWalletAuthMapper.mapLoginOutcome(result, err))
+            }
+            try {
+                api.authLogin(args, callback)
+            } catch (t: Throwable) {
+                PersistentLoggers.error(TAG, "authLogin threw: ${t.message}")
+                cont.resume(LoginOutcome.Error(t.message ?: "API call failed"))
+            }
+        }
+
+    private suspend fun networkCreateWithWallet(
+        api: Api,
+        walletAuth: WalletAuthArgs,
+        networkName: String,
+    ): DeviceWalletJwtResult = suspendCancellableCoroutine { cont ->
+        val args = NetworkCreateArgs().apply {
+            userName = ""
+            this.networkName = networkName
+            terms = true
+            this.walletAuth = walletAuth
+        }
+        val callback = NetworkCreateCallback { result: NetworkCreateResult?, err: Exception? ->
+            cont.resume(UrnetworkWalletAuthMapper.mapCreateOutcome(result, err))
+        }
+        try {
+            api.networkCreate(args, callback)
+        } catch (t: Throwable) {
+            PersistentLoggers.error(TAG, "networkCreate(wallet) threw: ${t.message}")
+            cont.resume(DeviceWalletJwtResult.Error(t.message ?: "API call failed"))
+        }
+    }
+
+    private companion object {
+        const val TAG = "RealUrnetworkAuthService"
+    }
+}
+
+internal object UrnetworkWalletAuthMapper {
+    suspend fun buildWalletAuth(identity: UrnetworkDeviceIdentity): WalletAuthArgs? {
         val pubkey = runCatching { identity.pubkeyBase58() }
             .getOrElse {
                 PersistentLoggers.warn(TAG, "identity.pubkeyBase58 threw: ${it.message}")
@@ -142,21 +184,7 @@ class RealUrnetworkAuthService(
         }
     }
 
-    private suspend fun authLoginWithWallet(api: Api, walletAuth: WalletAuthArgs): LoginOutcome =
-        suspendCancellableCoroutine { cont ->
-            val args = AuthLoginArgs().apply { this.walletAuth = walletAuth }
-            val callback = AuthLoginCallback { result: AuthLoginResult?, err: Exception? ->
-                cont.resume(mapLoginOutcome(result, err))
-            }
-            try {
-                api.authLogin(args, callback)
-            } catch (t: Throwable) {
-                PersistentLoggers.error(TAG, "authLogin threw: ${t.message}")
-                cont.resume(LoginOutcome.Error(t.message ?: "API call failed"))
-            }
-        }
-
-    private fun mapLoginOutcome(result: AuthLoginResult?, err: Exception?): LoginOutcome = when {
+    fun mapLoginOutcome(result: AuthLoginResult?, err: Exception?): LoginOutcome = when {
         err != null -> LoginOutcome.Error(err.message ?: "authLogin failed")
         result == null -> LoginOutcome.Error("empty authLogin response")
         result.error != null -> LoginOutcome.Error(result.error?.message ?: "authLogin error")
@@ -171,29 +199,7 @@ class RealUrnetworkAuthService(
         }
     }
 
-    private suspend fun networkCreateWithWallet(
-        api: Api,
-        walletAuth: WalletAuthArgs,
-        networkName: String,
-    ): DeviceWalletJwtResult = suspendCancellableCoroutine { cont ->
-        val args = NetworkCreateArgs().apply {
-            userName = ""
-            this.networkName = networkName
-            terms = true
-            this.walletAuth = walletAuth
-        }
-        val callback = NetworkCreateCallback { result: NetworkCreateResult?, err: Exception? ->
-            cont.resume(mapCreateOutcome(result, err))
-        }
-        try {
-            api.networkCreate(args, callback)
-        } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "networkCreate(wallet) threw: ${t.message}")
-            cont.resume(DeviceWalletJwtResult.Error(t.message ?: "API call failed"))
-        }
-    }
-
-    private fun mapCreateOutcome(result: NetworkCreateResult?, err: Exception?): DeviceWalletJwtResult =
+    fun mapCreateOutcome(result: NetworkCreateResult?, err: Exception?): DeviceWalletJwtResult =
         when {
             err != null -> DeviceWalletJwtResult.Error(err.message ?: "networkCreate failed")
             result == null -> DeviceWalletJwtResult.Error("empty networkCreate response")
@@ -209,15 +215,13 @@ class RealUrnetworkAuthService(
             }
         }
 
-    private sealed class LoginOutcome {
-        data class Existing(val byJwt: String) : LoginOutcome()
-        object NeedCreate : LoginOutcome()
-        data class Error(val message: String) : LoginOutcome()
-    }
+    const val WALLET_BLOCKCHAIN_SOLANA = "solana"
+    const val WALLET_MESSAGE_PREFIX = "ozero-auth-v1:"
+    private const val TAG = "RealUrnetworkAuthService"
+}
 
-    private companion object {
-        const val TAG = "RealUrnetworkAuthService"
-        const val WALLET_BLOCKCHAIN_SOLANA = "solana"
-        const val WALLET_MESSAGE_PREFIX = "ozero-auth-v1:"
-    }
+internal sealed class LoginOutcome {
+    data class Existing(val byJwt: String) : LoginOutcome()
+    object NeedCreate : LoginOutcome()
+    data class Error(val message: String) : LoginOutcome()
 }
