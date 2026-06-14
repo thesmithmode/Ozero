@@ -15,6 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import ru.ozero.singboxroom.entity.ProxyProfile
+import ru.ozero.singboxroom.entity.ProxyChainStep
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 
 @RunWith(RobolectricTestRunner::class)
@@ -266,5 +267,50 @@ class ProxyProfileDaoTest {
 
         assertEquals(listOf(keptId), chainDao.getAll().map { it.profileId })
         assertNull(profileDao.getById(removedId))
+    }
+
+    @Test
+    fun `replaceForGroup should handle large stable id subscriptions without dropping chains`() = runBlocking {
+        val groupId = insertGroup()
+        val profileDao = db.proxyProfileDao()
+        val chainDao = db.proxyChainDao()
+        val ids = (1..1007).map { index ->
+            profileDao.insert(
+                ProxyProfile(
+                    groupId = groupId,
+                    name = "Old $index",
+                    beanBlob = byteArrayOf(index.toByte()),
+                    protocolType = 1,
+                    userOrder = index,
+                ),
+            )
+        }
+        val keptIds = ids.take(1005)
+        chainDao.insertAll(
+            listOf(
+                ProxyChainStep(profileId = keptIds.first(), userOrder = 0),
+                ProxyChainStep(profileId = keptIds[999], userOrder = 1),
+                ProxyChainStep(profileId = keptIds.last(), userOrder = 2),
+            ),
+        )
+
+        profileDao.replaceForGroup(
+            groupId,
+            keptIds.mapIndexed { index, id ->
+                ProxyProfile(
+                    id = id,
+                    groupId = groupId,
+                    name = "New ${index + 1}",
+                    beanBlob = byteArrayOf((index + 1).toByte()),
+                    protocolType = 1,
+                    userOrder = index,
+                )
+            },
+        )
+
+        assertEquals(1005, profileDao.countByGroupId(groupId))
+        assertNull(profileDao.getById(ids[1005]))
+        assertNull(profileDao.getById(ids[1006]))
+        assertEquals(listOf(keptIds.first(), keptIds[999], keptIds.last()), chainDao.getAll().map { it.profileId })
     }
 }
