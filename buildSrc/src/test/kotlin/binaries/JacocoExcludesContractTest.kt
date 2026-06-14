@@ -87,6 +87,7 @@ class JacocoExcludesContractTest {
             "BackupUrnetworkLocation",
             "RawUpdater",
             "HttpUrlConnectionClient",
+            "FptnEngine",
         ).forEach { className ->
             assertThat(jacocoScript)
                 .withFailMessage("$className is deterministic production logic and must stay in coverage gate.")

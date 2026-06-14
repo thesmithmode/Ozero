@@ -566,6 +566,33 @@ class RawUpdaterTest {
     }
 
     @Test
+    fun `should preserve duplicate VLESS ids by TLS and websocket runtime fields when provider reorders rows`() =
+        runBlocking {
+            val insecure =
+                "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup.example.com:443" +
+                    "?type=ws&security=tls&sni=dup.example.com&host=front.example.com" +
+                    "&path=/ws&allowInsecure=1&ed=16&eh=Sec-WebSocket-Protocol#Insecure"
+            val strict =
+                "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup.example.com:443" +
+                    "?type=ws&security=tls&sni=dup.example.com&host=front.example.com" +
+                    "&path=/ws&allowInsecure=0&ed=0&eh=Early#Strict"
+            server.enqueue(MockResponse().setBody("$insecure\n$strict"))
+            val g = group()
+
+            rawUpdater.refresh(g)
+            val firstByName = profileDao.profiles.associateBy { it.name }
+            val insecureId = firstByName.getValue("Insecure").id
+            val strictId = firstByName.getValue("Strict").id
+
+            server.enqueue(MockResponse().setBody("$strict\n$insecure"))
+            rawUpdater.refresh(g)
+            val secondByName = profileDao.profiles.associateBy { it.name }
+
+            assertEquals(insecureId, secondByName.getValue("Insecure").id)
+            assertEquals(strictId, secondByName.getValue("Strict").id)
+        }
+
+    @Test
     fun `should preserve duplicate Trojan ids by password when provider reorders rows`() = runBlocking {
         server.enqueue(MockResponse().setBody("$trojan1\n$trojan2"))
         val g = group()

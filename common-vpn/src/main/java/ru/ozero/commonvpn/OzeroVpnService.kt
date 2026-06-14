@@ -349,6 +349,10 @@ class OzeroVpnService : android.net.VpnService() {
     }
 
     private fun restartVpn() {
+        if (tunnelController.state.value is TunnelState.Idle) {
+            PersistentLoggers.warn(TAG, "restartVpn ignored because tunnel is idle")
+            return
+        }
         val shutdownStarted = stopping.compareAndSet(false, true)
         if (!shutdownStarted) return
         runtimeConfigRestartCancelled.set(false)

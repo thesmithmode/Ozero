@@ -127,7 +127,6 @@ val excludedClasses = listOf(
     "**/TProxyService*.*",
     "**/FptnNativeHttpsClient*.*",
     "**/FptnNativeSniChecker*.*",
-    "**/FptnEngine*.*",
     "**/AndroidNetworkProfileDetector*.*",
     "**/AndroidDummyPipeFactory*.*",
     "**/RelayLockManager*.*",
