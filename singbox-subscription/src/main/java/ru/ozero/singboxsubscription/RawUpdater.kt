@@ -157,7 +157,16 @@ private fun AbstractBean.stableCredentialKey(): String = when (this) {
 }
 
 private fun AbstractBean.stableRuntimeKey(): String = when (this) {
-    is StandardV2RayBean -> listOf(
+    is VLESSBean -> listOf(
+        standardV2RayRuntimeKey(),
+        "flow=${flow.trim()}",
+    ).joinToString("|")
+    is StandardV2RayBean -> standardV2RayRuntimeKey()
+    else -> ""
+}
+
+private fun StandardV2RayBean.standardV2RayRuntimeKey(): String =
+    listOf(
         "type=${type.trim()}",
         "security=${security.trim()}",
         "sni=${sni.trim()}",
@@ -174,5 +183,3 @@ private fun AbstractBean.stableRuntimeKey(): String = when (this) {
         "realityPublicKey=${realityPublicKey.trim()}",
         "realityShortId=${realityShortId.trim()}",
     ).joinToString("|")
-    else -> ""
-}

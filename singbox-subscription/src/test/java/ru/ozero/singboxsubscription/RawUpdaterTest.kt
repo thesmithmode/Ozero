@@ -464,4 +464,28 @@ class RawUpdaterTest {
         assertEquals(wsId, secondByName.getValue("WS").id)
         assertEquals(grpcId, secondByName.getValue("GRPC").id)
     }
+
+    @Test
+    fun `should preserve duplicate VLESS ids by flow when provider reorders rows`() = runBlocking {
+        val vision =
+            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup.example.com:443" +
+                "?type=tcp&security=reality&flow=xtls-rprx-vision&pbk=pub&sid=01#Vision"
+        val blankFlow =
+            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup.example.com:443" +
+                "?type=tcp&security=reality&pbk=pub&sid=01#Blank"
+        server.enqueue(MockResponse().setBody("$vision\n$blankFlow"))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val firstByName = profileDao.profiles.associateBy { it.name }
+        val visionId = firstByName.getValue("Vision").id
+        val blankId = firstByName.getValue("Blank").id
+
+        server.enqueue(MockResponse().setBody("$blankFlow\n$vision"))
+        rawUpdater.refresh(g)
+        val secondByName = profileDao.profiles.associateBy { it.name }
+
+        assertEquals(visionId, secondByName.getValue("Vision").id)
+        assertEquals(blankId, secondByName.getValue("Blank").id)
+    }
 }

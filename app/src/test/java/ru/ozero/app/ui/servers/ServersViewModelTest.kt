@@ -99,6 +99,21 @@ class ServersViewModelTest {
     }
 
     @Test
+    fun `content resolves selected entry exit and can save distinct pair`() = runTest {
+        dao.emit(sample)
+        advanceUntilIdle()
+
+        viewModel.onEntrySelect("a")
+        viewModel.onExitSelect("b")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value as ServersUiState.Content
+        assertEquals("a", state.entry?.id)
+        assertEquals("b", state.exit?.id)
+        assertTrue(state.canSave)
+    }
+
+    @Test
     fun `onSavePair upserts both entries with cross pairId`() = runTest {
         dao.emit(sample)
         advanceUntilIdle()
