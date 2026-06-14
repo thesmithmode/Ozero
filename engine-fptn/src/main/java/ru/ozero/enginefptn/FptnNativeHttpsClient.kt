@@ -1,8 +1,7 @@
 package ru.ozero.enginefptn
 
-class FptnNativeHttpsClient {
-
-    external fun nativeCreate(
+interface FptnHttpsClient {
+    fun nativeCreate(
         host: String,
         port: Int,
         sni: String,
@@ -10,11 +9,26 @@ class FptnNativeHttpsClient {
         censorshipStrategy: String,
     ): Long
 
-    external fun nativeDestroy(handle: Long)
+    fun nativeDestroy(handle: Long)
+    fun nativeGet(handle: Long, path: String, timeoutSeconds: Int): FptnNativeResponse
+    fun nativePost(handle: Long, path: String, body: String, timeoutSeconds: Int): FptnNativeResponse
+}
 
-    external fun nativeGet(handle: Long, path: String, timeoutSeconds: Int): FptnNativeResponse
+class FptnNativeHttpsClient : FptnHttpsClient {
 
-    external fun nativePost(
+    external override fun nativeCreate(
+        host: String,
+        port: Int,
+        sni: String,
+        md5Fingerprint: String,
+        censorshipStrategy: String,
+    ): Long
+
+    external override fun nativeDestroy(handle: Long)
+
+    external override fun nativeGet(handle: Long, path: String, timeoutSeconds: Int): FptnNativeResponse
+
+    external override fun nativePost(
         handle: Long,
         path: String,
         body: String,

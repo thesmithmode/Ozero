@@ -43,10 +43,9 @@ import java.util.Locale
 class FptnEngine(
     private val configStore: FptnConfigStore,
     private val onEngineFailed: (String) -> Unit = {},
+    private val wsClient: FptnWebSocketClient = FptnNativeWebSocket(),
+    private val httpsClient: FptnHttpsClient = FptnNativeHttpsClient(),
 ) : EnginePlugin, TunFdAcceptor {
-
-    private val wsClient = FptnNativeWebSocket()
-    private val httpsClient = FptnNativeHttpsClient()
 
     private val _stats = MutableStateFlow(EngineStats())
     private var tunScope: CoroutineScope? = null
@@ -147,11 +146,11 @@ class FptnEngine(
                 "n=${tokenData.servers.size} candidates=${candidates.size}",
         )
 
-        FptnNativeWebSocket.loadOnce()
-        if (!FptnNativeWebSocket.libraryLoaded) {
-            PersistentLoggers.error(TAG, "native lib load failed: ${FptnNativeWebSocket.loadError}")
+        wsClient.loadOnce()
+        if (!wsClient.libraryLoaded) {
+            PersistentLoggers.error(TAG, "native lib load failed: ${wsClient.loadError}")
             return StartResult.Failure(
-                "fptn_native_lib not loaded: ${FptnNativeWebSocket.loadError}"
+                "fptn_native_lib not loaded: ${wsClient.loadError}"
             )
         }
 

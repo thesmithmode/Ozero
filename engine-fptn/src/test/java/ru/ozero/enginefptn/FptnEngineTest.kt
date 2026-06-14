@@ -1,5 +1,6 @@
 package ru.ozero.enginefptn
 
+import android.os.ParcelFileDescriptor
 import android.util.Base64
 import io.mockk.every
 import io.mockk.mockkStatic
@@ -19,6 +20,7 @@ import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
 import java.io.File
+import java.io.FileOutputStream
 import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -167,6 +169,275 @@ class FptnEngineTest {
 
         val failure = assertIs<StartResult.Failure>(result)
         assertEquals(FptnEngine.FPTN_NO_SERVER_AVAILABLE, failure.reason)
+    }
+
+    @Test
+    fun `start authenticates selected server and exposes exit node after success`() = runTest {
+        val https = FakeHttpsClient(
+            postResponses = ArrayDeque(
+                listOf(FptnNativeResponse(200, """{"access_token":"access"}""", "")),
+            ),
+        )
+        engine = FptnEngine(store, wsClient = FakeWebSocketClient(), httpsClient = https)
+
+        val result = engine.start(
+            EngineConfig.Fptn(
+                token = "fptn:${validTokenB64(host = "127.0.0.1", countryCode = "de")}",
+                autoSelect = true,
+            ),
+            Upstream.None,
+        )
+
+        assertIs<StartResult.Success>(result)
+        assertEquals(listOf("127.0.0.1"), https.createdHosts)
+        assertEquals(listOf(1L), https.destroyedHandles)
+        val strategy = assertIs<ExitNodeStrategy.ProviderLabel>(engine.exitNodeStrategy(0))
+        assertEquals("127.0.0.1", strategy.ip)
+        assertEquals("DE", strategy.countryCode)
+    }
+
+    @Test
+    fun `start returns token rejected on terminal auth response`() = runTest {
+        engine = FptnEngine(
+            store,
+            wsClient = FakeWebSocketClient(),
+            httpsClient = FakeHttpsClient(
+                postResponses = ArrayDeque(listOf(FptnNativeResponse(401, "", "unauthorized"))),
+            ),
+        )
+
+        val result = engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64()}"), Upstream.None)
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals(FptnEngine.FPTN_TOKEN_REJECTED, failure.reason)
+    }
+
+    @Test
+    fun `start maps missing access token to api error`() = runTest {
+        engine = FptnEngine(
+            store,
+            wsClient = FakeWebSocketClient(),
+            httpsClient = FakeHttpsClient(
+                postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"ok":true}""", ""))),
+            ),
+        )
+
+        val result = engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64()}"), Upstream.None)
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals(FptnEngine.FPTN_API_ERROR, failure.reason)
+    }
+
+    @Test
+    fun `start maps non success auth response to api error and destroys handle`() = runTest {
+        val https = FakeHttpsClient(
+            postResponses = ArrayDeque(listOf(FptnNativeResponse(500, "", "server error"))),
+        )
+        engine = FptnEngine(store, wsClient = FakeWebSocketClient(), httpsClient = https)
+
+        val result = engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64()}"), Upstream.None)
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals(FptnEngine.FPTN_API_ERROR, failure.reason)
+        assertEquals(listOf(1L), https.destroyedHandles)
+    }
+
+    @Test
+    fun `start maps native post exception and continues to next auto candidate`() = runTest {
+        val https = FakeHttpsClient(
+            postFailures = ArrayDeque(listOf(IllegalStateException("timed out"))),
+            postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access-2"}""", ""))),
+        )
+        engine = FptnEngine(store, wsClient = FakeWebSocketClient(), httpsClient = https)
+
+        val result = engine.start(EngineConfig.Fptn(token = "fptn:${multiServerTokenB64()}"), Upstream.None)
+
+        assertIs<StartResult.Success>(result)
+        assertEquals(listOf("203.0.113.1", "127.0.0.1"), https.createdHosts)
+        assertEquals(listOf(1L, 2L), https.destroyedHandles)
+    }
+
+    @Test
+    fun `start tries next auto candidate after non terminal auth failure`() = runTest {
+        val https = FakeHttpsClient(
+            postResponses = ArrayDeque(
+                listOf(
+                    FptnNativeResponse(608, "", "timeout"),
+                    FptnNativeResponse(200, """{"access_token":"access-2"}""", ""),
+                ),
+            ),
+        )
+        engine = FptnEngine(store, wsClient = FakeWebSocketClient(), httpsClient = https)
+
+        val result = engine.start(
+            EngineConfig.Fptn(token = "fptn:${multiServerTokenB64()}"),
+            Upstream.None,
+        )
+
+        assertIs<StartResult.Success>(result)
+        assertEquals(listOf("203.0.113.1", "127.0.0.1"), https.createdHosts)
+    }
+
+    @Test
+    fun `start reports all candidates failed when auto auth never succeeds`() = runTest {
+        engine = FptnEngine(
+            store,
+            wsClient = FakeWebSocketClient(),
+            httpsClient = FakeHttpsClient(
+                postResponses = ArrayDeque(
+                    listOf(
+                        FptnNativeResponse(608, "", "timeout"),
+                        FptnNativeResponse(500, "", "server error"),
+                    ),
+                ),
+            ),
+        )
+
+        val result = engine.start(EngineConfig.Fptn(token = "fptn:${multiServerTokenB64()}"), Upstream.None)
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals("${FptnEngine.FPTN_ALL_CANDIDATES_FAILED}: ${FptnEngine.FPTN_API_ERROR}", failure.reason)
+    }
+
+    @Test
+    fun `start returns dns failure when authenticated host cannot resolve`() = runTest {
+        engine = FptnEngine(
+            store,
+            wsClient = FakeWebSocketClient(),
+            httpsClient = FakeHttpsClient(
+                postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
+            ),
+        )
+
+        val result = engine.start(
+            EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "invalid.invalid.invalid")}"),
+            Upstream.None,
+        )
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals(FptnEngine.FPTN_DNS_FAILED, failure.reason)
+    }
+
+    @Test
+    fun `attachTun fails when authenticated state has no resolved ip or access token`() = runTest {
+        engine.setPrivate("_currentServer", server("S1"))
+
+        val noIp = engine.attachTun(42)
+
+        assertEquals("No resolved server IP", assertIs<TunAttachResult.Failure>(noIp).reason)
+        engine.setPrivate("_currentServerIp", "127.0.0.1")
+
+        val noToken = engine.attachTun(42)
+
+        assertEquals("No access token", assertIs<TunAttachResult.Failure>(noToken).reason)
+    }
+
+    @Test
+    fun `attachTun starts websocket callbacks and stop tears native handle down`() = runTest {
+        val ws = FakeWebSocketClient()
+        val failures = mutableListOf<String>()
+        engine = FptnEngine(
+            store,
+            onEngineFailed = { failures += it },
+            wsClient = ws,
+            httpsClient = FakeHttpsClient(
+                postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
+            ),
+        )
+        assertIs<StartResult.Success>(
+            engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
+        )
+
+        val attach = engine.attachTun(detachedReadWriteFd())
+
+        assertIs<TunAttachResult.Success>(attach)
+        assertEquals(listOf("127.0.0.1"), ws.createdServerIps)
+        assertEquals(listOf("access"), ws.createdAccessTokens)
+        assertEquals(listOf(11L), ws.runHandles)
+        assertIs<EnginePlugin.ReadyResult.Ready>(engine.awaitReady())
+        ws.onOpen()
+        assertEquals(1, engine.stats().first().activeConnections)
+        ws.onMessage(byteArrayOf(1, 2, 3))
+        ws.onFailure()
+        assertEquals(listOf("fptn-ws-reconnect-exhausted"), failures)
+        assertEquals(0, engine.stats().first().activeConnections)
+
+        engine.stop()
+
+        assertEquals(listOf(11L), ws.stoppedHandles)
+        assertEquals(listOf(11L), ws.destroyedHandles)
+    }
+
+    @Test
+    fun `attachTun maps native create exception to attach failure`() = runTest {
+        val ws = FakeWebSocketClient(createFailure = IllegalStateException("create boom"))
+        engine = FptnEngine(
+            store,
+            wsClient = ws,
+            httpsClient = FakeHttpsClient(
+                postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
+            ),
+        )
+        assertIs<StartResult.Success>(
+            engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
+        )
+
+        val attach = engine.attachTun(detachedReadWriteFd())
+
+        val failure = assertIs<TunAttachResult.Failure>(attach)
+        assertTrue(failure.reason.contains("nativeCreate failed"))
+        assertEquals(emptyList(), ws.destroyedHandles)
+    }
+
+    @Test
+    fun `attachTun destroys handle when native run throws`() = runTest {
+        val ws = FakeWebSocketClient(runFailure = IllegalStateException("run boom"))
+        engine = FptnEngine(
+            store,
+            wsClient = ws,
+            httpsClient = FakeHttpsClient(
+                postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
+            ),
+        )
+        assertIs<StartResult.Success>(
+            engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
+        )
+
+        val attach = engine.attachTun(detachedReadWriteFd())
+
+        val failure = assertIs<TunAttachResult.Failure>(attach)
+        assertTrue(failure.reason.contains("nativeRun failed"))
+        assertEquals(listOf(11L), ws.destroyedHandles)
+    }
+
+    @Test
+    fun `start returns native library load failure before auth`() = runTest {
+        val https = FakeHttpsClient(
+            postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
+        )
+        engine = FptnEngine(
+            store,
+            wsClient = FakeWebSocketClient(libraryLoaded = false, loadError = "missing lib"),
+            httpsClient = https,
+        )
+
+        val result = engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64()}"), Upstream.None)
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertTrue(failure.reason.contains("not loaded"))
+        assertEquals(emptyList(), https.createdHosts)
+    }
+
+    @Test
+    fun `start maps native create exception and destroys no auth handle`() = runTest {
+        val https = FakeHttpsClient(createFailure = IllegalStateException("resolve failed"))
+        engine = FptnEngine(store, wsClient = FakeWebSocketClient(), httpsClient = https)
+
+        val result = engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64()}"), Upstream.None)
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals(FptnEngine.FPTN_DNS_FAILED, failure.reason)
+        assertEquals(emptyList(), https.destroyedHandles)
     }
 
     @Test
@@ -778,9 +1049,18 @@ class FptnEngineTest {
         assertEquals(false, FptnBypassMethod.REALITY_METHODS.contains(FptnBypassMethod.OBFUSCATION))
     }
 
-    private fun validTokenB64(): String {
+    private fun validTokenB64(host: String = "1.2.3.4", countryCode: String = ""): String {
         val json = """{"version":1,"username":"u","password":"p",
-            "servers":[{"name":"S1","host":"1.2.3.4","port":443}]}"""
+            "servers":[{"name":"S1","host":"$host","port":443,"countryCode":"$countryCode"}]}"""
+        return java.util.Base64.getEncoder().encodeToString(json.toByteArray())
+    }
+
+    private fun multiServerTokenB64(): String {
+        val json = """{"version":1,"username":"u","password":"p",
+            "servers":[
+              {"name":"S1","host":"203.0.113.1","port":443},
+              {"name":"S2","host":"127.0.0.1","port":443}
+            ]}"""
         return java.util.Base64.getEncoder().encodeToString(json.toByteArray())
     }
 
@@ -800,4 +1080,111 @@ class FptnEngineTest {
             md5Fingerprint = "",
             countryCode = "",
         )
+
+    private fun detachedReadWriteFd(): Int {
+        val file = File.createTempFile("fptn-engine-test", ".tun")
+        file.deleteOnExit()
+        FileOutputStream(file).use { it.write(byteArrayOf(0)) }
+        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_WRITE).detachFd()
+    }
+
+    private fun Any.setPrivate(name: String, value: Any?) {
+        val field = javaClass.getDeclaredField(name)
+        field.isAccessible = true
+        field.set(this, value)
+    }
+
+    private class FakeWebSocketClient(
+        override val libraryLoaded: Boolean = true,
+        override val loadError: String? = null,
+        private val createFailure: RuntimeException? = null,
+        private val runFailure: RuntimeException? = null,
+    ) : FptnWebSocketClient {
+        override var onOpen: () -> Unit = {}
+        override var onMessage: (ByteArray) -> Unit = {}
+        override var onFailure: () -> Unit = {}
+        var loadCalls = 0
+        val createdServerIps = mutableListOf<String>()
+        val createdAccessTokens = mutableListOf<String>()
+        val runHandles = mutableListOf<Long>()
+        val destroyedHandles = mutableListOf<Long>()
+        val stoppedHandles = mutableListOf<Long>()
+
+        override fun loadOnce() {
+            loadCalls++
+        }
+
+        override fun nativeCreate(
+            serverIp: String,
+            serverPort: Int,
+            tunIpv4: String,
+            tunIpv6: String,
+            sni: String,
+            accessToken: String,
+            md5Fingerprint: String,
+            censorshipStrategy: String,
+        ): Long {
+            createFailure?.let { throw it }
+            createdServerIps += serverIp
+            createdAccessTokens += accessToken
+            return 11L
+        }
+
+        override fun nativeDestroy(handle: Long) {
+            destroyedHandles += handle
+        }
+
+        override fun nativeRun(handle: Long): Boolean {
+            runFailure?.let { throw it }
+            runHandles += handle
+            return true
+        }
+
+        override fun nativeStop(handle: Long): Boolean {
+            stoppedHandles += handle
+            return true
+        }
+
+        override fun nativeSend(handle: Long, data: ByteArray, length: Long): Boolean = true
+        override fun nativeIsStarted(handle: Long): Boolean = true
+    }
+
+    private class FakeHttpsClient(
+        private val postResponses: ArrayDeque<FptnNativeResponse> = ArrayDeque(),
+        private val postFailures: ArrayDeque<RuntimeException> = ArrayDeque(),
+        private val createFailure: RuntimeException? = null,
+    ) : FptnHttpsClient {
+        val createdHosts = mutableListOf<String>()
+        val destroyedHandles = mutableListOf<Long>()
+        private var nextHandle = 1L
+
+        override fun nativeCreate(
+            host: String,
+            port: Int,
+            sni: String,
+            md5Fingerprint: String,
+            censorshipStrategy: String,
+        ): Long {
+            createFailure?.let { throw it }
+            createdHosts += host
+            return nextHandle++
+        }
+
+        override fun nativeDestroy(handle: Long) {
+            destroyedHandles += handle
+        }
+
+        override fun nativeGet(handle: Long, path: String, timeoutSeconds: Int): FptnNativeResponse =
+            error("GET is not used by FptnEngine auth")
+
+        override fun nativePost(
+            handle: Long,
+            path: String,
+            body: String,
+            timeoutSeconds: Int,
+        ): FptnNativeResponse {
+            if (postFailures.isNotEmpty()) throw postFailures.removeFirst()
+            return postResponses.removeFirst()
+        }
+    }
 }

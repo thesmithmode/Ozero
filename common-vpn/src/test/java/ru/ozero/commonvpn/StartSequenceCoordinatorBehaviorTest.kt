@@ -670,7 +670,7 @@ class StartSequenceCoordinatorBehaviorTest {
             every { fd } returns 100
             every { dup() } returns dupFd
         }
-        val builder = mockk<VpnService.Builder> {
+        val builder = mockk<VpnService.Builder>(relaxed = true) {
             every { establish() } returns tunFd
         }
         every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns builder

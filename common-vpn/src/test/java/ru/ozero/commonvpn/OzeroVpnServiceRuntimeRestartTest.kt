@@ -18,12 +18,14 @@ class OzeroVpnServiceRuntimeRestartTest {
         val commandBody = source
             .substringAfter("override fun onStartCommand")
             .substringBefore("private fun startVpn()")
-        assertTrue(commandBody.contains("ACTION_RESTART_RUNTIME_CONFIG -> restartVpn()"))
+        assertTrue(commandBody.contains("ACTION_RESTART_RUNTIME_CONFIG -> {"))
+        assertTrue(commandBody.contains("tunnelController.state.value is TunnelState.Idle"))
+        assertTrue(commandBody.contains("stopSelf(startId)"))
+        assertTrue(commandBody.contains("restartVpn()"))
 
         val restartBody = source
             .substringAfter("private fun restartVpn()")
             .substringBefore("private fun logActiveExternalVpn()")
-        assertTrue(restartBody.contains("tunnelController.state.value is TunnelState.Idle"))
         assertTrue(restartBody.contains("shutdownCoord.stopVpn(callStopSelf = false)"))
         assertTrue(restartBody.contains("if (!shutdownStarted) return"))
         assertTrue(restartBody.contains("runtimeConfigRestartInProgress.set(true)"))
@@ -70,15 +72,16 @@ class OzeroVpnServiceRuntimeRestartTest {
 
     @Test
     fun `runtime restart ignores stale intent after tunnel became idle`() {
-        val restartBody = source
-            .substringAfter("private fun restartVpn()")
-            .substringBefore("private fun logActiveExternalVpn()")
-        val idleGuard = restartBody.substringBefore("val shutdownStarted")
+        val commandBody = source
+            .substringAfter("override fun onStartCommand")
+            .substringBefore("private fun startVpn()")
+        val restartCommand = commandBody
+            .substringAfter("ACTION_RESTART_RUNTIME_CONFIG -> {")
+            .substringBefore("ACTION_START, null")
 
-        assertTrue(idleGuard.contains("tunnelController.state.value is TunnelState.Idle"))
-        assertTrue(idleGuard.contains("return"))
-        assertTrue(!idleGuard.contains("runtimeConfigRestartInProgress.set(true)"))
-        assertTrue(!idleGuard.contains("shutdownCoord.stopVpn(callStopSelf = false)"))
-        assertTrue(!idleGuard.contains("startVpn()"))
+        assertTrue(restartCommand.contains("tunnelController.state.value is TunnelState.Idle"))
+        assertTrue(restartCommand.contains("stopSelf(startId)"))
+        assertTrue(restartCommand.contains("} else {"))
+        assertTrue(restartCommand.contains("restartVpn()"))
     }
 }

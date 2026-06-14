@@ -168,7 +168,7 @@ class WarpRuntimeFingerprintTest {
 
         assertEquals(first, second)
         assertEquals(first.hashCode(), second.hashCode())
-        assertNotEquals(first, "same-digest")
+        assertTrue(first != "same-digest")
     }
 
     @Test

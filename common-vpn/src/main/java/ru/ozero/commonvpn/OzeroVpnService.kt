@@ -267,7 +267,14 @@ class OzeroVpnService : android.net.VpnService() {
             latestStartId.set(startId)
             when (intent?.action) {
                 ACTION_STOP -> stopVpn()
-                ACTION_RESTART_RUNTIME_CONFIG -> restartVpn()
+                ACTION_RESTART_RUNTIME_CONFIG -> {
+                    if (tunnelController.state.value is TunnelState.Idle) {
+                        PersistentLoggers.warn(TAG, "runtime config restart ignored because tunnel is idle")
+                        stopSelf(startId)
+                    } else {
+                        restartVpn()
+                    }
+                }
                 ACTION_START, null -> {
                     stopping.set(false)
                     startVpn()
@@ -349,10 +356,6 @@ class OzeroVpnService : android.net.VpnService() {
     }
 
     private fun restartVpn() {
-        if (tunnelController.state.value is TunnelState.Idle) {
-            PersistentLoggers.warn(TAG, "restartVpn ignored because tunnel is idle")
-            return
-        }
         val shutdownStarted = stopping.compareAndSet(false, true)
         if (!shutdownStarted) return
         runtimeConfigRestartCancelled.set(false)
