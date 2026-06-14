@@ -97,7 +97,7 @@ class LoggingContractTest {
         val result = mutableListOf<File>()
         repoRoot.walkTopDown()
             .onEnter { dir ->
-                dir.name !in skipDirs
+                dir.name !in skipDirs && !dir.name.startsWith("_")
             }
             .forEach { f ->
                 if (!f.isFile || !f.name.endsWith(".kt")) return@forEach

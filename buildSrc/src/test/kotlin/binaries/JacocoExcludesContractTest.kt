@@ -106,10 +106,18 @@ class JacocoExcludesContractTest {
 
     @Test
     fun `coverage thresholds stay at project policy minimum`() {
-        listOf("0.74", "0.59", "0.75", "0.64", "0.89", "0.68", "0.90", "0.88").forEach { threshold ->
-            assertThat(jacocoScript)
+        val thresholds = Regex("""CoverageThresholds\(BigDecimal\("([0-9.]+)"\), BigDecimal\("([0-9.]+)"\)\)""")
+            .findAll(jacocoScript)
+            .flatMap { match -> match.groupValues.drop(1) }
+            .map { it.toBigDecimal() }
+            .toList()
+        assertThat(thresholds)
+            .withFailMessage("coverage threshold declarations must be explicit and testable.")
+            .isNotEmpty()
+        thresholds.forEach { threshold ->
+            assertThat(threshold)
                 .withFailMessage("coverage threshold $threshold is below the repo minimum policy.")
-                .doesNotContain(threshold)
+                .isGreaterThanOrEqualTo("0.95".toBigDecimal())
         }
         assertThat(jacocoScript).contains("0.95")
     }

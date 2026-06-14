@@ -31,6 +31,14 @@ class RawUpdaterTest {
         "vless://bbbbbbbb-2222-2222-2222-bbbbbbbbbbbb@s2.example.com:443?type=tcp&security=none#S2"
     private val vless1RotatedRuntime =
         "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443?type=grpc&security=none#S1"
+    private val trojan1 =
+        "trojan://secret-one@tr.example.com:443?security=tls&sni=tr.example.com#Trojan1"
+    private val trojan2 =
+        "trojan://secret-two@tr.example.com:443?security=tls&sni=tr.example.com#Trojan2"
+    private val shadowsocks1 =
+        "ss://YWVzLTEyOC1nY206cGFzcy1vbmU@ss.example.com:8388#SS1"
+    private val shadowsocks2 =
+        "ss://YWVzLTEyOC1nY206cGFzcy10d28@ss.example.com:8388#SS2"
 
     @BeforeEach
     fun setUp() {
@@ -487,5 +495,62 @@ class RawUpdaterTest {
 
         assertEquals(visionId, secondByName.getValue("Vision").id)
         assertEquals(blankId, secondByName.getValue("Blank").id)
+    }
+
+    @Test
+    fun `should preserve duplicate Trojan ids by password when provider reorders rows`() = runBlocking {
+        server.enqueue(MockResponse().setBody("$trojan1\n$trojan2"))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val firstByName = profileDao.profiles.associateBy { it.name }
+        val firstId = firstByName.getValue("Trojan1").id
+        val secondId = firstByName.getValue("Trojan2").id
+
+        server.enqueue(MockResponse().setBody("$trojan2\n$trojan1"))
+        rawUpdater.refresh(g)
+        val secondByName = profileDao.profiles.associateBy { it.name }
+
+        assertEquals(firstId, secondByName.getValue("Trojan1").id)
+        assertEquals(secondId, secondByName.getValue("Trojan2").id)
+    }
+
+    @Test
+    fun `should preserve duplicate Shadowsocks ids by method and password when provider reorders rows`() = runBlocking {
+        server.enqueue(MockResponse().setBody("$shadowsocks1\n$shadowsocks2"))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val firstByName = profileDao.profiles.associateBy { it.name }
+        val firstId = firstByName.getValue("SS1").id
+        val secondId = firstByName.getValue("SS2").id
+
+        server.enqueue(MockResponse().setBody("$shadowsocks2\n$shadowsocks1"))
+        rawUpdater.refresh(g)
+        val secondByName = profileDao.profiles.associateBy { it.name }
+
+        assertEquals(firstId, secondByName.getValue("SS1").id)
+        assertEquals(secondId, secondByName.getValue("SS2").id)
+    }
+
+    @Test
+    fun `should not match corrupted existing blob to incoming valid profile`() = runBlocking {
+        server.enqueue(MockResponse().setBody(vless1))
+        val g = group()
+        profileDao.profiles.add(
+            ru.ozero.singboxroom.entity.ProxyProfile(
+                id = 501L,
+                groupId = g.id,
+                name = "Corrupted",
+                beanBlob = byteArrayOf(9, 8, 7),
+                protocolType = RawUpdater.PROTOCOL_VLESS,
+            ),
+        )
+
+        rawUpdater.refresh(g)
+
+        assertEquals(1, profileDao.profiles.size)
+        assertTrue(profileDao.profiles.none { it.id == 501L })
+        assertEquals("S1", profileDao.profiles.single().name)
     }
 }
