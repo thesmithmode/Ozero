@@ -83,4 +83,38 @@ class ByeDpiArgvValidatorTest {
         assertFalse(ByeDpiArgvValidator.isValid("-n \"\" -K"))
         assertTrue(ByeDpiArgvValidator.isValid("-n sub_domain.example-test.com -K"))
     }
+
+    @Test
+    fun `long option names reject uppercase underscore and bare double dash`() {
+        assertFalse(ByeDpiArgvValidator.isValid("--ttl_ms 8 -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("--Fake -1 -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-- -K"))
+    }
+
+    @Test
+    fun `detached long option values must satisfy option specific validation`() {
+        assertFalse(ByeDpiArgvValidator.isValid("--ttl abc -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("--fake +abc -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("--disorder -1+s -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("--split bad/value -K"))
+        assertTrue(ByeDpiArgvValidator.isValid("--ttl 0 --fake +1 --split 1+s --disorder 2+d -K"))
+    }
+
+    @Test
+    fun `short option values reject blank dangling and invalid modifier characters`() {
+        assertFalse(ByeDpiArgvValidator.isValid("-a"))
+        assertFalse(ByeDpiArgvValidator.isValid("-d @bad"))
+        assertFalse(ByeDpiArgvValidator.isValid("-e -next"))
+        assertFalse(ByeDpiArgvValidator.isValid("-f bad/value"))
+        assertTrue(ByeDpiArgvValidator.isValid("-a 1+s -d 2+d -e abc.def -f 204 -K"))
+    }
+
+    @Test
+    fun `compound short flags accept only documented characters`() {
+        assertTrue(ByeDpiArgvValidator.isValid("-Antrs,c -Ktuh, -Mhdr, -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-Aq -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-Kx -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-Mz -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-l 127.0.0.1 -K"))
+    }
 }

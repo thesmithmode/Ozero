@@ -161,6 +161,11 @@ private fun AbstractBean.stableRuntimeKey(): String = when (this) {
         standardV2RayRuntimeKey(),
         "flow=${flow.trim()}",
     ).joinToString("|")
+    is VMessBean -> listOf(
+        standardV2RayRuntimeKey(),
+        "alterId=$alterId",
+        "encryption=${encryption.trim()}",
+    ).joinToString("|")
     is StandardV2RayBean -> standardV2RayRuntimeKey()
     is ShadowsocksBean -> listOf(
         "plugin=${plugin.trim()}",

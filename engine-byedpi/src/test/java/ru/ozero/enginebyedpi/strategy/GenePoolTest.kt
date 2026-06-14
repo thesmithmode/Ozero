@@ -67,6 +67,15 @@ class GenePoolTest {
     }
 
     @Test
+    fun `blank only seed list uses K fallback vocabulary and block`() {
+        val pool = GenePool(listOf(" ", "\t"))
+
+        assertEquals(listOf("-K"), pool.allGenes().map { it.token })
+        assertEquals(listOf("-K"), pool.randomBlock(Random(0)).map { it.token })
+        assertEquals(listOf("-K"), pool.randomChromosome(1..1, Random(0)).map { it.token })
+    }
+
+    @Test
     fun `parseChromosome ignores extra spaces`() {
         val chromosome = parseChromosome("  -Ku  -An  ")
         assertEquals(2, chromosome.size)
@@ -82,6 +91,16 @@ class GenePoolTest {
             val gene = pool.weightedRandomGene(memory, kotlin.random.Random(it.toLong()))
             assertTrue(vocab.contains(gene.token), "weighted gene '${gene.token}' not in vocab")
         }
+    }
+
+    @Test
+    fun `weighted random block returns fallback block for blank only seeds`() {
+        val pool = GenePool(listOf(""))
+        val memory = GeneMemory(java.io.File.createTempFile("mem-block", ".json").also { it.deleteOnExit() })
+
+        val block = pool.weightedRandomBlock(memory, Random(0))
+
+        assertEquals(listOf("-K"), block.map { it.token })
     }
 
     @Test

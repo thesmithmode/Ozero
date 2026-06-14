@@ -498,6 +498,74 @@ class RawUpdaterTest {
     }
 
     @Test
+    fun `should preserve duplicate VMess ids by alter id and encryption when provider reorders rows`() = runBlocking {
+        val firstOrder =
+            """
+            {
+              "outbounds": [
+                {
+                  "type": "vmess",
+                  "tag": "VMess Auto",
+                  "server": "vmess-dup.example.com",
+                  "server_port": 443,
+                  "uuid": "cccccccc-3333-3333-3333-cccccccccccc",
+                  "alter_id": 0,
+                  "security": "auto"
+                },
+                {
+                  "type": "vmess",
+                  "tag": "VMess AES",
+                  "server": "vmess-dup.example.com",
+                  "server_port": 443,
+                  "uuid": "cccccccc-3333-3333-3333-cccccccccccc",
+                  "alter_id": 4,
+                  "security": "aes-128-gcm"
+                }
+              ]
+            }
+            """.trimIndent()
+        val secondOrder =
+            """
+            {
+              "outbounds": [
+                {
+                  "type": "vmess",
+                  "tag": "VMess AES",
+                  "server": "vmess-dup.example.com",
+                  "server_port": 443,
+                  "uuid": "cccccccc-3333-3333-3333-cccccccccccc",
+                  "alter_id": 4,
+                  "security": "aes-128-gcm"
+                },
+                {
+                  "type": "vmess",
+                  "tag": "VMess Auto",
+                  "server": "vmess-dup.example.com",
+                  "server_port": 443,
+                  "uuid": "cccccccc-3333-3333-3333-cccccccccccc",
+                  "alter_id": 0,
+                  "security": "auto"
+                }
+              ]
+            }
+            """.trimIndent()
+        server.enqueue(MockResponse().setBody(firstOrder))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val firstByName = profileDao.profiles.associateBy { it.name }
+        val autoId = firstByName.getValue("VMess Auto").id
+        val aesId = firstByName.getValue("VMess AES").id
+
+        server.enqueue(MockResponse().setBody(secondOrder))
+        rawUpdater.refresh(g)
+        val secondByName = profileDao.profiles.associateBy { it.name }
+
+        assertEquals(autoId, secondByName.getValue("VMess Auto").id)
+        assertEquals(aesId, secondByName.getValue("VMess AES").id)
+    }
+
+    @Test
     fun `should preserve duplicate Trojan ids by password when provider reorders rows`() = runBlocking {
         server.enqueue(MockResponse().setBody("$trojan1\n$trojan2"))
         val g = group()

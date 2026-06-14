@@ -150,4 +150,57 @@ class UrnetworkConfigModelCoverageTest {
         assertEquals("injected", store.snapshot.byJwt)
         assertFalse(store.snapshot.allowDirect)
     }
+
+    @Test
+    fun `location normalization accepts country-only and trims all location parts`() {
+        assertEquals(
+            UrnetworkLocationSelection("US", null, null),
+            UrnetworkLocationSelection(" us ", null, null).normalized(),
+        )
+        assertEquals(
+            UrnetworkLocationSelection("NL", "North Holland", "Amsterdam"),
+            UrnetworkLocationSelection(" nl ", " North Holland ", " Amsterdam ").normalized(),
+        )
+    }
+
+    @Test
+    fun `location summary keeps placeholders only for missing country`() {
+        assertEquals("??", UrnetworkLocationSelection(null, null, null).summary())
+        assertEquals("DE", UrnetworkLocationSelection("DE", null, null).summary())
+        assertEquals("DE/Bavaria", UrnetworkLocationSelection("DE", "Bavaria", null).summary())
+        assertEquals("DE/Munich", UrnetworkLocationSelection("DE", null, "Munich").summary())
+        assertEquals("??/Bavaria/Munich", UrnetworkLocationSelection(null, "Bavaria", "Munich").summary())
+    }
+
+    @Test
+    fun `setSelectedLocation clears blank region and city while keeping uppercase country`() = runTest {
+        val store = InMemoryUrnetworkConfigStore()
+
+        store.setSelectedLocation(UrnetworkLocationSelection(" br ", " ", "\t"))
+
+        assertEquals(UrnetworkLocationSelection("BR", null, null), store.selectedLocation().first())
+    }
+
+    @Test
+    fun `setSelectedLocation does not validate country length but normalized does`() = runTest {
+        val store = InMemoryUrnetworkConfigStore()
+
+        store.setSelectedLocation(UrnetworkLocationSelection(" usa ", null, null))
+
+        assertEquals(UrnetworkLocationSelection("USA", null, null), store.selectedLocation().first())
+        assertNull(store.selectedLocation().first().normalized())
+    }
+
+    @Test
+    fun `wallet address uses override only when non blank`() {
+        assertEquals(
+            UrnetworkDefaults.PRESET_WALLET,
+            UrnetworkConfig(walletOverride = "").walletAddress,
+        )
+        assertEquals(
+            UrnetworkDefaults.PRESET_WALLET,
+            UrnetworkConfig(walletOverride = "   ").walletAddress,
+        )
+        assertEquals("custom-wallet", UrnetworkConfig(walletOverride = "custom-wallet").walletAddress)
+    }
 }

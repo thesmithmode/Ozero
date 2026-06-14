@@ -178,6 +178,36 @@ class FptnTokenTest {
     }
 
     @Test
+    fun `country_code takes precedence over camel case countryCode`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"S","host":"h","port":1,"country_code":"de","countryCode":"br"}]}"""
+
+        val result = FptnToken.parse("fptn:${encode(json)}")
+
+        assertNotNull(result)
+        assertEquals("DE", result.servers.single().countryCode)
+    }
+
+    @Test
+    fun `blank country_code falls back to camel case countryCode`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"S","host":"h","port":1,"country_code":" ","countryCode":"br"}]}"""
+
+        val result = FptnToken.parse("fptn:${encode(json)}")
+
+        assertNotNull(result)
+        assertEquals("BR", result.servers.single().countryCode)
+    }
+
+    @Test
+    fun `should return null when server item is missing required host`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"S","port":1,"country_code":"de"}]}"""
+
+        assertNull(FptnToken.parse("fptn:${encode(json)}"))
+    }
+
+    @Test
     fun `toString should not expose username or password`() {
         val json = """{"username":"sensitive_user","password":"secret_pass",
             "servers":[{"name":"S","host":"h","port":1}]}"""
@@ -204,6 +234,15 @@ class FptnTokenTest {
     fun `readBounded returns content when within limit`() {
         val data = ByteArray(100) { it.toByte() }
         val result = FptnToken.readBounded(ByteArrayInputStream(data), 1024)
+        assertContentEquals(data, result)
+    }
+
+    @Test
+    fun `readBounded allows payload exactly at limit`() {
+        val data = ByteArray(128) { it.toByte() }
+
+        val result = FptnToken.readBounded(ByteArrayInputStream(data), 128)
+
         assertContentEquals(data, result)
     }
 

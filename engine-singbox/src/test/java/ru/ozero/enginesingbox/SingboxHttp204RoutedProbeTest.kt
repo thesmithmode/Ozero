@@ -16,6 +16,17 @@ import kotlin.test.assertTrue
 class SingboxHttp204RoutedProbeTest {
 
     @Test
+    fun `routed probe rejects non positive socks ports without opening connection`() = runTest {
+        val probe = SingboxHttp204RoutedProbe(
+            probeUrl = URL("http://127.0.0.1/generate_204"),
+            timeoutMs = 100,
+        )
+
+        assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, probe.probeLatencyMs(0))
+        assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, probe.probeLatencyMs(-1))
+    }
+
+    @Test
     fun `routed probe succeeds after HTTP 204 through SOCKS`() = runTest {
         Socks204Server().use { socks ->
             val probe = SingboxHttp204RoutedProbe(
