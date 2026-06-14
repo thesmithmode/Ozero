@@ -46,6 +46,17 @@ class BootDiagnosticsRuntimeTest {
     }
 
     @Test
+    fun `guardUnit runs successful block once`() {
+        val counter = AtomicInteger(0)
+
+        BootDiagnostics.guardUnit("unit-ok") {
+            counter.incrementAndGet()
+        }
+
+        assertEquals(1, counter.get())
+    }
+
+    @Test
     fun `installUncaughtHandler forwards throwable to crash sink and previous handler`() {
         val seen = mutableListOf<String>()
         val previous = Thread.UncaughtExceptionHandler { thread, throwable ->
@@ -113,5 +124,18 @@ class BootDiagnosticsRuntimeTest {
     @Test
     fun `signalToString falls back for unknown signal`() {
         assertEquals("signal=99", BootDiagnostics.signalToString(99))
+    }
+
+    @Test
+    fun `signalToString maps common fatal and stop signals`() {
+        assertEquals("SIGHUP", BootDiagnostics.signalToString(1))
+        assertEquals("SIGINT", BootDiagnostics.signalToString(2))
+        assertEquals("SIGQUIT", BootDiagnostics.signalToString(3))
+        assertEquals("SIGABRT", BootDiagnostics.signalToString(6))
+        assertEquals("SIGKILL", BootDiagnostics.signalToString(9))
+        assertEquals("SIGSEGV", BootDiagnostics.signalToString(11))
+        assertEquals("SIGPIPE", BootDiagnostics.signalToString(13))
+        assertEquals("SIGTERM", BootDiagnostics.signalToString(15))
+        assertEquals("SIGSTOP", BootDiagnostics.signalToString(19))
     }
 }
