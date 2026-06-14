@@ -1,12 +1,70 @@
 package ru.ozero.engineurnetwork.auth
 
+import android.app.Application
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
 class UrnetworkWalletAuthMapperTest {
+
+    private val mainDispatcher = UnconfinedTestDispatcher()
+
+    @BeforeEach
+    fun setUpMainDispatcher() {
+        Dispatchers.setMain(mainDispatcher)
+    }
+
+    @AfterEach
+    fun resetMainDispatcher() {
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `real auth service rejects blank client jwt before runtime init`() = runTest {
+        val service = RealUrnetworkAuthService(Application())
+
+        val result = service.acquireClientJwt("   ")
+
+        assertEquals("byJwt is blank", assertIs<ClientJwtResult.Error>(result).message)
+    }
+
+    @Test
+    fun `buildWalletAuth signs prefixed pubkey and fills wallet fields`() = runTest {
+        val signature = byteArrayOf(1, 2, 3, 4)
+        val identity = FakeIdentity(pubkey = "pub-key", signature = signature)
+
+        val auth = UrnetworkWalletAuthMapper.buildWalletAuth(
+            identity = identity,
+            encodeSignature = { raw -> "encoded:${raw.joinToString("-")}" },
+        )
+
+        assertEquals("pub-key", auth?.publicKey)
+        assertEquals("ozero-auth-v1:pub-key", auth?.message)
+        assertEquals("encoded:1-2-3-4", auth?.signature)
+        assertEquals("solana", auth?.blockchain)
+        assertEquals("ozero-auth-v1:pub-key", identity.signedMessage?.decodeToString())
+    }
+
+    @Test
+    fun `buildWalletAuth returns null when encoder throws`() = runTest {
+        val identity = FakeIdentity(pubkey = "pub-key", signature = byteArrayOf(1))
+
+        val auth = UrnetworkWalletAuthMapper.buildWalletAuth(
+            identity = identity,
+            encodeSignature = { error("encode failed") },
+        )
+
+        assertNull(auth)
+        assertEquals("ozero-auth-v1:pub-key", identity.signedMessage?.decodeToString())
+    }
 
     @Test
     fun `buildWalletAuth returns null when pubkey lookup throws`() = runTest {

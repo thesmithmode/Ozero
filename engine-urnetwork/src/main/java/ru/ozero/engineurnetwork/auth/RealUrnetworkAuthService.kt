@@ -162,7 +162,10 @@ class RealUrnetworkAuthService(
 }
 
 internal object UrnetworkWalletAuthMapper {
-    suspend fun buildWalletAuth(identity: UrnetworkDeviceIdentity): WalletAuthArgs? {
+    suspend fun buildWalletAuth(
+        identity: UrnetworkDeviceIdentity,
+        encodeSignature: (ByteArray) -> String = { raw -> Base64.encodeToString(raw, Base64.NO_WRAP) },
+    ): WalletAuthArgs? {
         val pubkey = runCatching { identity.pubkeyBase58() }
             .getOrElse {
                 PersistentLoggers.warn(TAG, "identity.pubkeyBase58 threw: ${it.message}")
@@ -171,7 +174,7 @@ internal object UrnetworkWalletAuthMapper {
         val message = WALLET_MESSAGE_PREFIX + pubkey
         val signature = runCatching {
             val raw = identity.sign(message.toByteArray(Charsets.UTF_8))
-            Base64.encodeToString(raw, Base64.NO_WRAP)
+            encodeSignature(raw)
         }.getOrElse {
             PersistentLoggers.warn(TAG, "identity.sign threw: ${it.message}")
             return null
