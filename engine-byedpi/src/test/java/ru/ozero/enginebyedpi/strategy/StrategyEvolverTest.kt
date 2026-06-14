@@ -296,6 +296,28 @@ class StrategyEvolverTest {
     }
 
     @Test
+    fun `mutate with empty memory falls back to random block`() {
+        val memory = GeneMemory(java.io.File.createTempFile("mem-empty", ".json").also { it.deleteOnExit() })
+        val chromosome = parseChromosome("-a -b -c")
+        val vocab = pool.allGenes().map { it.token }.toSet()
+
+        val mutated = evolver.mutate(chromosome, rate = 1f, random = Random(2), memory = memory)
+
+        assertTrue(mutated.isNotEmpty())
+        assertTrue(mutated.all { it.token in vocab })
+    }
+
+    @Test
+    fun `mutate can skip insert delete and swap gates`() {
+        val chromosome = parseChromosome("-a -b -c -d")
+
+        val results = (10..40).map { evolver.mutate(chromosome, rate = 0.4f, random = Random(it)) }
+
+        assertTrue(results.any { it.size == chromosome.size })
+        assertTrue(results.all { it.isNotEmpty() })
+    }
+
+    @Test
     fun `select returns top-k by fitness descending`() {
         val scored = listOf(
             parseChromosome("-a") to 0.5,
@@ -370,6 +392,19 @@ class StrategyEvolverTest {
         }
         val winnerCount = counts[winner] ?: 0
         assertTrue(winnerCount > 10, "winner should be selected frequently, got $winnerCount/50")
+    }
+
+    @Test
+    fun `tournament size larger than population uses whole population`() {
+        val scored = listOf(
+            parseChromosome("-low") to 0.1,
+            parseChromosome("-high") to 0.9,
+        )
+
+        val picked = evolver.tournament(scored, k = 1, tournamentSize = 10, random = Random(0))
+
+        assertEquals(1, picked.size)
+        assertTrue(picked.first().isNotEmpty())
     }
 
     @Test

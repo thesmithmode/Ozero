@@ -42,17 +42,22 @@ interface ProxyProfileDao {
     @Transaction
     suspend fun replaceForGroup(groupId: Long, profiles: List<ProxyProfile>) {
         val stableIds = profiles.mapNotNull { profile -> profile.id.takeIf { it != 0L } }
+        val existingIds = getIdsByGroupId(groupId).toHashSet()
         if (stableIds.isEmpty()) {
             deleteByGroupId(groupId)
         } else {
             val stableIdSet = stableIds.toHashSet()
-            getIdsByGroupId(groupId)
+            existingIds
                 .asSequence()
                 .filterNot { id -> id in stableIdSet }
                 .chunked(MAX_SQL_BIND_IDS)
                 .forEach { ids -> deleteByIds(ids) }
         }
-        insertAll(profiles)
+        val (existingProfiles, newProfiles) = profiles.partition { profile ->
+            profile.id != 0L && profile.id in existingIds
+        }
+        existingProfiles.forEach { profile -> update(profile) }
+        insertAll(newProfiles)
     }
 
     companion object {

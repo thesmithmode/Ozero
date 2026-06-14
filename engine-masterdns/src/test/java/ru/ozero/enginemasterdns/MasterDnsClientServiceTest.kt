@@ -131,6 +131,45 @@ class MasterDnsClientServiceTest {
     }
 
     @Test
+    fun `stop before start stays idle`(@TempDir tmp: Path) = runTest {
+        val service = makeService(tmp, FakeProcess(alive = true), StandardTestDispatcher(testScheduler))
+
+        service.stop()
+
+        assertEquals(MasterDnsClientState.Idle, service.state.first())
+    }
+
+    @Test
+    fun `writer throwable without message yields unknown error`(@TempDir tmp: Path) = runTest {
+        val workDir = File(tmp.toFile(), "masterdns")
+        val service = MasterDnsClientService(
+            workDirProvider = { workDir },
+            wrapperFactory = {
+                object : MasterDnsClientWrapperContract {
+                    override val binary: File = File("/tmp/libmdnsvpn.so")
+                    override fun startClient(
+                        configPath: String,
+                        resolversPath: String,
+                        logPath: String?,
+                        upstreamSocksUrl: String?,
+                    ): Process = FakeProcess(alive = true)
+                }
+            },
+            writer = object : MasterDnsConfigWriter(workDir) {
+                override fun write(runtime: MasterDnsRuntimeConfig): Files = throw UnknownMasterDnsWriterFailure()
+            },
+            startupCheckMs = 1,
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+        )
+
+        service.start(runtime())
+
+        val state = service.state.first { it is MasterDnsClientState.Error }
+        assertEquals("unknown error", (state as MasterDnsClientState.Error).message)
+        service.stop()
+    }
+
+    @Test
     fun `successive starts cancel prior job`(@TempDir tmp: Path) = runTest {
         val firstProcess = FakeProcess(alive = true)
         val secondProcess = FakeProcess(alive = true)
@@ -220,4 +259,6 @@ class MasterDnsClientServiceTest {
         }
         override fun isAlive(): Boolean = alive && !destroyed
     }
+
+    private class UnknownMasterDnsWriterFailure : RuntimeException(null as String?)
 }

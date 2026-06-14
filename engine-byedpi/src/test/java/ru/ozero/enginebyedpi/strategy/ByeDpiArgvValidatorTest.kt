@@ -106,6 +106,8 @@ class ByeDpiArgvValidatorTest {
         assertFalse(ByeDpiArgvValidator.isValid("-d @bad"))
         assertFalse(ByeDpiArgvValidator.isValid("-e -next"))
         assertFalse(ByeDpiArgvValidator.isValid("-f bad/value"))
+        assertFalse(ByeDpiArgvValidator.isValid("-m bad_value"))
+        assertFalse(ByeDpiArgvValidator.isValid("-o --next"))
         assertTrue(ByeDpiArgvValidator.isValid("-a 1+s -d 2+d -e abc.def -f 204 -K"))
     }
 
@@ -116,5 +118,107 @@ class ByeDpiArgvValidatorTest {
         assertFalse(ByeDpiArgvValidator.isValid("-Kx -K"))
         assertFalse(ByeDpiArgvValidator.isValid("-Mz -K"))
         assertFalse(ByeDpiArgvValidator.isValid("-l 127.0.0.1 -K"))
+    }
+
+    @Test
+    fun `placeholder braces reject both opening and closing markers`() {
+        assertFalse(ByeDpiArgvValidator.isValid("-n sni} -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-n {sni -K"))
+    }
+
+    @Test
+    fun `long option attached values reject invalid numeric and modifier forms`() {
+        assertFalse(ByeDpiArgvValidator.isValid("--fake=abc -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("--ttl=abc -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("--disorder=bad/value -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("--split=-1+s -K"))
+    }
+
+    @Test
+    fun `unknown long option with detached value is treated as standalone flag`() {
+        assertFalse(ByeDpiArgvValidator.isValid("--unknown value -K"))
+        assertTrue(ByeDpiArgvValidator.isValid("--unknown -K"))
+    }
+
+    @Test
+    fun `short token branches reject whitespace and invalid attached values`() {
+        assertFalse(ByeDpiArgvValidator.isValid("'-a 1' -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-p@bad -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-R/bad -K"))
+        assertTrue(ByeDpiArgvValidator.isValid("-l:127.0.0.1:1080 -K"))
+    }
+
+    @Test
+    fun `domain and integer validators cover signed unsigned and quoted edges`() {
+        assertTrue(ByeDpiArgvValidator.isValid("-n \"sub.example\" --fake -42 --ttl 42 -K"))
+        assertTrue(ByeDpiArgvValidator.isValid("-n host_name.example --ttl +42 --fake 0 -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-n .bad/slash -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-n -bad.example -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("--fake 1.5 -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("--ttl +abc -K"))
+    }
+
+    @Test
+    fun `attached value characters cover every allowed separator`() {
+        assertTrue(ByeDpiArgvValidator.isValid("-aA1-b+c:d,e.f -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-aA1_b -K"))
+    }
+
+    @Test
+    fun `validator covers remaining flag and value edge branches`() {
+        assertTrue(ByeDpiArgvValidator.isValid("-S -Y -K"))
+        assertTrue(ByeDpiArgvValidator.isValid("--custom=value -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("--custom= -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-A -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-K -M -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-l -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-a@ -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-n \"   \" -K"))
+        assertFalse(ByeDpiArgvValidator.isValid("-n bad?domain -K"))
+    }
+
+    @Test
+    fun `private validator primitives cover option parser branch matrix`() {
+        val flag = ByeDpiArgvValidator::class.java.getDeclaredMethod("isFlagToken", String::class.java).apply {
+            isAccessible = true
+        }
+        val longToken = ByeDpiArgvValidator::class.java
+            .getDeclaredMethod("isLongOptionToken", String::class.java)
+            .apply { isAccessible = true }
+        val valueValid = ByeDpiArgvValidator::class.java.getDeclaredMethod(
+            "isValueValid",
+            String::class.java,
+            String::class.java,
+        ).apply { isAccessible = true }
+        val detachedLong = ByeDpiArgvValidator::class.java.getDeclaredMethod(
+            "expectsDetachedLongValue",
+            String::class.java,
+        ).apply { isAccessible = true }
+        val valueChar = ByeDpiArgvValidator::class.java.getDeclaredMethod(
+            "isAttachedValueChar",
+            Char::class.javaPrimitiveType,
+        ).apply { isAccessible = true }
+
+        listOf("-K", "-S", "-Y", "-An", "-Kt", "-Mh", "-a", "-a1", "-l:127.0.0.1").forEach {
+            assertTrue(flag.invoke(ByeDpiArgvValidator, it) as Boolean, it)
+        }
+        listOf("-", "-A", "-Kx", "-M", "-l", "-a_", "-Q", "-Qr1", "-Mhz").forEach {
+            assertFalse(flag.invoke(ByeDpiArgvValidator, it) as Boolean, it)
+        }
+        assertFalse(flag.invoke(ByeDpiArgvValidator, "-a 1") as Boolean)
+        listOf("--a", "--abc", "--abc-1", "--abc=1").forEach {
+            assertTrue(longToken.invoke(ByeDpiArgvValidator, it) as Boolean, it)
+        }
+        listOf("--", "--A", "--abc_", "--abc=").forEach {
+            assertFalse(longToken.invoke(ByeDpiArgvValidator, it) as Boolean, it)
+        }
+        assertTrue(valueValid.invoke(ByeDpiArgvValidator, "--unknown", "value") as Boolean)
+        assertFalse(valueValid.invoke(ByeDpiArgvValidator, "--unknown", "") as Boolean)
+        assertTrue(detachedLong.invoke(ByeDpiArgvValidator, "--ttl") as Boolean)
+        assertFalse(detachedLong.invoke(ByeDpiArgvValidator, "--ttl=8") as Boolean)
+        listOf('a', '1', '-', '+', ':', ',', '.').forEach {
+            assertTrue(valueChar.invoke(ByeDpiArgvValidator, it) as Boolean, it.toString())
+        }
+        assertFalse(valueChar.invoke(ByeDpiArgvValidator, '_') as Boolean)
     }
 }

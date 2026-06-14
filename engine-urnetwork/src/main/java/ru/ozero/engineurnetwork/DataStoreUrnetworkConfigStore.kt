@@ -8,8 +8,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import org.json.JSONArray
-import org.json.JSONObject
 
 class DataStoreUrnetworkConfigStore(
     private val dataStore: DataStore<Preferences>,
@@ -71,27 +69,7 @@ class DataStoreUrnetworkConfigStore(
     private fun readLocationCache(raw: String?): List<UrnetworkCachedLocation> {
         if (raw.isNullOrBlank()) return emptyList()
         readLocationCacheLines(raw)?.let { return it }
-        return runCatching {
-            val arr = JSONArray(raw)
-            buildList {
-                for (i in 0 until arr.length()) {
-                    val obj = arr.optJSONObject(i) ?: continue
-                    val name = obj.optString("name").takeIf { it.isNotBlank() } ?: continue
-                    val code = obj.nullableString("code")?.takeIf { it.length == 2 } ?: continue
-                    add(
-                        UrnetworkCachedLocation(
-                            name = name,
-                            countryCode = code.uppercase(),
-                            region = obj.nullableString("region"),
-                            city = obj.nullableString("city"),
-                            providerCount = obj.optInt("providers", 0),
-                            isStable = obj.optBoolean("stable", true),
-                            isStrongPrivacy = obj.optBoolean("privacy", false),
-                        ),
-                    )
-                }
-            }
-        }.getOrDefault(emptyList())
+        return readLegacyJsonLocationCache(raw)
     }
 
     private fun writeLocationCache(items: List<UrnetworkCachedLocation>): String? {
@@ -174,8 +152,42 @@ private fun MutablePreferences.writeOrRemove(key: Preferences.Key<String>, value
     value?.takeIf { it.isNotBlank() }?.let { this[key] = it } ?: remove(key)
 }
 
-private fun JSONObject.nullableString(key: String): String? =
-    if (isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
+private fun readLegacyJsonLocationCache(raw: String): List<UrnetworkCachedLocation> {
+    if (!raw.trimStart().startsWith("[")) return emptyList()
+    return Regex("""\{[^{}]*}""")
+        .findAll(raw)
+        .mapNotNull { match ->
+            val obj = match.value
+            val name = obj.jsonString("name")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val code = obj.jsonString("code")?.takeIf { it.length == 2 } ?: return@mapNotNull null
+            UrnetworkCachedLocation(
+                name = name,
+                countryCode = code.uppercase(),
+                region = obj.jsonString("region")?.takeIf { it.isNotBlank() },
+                city = obj.jsonString("city")?.takeIf { it.isNotBlank() },
+                providerCount = obj.jsonInt("providers") ?: 0,
+                isStable = obj.jsonBoolean("stable") ?: true,
+                isStrongPrivacy = obj.jsonBoolean("privacy") ?: false,
+            )
+        }
+        .take(500)
+        .toList()
+}
+
+private fun String.jsonString(key: String): String? {
+    val match = Regex(""""$key"\s*:\s*(null|"([^"\\]|\\.)*")""").find(this) ?: return null
+    val raw = match.groupValues[1]
+    if (raw == "null") return null
+    return raw.removeSurrounding("\"")
+        .replace("\\\"", "\"")
+        .replace("\\\\", "\\")
+}
+
+private fun String.jsonInt(key: String): Int? =
+    Regex(""""$key"\s*:\s*(-?\d+)""").find(this)?.groupValues?.get(1)?.toIntOrNull()
+
+private fun String.jsonBoolean(key: String): Boolean? =
+    Regex(""""$key"\s*:\s*(true|false)""").find(this)?.groupValues?.get(1)?.toBooleanStrictOrNull()
 
 private fun String.escapeCacheField(): String =
     replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n")

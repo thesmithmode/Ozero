@@ -54,4 +54,15 @@ class MasterDnsPortAllocatorTest {
         val port = allocator.allocate(19005)
         assertEquals(19005, port)
     }
+
+    @Test
+    fun `busy desired inside custom range falls back to next free port`() {
+        ServerSocket(0).use { busy ->
+            val range = busy.localPort..(busy.localPort + 1)
+
+            val port = MasterDnsPortAllocator(range).allocate(busy.localPort)
+
+            assertEquals(busy.localPort + 1, port)
+        }
+    }
 }

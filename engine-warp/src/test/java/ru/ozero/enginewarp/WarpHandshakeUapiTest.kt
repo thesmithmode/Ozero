@@ -14,6 +14,14 @@ class WarpHandshakeUapiTest {
     }
 
     @Test
+    fun `check returns false when socket file exists but local socket connect fails`(@TempDir tmp: File) {
+        val sockets = File(tmp, "sockets").apply { mkdirs() }
+        File(sockets, "ozero-warp.sock").createNewFile()
+
+        assertEquals(false, WarpHandshakeUapi.check(tmp.absolutePath, "ozero-warp"))
+    }
+
+    @Test
     fun `findUapiSocket предпочитает preferred имя если exists`(@TempDir tmp: File) {
         val sockets = File(tmp, "sockets").apply { mkdirs() }
         File(sockets, "ozero-warp.sock").createNewFile()

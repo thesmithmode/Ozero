@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
-import ru.ozero.enginescore.EnginePreflight
 import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
@@ -109,6 +108,22 @@ class MasterDnsEngineTest {
         val result = engine.start(masterDnsConfig(), Upstream.None)
         assertTrue(result is StartResult.Failure) { "got=$result" }
         assertEquals("boom", (result as StartResult.Failure).reason)
+    }
+
+    @Test
+    fun `start with service unexpected idle terminal returns Failure`() = runTest {
+        val service = IdleTerminalService()
+        val engine = MasterDnsEngine(
+            serviceFactory = { service },
+            portAllocator = StubAllocator(18000),
+            startTimeoutMs = 50,
+        )
+
+        val result = engine.start(masterDnsConfig(), Upstream.None)
+
+        assertTrue(result is StartResult.Failure) { "got=$result" }
+        assertTrue((result as StartResult.Failure).reason.contains("timeout"))
+        assertTrue(service.stopped)
     }
 
     @Test
@@ -209,11 +224,20 @@ class MasterDnsEngineTest {
     }
 
     @Test
+    fun `exitNodeStrategy ignores negative supplied port`() = runTest {
+        val engine = makeEngine(service = FakeService())
+
+        val strategy = engine.exitNodeStrategy(-1)
+
+        assertTrue(strategy is ExitNodeStrategy.Unavailable)
+    }
+
+    @Test
     fun `preflight returns MasterDnsPreflight`() {
         val engine = makeEngine(service = FakeService())
         val pf = engine.preflight()
         assertNotNull(pf)
-        assertTrue(pf is EnginePreflight)
+        assertTrue(pf.javaClass.simpleName.contains("MasterDnsPreflight"))
     }
 
     @Test
@@ -345,6 +369,17 @@ class MasterDnsEngineTest {
         override fun start(runtime: MasterDnsRuntimeConfig) {
             flow.value = MasterDnsClientState.Starting
         }
+        override fun stop() {
+            stopped = true
+            flow.value = MasterDnsClientState.Idle
+        }
+    }
+
+    private class IdleTerminalService : MasterDnsClientServiceContract {
+        var stopped: Boolean = false
+        private val flow = MutableStateFlow<MasterDnsClientState>(MasterDnsClientState.Idle)
+        override val state: StateFlow<MasterDnsClientState> = flow.asStateFlow()
+        override fun start(runtime: MasterDnsRuntimeConfig) = Unit
         override fun stop() {
             stopped = true
             flow.value = MasterDnsClientState.Idle

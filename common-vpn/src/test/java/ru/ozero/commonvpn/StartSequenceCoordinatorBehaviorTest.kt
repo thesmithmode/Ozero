@@ -1169,8 +1169,10 @@ class StartSequenceCoordinatorBehaviorTest {
 
         override suspend fun probe(): ProbeResult = ProbeResult.Success(1L)
         override fun stats(): Flow<EngineStats> = emptyFlow()
-        override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.ByeDpi(socksPort = socksPort)
-        override fun buildProxyConfig(settings: SettingsModel?): EngineConfig = EngineConfig.ByeDpi(socksPort = socksPort)
+        override fun buildManualConfig(settings: SettingsModel?): EngineConfig =
+            EngineConfig.ByeDpi(socksPort = socksPort)
+        override fun buildProxyConfig(settings: SettingsModel?): EngineConfig =
+            EngineConfig.ByeDpi(socksPort = socksPort)
         override suspend fun tunSpec(): TunSpec = TunSpec(
             sessionName = "ThrowingTunEngine",
             mtu = 1500,

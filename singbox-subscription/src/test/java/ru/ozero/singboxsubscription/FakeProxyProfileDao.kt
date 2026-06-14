@@ -36,6 +36,14 @@ class FakeProxyProfileDao : ProxyProfileDao {
         profiles.removeAll { it.groupId == groupId }
     }
 
+    override suspend fun getIdsByGroupId(groupId: Long): List<Long> =
+        profiles.filter { it.groupId == groupId }.map { it.id }
+
+    override suspend fun deleteByIds(ids: List<Long>) {
+        val idSet = ids.toSet()
+        profiles.removeAll { it.id in idSet }
+    }
+
     override suspend fun updateLatency(id: Long, latency: Int) {
         val idx = profiles.indexOfFirst { it.id == id }
         if (idx >= 0) profiles[idx] = profiles[idx].copy(latencyMs = latency)

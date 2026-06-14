@@ -1,6 +1,5 @@
 package ru.ozero.enginefptn
 
-import android.os.ParcelFileDescriptor
 import android.util.Base64
 import io.mockk.every
 import io.mockk.mockkStatic
@@ -19,8 +18,9 @@ import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileOutputStream
 import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -343,12 +343,13 @@ class FptnEngineTest {
             httpsClient = FakeHttpsClient(
                 postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
             ),
+            tunIo = fakeTunIo(),
         )
         assertIs<StartResult.Success>(
             engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
         )
 
-        val attach = engine.attachTun(detachedReadWriteFd())
+        val attach = engine.attachTun(DETACHED_READ_WRITE_FD)
 
         assertIs<TunAttachResult.Success>(attach)
         assertEquals(listOf("127.0.0.1"), ws.createdServerIps)
@@ -377,12 +378,13 @@ class FptnEngineTest {
             httpsClient = FakeHttpsClient(
                 postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
             ),
+            tunIo = fakeTunIo(),
         )
         assertIs<StartResult.Success>(
             engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
         )
 
-        val attach = engine.attachTun(detachedReadWriteFd())
+        val attach = engine.attachTun(DETACHED_READ_WRITE_FD)
 
         val failure = assertIs<TunAttachResult.Failure>(attach)
         assertTrue(failure.reason.contains("nativeCreate failed"))
@@ -398,12 +400,13 @@ class FptnEngineTest {
             httpsClient = FakeHttpsClient(
                 postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
             ),
+            tunIo = fakeTunIo(),
         )
         assertIs<StartResult.Success>(
             engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
         )
 
-        val attach = engine.attachTun(detachedReadWriteFd())
+        val attach = engine.attachTun(DETACHED_READ_WRITE_FD)
 
         val failure = assertIs<TunAttachResult.Failure>(attach)
         assertTrue(failure.reason.contains("nativeRun failed"))
@@ -1081,12 +1084,19 @@ class FptnEngineTest {
             countryCode = "",
         )
 
-    private fun detachedReadWriteFd(): Int {
-        val file = File.createTempFile("fptn-engine-test", ".tun")
-        file.deleteOnExit()
-        FileOutputStream(file).use { it.write(byteArrayOf(0)) }
-        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_WRITE).detachFd()
+    private companion object {
+        const val DETACHED_READ_WRITE_FD = 42
     }
+
+    private fun fakeTunIo(): FptnTunIo =
+        object : FptnTunIo {
+            override fun open(tunFd: Int): FptnTunStreams =
+                FptnTunStreams(
+                    pfd = null,
+                    input = ByteArrayInputStream(ByteArray(0)),
+                    output = ByteArrayOutputStream(),
+                )
+        }
 
     private fun Any.setPrivate(name: String, value: Any?) {
         val field = javaClass.getDeclaredField(name)

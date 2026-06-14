@@ -76,4 +76,42 @@ class LogSanitizerTest {
         assertFalse(sanitized.contains("abcdefghijklmnopqrstuvwxyzABCDEF0123456789"))
         assertFalse(sanitized.contains("abcdEFGHijklMNOPqrstUVWXyz012345"))
     }
+
+    @Test
+    fun `sanitize preserves long alphabetic identifiers but redacts digit or separator tokens`() {
+        val identifier = "EngineRuntimeConfigRestartObserverLongIdentifier"
+        val withDigit = "abcdefghijklmnopqrstuvwxyzABCDEF012345"
+        val withSeparator = "abcdefghijklmnopqrstuvwxyzABCDEF_ghijkl"
+
+        val sanitized = LogSanitizer.sanitize("$identifier $withDigit $withSeparator")
+
+        assertTrue(sanitized.contains(identifier))
+        assertEquals(2, Regex("<redacted-token>").findAll(sanitized).count())
+        assertFalse(sanitized.contains(withDigit))
+        assertFalse(sanitized.contains(withSeparator))
+    }
+
+    @Test
+    fun `sanitize redacts separator-only long token variants`() {
+        val tokens = listOf(
+            "abcdefghijklmnopqrstuvwxyzABCDEF+",
+            "abcdefghijklmnopqrstuvwxyzABCDEF/",
+            "abcdefghijklmnopqrstuvwxyzABCDEF-",
+            "abcdefghijklmnopqrstuvwxyzABCDEF=",
+        )
+
+        val sanitized = LogSanitizer.sanitize(tokens.joinToString(" "))
+
+        assertEquals(tokens.size, Regex("<redacted-token>").findAll(sanitized).count())
+        tokens.forEach { assertFalse(sanitized.contains(it)) }
+    }
+
+    @Test
+    fun `sanitize redacts long alphabetic keyed values`() {
+        val value = "abcdefghijklmnopqrstuvwxyzABCDEFGH"
+
+        val sanitized = LogSanitizer.sanitize("class=$value")
+
+        assertEquals("class=<redacted-token>", sanitized)
+    }
 }

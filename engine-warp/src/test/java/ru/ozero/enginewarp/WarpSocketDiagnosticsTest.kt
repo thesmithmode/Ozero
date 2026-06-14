@@ -14,11 +14,34 @@ class WarpSocketDiagnosticsTest {
         File(tmp, "wireguard").mkdirs()
         File(tmp, "sockets/a.sock").writeText("")
         File(tmp, "wireguard/b.sock").writeText("")
+        File(tmp, "root.sock").writeText("")
 
         val result = WarpSocketDiagnostics.listSocketCandidates(tmp.absolutePath)
 
+        assertContains(result, "sockets")
+        assertContains(result, "wireguard")
+        assertContains(result, "root.sock")
         assertContains(result, "[sockets/]={a.sock}")
         assertContains(result, "[wireguard/]={b.sock}")
+    }
+
+    @Test
+    fun `listSocketCandidates reports absent nested directories`(@TempDir tmp: File) {
+        val result = WarpSocketDiagnostics.listSocketCandidates(tmp.absolutePath)
+
+        assertContains(result, "[sockets/]={absent}")
+        assertContains(result, "[wireguard/]={absent}")
+    }
+
+    @Test
+    fun `listSocketCandidates reports empty when nested listFiles is null`(@TempDir tmp: File) {
+        File(tmp, "sockets").writeText("not a directory")
+        File(tmp, "wireguard").writeText("not a directory")
+
+        val result = WarpSocketDiagnostics.listSocketCandidates(tmp.absolutePath)
+
+        assertContains(result, "[sockets/]={empty}")
+        assertContains(result, "[wireguard/]={empty}")
     }
 
     @Test

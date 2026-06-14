@@ -1,3 +1,5 @@
+@file:Suppress("LargeClass")
+
 package ru.ozero.enginemasterdns.deploy
 
 import kotlinx.coroutines.flow.toList
@@ -185,6 +187,17 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `structured port busy with missing proto or address falls back to raw generic error`() = runTest {
+        transport.setResponse("bind_probe", "PORT_BUSY|proto=|addr=|owner=dnsmasq")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("port_53_busy|proto=|addr=|owner=dnsmasq", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("apt-get") })
+    }
+
+    @Test
     fun `legacy port busy marker maps to generic port error without details`() = runTest {
         transport.setResponse("bind_probe", MasterDnsDockerScripts.MARKER_PORT_BUSY)
 
@@ -221,6 +234,21 @@ class MasterDnsDeployerTest {
         assertEquals("docker:adguardhome", portBusy.owner)
         assertFalse(transport.executedCommands.any { it.contains("Dockerfile") })
         assertFalse(transport.executedCommands.any { it.contains("docker run -d") })
+    }
+
+    @Test
+    fun `post docker amnezia dns conflict stops before build`() = runTest {
+        transport.setResponses(
+            "docker inspect amnezia-dns",
+            listOf("", "AMNEZIA_DNS_CONFLICT|proto=udp|addr=0.0.0.0:53"),
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val conflict = states.last() as MasterDnsDeployState.AmneziaDnsConflict
+        assertEquals("udp", conflict.protocol)
+        assertEquals("0.0.0.0:53", conflict.address)
+        assertFalse(transport.executedCommands.any { it.contains("Dockerfile") })
     }
 
     @Test
@@ -371,6 +399,16 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `bin missing reason without marker line uses compact bin missing error`() = runTest {
+        transport.setResponse("Dockerfile", "some log\nreason=bin_missing\nmore log")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("build_failed/bin_missing", error.message)
+    }
+
+    @Test
     fun `should return Error when container run fails`() = runTest {
         transport.setResponse("docker run -d", MasterDnsDockerScripts.MARKER_ERR_RUN)
 
@@ -399,6 +437,16 @@ class MasterDnsDeployerTest {
     @Test
     fun `run error marker with blank details maps to compact run failed`() = runTest {
         transport.setResponse("docker run -d", "${MasterDnsDockerScripts.MARKER_ERR_RUN}|")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("run_failed", error.message)
+    }
+
+    @Test
+    fun `run failure without marker maps to compact run failed`() = runTest {
+        transport.setResponse("docker run -d", "container exited before marker")
 
         val states = deployer.deploy(credentials()).toList()
 
@@ -593,8 +641,28 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `both resources below threshold stop before docker install`() = runTest {
+        transport.setResponse("free -m", "1 1")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("insufficient_resources", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("apt-get") })
+    }
+
+    @Test
     fun `firewall ok marker completes without warning path`() = runTest {
         transport.setResponse("ufw", "FW_OK")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        assertInstanceOf(MasterDnsDeployState.Done::class.java, states.last())
+    }
+
+    @Test
+    fun `firewall none marker is non fatal`() = runTest {
+        transport.setResponse("ufw", MasterDnsDockerScripts.MARKER_FW_NONE_OK)
 
         val states = deployer.deploy(credentials()).toList()
 
@@ -723,4 +791,48 @@ class MasterDnsDeployerTest {
         deployer.undeploy(creds).toList()
         assertTrue(creds.password.all { it == '\u0000' }, "password must be wiped after connect failure")
     }
+
+    @Test
+    fun `private deploy mappers cover malformed and fallback marker branches`() {
+        val parsePortBusy = deployerMethod("parsePortBusy", String::class.java)
+        val parseConflict = deployerMethod("parseAmneziaDnsConflict", String::class.java)
+        val markerValue = deployerMethod("markerValue", String::class.java, String::class.java)
+        val mapSudo = deployerMethod("mapSudoResult", String::class.java)
+        val mapBuild = deployerMethod("mapBuildError", String::class.java)
+        val mapRun = deployerMethod("mapRunError", String::class.java)
+        val mapPort = deployerMethod("mapPortResult", String::class.java)
+        val buildToml = deployerMethod("buildClientToml", String::class.java, String::class.java)
+
+        assertEquals(null, parsePortBusy.invoke(null, "ok"))
+        assertEquals(null, parsePortBusy.invoke(null, "PORT_BUSY|proto=udp|addr=0.0.0.0|owner="))
+        val busy = parsePortBusy.invoke(null, "noise\nPORT_BUSY|proto=UDP|addr=0.0.0.0:53|name=dnsmasq")
+            as MasterDnsDeployState.PortBusy
+        assertEquals("udp", busy.protocol)
+        assertEquals("dnsmasq", busy.owner)
+
+        assertEquals(null, parseConflict.invoke(null, "no conflict"))
+        val conflict = parseConflict.invoke(null, "AMNEZIA_DNS_CONFLICT|proto=tcp|addr=127.0.0.1:53")
+            as MasterDnsDeployState.AmneziaDnsConflict
+        assertEquals("tcp", conflict.protocol)
+        assertEquals("127.0.0.1:53", conflict.address)
+        assertEquals("value", markerValue.invoke(null, "a|key= value |b", "key"))
+        assertEquals("", markerValue.invoke(null, "a|other=value", "key"))
+
+        assertEquals(null, mapSudo.invoke(null, "SUDO_OK"))
+        assertEquals("build_failed", mapBuild.invoke(null, "ERR_BUILD"))
+        assertEquals("build_failed/bin_missing", mapBuild.invoke(null, "reason=bin_missing"))
+        assertEquals("run_failed", mapRun.invoke(null, "ERR_RUN"))
+        assertEquals("run_failed|exit=1", mapRun.invoke(null, "ERR_RUN|exit=1"))
+        assertEquals(null, mapPort.invoke(null, "PORT_FREE"))
+        assertEquals("port_53_busy", mapPort.invoke(null, "PORT_BUSY"))
+        assertEquals("port_53_busy|proto=udp", mapPort.invoke(null, "PORT_BUSY|proto=udp"))
+        val toml = buildToml.invoke(null, "203.0.113.10", "secret-key") as String
+        assertTrue(toml.contains("SERVER = \"203.0.113.10\""))
+        assertTrue(toml.contains("ENCRYPTION_KEY = \"secret-key\""))
+    }
+
+    private fun deployerMethod(name: String, vararg types: Class<*>) =
+        Class.forName("ru.ozero.enginemasterdns.deploy.MasterDnsDeployerImplKt")
+            .getDeclaredMethod(name, *types)
+            .apply { isAccessible = true }
 }

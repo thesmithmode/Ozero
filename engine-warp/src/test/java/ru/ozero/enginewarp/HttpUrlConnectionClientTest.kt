@@ -91,6 +91,21 @@ class HttpUrlConnectionClientTest {
     }
 
     @Test
+    fun `postJson accepts 299 and rejects 300 boundary responses`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(299).setBody("upper-ok"))
+        server.enqueue(MockResponse().setResponseCode(300).setBody("redirect"))
+        val url = server.url("/api/warp").toString()
+
+        val upperOk = client.postJson(url, "{}", "ua")
+        val redirect = client.postJson(url, "{}", "ua")
+
+        assertTrue(upperOk.isSuccess)
+        assertEquals("upper-ok", upperOk.getOrThrow())
+        assertTrue(redirect.isFailure)
+        assertTrue(redirect.exceptionOrNull()?.message?.contains("300") == true)
+    }
+
+    @Test
     fun `postJson отклоняет ответ больше 512KB чтобы предотвратить OOM`() = runTest {
         val tooLarge = "x".repeat(600_000)
         server.enqueue(MockResponse().setResponseCode(200).setBody(tooLarge))

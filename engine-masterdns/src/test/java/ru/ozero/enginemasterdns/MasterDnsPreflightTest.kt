@@ -116,4 +116,26 @@ class MasterDnsPreflightTest {
         assertEquals("2001:db8::1", host)
         assertEquals(53, port)
     }
+
+    @Test
+    fun `bracketed ipv6 with empty and invalid port fall back to 53`() {
+        val empty = MasterDnsPreflight(resolversProvider = { listOf("[2001:db8::1]:") })
+        val invalid = MasterDnsPreflight(resolversProvider = { listOf("[2001:db8::1]:dns") })
+        val suffix = MasterDnsPreflight(resolversProvider = { listOf("[2001:db8::1]suffix") })
+
+        assertEquals("2001:db8::1" to 53, empty.resolveTarget())
+        assertEquals("2001:db8::1" to 53, invalid.resolveTarget())
+        assertEquals("2001:db8::1" to 53, suffix.resolveTarget())
+    }
+
+    @Test
+    fun `host colon invalid and boundary ports are parsed precisely`() {
+        val invalid = MasterDnsPreflight(resolversProvider = { listOf("1.1.1.1:dns") })
+        val low = MasterDnsPreflight(resolversProvider = { listOf("1.1.1.1:1") })
+        val high = MasterDnsPreflight(resolversProvider = { listOf("1.1.1.1:65535") })
+
+        assertEquals("1.1.1.1:dns" to 53, invalid.resolveTarget())
+        assertEquals("1.1.1.1" to 1, low.resolveTarget())
+        assertEquals("1.1.1.1" to 65535, high.resolveTarget())
+    }
 }

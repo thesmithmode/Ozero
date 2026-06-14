@@ -127,6 +127,16 @@ class GeneMemoryTest {
     }
 
     @Test
+    fun `record with empty token list leaves memory empty`() {
+        val mem = memory()
+
+        mem.record(emptyList(), fitness = 1.0)
+
+        assertFalse(mem.hasData())
+        assertNull(mem.rawJson())
+    }
+
+    @Test
     fun `rawJson returns null for empty memory and JSON after record`() {
         val mem = memory()
         assertNull(mem.rawJson())
@@ -225,6 +235,16 @@ class GeneMemoryTest {
         val mem2 = GeneMemory(File(tempDir, "test_memory.json"))
         mem2.load()
         assertTrue(mem2.hasData(), "valid prior state must survive failed import")
+    }
+
+    @Test
+    fun `importRawJson ignores empty array JSON`() {
+        val mem = memory()
+        mem.record(listOf("-keep"), fitness = 1.0)
+
+        mem.importRawJson("[]")
+
+        assertTrue(mem.hasData())
     }
 
     @Test

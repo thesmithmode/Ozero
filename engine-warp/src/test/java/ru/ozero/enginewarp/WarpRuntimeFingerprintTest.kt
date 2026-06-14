@@ -227,6 +227,32 @@ class WarpRuntimeFingerprintTest {
     }
 
     @Test
+    fun `fingerprint tracks unknown interface key but ignores known comments and blank lines`() {
+        val base = WarpConfigSlot(
+            id = "slot-extra-interface",
+            name = "WARP",
+            config = config(privateKey = "sample-warp-key-a", dnsServers = listOf("1.1.1.1")),
+            rawIniOverride = """
+                [Interface]
+                # comment
+                PrivateKey = sample-warp-key-a
+                Address = 172.16.0.2/32
+                CustomInterface = a
+
+                [Peer]
+                PublicKey = sample-peer-key
+                Endpoint = engage.cloudflareclient.com:2408
+            """.trimIndent(),
+            endpointList = emptyList(),
+        )
+        val changed = base.copy(
+            rawIniOverride = base.rawIniOverride?.replace("CustomInterface = a", "CustomInterface = b"),
+        )
+
+        assertNotEquals(base.runtimeFingerprint(), changed.runtimeFingerprint())
+    }
+
+    @Test
     fun `WarpSdkBridge default proxy methods are explicit unsupported noops`() = runTest {
         val bridge = object : WarpSdkBridge {
             override suspend fun attachTun(

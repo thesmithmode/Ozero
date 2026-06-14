@@ -36,6 +36,9 @@ class Socks5HandshakeProbeTest {
             Socks5HandshakeProbe.probe("127.0.0.1", 0, timeoutMs = 1_000)
         }
         assertFailsWith<IllegalArgumentException> {
+            Socks5HandshakeProbe.probe("127.0.0.1", -1, timeoutMs = 1_000)
+        }
+        assertFailsWith<IllegalArgumentException> {
             Socks5HandshakeProbe.probe("127.0.0.1", 65_536, timeoutMs = 1_000)
         }
         assertFailsWith<IllegalArgumentException> {
