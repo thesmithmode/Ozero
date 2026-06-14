@@ -228,6 +228,47 @@ class GeneMemoryTest {
     }
 
     @Test
+    fun `importRawJson replaces scores from valid JSON file`() {
+        val mem = memory()
+        mem.record(listOf("-old"), fitness = 1.0)
+        val json = JSONObject()
+            .put(
+                "-new",
+                JSONObject()
+                    .put("wins", 8.0)
+                    .put("trials", 10.0)
+                    .put("lastMs", System.currentTimeMillis()),
+            )
+            .toString()
+
+        mem.importRawJson(json)
+
+        assertTrue(meanSamples(mem, "-new", SEED_DEFAULT) > 0.6)
+        assertTrue(meanSamples(mem, "-old", SEED_DEFAULT) < 0.7)
+    }
+
+    @Test
+    fun `load ignores malformed persisted JSON`() {
+        val file = File(tempDir, "persist.json")
+        file.writeText("{broken")
+        val mem = GeneMemory(file)
+
+        mem.load()
+
+        assertFalse(mem.hasData())
+    }
+
+    @Test
+    fun `sampleScore supports fractional fitness posterior`() {
+        val mem = memory()
+        repeat(REPEAT_TIMES_HIGH) { mem.record(listOf("-half"), fitness = 0.5) }
+
+        val mean = meanSamples(mem, "-half", SEED_DEFAULT)
+
+        assertTrue(mean in 0.35..0.65, "fractional fitness should stay near 0.5, got $mean")
+    }
+
+    @Test
     fun `sampleScore is stochastic — different random produces different values`() {
         val mem = memory()
         mem.record(listOf("-x"), fitness = 0.7)

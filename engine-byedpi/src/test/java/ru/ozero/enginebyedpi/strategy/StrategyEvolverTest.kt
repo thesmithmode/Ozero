@@ -410,4 +410,34 @@ class StrategyEvolverTest {
         val results = (1..50).map { evolver.mutate(chromosome, rate = 1f, random = Random(it)) }
         assertTrue(results.any { it.size != chromosome.size }, "at least one mutation should change length")
     }
+
+    @Test
+    fun `default random overloads return valid chromosomes`() {
+        val p1 = parseChromosome("-a -b -c -d")
+        val p2 = parseChromosome("-e -f -g -h")
+        val chromosome = parseChromosome("-a -b -c -d")
+
+        val results = listOf(
+            evolver.crossoverSinglePoint(p1, p2),
+            evolver.crossoverTwoPoint(p1, p2),
+            evolver.crossoverUniform(p1, p2),
+            evolver.crossover(p1, p2),
+            evolver.insert(chromosome),
+            evolver.delete(chromosome),
+            evolver.swap(chromosome),
+        )
+
+        assertTrue(results.all { it.isNotEmpty() })
+        assertTrue(results.all { result -> result.all { it.token.startsWith("-") } })
+    }
+
+    @Test
+    fun `mutate default arguments keep valid chromosome`() {
+        val chromosome = parseChromosome("-a -b -c -d")
+
+        val result = evolver.mutate(chromosome)
+
+        assertTrue(result.isNotEmpty())
+        assertTrue(result.all { it.token.startsWith("-") })
+    }
 }

@@ -6,7 +6,9 @@ import io.mockk.mockk
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -180,6 +182,7 @@ class NativeHevTunnelGatewayCoverageTest {
     @Test
     fun `stats poller disabled never calls nativeStats`(@TempDir tmp: File) {
         val statsCalls = AtomicInteger(0)
+        val observed = CountDownLatch(2)
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
             loader = loader,
@@ -220,12 +223,14 @@ class NativeHevTunnelGatewayCoverageTest {
     @Test
     fun `stats poller tolerates null and short native stats`(@TempDir tmp: File) {
         val statsCalls = AtomicInteger(0)
+        val observed = CountDownLatch(2)
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
             loader = loader,
             nativeStart = { _, _ -> 0 },
             nativeStop = {},
             nativeStats = {
+                observed.countDown()
                 when (statsCalls.incrementAndGet()) {
                     1 -> null
                     2 -> longArrayOf(1L)
@@ -237,7 +242,7 @@ class NativeHevTunnelGatewayCoverageTest {
         )
 
         gateway.start(HevTunnelConfig(tunPfd = pfd(7), socksAddress = "127.0.0.1", socksPort = 1080))
-        Thread.sleep(40L)
+        assertTrue(observed.await(1, TimeUnit.SECONDS))
         gateway.stop()
 
         assertTrue(statsCalls.get() >= 2)
@@ -269,6 +274,7 @@ class NativeHevTunnelGatewayCoverageTest {
     @Test
     fun `stats poller records movement and idle samples`(@TempDir tmp: File) {
         val statsCalls = AtomicInteger(0)
+        val observed = CountDownLatch(8)
         val samples = listOf(
             longArrayOf(0L, 0L, 0L, 0L),
             longArrayOf(1L, 10L, 2L, 20L),
@@ -285,6 +291,7 @@ class NativeHevTunnelGatewayCoverageTest {
             nativeStart = { _, _ -> 0 },
             nativeStop = {},
             nativeStats = {
+                observed.countDown()
                 samples.getOrElse(statsCalls.getAndIncrement()) { samples.last() }
             },
             pollIntervalMs = 2L,
@@ -292,7 +299,7 @@ class NativeHevTunnelGatewayCoverageTest {
         )
 
         gateway.start(HevTunnelConfig(tunPfd = pfd(13), socksAddress = "127.0.0.1", socksPort = 1080))
-        Thread.sleep(30L)
+        assertTrue(observed.await(1, TimeUnit.SECONDS))
         gateway.stop()
 
         assertTrue(statsCalls.get() >= samples.size)
@@ -301,12 +308,14 @@ class NativeHevTunnelGatewayCoverageTest {
     @Test
     fun `stats poller stops when nativeStats throws`(@TempDir tmp: File) {
         val statsCalls = AtomicInteger(0)
+        val observed = CountDownLatch(1)
         val gateway = NativeHevTunnelGateway(
             cacheDir = tmp,
             loader = loader,
             nativeStart = { _, _ -> 0 },
             nativeStop = {},
             nativeStats = {
+                observed.countDown()
                 statsCalls.incrementAndGet()
                 error("stats boom")
             },
@@ -315,7 +324,7 @@ class NativeHevTunnelGatewayCoverageTest {
         )
 
         gateway.start(HevTunnelConfig(tunPfd = pfd(14), socksAddress = "127.0.0.1", socksPort = 1080))
-        Thread.sleep(15L)
+        assertTrue(observed.await(1, TimeUnit.SECONDS))
         gateway.stop()
 
         assertEquals(1, statsCalls.get())

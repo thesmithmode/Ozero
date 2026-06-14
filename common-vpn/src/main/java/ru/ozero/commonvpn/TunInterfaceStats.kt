@@ -48,7 +48,11 @@ object TunInterfaceStats {
     }
 
     fun readTunStats(iface: String): Snapshot? {
-        val content = runCatching { File(PROC_NET_DEV).readText() }.getOrNull() ?: return null
+        return readTunStats(iface) { File(PROC_NET_DEV).readText() }
+    }
+
+    internal fun readTunStats(iface: String, readProcNetDev: () -> String): Snapshot? {
+        val content = runCatching { readProcNetDev() }.getOrNull() ?: return null
         val (rx, tx) = parseProcNetDev(content, iface) ?: return null
         return Snapshot(rxBytes = rx, txBytes = tx)
     }

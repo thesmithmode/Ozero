@@ -38,4 +38,19 @@ class TunInterfaceStatsAdditionalCoverageTest {
         assertEquals("tun2", TunInterfaceStats.pickNewTunInterface(emptySet(), setOf("tunX", "tun2")))
         assertEquals("tunX", TunInterfaceStats.pickNewTunInterface(emptySet(), setOf("tunX")))
     }
+
+    @Test
+    fun `readTunStats returns snapshot from supplied proc reader`() {
+        val content = "tun9: 100 0 0 0 0 0 0 0 200 0 0 0 0 0 0 0"
+
+        val snapshot = TunInterfaceStats.readTunStats("tun9") { content }
+
+        assertEquals(TunInterfaceStats.Snapshot(rxBytes = 100, txBytes = 200), snapshot)
+    }
+
+    @Test
+    fun `readTunStats returns null when proc reader fails or interface missing`() {
+        assertNull(TunInterfaceStats.readTunStats("tun9") { error("boom") })
+        assertNull(TunInterfaceStats.readTunStats("tun9") { "eth0: 1 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0" })
+    }
 }

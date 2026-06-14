@@ -306,6 +306,8 @@ class SingboxProbeServiceTest {
         override fun getByGroupIdFlow(groupId: Long): Flow<List<ProxyProfile>> = MutableStateFlow(emptyList())
         override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> = emptyList()
         override suspend fun deleteByGroupId(groupId: Long) = Unit
+        override suspend fun getIdsByGroupId(groupId: Long): List<Long> = emptyList()
+        override suspend fun deleteByIds(ids: List<Long>) = Unit
         override suspend fun replaceForGroup(groupId: Long, profiles: List<ProxyProfile>) = Unit
         override suspend fun countByGroupId(groupId: Long): Int = 0
         override suspend fun update(profile: ProxyProfile) = Unit

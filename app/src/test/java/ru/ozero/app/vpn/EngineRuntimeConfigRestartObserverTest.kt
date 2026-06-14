@@ -977,6 +977,9 @@ class EngineRuntimeConfigRestartObserverTest {
             override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> =
                 flow.value.filter { it.groupId == groupId }
             override suspend fun deleteByGroupId(groupId: Long) = Unit
+            override suspend fun getIdsByGroupId(groupId: Long): List<Long> =
+                flow.value.filter { it.groupId == groupId }.map { it.id }
+            override suspend fun deleteByIds(ids: List<Long>) = Unit
             override suspend fun updateLatency(id: Long, latency: Int) = Unit
             override suspend fun countByGroupId(groupId: Long): Int = flow.value.count { it.groupId == groupId }
             override suspend fun update(profile: ProxyProfile) = Unit

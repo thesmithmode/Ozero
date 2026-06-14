@@ -832,6 +832,141 @@ class StartSequenceCoordinatorBehaviorTest {
         verify(exactly = 0) { fixture.statsLogger.start() }
     }
 
+    @Test
+    fun `manual TUN establish null stops started chain and requests stop`() = runTest {
+        val engine = FakeEnginePlugin(id = EngineId.BYEDPI, socksPort = 2098, capabilities = tunnelCapabilities())
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(trafficMode = TrafficMode.TUN, manualEngine = EngineId.BYEDPI),
+        )
+        fixture.establishedTunFd(null)
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.startedConfigs.size)
+        assertEquals(1, engine.stopCalls)
+        assertTrue(fixture.stopRequested.get())
+        assertEquals(null, fixture.state.tunFdRef.get())
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.BYEDPI,
+                match { it.startsWith("establishTun fail") },
+            )
+        }
+        verify(exactly = 0) { fixture.tunnelGateway.start(any()) }
+        verify(exactly = 0) { fixture.statsLogger.start() }
+    }
+
+    @Test
+    fun `manual TUN establish throw stops started chain and reports failure`() = runTest {
+        val engine = FakeEnginePlugin(id = EngineId.BYEDPI, socksPort = 2099, capabilities = tunnelCapabilities())
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(trafficMode = TrafficMode.TUN, manualEngine = EngineId.BYEDPI),
+        )
+        val builder = mockk<VpnService.Builder> {
+            every { establish() } throws IllegalStateException("vpn busy")
+        }
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any()) } returns builder
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any(), any()) } returns builder
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.startedConfigs.size)
+        assertEquals(1, engine.stopCalls)
+        assertTrue(fixture.stopRequested.get())
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.BYEDPI,
+                match { it.startsWith("establishTun fail") },
+            )
+        }
+        verify(exactly = 0) { fixture.tunnelGateway.start(any()) }
+        verify(exactly = 0) { fixture.statsLogger.start() }
+    }
+
+    @Test
+    fun `manual TUN native tunnel throw stops chain and reports failure`() = runTest {
+        val engine = FakeEnginePlugin(id = EngineId.BYEDPI, socksPort = 2100, capabilities = tunnelCapabilities())
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(trafficMode = TrafficMode.TUN, manualEngine = EngineId.BYEDPI),
+        )
+        fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } throws IllegalStateException("hev boom")
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.startedConfigs.size)
+        assertEquals(1, engine.stopCalls)
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.BYEDPI,
+                "tunnel threw: hev boom",
+            )
+        }
+        verify(exactly = 0) { fixture.statsLogger.start() }
+    }
+
+    @Test
+    fun `manual proxy health monitor throw still completes startup`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.SINGBOX,
+            socksPort = 2101,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(trafficMode = TrafficMode.PROXY, manualEngine = EngineId.SINGBOX),
+        )
+        coEvery { fixture.healthMonitor.start(2101) } throws IllegalStateException("health down")
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.startedConfigs.size)
+        val connected = assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+        assertEquals(EngineId.SINGBOX, connected.engineId)
+        verify(exactly = 1) { fixture.statsLogger.start() }
+        verify(exactly = 1) { fixture.engineWatchdog.startHealthKillswitchWatcher(EngineId.SINGBOX) }
+        verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(any(), any()) }
+    }
+
+    @Test
+    fun `custom TUN attach throw closes TUN and stops chain`() = runTest {
+        val engine = ThrowingTunEngine(id = EngineId.BYEDPI, socksPort = 2102)
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(trafficMode = TrafficMode.TUN, manualEngine = EngineId.BYEDPI),
+        )
+        val tunFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 2102
+        }
+        val dupFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { detachFd() } returns 2103
+        }
+        every { tunFd.dup() } returns dupFd
+        val builder = mockk<VpnService.Builder>(relaxed = true) {
+            every { establish() } returns tunFd
+        }
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns builder
+        fixture.establishedTunFd(tunFd)
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.startedConfigs.size)
+        assertEquals(1, engine.stopCalls)
+        assertEquals(null, fixture.state.tunFdRef.get())
+        verify(exactly = 1) { tunFd.close() }
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.BYEDPI,
+                "attachTun threw: aidl dead",
+            )
+        }
+        verify(exactly = 0) { fixture.tunnelGateway.start(any()) }
+        verify(exactly = 0) { fixture.statsLogger.start() }
+    }
+
     private fun startFixture(
         vararg engines: EnginePlugin,
         settings: SettingsModel,
@@ -1004,6 +1139,47 @@ class StartSequenceCoordinatorBehaviorTest {
             EngineId.NAIVE -> EngineConfig.Naive(proxyUrl = "https://example.invalid", socksPort = socksPort)
             EngineId.TOR -> EngineConfig.Tor(socksPort = socksPort)
         }
+    }
+
+    private class ThrowingTunEngine(
+        override val id: EngineId,
+        private val socksPort: Int,
+    ) : EnginePlugin, TunFdAcceptor {
+        override val capabilities: EngineCapabilities = EngineCapabilities(
+            supportsTcp = true,
+            supportsUdp = true,
+            supportsDoH = false,
+            localOnly = true,
+            requiresServer = false,
+            supportsUpstreamSocks = false,
+            providesLocalSocks = true,
+            providesLocalSocksWithoutUpstream = false,
+        )
+        val startedConfigs = mutableListOf<EngineConfig>()
+        var stopCalls = 0
+
+        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
+            startedConfigs += config
+            return StartResult.Success(socksPort)
+        }
+
+        override suspend fun stop() {
+            stopCalls++
+        }
+
+        override suspend fun probe(): ProbeResult = ProbeResult.Success(1L)
+        override fun stats(): Flow<EngineStats> = emptyFlow()
+        override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.ByeDpi(socksPort = socksPort)
+        override fun buildProxyConfig(settings: SettingsModel?): EngineConfig = EngineConfig.ByeDpi(socksPort = socksPort)
+        override suspend fun tunSpec(): TunSpec = TunSpec(
+            sessionName = "ThrowingTunEngine",
+            mtu = 1500,
+            blocking = true,
+            ipv4Address = "10.0.0.2",
+            ipv4PrefixLength = 32,
+            dnsServers = listOf("1.1.1.1"),
+        )
+        override suspend fun attachTun(fd: Int): TunAttachResult = throw IllegalStateException("aidl dead")
     }
 
     private class StaticSettingsRepository(

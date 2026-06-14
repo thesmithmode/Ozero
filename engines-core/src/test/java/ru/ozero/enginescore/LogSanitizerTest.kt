@@ -30,6 +30,22 @@ class LogSanitizerTest {
     }
 
     @Test
+    fun `sanitize preserves long class and method names`() {
+        val raw = """
+            EngineRuntimeConfigRestartObserver failed
+            at ru.ozero.app.vpn.EngineRuntimeConfigRestartObserver.observeRuntimeConfigChanges(EngineRuntimeConfigRestartObserver.kt:42)
+            token=abcdefghijklmnopqrstuvwxyzABCDEF0123456789
+        """.trimIndent()
+
+        val sanitized = LogSanitizer.sanitize(raw)
+
+        assertTrue(sanitized.contains("EngineRuntimeConfigRestartObserver"))
+        assertTrue(sanitized.contains("observeRuntimeConfigChanges"))
+        assertTrue(sanitized.contains("token=<redacted-token>"))
+        assertFalse(sanitized.contains("abcdefghijklmnopqrstuvwxyzABCDEF0123456789"))
+    }
+
+    @Test
     fun `redactUrl keeps scheme host and port only`() {
         assertEquals(
             "https://example.com:8443/<redacted>",

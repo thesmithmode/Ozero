@@ -9,7 +9,9 @@ object LogSanitizer {
         out = USERINFO_URI.replace(out) { m -> "${m.groupValues[1]}://<redacted>@${m.groupValues[3]}" }
         out = PROXY_URI.replace(out, "<redacted-uri>")
         out = KEYED_LONG_TOKEN.replace(out) { m -> "${m.groupValues[1]}=<redacted-token>" }
-        out = LONG_TOKEN.replace(out, "<redacted-token>")
+        out = LONG_TOKEN.replace(out) { m ->
+            if (m.value.isBareTokenLike()) "<redacted-token>" else m.value
+        }
         return out
     }
 
@@ -37,4 +39,10 @@ object LogSanitizer {
     private val LONG_TOKEN = Regex(
         "[A-Za-z0-9+/_=-]{32,}",
     )
+
+    private fun String.isBareTokenLike(): Boolean {
+        val hasDigit = any { it.isDigit() }
+        val hasTokenSeparator = any { it == '+' || it == '/' || it == '_' || it == '-' || it == '=' }
+        return hasTokenSeparator || hasDigit
+    }
 }

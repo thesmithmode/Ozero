@@ -994,6 +994,14 @@ class SingboxEngineSettingsViewModelCoverageTest {
             flow.value = flow.value.filterNot { it.groupId == groupId }
         }
 
+        override suspend fun getIdsByGroupId(groupId: Long): List<Long> =
+            flow.value.filter { it.groupId == groupId }.map { it.id }
+
+        override suspend fun deleteByIds(ids: List<Long>) {
+            val idSet = ids.toSet()
+            flow.value = flow.value.filterNot { it.id in idSet }
+        }
+
         override suspend fun updateLatency(id: Long, latency: Int) = Unit
 
         override suspend fun countByGroupId(groupId: Long): Int = flow.value.count { it.groupId == groupId }
