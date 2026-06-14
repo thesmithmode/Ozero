@@ -65,7 +65,7 @@ object ClashYamlParser {
             method = fields.shadowsocksMethod().ifBlank { method }
             password = fields.string("password")
             plugin = fields.string("plugin")
-            pluginOpts = fields.shadowsocksPluginOpts("plugin-opts", "plugin_opts")
+            pluginOpts = fields.string("plugin-opts", "plugin_opts", entrySeparator = ";")
         }
         else -> null
     }?.takeIf { it.serverAddress.isNotBlank() && it.serverPort > 0 }
@@ -144,11 +144,14 @@ object ClashYamlParser {
         key.toString() to value
     }
 
-    private fun Map<String, Any?>.string(vararg keys: String): String = keys.firstNotNullOfOrNull { key ->
+    private fun Map<String, Any?>.string(
+        vararg keys: String,
+        entrySeparator: String = ",",
+    ): String = keys.firstNotNullOfOrNull { key ->
         when (val value = this[key]) {
             null -> null
-            is Map<*, *> -> value.entries.joinToString(",") { (k, v) -> "$k=$v" }
-            is Iterable<*> -> value.joinToString(",") { it.toString() }
+            is Map<*, *> -> value.entries.joinToString(entrySeparator) { (k, v) -> "$k=$v" }
+            is Iterable<*> -> value.joinToString(entrySeparator) { it.toString() }
             else -> value.toString()
         }?.takeIf { it.isNotBlank() }
     }.orEmpty()
@@ -177,15 +180,6 @@ object ClashYamlParser {
         is Iterable<*> -> value.joinToString(",") { it.toString() }
         else -> string(key)
     }
-
-    private fun Map<String, Any?>.shadowsocksPluginOpts(vararg keys: String): String = keys.firstNotNullOfOrNull { key ->
-        when (val value = this[key]) {
-            null -> null
-            is Map<*, *> -> value.entries.joinToString(";") { (k, v) -> "$k=$v" }
-            is Iterable<*> -> value.joinToString(";") { it.toString() }
-            else -> value.toString()
-        }?.takeIf { it.isNotBlank() }
-    }.orEmpty()
 
     private fun Map<String, Any?>.shadowsocksMethod(): String = when (val cipher = this["cipher"]) {
         is String -> cipher
