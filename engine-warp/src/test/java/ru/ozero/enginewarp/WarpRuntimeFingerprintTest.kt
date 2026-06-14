@@ -149,6 +149,84 @@ class WarpRuntimeFingerprintTest {
     }
 
     @Test
+    fun `fingerprint equality ignores slot id but rejects unrelated objects`() {
+        val config = config(privateKey = "sample-warp-key-a", dnsServers = listOf("1.1.1.1"))
+        val first = WarpConfigSlot(
+            id = "slot-a",
+            name = "WARP",
+            config = config,
+            rawIniOverride = null,
+            endpointList = emptyList(),
+        ).runtimeFingerprint()
+        val second = WarpConfigSlot(
+            id = "slot-b",
+            name = "WARP copy",
+            config = config,
+            rawIniOverride = null,
+            endpointList = emptyList(),
+        ).runtimeFingerprint()
+
+        assertEquals(first, second)
+        assertEquals(first.hashCode(), second.hashCode())
+        assertNotEquals(first, "same-digest")
+    }
+
+    @Test
+    fun `fingerprint canonicalizes endpoint whitespace and duplicates`() {
+        val config = config(privateKey = "sample-warp-key-a", dnsServers = listOf("1.1.1.1"))
+        val first = WarpConfigSlot(
+            id = "slot-a",
+            name = "WARP",
+            config = config,
+            rawIniOverride = null,
+            endpointList = listOf(" 162.159.193.10:2408 ", "", "162.159.193.10:2408"),
+        )
+        val second = first.copy(endpointList = listOf("162.159.193.10:2408"))
+
+        assertEquals(first.runtimeFingerprint(), second.runtimeFingerprint())
+    }
+
+    @Test
+    fun `fingerprint preserves malformed raw ini fallback exactly`() {
+        val base = WarpConfigSlot(
+            id = "slot-raw",
+            name = "WARP",
+            config = config(privateKey = "sample-warp-key-a", dnsServers = listOf("1.1.1.1")),
+            rawIniOverride = "[Interface\nPrivateKey = sample-warp-key-a",
+            endpointList = emptyList(),
+        )
+        val changed = base.copy(rawIniOverride = "[Interface\nPrivateKey = sample-warp-key-b")
+
+        assertNotEquals(base.runtimeFingerprint(), changed.runtimeFingerprint())
+    }
+
+    @Test
+    fun `fingerprint tracks unknown raw ini sections and bare extra lines`() {
+        val base = WarpConfigSlot(
+            id = "slot-extra-section",
+            name = "WARP",
+            config = config(privateKey = "sample-warp-key-a", dnsServers = listOf("1.1.1.1")),
+            rawIniOverride = """
+                [Interface]
+                PrivateKey = sample-warp-key-a
+                Address = 172.16.0.2/32
+                CustomInterface = a
+                [Peer]
+                PublicKey = sample-peer-key
+                Endpoint = engage.cloudflareclient.com:2408
+                [Unknown]
+                BareLine
+            """.trimIndent(),
+            endpointList = emptyList(),
+        )
+        val changed = base.copy(
+            rawIniOverride = base.rawIniOverride?.replace("BareLine", "OtherBareLine"),
+        )
+
+        assertNotEquals(base.runtimeFingerprint(), changed.runtimeFingerprint())
+    }
+
+    @Test
     fun `WarpSdkBridge default proxy methods are explicit unsupported noops`() = runTest {
         val bridge = object : WarpSdkBridge {
             override suspend fun attachTun(

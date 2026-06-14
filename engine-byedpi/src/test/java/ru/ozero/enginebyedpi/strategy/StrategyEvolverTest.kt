@@ -47,6 +47,18 @@ class StrategyEvolverTest {
     }
 
     @Test
+    fun `crossoverSinglePoint with empty parent1 returns parent2`() {
+        val p2 = parseChromosome("-a -b")
+        assertEquals(p2, evolver.crossoverSinglePoint(emptyList(), p2, Random(0)))
+    }
+
+    @Test
+    fun `crossoverSinglePoint with empty parent2 returns parent1`() {
+        val p1 = parseChromosome("-a -b")
+        assertEquals(p1, evolver.crossoverSinglePoint(p1, emptyList(), Random(0)))
+    }
+
+    @Test
     fun `crossoverTwoPoint produces child with genes only from parents`() {
         val p1 = parseChromosome("-a -b -c -d")
         val p2 = parseChromosome("-w -x -y -z")
@@ -98,6 +110,18 @@ class StrategyEvolverTest {
     fun `crossoverTwoPoint with empty parent2 returns parent1`() {
         val p1 = parseChromosome("-a -b")
         assertEquals(p1, evolver.crossoverTwoPoint(p1, emptyList(), Random(0)))
+    }
+
+    @Test
+    fun `crossoverTwoPoint with one block parents falls back to single point`() {
+        val p1 = parseChromosome("-n example.com")
+        val p2 = parseChromosome("--fake -1")
+        val allTokens = (p1 + p2).map { it.token }.toSet()
+
+        val child = evolver.crossoverTwoPoint(p1, p2, Random(0))
+
+        assertTrue(child.isNotEmpty())
+        assertTrue(child.all { it.token in allTokens })
     }
 
     @Test
@@ -181,6 +205,11 @@ class StrategyEvolverTest {
     fun `swap on single gene chromosome returns unchanged`() {
         val chromosome = parseChromosome("-a")
         assertEquals(chromosome, evolver.swap(chromosome, Random(0)))
+    }
+
+    @Test
+    fun `swap on empty chromosome returns unchanged`() {
+        assertEquals(emptyList(), evolver.swap(emptyList(), Random(0)))
     }
 
     @Test
@@ -368,6 +397,11 @@ class StrategyEvolverTest {
         val chromosome = parseChromosome("-a")
         val result = evolver.delete(chromosome, Random(0))
         assertEquals(chromosome, result)
+    }
+
+    @Test
+    fun `delete on empty chromosome returns unchanged`() {
+        assertEquals(emptyList(), evolver.delete(emptyList(), Random(0)))
     }
 
     @Test

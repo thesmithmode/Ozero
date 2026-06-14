@@ -135,10 +135,41 @@ class SubscriptionParserYamlEdgeCoverageTest {
         assertEquals("tls", httpUpgrade.security)
         val ss = result[3] as ShadowsocksBean
         assertEquals("chacha20-ietf-poly1305", ss.method)
-        assertEquals("mode=websocket,host=plugin.example.com", ss.pluginOpts)
+        assertEquals("mode=websocket;host=plugin.example.com", ss.pluginOpts)
         val vmessNetAlias = result[4] as VMessBean
         assertEquals("splithttp", vmessNetAlias.type)
         assertEquals("none", vmessNetAlias.security)
         assertTrue(vmessNetAlias.allowInsecure)
+    }
+
+    @Test
+    fun `clash shadowsocks plugin opts map uses sip003 semicolon separators while hosts keep commas`() {
+        val yaml = """
+            proxies:
+              - name: H2 Host List
+                type: vmess
+                server: h2-hosts.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+                h2-opts:
+                  host:
+                    - one.example.com
+                    - two.example.com
+              - name: SS Plugin Opts Map
+                type: ss
+                server: ss-plugin.example.com
+                port: 8388
+                cipher: chacha20-ietf-poly1305
+                password: secret
+                plugin-opts:
+                  obfs: http
+                  obfs-host: www.example.com
+        """.trimIndent()
+
+        val result = ClashYamlParser.parse(yaml)
+
+        assertEquals(2, result.size)
+        assertEquals("one.example.com,two.example.com", (result[0] as VMessBean).host)
+        assertEquals("obfs=http;obfs-host=www.example.com", (result[1] as ShadowsocksBean).pluginOpts)
     }
 }

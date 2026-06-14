@@ -155,6 +155,52 @@ class NativeHevTunnelGatewayCoverageTest {
     }
 
     @Test
+    fun `written config uses stable file name and default udp mode`(@TempDir tmp: File) {
+        var capturedPath: String? = null
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = loader,
+            nativeStart = { path, _ ->
+                capturedPath = path
+                0
+            },
+            nativeStop = {},
+        )
+
+        gateway.start(HevTunnelConfig(tunPfd = pfd(15), socksAddress = "127.0.0.1", socksPort = 1080))
+
+        val configFile = File(assertNotNull(capturedPath))
+        assertEquals("hev-socks5-tunnel.yaml", configFile.name)
+        assertEquals(tmp.absoluteFile, configFile.parentFile?.absoluteFile)
+        val yaml = configFile.readText()
+        assertTrue(yaml.contains("udp: udp"))
+        assertTrue(yaml.endsWith("\n"))
+    }
+
+    @Test
+    fun `stats poller disabled never calls nativeStats`(@TempDir tmp: File) {
+        val statsCalls = AtomicInteger(0)
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = loader,
+            nativeStart = { _, _ -> 0 },
+            nativeStop = {},
+            nativeStats = {
+                statsCalls.incrementAndGet()
+                longArrayOf(1L, 2L, 3L, 4L)
+            },
+            pollIntervalMs = 1L,
+            statsPollerEnabled = false,
+        )
+
+        gateway.start(HevTunnelConfig(tunPfd = pfd(16), socksAddress = "127.0.0.1", socksPort = 1080))
+        Thread.sleep(10L)
+        gateway.stop()
+
+        assertEquals(0, statsCalls.get())
+    }
+
+    @Test
     fun `stop after successful start is idempotent`(@TempDir tmp: File) {
         val stopCalls = AtomicInteger(0)
         val gateway = NativeHevTunnelGateway(
