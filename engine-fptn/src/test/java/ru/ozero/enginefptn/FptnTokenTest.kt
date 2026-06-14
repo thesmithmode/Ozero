@@ -152,6 +152,32 @@ class FptnTokenTest {
     }
 
     @Test
+    fun `should ignore blank and null country metadata`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[
+                {"name":"blank","host":"h1","port":1,"country_code":"   "},
+                {"name":"null","host":"h2","port":2,"countryCode":null}
+            ]}"""
+        val result = FptnToken.parse("fptn:${encode(json)}")
+        assertNotNull(result)
+        assertNull(result.servers[0].countryCode)
+        assertNull(result.servers[1].countryCode)
+    }
+
+    @Test
+    fun `should reject long and partially numeric country codes`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[
+                {"name":"long","host":"h1","port":1,"country_code":"rus"},
+                {"name":"numeric","host":"h2","port":2,"country_code":"r1"}
+            ]}"""
+        val result = FptnToken.parse("fptn:${encode(json)}")
+        assertNotNull(result)
+        assertNull(result.servers[0].countryCode)
+        assertNull(result.servers[1].countryCode)
+    }
+
+    @Test
     fun `toString should not expose username or password`() {
         val json = """{"username":"sensitive_user","password":"secret_pass",
             "servers":[{"name":"S","host":"h","port":1}]}"""

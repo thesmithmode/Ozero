@@ -1,4 +1,6 @@
 import java.math.BigDecimal
+import org.gradle.api.tasks.testing.Test
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
 
 plugins {
     jacoco
@@ -130,6 +132,13 @@ val excludedClasses = listOf(
 )
 
 if (isAndroid) {
+    tasks.withType<Test>().configureEach {
+        extensions.configure<JacocoTaskExtension> {
+            isIncludeNoLocationClasses = true
+            excludes = listOf("jdk.internal.*")
+        }
+    }
+
     val thresholds = coverageThresholdsFor(project.path)
     tasks.register<JacocoReport>("jacocoTestReport") {
         group = "verification"

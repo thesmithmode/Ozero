@@ -13,14 +13,16 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class TunnelControllerTest {
-    private lateinit var controller: TunnelController
+abstract class TunnelControllerTestBase {
+    protected lateinit var controller: TunnelController
 
     @BeforeEach
     fun setUp() {
         controller = TunnelController()
     }
+}
 
+class TunnelControllerStateTest : TunnelControllerTestBase() {
     @Test
     fun initialStateIsIdle() {
         assertIs<TunnelState.Idle>(controller.state.value)
@@ -218,7 +220,9 @@ class TunnelControllerTest {
         controller.onDisconnecting()
         assertIs<TunnelState.Disconnecting>(controller.state.value)
     }
+}
 
+class TunnelControllerStatsTest : TunnelControllerTestBase() {
     @Test
     fun statsInitiallyNull() {
         assertNull(controller.stats.value)
@@ -336,7 +340,9 @@ class TunnelControllerTest {
         ctl.reset()
         assertEquals(false, ctl.stagnant.value)
     }
+}
 
+class TunnelControllerKillswitchTest : TunnelControllerTestBase() {
     @Test
     fun killswitchActiveInitiallyFalse() {
         assertEquals(false, controller.killswitchActive.value)
@@ -395,7 +401,9 @@ class TunnelControllerTest {
         assertIs<TunnelState.Failed>(s)
         assertEquals(EngineId.WARP, s.engineId)
     }
+}
 
+class TunnelControllerStatsSmoothingTest : TunnelControllerTestBase() {
     @Test
     fun updateStats_firstSampleBpsIsZero() {
         controller.updateStats(
@@ -459,7 +467,9 @@ class TunnelControllerTest {
         )
         assertEquals(0.0, snap.bpsIn, "rx не менялся → bpsIn=0")
     }
+}
 
+class TunnelControllerSwitchingTest : TunnelControllerTestBase() {
     @Test
     fun switchingStartedSetsTransitionAndPersistsThroughIdle() {
         controller.onProbing()
