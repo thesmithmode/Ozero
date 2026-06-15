@@ -103,6 +103,39 @@ class EngineUrnetworkCoverageTest {
     }
 
     @Test
+    fun `successful start tolerates optional bridge configuration failures`() = runTest {
+        val store = InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                byClientJwt = "client",
+                selectedLocation = UrnetworkLocationSelection(" ", null, null),
+                provideEnabled = true,
+            ),
+        )
+        val bridge = RecordingBridge(throwOptionalConfiguration = true)
+        val fixture = fixture(store = store, bridge = bridge)
+
+        val result = fixture.engine.start(EngineConfig.Urnetwork(jwtToken = "", region = "BR"), Upstream.None)
+
+        assertEquals(StartResult.Success(0), result)
+        assertEquals(1, bridge.startCalls)
+        assertEquals(UrnetworkLocationSelection("BR", null, null), bridge.recordedPreferredLocation)
+        fixture.close()
+    }
+
+    @Test
+    fun `second successful start cancels previous stats polling job`() = runTest {
+        val bridge = RecordingBridge(snapshot = UrnetworkSdkBridge.RuntimeSnapshot(peers = 1))
+        val fixture = fixture(bridge = bridge)
+
+        assertEquals(StartResult.Success(0), fixture.engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None))
+        assertEquals(StartResult.Success(0), fixture.engine.start(EngineConfig.Urnetwork(jwtToken = ""), Upstream.None))
+        fixture.engine.stop()
+
+        assertEquals(2, bridge.startCalls)
+        fixture.close()
+    }
+
+    @Test
     fun `attachTun maps bridge success and failure`() = runTest {
         val success = fixture(bridge = RecordingBridge(attachResult = UrnetworkSdkBridge.AttachResult.Success))
         assertEquals(TunAttachResult.Success, success.engine.attachTun(44))
@@ -153,6 +186,19 @@ class EngineUrnetworkCoverageTest {
         )
         assertEquals("connected", status.engine.statsLabel(EngineStats()))
         status.close()
+
+        val fallbackStatus = fixture(
+            bridge = RecordingBridge(
+                snapshot = UrnetworkSdkBridge.RuntimeSnapshot(),
+                fallbackConnectionStatus = "CONNECTED",
+            ),
+        )
+        assertEquals("connected", fallbackStatus.engine.statsLabel(EngineStats()))
+        fallbackStatus.close()
+
+        val activeConnections = fixture(bridge = RecordingBridge(snapshot = UrnetworkSdkBridge.RuntimeSnapshot()))
+        assertEquals("2 peers", activeConnections.engine.statsLabel(EngineStats(activeConnections = 2)))
+        activeConnections.close()
 
         val empty = fixture(bridge = RecordingBridge(snapshot = UrnetworkSdkBridge.RuntimeSnapshot()))
         assertNull(empty.engine.statsLabel(EngineStats()))
@@ -307,6 +353,8 @@ class EngineUrnetworkCoverageTest {
         private val locationInfo: UrnetworkSdkBridge.LocationInfo? = null,
         private val snapshot: UrnetworkSdkBridge.RuntimeSnapshot = UrnetworkSdkBridge.RuntimeSnapshot(),
         private val connectToThrows: Boolean = false,
+        private val throwOptionalConfiguration: Boolean = false,
+        private val fallbackConnectionStatus: String? = snapshot.connectionStatus,
     ) : UrnetworkSdkBridge {
         var startCalls = 0
         var connectToCalls = 0
@@ -346,9 +394,11 @@ class EngineUrnetworkCoverageTest {
         override fun openLocationsViewController(): com.bringyour.sdk.LocationsViewController? = null
         override fun setPreferredLocation(selection: UrnetworkLocationSelection?) {
             recordedPreferredLocation = selection
+            if (throwOptionalConfiguration) error("preferred failed")
         }
         override fun setProvidePaused(paused: Boolean) {
             providePaused = paused
+            if (throwOptionalConfiguration) error("provide failed")
         }
         override fun isProvidePaused(): Boolean = providePaused == true
         override fun applyPerformanceProfile(
@@ -359,16 +409,19 @@ class EngineUrnetworkCoverageTest {
             this.windowType = windowType
             this.fixedIpSize = fixedIpSize
             this.allowDirect = allowDirect
+            if (throwOptionalConfiguration) error("profile failed")
         }
         override fun setProvideControlMode(mode: UrnetworkProvideControlMode) {
             controlMode = mode
+            if (throwOptionalConfiguration) error("control failed")
         }
         override fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) {
             networkMode = mode
+            if (throwOptionalConfiguration) error("network failed")
         }
         override fun runtimeSnapshot(): UrnetworkSdkBridge.RuntimeSnapshot = snapshot
         override fun peerCount(): Int = snapshot.peers
-        override fun connectionStatus(): String? = snapshot.connectionStatus
+        override fun connectionStatus(): String? = fallbackConnectionStatus
         override fun unpaidByteCount(): Long = 0L
         override fun fetchTransferStats() = Unit
         override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null

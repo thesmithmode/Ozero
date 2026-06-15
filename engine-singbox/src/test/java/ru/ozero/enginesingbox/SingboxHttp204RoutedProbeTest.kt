@@ -27,6 +27,13 @@ class SingboxHttp204RoutedProbeTest {
     }
 
     @Test
+    fun `routed probe default configuration rejects invalid port`() = runTest {
+        val probe = SingboxHttp204RoutedProbe()
+
+        assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, probe.probeLatencyMs(0))
+    }
+
+    @Test
     fun `routed probe succeeds after HTTP 204 through SOCKS`() = runTest {
         val ticks = 1_000L
         SocksHttpServer(statusCode = 204, reason = "No Content").use { socks ->

@@ -98,6 +98,17 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `exitNodeStrategy omits blank resolved ip after authenticated start`() = runTest {
+        engine.setPrivate("_currentServer", server("S1").copy(countryCode = "fr"))
+        engine.setPrivate("_currentServerIp", "   ")
+
+        val strategy = assertIs<ExitNodeStrategy.ProviderLabel>(engine.exitNodeStrategy(0))
+
+        assertEquals("FR", strategy.countryCode)
+        assertNull(strategy.ip)
+    }
+
+    @Test
     fun `attachTun fails before start`() = runTest {
         val result = engine.attachTun(42)
 
@@ -910,7 +921,7 @@ class FptnEngineTest {
 
     @Test
     fun `exit node strategy falls back when country code is blank long or numeric`() {
-        listOf("", "USA", "1A").forEach { code ->
+        listOf("", " ", "USA", "1A", "U1", "u").forEach { code ->
             val strategy = fptnExitNodeStrategy(
                 server("Token-$code").copy(countryCode = code),
                 serverIp = null,
@@ -1003,6 +1014,14 @@ class FptnEngineTest {
         assertEquals(
             FptnEngine.FPTN_API_ERROR,
             classifyFptnAuthFailure(FptnNativeResponse(500, "", "internal server error")),
+        )
+        assertEquals(
+            FptnEngine.FPTN_API_ERROR,
+            classifyFptnAuthFailure(FptnNativeResponse(302, "", "")),
+        )
+        assertEquals(
+            FptnEngine.FPTN_API_ERROR,
+            classifyFptnAuthFailure(),
         )
     }
 
