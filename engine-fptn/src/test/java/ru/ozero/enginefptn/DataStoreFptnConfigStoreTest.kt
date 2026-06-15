@@ -5,17 +5,21 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.util.concurrent.CountDownLatch
 import ru.ozero.enginescore.EngineConfig
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -35,6 +39,29 @@ class DataStoreFptnConfigStoreTest {
 
         assertEquals(FptnConfig(), config)
         assertEquals(config, store.currentConfig())
+    }
+
+    @Test
+    fun `currentConfig returns cached value on repeated reads`() = runTest {
+        val dataStoreScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
+            produceFile = { File(tmp, "fptn-cached.preferences_pb") },
+        )
+        try {
+            dataStore.edit { prefs ->
+                prefs[stringPreferencesKey("fptn_token")] = "persisted-token"
+            }
+            val store = DataStoreFptnConfigStore(dataStore)
+
+            val first = store.currentConfig()
+            val second = store.currentConfig()
+
+            assertEquals("persisted-token", first.token)
+            assertEquals(first, second)
+        } finally {
+            dataStoreScope.cancel()
+        }
     }
 
     @Test
@@ -188,6 +215,33 @@ class DataStoreFptnConfigStoreTest {
     }
 
     @Test
+    fun `currentConfig skips reload when load happens while waiting on lock`() = runTest {
+        val store = newStore(this)
+        val holder = CompletableDeferred<Unit>()
+        val release = CountDownLatch(1)
+
+        val locker = launch(Dispatchers.IO) {
+            synchronized(store) {
+                holder.complete(Unit)
+                release.await()
+            }
+        }
+        holder.await()
+        val current = async(Dispatchers.IO) {
+            store.currentConfig()
+        }
+
+        store.update {
+            it.copy(token = "fptn:updated")
+        }
+        release.countDown()
+        val config = current.await()
+        locker.join()
+
+        assertEquals("fptn:updated", config.token)
+    }
+
+    @Test
     fun `blank optional strings fall back to defaults on reread`() = runTest {
         val store = newStore(this)
 
@@ -203,6 +257,17 @@ class DataStoreFptnConfigStoreTest {
         assertNull(reloaded.selectedServerName)
         assertEquals(FptnBypassMethod.DEFAULT.strategyName, reloaded.bypassMethod)
         assertEquals(FptnConfig.DEFAULT_SNI_DOMAIN, reloaded.sniDomain)
+    }
+
+    @Test
+    fun `unknown bypass method string falls back to default enum when mapped`() = runTest {
+        val store = newStore(this)
+
+        store.update { it.copy(bypassMethod = "UNKNOWN") }
+        val config = store.currentConfig()
+
+        assertEquals("UNKNOWN", config.bypassMethod)
+        assertEquals(FptnBypassMethod.DEFAULT, FptnBypassMethod.fromStrategyName(config.bypassMethod))
     }
 
     @Test
@@ -234,6 +299,39 @@ class DataStoreFptnConfigStoreTest {
         assertEquals(false, config.reconnectOnNetworkChange)
         assertEquals(false, config.reconnectOnIpChange)
         assertEquals(false, config.resetServerOnDisconnect)
+    }
+
+    @Test
+    fun `currentConfig follows boolean updates to true after false`() = runTest {
+        val store = newStore(this)
+
+        store.update {
+            it.copy(
+                autoSelect = false,
+                reconnectOnNetworkChange = false,
+                reconnectOnIpChange = false,
+                resetServerOnDisconnect = false,
+            )
+        }
+        assertEquals(false, store.currentConfig().autoSelect)
+        assertEquals(false, store.currentConfig().reconnectOnNetworkChange)
+        assertEquals(false, store.currentConfig().reconnectOnIpChange)
+        assertEquals(false, store.currentConfig().resetServerOnDisconnect)
+
+        store.update {
+            it.copy(
+                autoSelect = true,
+                reconnectOnNetworkChange = true,
+                reconnectOnIpChange = true,
+                resetServerOnDisconnect = true,
+            )
+        }
+
+        val current = store.currentConfig()
+        assertEquals(true, current.autoSelect)
+        assertEquals(true, current.reconnectOnNetworkChange)
+        assertEquals(true, current.reconnectOnIpChange)
+        assertEquals(true, current.resetServerOnDisconnect)
     }
 
     private fun newStore(scope: TestScope): DataStoreFptnConfigStore {

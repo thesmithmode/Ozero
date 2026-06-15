@@ -6,7 +6,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.launch
+import android.content.Context
+import android.net.ConnectivityManager
 import org.junit.jupiter.api.Test
+import ru.ozero.enginescore.EngineStats
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.Upstream
@@ -14,6 +18,9 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import io.mockk.mockk
+import io.mockk.every
+import io.mockk.verify
 
 class EngineWarpStatsRecoverTest {
 
@@ -184,6 +191,196 @@ class EngineWarpStatsRecoverTest {
         )
     }
 
+    @Test
+    fun `recover reattach succeeds when handshake returns ready`() = runTest {
+        val bridge = FakeBridge()
+        val e = newEngine(
+            bridge = bridge,
+            reader = FixedReader(WarpUapiState(handshakeAgeSeconds = 999L, rxBytes = 0L, txBytes = 0L, peersSeen = 1)),
+            scope = backgroundScope,
+            handshakeChecker = { _, _ -> true },
+        )
+
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.attachTun(tunFd = 10)
+        assertIs<EnginePlugin.RecoverResult.Failed>(e.recover())
+        assertIs<EnginePlugin.RecoverResult.Success>(e.recover())
+        assertEquals(2, bridge.attachCalls)
+    }
+
+    @Test
+    fun `recover reattach stays success even when handshake never succeeds`() = runTest {
+        val bridge = FakeBridge()
+        val e = newEngine(
+            bridge = bridge,
+            reader = FixedReader(WarpUapiState(handshakeAgeSeconds = 999L, rxBytes = 0L, txBytes = 0L, peersSeen = 1)),
+            scope = backgroundScope,
+            handshakeChecker = { _, _ -> false },
+        )
+
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.attachTun(tunFd = 11)
+        assertIs<EnginePlugin.RecoverResult.Failed>(e.recover())
+        assertIs<EnginePlugin.RecoverResult.Success>(e.recover())
+        assertEquals(2, bridge.attachCalls)
+    }
+
+    @Test
+    fun `recover second stale returns success when handshakeChecker throws during reattach wait`() = runTest {
+        val bridge = FakeBridge()
+        val reader = FixedReader(WarpUapiState(handshakeAgeSeconds = 999L, rxBytes = 1L, txBytes = 2L, peersSeen = 1))
+        val e = newEngine(
+            bridge = bridge,
+            reader = reader,
+            scope = backgroundScope,
+            handshakeChecker = { _, _ -> throw IllegalStateException("checker boom") },
+        )
+
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.attachTun(77)
+        assertIs<EnginePlugin.RecoverResult.Failed>(e.recover())
+        val second = e.recover()
+
+        assertIs<EnginePlugin.RecoverResult.Success>(second)
+        assertEquals(2, bridge.attachCalls)
+        assertEquals(1, bridge.detachCalls)
+    }
+
+    @Test
+    fun `recover second stale unregisters network callback when reattaching`() = runTest {
+        val connectivityManager = mockk<ConnectivityManager>(relaxed = true)
+        val context = mockk<Context>(relaxed = true)
+        every { context.getSystemService(Context.CONNECTIVITY_SERVICE) } returns connectivityManager
+        every { connectivityManager.registerDefaultNetworkCallback(any()) } returns Unit
+
+        val bridge = FakeBridge()
+        val reader = FixedReader(WarpUapiState(handshakeAgeSeconds = 999L, rxBytes = 1L, txBytes = 1L, peersSeen = 1))
+        val e = newEngine(
+            bridge = bridge,
+            reader = reader,
+            scope = backgroundScope,
+            handshakeChecker = { _, _ -> true },
+            context = context,
+        )
+
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.attachTun(78)
+        assertIs<EnginePlugin.RecoverResult.Failed>(e.recover())
+        assertIs<EnginePlugin.RecoverResult.Success>(e.recover())
+
+        verify(exactly = 1) { connectivityManager.registerDefaultNetworkCallback(any()) }
+        verify(exactly = 1) { connectivityManager.unregisterNetworkCallback(any()) }
+    }
+
+    @Test
+    fun `stats poll tracks latest counters after repeated non-null updates`() = runTest {
+        val calls = AtomicInteger(0)
+        val states = listOf(
+            WarpUapiState(handshakeAgeSeconds = 5L, rxBytes = 10L, txBytes = 20L, peersSeen = 1),
+            WarpUapiState(handshakeAgeSeconds = 300L, rxBytes = 20L, txBytes = 30L, peersSeen = 1),
+            WarpUapiState(handshakeAgeSeconds = 5L, rxBytes = 30L, txBytes = 50L, peersSeen = 1),
+            WarpUapiState(handshakeAgeSeconds = 5L, rxBytes = 40L, txBytes = 80L, peersSeen = 1),
+            WarpUapiState(handshakeAgeSeconds = 5L, rxBytes = 50L, txBytes = 120L, peersSeen = 1),
+            WarpUapiState(handshakeAgeSeconds = 5L, rxBytes = 60L, txBytes = 180L, peersSeen = 1),
+        )
+        val reader = WarpUapiStateReader { _, _ ->
+            val idx = calls.getAndIncrement()
+            states.getOrElse(idx) { states.last() }
+        }
+        val e = newEngine(
+            bridge = FakeBridge(),
+            reader = reader,
+            scope = backgroundScope,
+            pollMs = 1L,
+        )
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.attachTun(tunFd = 12)
+        runCurrent()
+        advanceTimeBy(20L)
+        runCurrent()
+
+        val s = e.stats().first { it.bytesIn == 60L && it.bytesOut == 180L }
+        assertEquals(60L, s.bytesIn)
+        assertEquals(180L, s.bytesOut)
+        assertEquals(1, s.activeConnections)
+    }
+
+    @Test
+    fun `stats poll handles null, stale and fresh handshake phases`() = runTest {
+        val readCalls = AtomicInteger(0)
+        val sequence = listOf(
+            null,
+            null,
+            null,
+            null,
+            null,
+            WarpUapiState(handshakeAgeSeconds = 500L, rxBytes = 1L, txBytes = 2L, peersSeen = 1),
+            WarpUapiState(handshakeAgeSeconds = 5L, rxBytes = 3L, txBytes = 4L, peersSeen = 1),
+            WarpUapiState(handshakeAgeSeconds = 6L, rxBytes = 5L, txBytes = 7L, peersSeen = 1),
+            WarpUapiState(handshakeAgeSeconds = 7L, rxBytes = 9L, txBytes = 11L, peersSeen = 1),
+            WarpUapiState(handshakeAgeSeconds = 8L, rxBytes = 13L, txBytes = 17L, peersSeen = 1),
+        )
+        val reader = WarpUapiStateReader { _, _ ->
+            val idx = sequence.getOrNull(readCalls.getAndIncrement()) ?: sequence.last()
+            idx
+        }
+        val e = newEngine(bridge = FakeBridge(), reader = reader, scope = backgroundScope, pollMs = 1L)
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.attachTun(tunFd = 55)
+        val snapshots = mutableListOf<EngineStats>()
+        val collectJob = launch {
+            e.stats().collect { snapshots.add(it) }
+        }
+
+        advanceTimeBy(20L)
+        runCurrent()
+        collectJob.cancel()
+        collectJob.join()
+
+        val intermediate = snapshots.firstOrNull {
+            it.connectedSince == 0L && it.activeConnections == 0 && it.bytesIn == 1L
+        }
+        assertTrue(intermediate != null, "intermediate stale handshake snapshot present")
+        assertEquals(1L, intermediate!!.bytesIn)
+        assertEquals(0L, intermediate.connectedSince)
+        val final = snapshots.firstOrNull {
+            it.connectedSince > 0L && it.activeConnections == 1 && it.bytesIn == 13L
+        }
+        assertTrue(final != null, "final fresh handshake snapshot present")
+        assertEquals(17L, final!!.bytesOut)
+    }
+
+    @Test
+    fun `null handshake age keeps activeConnections at zero during stats poll`() = runTest {
+        val reader = WarpUapiStateReader { _, _ ->
+            WarpUapiState(handshakeAgeSeconds = null, rxBytes = 11L, txBytes = 22L, peersSeen = 1)
+        }
+        val e = newEngine(bridge = FakeBridge(), reader = reader, scope = backgroundScope, pollMs = 50L)
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.attachTun(tunFd = 11)
+        runCurrent()
+        advanceTimeBy(300L)
+        runCurrent()
+        val s = e.stats().first()
+        assertEquals(0, s.activeConnections)
+        assertEquals(0L, s.connectedSince)
+        assertEquals(11L, s.bytesIn)
+    }
+
+    @Test
+    fun `recover reattach unavailable if no saved fd and ini`() = runTest {
+        val e = newEngine(
+            bridge = FakeBridge(),
+            reader = FixedReader(WarpUapiState(handshakeAgeSeconds = 999L, rxBytes = 0L, txBytes = 0L, peersSeen = 1)),
+            scope = backgroundScope,
+        )
+
+        assertIs<EnginePlugin.RecoverResult.Failed>(e.recover())
+        val second = e.recover()
+        val failed = assertIs<EnginePlugin.RecoverResult.Failed>(second)
+        assertEquals("handshake stale, reattach unavailable", failed.reason)
+    }
+
     private fun interface WarpUapiStateReader {
         operator fun invoke(uapiPath: String, tunnelName: String): WarpUapiState?
     }
@@ -197,15 +394,18 @@ class EngineWarpStatsRecoverTest {
         reader: WarpUapiStateReader,
         scope: kotlinx.coroutines.CoroutineScope,
         pollMs: Long = 5_000L,
+        context: Context? = null,
         ipv6Enabled: Boolean = false,
+        handshakeChecker: (String, String) -> Boolean = { _, _ -> true },
     ): EngineWarp = EngineWarp(
         autoConfig = FakeAuto(),
         configStore = FakeStore(sampleConfig),
         sdkBridge = bridge,
         uapiPathProvider = { "/tmp/uapi" },
+        context = context,
         socketProtector = ru.ozero.enginescore.VpnSocketProtector { true },
         ipv6EnabledProvider = { ipv6Enabled },
-        handshakeChecker = { _, _ -> true },
+        handshakeChecker = handshakeChecker,
         uapiStateReader = { p, n -> reader(p, n) },
         warpReadyTimeoutMs = 100L,
         warpReadyPollMs = 10L,

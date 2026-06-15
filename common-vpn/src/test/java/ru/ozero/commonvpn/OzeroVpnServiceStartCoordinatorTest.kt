@@ -94,6 +94,21 @@ class OzeroVpnServiceStartCoordinatorTest {
     }
 
     @Test
+    fun `start while stopping active skips sequence and still drops in-flight start flag`() = runTest {
+        val fixture = fixture()
+        fixture.stopping.set(true)
+
+        fixture.coordinator.start()
+        runCurrent()
+
+        assertEquals(1, fixture.closeStaleTunCalls)
+        assertEquals(1, fixture.killswitchReleasedCalls)
+        assertEquals(1, fixture.loadCalls)
+        assertEquals(0, fixture.startSequenceCalls)
+        assertEquals(false, fixture.starting.get())
+    }
+
+    @Test
     fun `external vpn delays start sequence without blocking preflight side effects`() = runTest {
         val fixture = fixture(externalVpnActive = true, externalVpnReleaseDelayMs = 50L)
 

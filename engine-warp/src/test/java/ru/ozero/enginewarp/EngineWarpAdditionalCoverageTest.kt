@@ -1,5 +1,7 @@
 package ru.ozero.enginewarp
 
+import android.content.Context
+import android.net.ConnectivityManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -7,7 +9,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
 import org.junit.jupiter.api.Test
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.ExitNodeStrategy
@@ -165,6 +172,307 @@ class EngineWarpAdditionalCoverageTest {
         engine.attachTun(44)
 
         assertTrue(bridge.lastIni.orEmpty().contains("Endpoint = 162.159.192.9:2408"))
+    }
+
+    @Test
+    fun `resolveActive no active slot uses auto config without rawIni and fallback host auto`() = runTest {
+        val blankHostConfig = config.copy(peerEndpoint = " :2408")
+        val fresh = RegisteredWarpConfig(blankHostConfig, "[Interface]\n[Peer]\n")
+        val store = FakeStore(emptyList())
+        val engine = newEngine(
+            auto = FakeAuto(Result.success(fresh)),
+            store = store,
+            bridge = FakeBridge(),
+        )
+
+        val result = engine.start(EngineConfig.Warp, Upstream.None)
+
+        assertIs<StartResult.Success>(result)
+        assertEquals("WARP auto", store.lastAddName)
+        assertEquals(1, store.addCalls)
+    }
+
+    @Test
+    fun `resolveActive with active slot and no rawIni keeps endpoint as in config`() = runTest {
+        val bridge = FakeBridge()
+        val withIp = config.copy(peerEndpoint = "198.51.100.1:2408")
+        val engine = newEngine(
+            bridge = bridge,
+            store = FakeStore(listOf(slot(config = withIp))),
+            auto = FakeAuto(Result.success(RegisteredWarpConfig(config.copy(peerEndpoint = "9.9.9.9:2408"), ""))),
+        )
+
+        engine.start(EngineConfig.Warp, Upstream.None)
+        engine.attachTun(21)
+
+        val endpoint = bridge.lastIni.orEmpty()
+            .lineSequence()
+            .first { it.startsWith("Endpoint") || it.trimStart().startsWith("Endpoint") }
+            .substringAfter('=')
+            .trim()
+
+        assertEquals("198.51.100.1:2408", endpoint)
+    }
+
+    @Test
+    fun `resolveActive missing active slot auto register without rawIni keeps builder endpoint`() = runTest {
+        val bridge = FakeBridge()
+        val fresh = RegisteredWarpConfig(config.copy(peerEndpoint = "198.51.100.9:2408"), "")
+        val store = FakeStore(emptyList())
+        val engine = newEngine(
+            bridge = bridge,
+            store = store,
+            auto = FakeAuto(Result.success(fresh)),
+        )
+
+        engine.start(EngineConfig.Warp, Upstream.None)
+        engine.attachTun(26)
+
+        val endpoint = bridge.lastIni.orEmpty()
+            .lineSequence()
+            .first { it.startsWith("Endpoint") || it.trimStart().startsWith("Endpoint") }
+            .substringAfter('=')
+            .trim()
+
+        assertEquals("198.51.100.9:2408", endpoint)
+    }
+
+    @Test
+    fun `resolveActive falls back to auto register when active slot is not marked as active`() = runTest {
+        val bridge = FakeBridge()
+        val stale = slot(id = "inactive", config = config).copy(isActive = false)
+        val autoFresh = RegisteredWarpConfig(config.copy(peerEndpoint = "198.51.100.77:2408"), rawIni())
+        val store = FakeStore(listOf(stale))
+        val engine = newEngine(
+            bridge = bridge,
+            store = store,
+            auto = FakeAuto(Result.success(autoFresh)),
+        )
+
+        engine.start(EngineConfig.Warp, Upstream.None)
+        engine.attachTun(27)
+
+        assertEquals(1, store.addCalls)
+        val endpoint = bridge.lastIni.orEmpty()
+            .lineSequence()
+            .first { it.startsWith("Endpoint") || it.trimStart().startsWith("Endpoint") }
+            .substringAfter('=')
+            .trim()
+
+        assertEquals("198.51.100.77:2408", endpoint)
+    }
+
+    @Test
+    fun `resolveActive with active slot and rawIni applies endpoint to raw template`() = runTest {
+        val bridge = FakeBridge()
+        val raw = rawIni().replace("Endpoint = 162.159.192.1:2408", "Endpoint = legacy.example:2408")
+        val engine = newEngine(
+            bridge = bridge,
+            store = FakeStore(listOf(slot(config = config, rawIni = raw))),
+        )
+
+        engine.start(EngineConfig.Warp, Upstream.None)
+        engine.attachTun(22)
+
+        val endpoint = bridge.lastIni.orEmpty()
+            .lineSequence()
+            .first { it.startsWith("Endpoint") || it.trimStart().startsWith("Endpoint") }
+            .substringAfter('=')
+            .trim()
+
+        assertEquals(config.peerEndpoint, endpoint)
+        assertTrue(bridge.lastIni.orEmpty().contains("PrivateKey = private"))
+    }
+
+    @Test
+    fun `resolveEndpointHost keeps already ip endpoint`() = runTest {
+        val bridge = FakeBridge()
+        val ipConfig = config.copy(peerEndpoint = "203.0.113.10:2408")
+        val engine = newEngine(
+            bridge = bridge,
+            store = FakeStore(listOf(slot(config = ipConfig))),
+        )
+
+        engine.start(EngineConfig.Warp, Upstream.None)
+        engine.attachTun(23)
+
+        val endpoint = bridge.lastIni.orEmpty()
+            .lineSequence()
+            .first { it.startsWith("Endpoint") || it.trimStart().startsWith("Endpoint") }
+            .substringAfter('=')
+            .trim()
+
+        assertEquals("203.0.113.10:2408", endpoint)
+    }
+
+    @Test
+    fun `resolveEndpointHost keeps bracketed ip endpoint unchanged`() = runTest {
+        val bridge = FakeBridge()
+        val ipV6Host = config.copy(peerEndpoint = "[2001:db8::1]:2408")
+        val engine = newEngine(
+            bridge = bridge,
+            store = FakeStore(listOf(slot(config = ipV6Host))),
+        )
+
+        engine.start(EngineConfig.Warp, Upstream.None)
+        engine.attachTun(25)
+
+        val endpoint = bridge.lastIni.orEmpty()
+            .lineSequence()
+            .first { it.startsWith("Endpoint") || it.trimStart().startsWith("Endpoint") }
+            .substringAfter('=')
+            .trim()
+
+        assertEquals("[2001:db8::1]:2408", endpoint)
+    }
+
+    @Test
+    fun `resolveEndpointHost rewrites hostname through system resolver when host has no port`() = runTest {
+        val bridge = FakeBridge()
+        val hostnameNoPort = config.copy(peerEndpoint = "localhost")
+        val engine = newEngine(
+            bridge = bridge,
+            store = FakeStore(listOf(slot(config = hostnameNoPort))),
+        )
+
+        engine.start(EngineConfig.Warp, Upstream.None)
+        engine.attachTun(26)
+
+        val endpoint = bridge.lastIni.orEmpty()
+            .lineSequence()
+            .first { it.startsWith("Endpoint") || it.trimStart().startsWith("Endpoint") }
+            .substringAfter('=')
+            .trim()
+
+        assertEquals("localhost", endpoint)
+    }
+
+    @Test
+    fun `resolveEndpointHost keeps blank host endpoint unchanged`() = runTest {
+        val bridge = FakeBridge()
+        val blankHost = config.copy(peerEndpoint = " :2408", doHProvider = DoHProvider.SYSTEM)
+        val engine = newEngine(
+            bridge = bridge,
+            store = FakeStore(listOf(slot(config = blankHost))),
+        )
+
+        engine.start(EngineConfig.Warp, Upstream.None)
+        engine.attachTun(24)
+
+        val endpoint = bridge.lastIni.orEmpty()
+            .lineSequence()
+            .first { it.startsWith("Endpoint") || it.trimStart().startsWith("Endpoint") }
+            .substringAfter('=')
+            .trim()
+
+        assertEquals(":2408", endpoint)
+    }
+
+    @Test
+    fun `resolveEndpointHost keeps endpoint without port unchanged`() = runTest {
+        val hostWithoutPort = config.copy(
+            peerEndpoint = "engage.cloudflareclient.com",
+            doHProvider = DoHProvider.CLOUDFLARE_1111,
+        )
+        val bridge = FakeBridge()
+        val engine = newEngine(
+            bridge = bridge,
+            store = FakeStore(listOf(slot(config = hostWithoutPort))),
+        )
+        engine.start(EngineConfig.Warp, Upstream.None)
+        engine.attachTun(56)
+
+        val endpoint = bridge.lastIni.orEmpty()
+            .lineSequence()
+            .first { it.startsWith("Endpoint") || it.trimStart().startsWith("Endpoint") }
+            .substringAfter('=')
+            .trim()
+
+        assertEquals("engage.cloudflareclient.com", endpoint)
+    }
+
+    @Test
+    fun `resolveViaDoH parses ipv4 from local dns json response`() = runTest {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setBody("""{"Answer":[{"data":"203.0.113.8"}]}"""),
+            )
+            val engine = newEngine(bridge = FakeBridge(), store = FakeStore(emptyList()))
+            val resolved = engine.resolveViaDoH("engage.cloudflareclient.com", "${server.url("/dns-query")}")
+            assertEquals("203.0.113.8", resolved)
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun `resolveViaDoH returns null on non-ok response`() = runTest {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setResponseCode(500).setBody("boom"))
+            val engine = newEngine(bridge = FakeBridge(), store = FakeStore(emptyList()))
+            val resolved = engine.resolveViaDoH("engage.cloudflareclient.com", "${server.url("/dns-query")}")
+            assertEquals(null, resolved)
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun `bootstrapSafeDohUrl uses bootstrap for non-literal provider urls`() = runTest {
+        val engine = newEngine(bridge = FakeBridge(), store = FakeStore(emptyList()))
+        assertEquals("https://1.1.1.1/dns-query", engine.bootstrapSafeDohUrl(DoHProvider.CLOUDFLARE_1111))
+        assertEquals("https://1.1.1.1/dns-query", engine.bootstrapSafeDohUrl(DoHProvider.GOOGLE_8888))
+        assertEquals("https://1.1.1.1/dns-query", engine.bootstrapSafeDohUrl(DoHProvider.MALW))
+    }
+
+    @Test
+    fun `registerNetworkCallback failure path does not break attach`() = runTest {
+        val connectivityManager = mockk<ConnectivityManager>(relaxed = true)
+        val context = mockk<Context>(relaxed = true)
+        every { context.getSystemService(Context.CONNECTIVITY_SERVICE) } returns connectivityManager
+        every {
+            connectivityManager.registerDefaultNetworkCallback(any())
+        } throws IllegalStateException("network callback unavailable")
+
+        val engine = newEngine(
+            bridge = FakeBridge(),
+            store = FakeStore(listOf(slot())),
+            context = context,
+        )
+
+        engine.start(EngineConfig.Warp, Upstream.None)
+        assertIs<TunAttachResult.Success>(engine.attachTun(58))
+
+        verify(exactly = 1) { connectivityManager.registerDefaultNetworkCallback(any()) }
+        verify(exactly = 0) { connectivityManager.unregisterNetworkCallback(any()) }
+        engine.stop()
+    }
+
+    @Test
+    fun `unregister callback failure does not throw in stop`() = runTest {
+        val connectivityManager = mockk<ConnectivityManager>(relaxed = true)
+        val context = mockk<Context>(relaxed = true)
+        every { context.getSystemService(Context.CONNECTIVITY_SERVICE) } returns connectivityManager
+        every { connectivityManager.unregisterNetworkCallback(any()) } throws IllegalStateException("unregister failed")
+
+        val bridge = FakeBridge()
+        val engine = newEngine(
+            bridge = bridge,
+            store = FakeStore(listOf(slot())),
+            context = context,
+        )
+        engine.start(EngineConfig.Warp, Upstream.None)
+        assertIs<TunAttachResult.Success>(engine.attachTun(59))
+        engine.stop()
+
+        assertIs<ExitNodeStrategy.Unavailable>(engine.exitNodeStrategy(0))
+        assertEquals(1, bridge.detachCalls)
     }
 
     @Test
@@ -378,11 +686,13 @@ class EngineWarpAdditionalCoverageTest {
         ipv6: Boolean = false,
         reader: (String, String) -> WarpUapiState? = { _, _ -> null },
         checker: (String, String) -> Boolean = { _, _ -> true },
+        context: Context? = null,
     ): EngineWarp = EngineWarp(
         autoConfig = auto,
         configStore = store,
         sdkBridge = bridge,
         uapiPathProvider = { "/tmp/uapi" },
+        context = context,
         socketProtector = ru.ozero.enginescore.VpnSocketProtector { true },
         ipv6EnabledProvider = { ipv6 },
         handshakeChecker = checker,
@@ -401,6 +711,7 @@ class EngineWarpAdditionalCoverageTest {
     private class FakeStore(initial: List<WarpConfigSlot>) : WarpConfigSlotStore {
         private val slotsState = MutableStateFlow(initial)
         var addCalls = 0
+        var lastAddName: String? = null
         var activatedId: String? = null
         var throwDuplicateOnAdd = false
 
@@ -417,6 +728,7 @@ class EngineWarpAdditionalCoverageTest {
             endpointList: List<String>,
         ): String {
             addCalls++
+            lastAddName = name
             if (throwDuplicateOnAdd) throw WarpConfigDuplicateException("existing", "Existing")
             val id = "slot-$addCalls"
             slotsState.value = slotsState.value + slot(id = id, config = config, rawIni = rawIni)
@@ -483,6 +795,23 @@ class EngineWarpAdditionalCoverageTest {
         }
         override fun isRunning(): Boolean = false
         override fun reprotectSockets() = Unit
+    }
+
+    private fun EngineWarp.resolveViaDoH(host: String, dohUrl: String): String? {
+        val method = EngineWarp::class.java.getDeclaredMethod(
+            "resolveViaDoH",
+            String::class.java,
+            String::class.java,
+        ).apply { isAccessible = true }
+        return method.invoke(this, host, dohUrl) as String?
+    }
+
+    private fun EngineWarp.bootstrapSafeDohUrl(provider: DoHProvider): String {
+        val method = EngineWarp::class.java.getDeclaredMethod(
+            "bootstrapSafeDohUrl",
+            DoHProvider::class.java,
+        ).apply { isAccessible = true }
+        return method.invoke(this, provider) as String
     }
 
     private companion object {

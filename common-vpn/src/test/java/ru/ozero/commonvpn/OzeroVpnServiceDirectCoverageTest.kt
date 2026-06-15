@@ -1,5 +1,7 @@
 package ru.ozero.commonvpn
 
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import org.junit.jupiter.api.Test
@@ -7,6 +9,8 @@ import ru.ozero.enginescore.ChainOrchestrator
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.EngineId.BYEDPI
+import ru.ozero.enginescore.EngineId.WARP
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
 import ru.ozero.enginescore.ProbeResult
@@ -33,6 +37,37 @@ class OzeroVpnServiceDirectCoverageTest {
                 MinimalEngine(EngineId.BYEDPI),
             ),
         )
+
+        val extras = service.callEngineExtras()
+
+        assertEquals("", extras)
+    }
+
+    @Test
+    fun `engine extras joins active engine display names when chain has started engines`() {
+        val chain = ChainOrchestrator(setOf(BYEDPI, WARP).map(::MinimalEngine).toSet())
+        val startedField = ChainOrchestrator::class.java.getDeclaredField("started")
+        startedField.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val started = startedField.get(chain) as MutableList<EnginePlugin>
+        started += MinimalEngine(BYEDPI)
+        started += MinimalEngine(WARP)
+
+        val service = OzeroVpnService()
+        service.chainOrchestrator = chain
+
+        val extras = service.callEngineExtras()
+
+        assertEquals("ByeDPI + WARP", extras)
+    }
+
+    @Test
+    fun `engine extras falls back to empty string when active engines request fails`() {
+        val chain = mockk<ChainOrchestrator>()
+        every { chain.activeEngines() } throws IllegalStateException("boom")
+
+        val service = OzeroVpnService()
+        service.chainOrchestrator = chain
 
         val extras = service.callEngineExtras()
 

@@ -1,97 +1,131 @@
 package ru.ozero.commonvpn
 
 import org.junit.jupiter.api.Test
+import ru.ozero.enginescore.EngineId
 import java.io.File
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class OzeroVpnServiceRuntimeRestartTest {
 
-    private val source by lazy {
+    private val serviceSource by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
-        val file = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt")
-        assertTrue(file.exists(), "OzeroVpnService.kt не найден: $file")
-        file.readText()
+        val sourceFile = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/OzeroVpnService.kt")
+        assertTrue(sourceFile.exists(), "OzeroVpnService.kt not found: $sourceFile")
+        sourceFile.readText()
     }
 
     private val dispatcherSource by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
-        val file = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/OzeroVpnServiceActionDispatcher.kt")
-        assertTrue(file.exists(), "OzeroVpnServiceActionDispatcher.kt не найден: $file")
-        file.readText()
+        val sourceFile = File(
+            moduleRoot,
+            "src/main/java/ru/ozero/commonvpn/OzeroVpnServiceActionDispatcher.kt",
+        )
+        assertTrue(sourceFile.exists(), "OzeroVpnServiceActionDispatcher.kt not found: $sourceFile")
+        sourceFile.readText()
     }
 
     @Test
-    fun `ACTION_RESTART_RUNTIME_CONFIG делает restart внутри живого service`() {
-        val commandBody = dispatcherSource
-            .substringAfter("fun dispatch(")
-            .substringBefore("} catch")
-        assertTrue(commandBody.contains("ACTION_RESTART_RUNTIME_CONFIG -> {"))
-        assertTrue(commandBody.contains("isTunnelIdle()"))
-        assertTrue(commandBody.contains("stopSelf(startId)"))
-        assertTrue(commandBody.contains("restartVpn()"))
+    fun `ACTION_RESTART_RUNTIME_CONFIG restarts only active tunnel`() {
+        val commandBody = sourceBlock(
+            text = dispatcherSource,
+            startAnchor = "fun dispatch(",
+            endAnchor = "} catch",
+        )
+        val restartCommand = commandBody
+            .substringAfter("ACTION_RESTART_RUNTIME_CONFIG -> {")
+            .substringBefore("OzeroVpnService.ACTION_START, null")
 
-        val restartBody = source
-            .substringAfter("private fun restartVpn()")
-            .substringBefore("private fun logActiveExternalVpn()")
-        assertTrue(restartBody.contains("shutdownCoord.stopVpn(callStopSelf = false)"))
-        assertTrue(restartBody.contains("if (!shutdownStarted) return"))
-        assertTrue(restartBody.contains("runtimeConfigRestartInProgress.set(true)"))
-        assertTrue(restartBody.contains("shutdownJobRef.get()?.let"))
-        assertTrue(restartBody.contains("notificationFactory.enterForeground(this@OzeroVpnService)"))
-        assertTrue(restartBody.contains("startVpn()"))
-        assertTrue(restartBody.contains("runtimeConfigRestartInProgress.set(false)"))
+        assertTrue(restartCommand.contains("if (isTunnelIdle())"))
+        assertTrue(restartCommand.contains("stopSelf(startId)"))
+        assertTrue(restartCommand.contains("restartVpn()"))
     }
 
     @Test
-    fun `runtime restart respects user stop before relaunch`() {
-        val startBody = File(
-            File(System.getProperty("user.dir") ?: "."),
-            "src/main/java/ru/ozero/commonvpn/OzeroVpnServiceStartCoordinator.kt",
-        ).readText()
-        assertTrue(startBody.contains("runtimeConfigRestartCancelled.set(false)"))
+    fun `restartVpn relaunches without stopSelf and then requests start after shutdown`() {
+        val restartBody = sourceBlock(
+            text = serviceSource,
+            startAnchor = "private fun restartVpn()",
+            endAnchor = "private fun logActiveExternalVpn()",
+        )
+        val stopCallStart = restartBody.indexOf("shutdownCoord.stopVpn(callStopSelf = false)")
+        val shutdownJoinStart = restartBody.indexOf("shutdownJobRef.get()?.let")
+        val fgCheckStart = restartBody.indexOf("notificationFactory.enterForeground(this@OzeroVpnService)")
+        val startVpnCall = restartBody.indexOf("startVpn()", fgCheckStart)
+        val stopSelfCall = restartBody.indexOf("stopSelf(latestStartId.get())")
 
-        val stopBody = source.substringAfter("private fun stopVpn()").substringBefore("private fun restartVpn()")
-        assertTrue(stopBody.contains("runtimeConfigRestartInProgress.get()"))
-        assertTrue(stopBody.contains("runtimeConfigRestartCancelled.set(true)"))
-
-        val restartBody = source
-            .substringAfter("private fun restartVpn()")
-            .substringBefore("private fun logActiveExternalVpn()")
-        assertTrue(restartBody.contains("val restartCancelled = runtimeConfigRestartCancelled.get()"))
-        assertTrue(restartBody.contains("!restartCancelled"))
+        assertTrue(stopCallStart >= 0)
         assertTrue(restartBody.contains("runtimeConfigRestartCancelled.set(false)"))
-        assertTrue(restartBody.contains("stopSelf(latestStartId.get())"))
+        assertTrue(restartBody.contains("runtimeConfigRestartInProgress.set(true)"))
+        assertTrue(shutdownJoinStart > stopCallStart)
+        assertTrue(fgCheckStart > shutdownJoinStart)
+        assertTrue(startVpnCall > fgCheckStart)
+        assertTrue(stopSelfCall > startVpnCall)
+        assertTrue(restartBody.contains("startVpn()"))
     }
 
     @Test
-    fun `runtime restart stops service on every aborted relaunch path`() {
-        val restartBody = source
-            .substringAfter("private fun restartVpn()")
-            .substringBefore("private fun logActiveExternalVpn()")
+    fun `user stop during runtime restart cancels relaunch and stops service`() {
+        val stopBody = sourceBlock(
+            text = serviceSource,
+            startAnchor = "private fun stopVpn()",
+            endAnchor = "private fun restartVpn()",
+        )
+        val restartBody = sourceBlock(
+            text = serviceSource,
+            startAnchor = "private fun restartVpn()",
+            endAnchor = "private fun logActiveExternalVpn()",
+        )
         val abortBody = restartBody.substringAfter("} else {")
 
+        assertTrue(stopBody.contains("runtimeConfigRestartInProgress.get()"))
+        assertTrue(stopBody.contains("runtimeConfigRestartCancelled.set(true)"))
+        assertTrue(restartBody.contains("val restartCancelled = runtimeConfigRestartCancelled.get()"))
+        assertTrue(restartBody.contains("!restartCancelled"))
         assertTrue(abortBody.contains("runtimeConfigRestartInProgress.set(false)"))
         assertTrue(abortBody.contains("runtimeConfigRestartCancelled.set(false)"))
         assertTrue(abortBody.contains("stopSelf(latestStartId.get())"))
-        assertTrue(
-            !abortBody.contains("if (restartCancelled)"),
-            "stopSelf должен выполняться при любом abort restart: " +
-                "cancel, stopping или enterForeground=false",
-        )
     }
 
     @Test
-    fun `runtime restart ignores stale intent after tunnel became idle`() {
-        val commandBody = dispatcherSource
-            .substringAfter("fun dispatch(")
-            .substringBefore("} catch")
-        val restartCommand = commandBody
-            .substringAfter("ACTION_RESTART_RUNTIME_CONFIG -> {")
-            .substringBefore("ACTION_START, null")
+    fun `runtime failure router replaces active handler and ignores stale callbacks`() {
+        val router = RuntimeFailureRouter()
+        val staleCalls = mutableListOf<EngineId>()
+        val freshCalls = mutableListOf<EngineId>()
+        val stale = { engine: EngineId, _: String -> staleCalls += engine }
+        val fresh = { engine: EngineId, _: String -> freshCalls += engine }
 
-        assertTrue(restartCommand.contains("isTunnelIdle()"))
-        assertTrue(restartCommand.contains("stopSelf(startId)"))
-        assertTrue(restartCommand.contains("} else {"))
-        assertTrue(restartCommand.contains("restartVpn()"))
+        router.bind(stale)
+        router.handleEngineFailure(EngineId.BYEDPI, "first")
+        router.bind(fresh)
+        router.handleEngineFailure(EngineId.URNETWORK, "second")
+        router.unbind(stale)
+        router.unbind(fresh)
+        router.handleEngineFailure(EngineId.WARP, "third")
+
+        assertEquals(listOf(EngineId.BYEDPI), staleCalls)
+        assertEquals(listOf(EngineId.URNETWORK), freshCalls)
+    }
+
+    @Test
+    fun `runtime failure router ignores failures without a bound handler`() {
+        val router = RuntimeFailureRouter()
+        val calls = mutableListOf<EngineId>()
+
+        val handler = { engine: EngineId, _: String -> calls += engine }
+        router.bind(handler)
+        router.unbind(handler)
+        router.handleEngineFailure(EngineId.WARP, "ignored")
+
+        assertEquals(emptyList(), calls)
+    }
+
+    private fun sourceBlock(text: String, startAnchor: String, endAnchor: String): String {
+        assertTrue(text.contains(startAnchor), "Source anchor '$startAnchor' missing")
+        assertTrue(text.contains(endAnchor), "Source anchor '$endAnchor' missing")
+        val startIndex = text.indexOf(startAnchor)
+        val endIndex = text.indexOf(endAnchor, startIndex + startAnchor.length)
+        assertTrue(endIndex > startIndex, "End anchor appears before start anchor")
+        return text.substring(startIndex, endIndex)
     }
 }

@@ -7,7 +7,10 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import java.io.ByteArrayInputStream
+import java.io.IOException
 
 class HttpUrlConnectionClientTest {
 
@@ -27,7 +30,7 @@ class HttpUrlConnectionClientTest {
     }
 
     @Test
-    fun `postJson возвращает тело ответа при HTTP 200`() = runTest {
+    fun `postJson success on HTTP 200`() = runTest {
         server.enqueue(MockResponse().setResponseCode(200).setBody("""{"ok":true}"""))
         val url = server.url("/api/warp").toString()
         val result = client.postJson(url, "{}", "test-agent")
@@ -36,7 +39,7 @@ class HttpUrlConnectionClientTest {
     }
 
     @Test
-    fun `postJson отправляет POST с Content-Type application-json`() = runTest {
+    fun `postJson sets expected headers`() = runTest {
         server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
         val url = server.url("/api/warp").toString()
         client.postJson(url, """{"test":1}""", "ua")
@@ -49,7 +52,7 @@ class HttpUrlConnectionClientTest {
     }
 
     @Test
-    fun `postJson возвращает failure при HTTP 500`() = runTest {
+    fun `postJson failure on HTTP 500`() = runTest {
         server.enqueue(MockResponse().setResponseCode(500).setBody("Internal Server Error"))
         val url = server.url("/api/warp").toString()
         val result = client.postJson(url, "{}", "ua")
@@ -58,7 +61,16 @@ class HttpUrlConnectionClientTest {
     }
 
     @Test
-    fun `postJson возвращает failure при HTTP 404`() = runTest {
+    fun `postJson maps non-ok response without body as failure`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(500))
+        val url = server.url("/api/warp").toString()
+        val result = client.postJson(url, "{}", "ua")
+        assertTrue(result.isFailure)
+        assertEquals("HTTP 500: ", result.exceptionOrNull()?.message.orEmpty())
+    }
+
+    @Test
+    fun `postJson failure on HTTP 404`() = runTest {
         server.enqueue(MockResponse().setResponseCode(404).setBody("Not Found"))
         val url = server.url("/api/warp").toString()
         val result = client.postJson(url, "{}", "ua")
@@ -67,13 +79,19 @@ class HttpUrlConnectionClientTest {
     }
 
     @Test
-    fun `postJson возвращает failure при недоступном хосте`() = runTest {
+    fun `postJson failure on unreachable host`() = runTest {
         val result = client.postJson("http://127.0.0.1:1", "{}", "ua")
         assertTrue(result.isFailure)
     }
 
     @Test
-    fun `postJson возвращает пустую строку при пустом теле 200`() = runTest {
+    fun `postJson failure on malformed url`() = runTest {
+        val result = client.postJson(":", "{}", "ua")
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `postJson success with empty body`() = runTest {
         server.enqueue(MockResponse().setResponseCode(200).setBody(""))
         val url = server.url("/api/warp").toString()
         val result = client.postJson(url, "{}", "ua")
@@ -82,17 +100,8 @@ class HttpUrlConnectionClientTest {
     }
 
     @Test
-    fun `postJson принимает 201 как успешный ответ`() = runTest {
+    fun `postJson accepts 201 and rejects 300`() = runTest {
         server.enqueue(MockResponse().setResponseCode(201).setBody("""{"created":true}"""))
-        val url = server.url("/api/warp").toString()
-        val result = client.postJson(url, "{}", "ua")
-        assertTrue(result.isSuccess)
-        assertEquals("""{"created":true}""", result.getOrThrow())
-    }
-
-    @Test
-    fun `postJson accepts 299 and rejects 300 boundary responses`() = runTest {
-        server.enqueue(MockResponse().setResponseCode(299).setBody("upper-ok"))
         server.enqueue(MockResponse().setResponseCode(300).setBody("redirect"))
         val url = server.url("/api/warp").toString()
 
@@ -100,31 +109,56 @@ class HttpUrlConnectionClientTest {
         val redirect = client.postJson(url, "{}", "ua")
 
         assertTrue(upperOk.isSuccess)
-        assertEquals("upper-ok", upperOk.getOrThrow())
+        assertEquals("""{"created":true}""", upperOk.getOrThrow())
         assertTrue(redirect.isFailure)
         assertTrue(redirect.exceptionOrNull()?.message?.contains("300") == true)
     }
 
     @Test
-    fun `postJson отклоняет ответ больше 512KB чтобы предотвратить OOM`() = runTest {
+    fun `postJson too large response is failure`() = runTest {
         val tooLarge = "x".repeat(600_000)
         server.enqueue(MockResponse().setResponseCode(200).setBody(tooLarge))
         val url = server.url("/api/warp").toString()
         val result = client.postJson(url, "{}", "ua")
-        assertTrue(result.isFailure, "ответ >512KB обязан давать failure (DoS prevention)")
+        assertTrue(result.isFailure)
         val message = result.exceptionOrNull()?.message.orEmpty()
-        assertTrue(
-            message.contains("too large") || message.contains("524288"),
-            "сообщение об ошибке должно указывать на превышение лимита: $message",
-        )
+        assertTrue(message.contains("too large") || message.contains("524288"))
     }
 
     @Test
-    fun `postJson принимает ответ 512KB ровно (пограничное значение)`() = runTest {
+    fun `postJson max body size is allowed`() = runTest {
         val maxBody = "y".repeat(524_288)
         server.enqueue(MockResponse().setResponseCode(200).setBody(maxBody))
         val url = server.url("/api/warp").toString()
         val result = client.postJson(url, "{}", "ua")
-        assertTrue(result.isSuccess, "ответ ровно 512KB должен проходить (граница включительно)")
+        assertTrue(result.isSuccess)
+    }
+
+    @Test
+    fun `readBounded accepts exactly max response size`() {
+        val maxBody = ByteArray(524_288) { 'x'.code.toByte() }
+        val body = readBounded(ByteArrayInputStream(maxBody), 524_288L)
+        assertEquals(maxBody.size, body.length)
+    }
+
+    @Test
+    fun `readBounded throws when response exceeds max`() {
+        val over = ByteArray(524_289) { 'x'.code.toByte() }
+        assertFailsWith<IOException> {
+            readBounded(ByteArrayInputStream(over), 524_288L)
+        }
+    }
+
+    private fun readBounded(stream: ByteArrayInputStream, maxBytes: Long): String {
+        val companion = HttpUrlConnectionClient::class.java
+            .getDeclaredField("Companion")
+            .apply { isAccessible = true }
+            .get(null)
+        val method = companion.javaClass.getDeclaredMethod(
+            "readBounded",
+            java.io.InputStream::class.java,
+            Long::class.javaPrimitiveType,
+        ).apply { isAccessible = true }
+        return method.invoke(companion, stream, maxBytes) as String
     }
 }

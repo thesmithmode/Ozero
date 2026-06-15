@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -379,6 +380,42 @@ class UrnetworkConfigStoreTest {
     }
 
     @Test
+    fun `location selection normalized handles country with digits, blanks and city-only selections`() {
+        assertNull(UrnetworkLocationSelection("U1", "Berlin", "Munich").normalized())
+        assertEquals(
+            UrnetworkLocationSelection("DE", null, null),
+            UrnetworkLocationSelection(" de ", "   ", "   ").normalized(),
+        )
+        assertEquals(
+            UrnetworkLocationSelection(null, null, "Berlin"),
+            UrnetworkLocationSelection(null, "   ", "\tBerlin  ").normalized(),
+        )
+        assertEquals(
+            UrnetworkLocationSelection("DE", null, "Munich"),
+            UrnetworkLocationSelection(" de ", "   ", " Munich ").normalized(),
+        )
+    }
+
+    @Test
+    fun `location selection normalized and summary covers mixed variants`() {
+        val onlyCountry = UrnetworkLocationSelection(" us ", null, null).normalized()
+        val onlyCity = UrnetworkLocationSelection(null, null, " Munich ").normalized()
+        val countryAndCity = UrnetworkLocationSelection("de", null, "  Berlin ").normalized()
+
+        assertEquals(UrnetworkLocationSelection("US", null, null), onlyCountry)
+        assertEquals(UrnetworkLocationSelection(null, null, "Munich"), onlyCity)
+        assertEquals(UrnetworkLocationSelection("DE", null, "Berlin"), countryAndCity)
+        assertNotNull(countryAndCity)
+        assertNotNull(onlyCity)
+        assertEquals("DE/Berlin", countryAndCity.summary())
+        assertEquals("??/Munich", onlyCity.summary())
+        assertEquals(
+            UrnetworkLocationSelection.EMPTY.summary(),
+            UrnetworkLocationSelection(null, null, null).summary(),
+        )
+    }
+
+    @Test
     fun `persisted enum and boolean values reload through readConfig`() = runTest {
         val (store, ds) = newStore()
         store.setWindowType(UrnetworkWindowType.QUALITY)
@@ -502,6 +539,63 @@ class UrnetworkConfigStoreTest {
             assertTrue(snap.cachedBestMatches.isEmpty())
             snap
         }
+    }
+
+    @Test
+    fun `line cache defaults malformed ints and booleans and drops invalid rows`() = runTest {
+        val (_, ds) = newStore()
+        ds.editRaw(
+            "urnetwork_cached_countries" to listOf(
+                "Country\tde\t\tBerlin\tbad-int\tbad-bool\tbad-bool",
+                "Valid\tus\tRegion\tCity\t12\tnot-bool\tmaybe",
+                "\tde",
+                "BadCode\tusa\tRegion\tCity\t1\ttrue\tfalse",
+            ).joinToString("\n"),
+        )
+
+        val cached = DataStoreUrnetworkConfigStore(ds).config().first().cachedCountries
+
+        assertEquals(2, cached.size)
+        assertEquals("Country", cached[0].name)
+        assertEquals("DE", cached[0].countryCode)
+        assertEquals(0, cached[0].providerCount)
+        assertEquals(true, cached[0].isStable)
+        assertEquals(false, cached[0].isStrongPrivacy)
+        assertEquals("Valid", cached[1].name)
+        assertEquals("US", cached[1].countryCode)
+        assertEquals(12, cached[1].providerCount)
+        assertEquals(true, cached[1].isStable)
+        assertEquals(false, cached[1].isStrongPrivacy)
+    }
+
+    @Test
+    fun `line cache reload preserves escaped fields`() = runTest {
+        val (_, ds) = newStore()
+        val rawLine = "Esc\\taped\tde\tReg\\nion\tCity\\\\Name\t1\tfalse\ttrue"
+        ds.editRaw("urnetwork_cached_regions" to rawLine)
+
+        val cached = DataStoreUrnetworkConfigStore(ds).config().first().cachedRegions.single()
+
+        assertEquals("Esc\taped", cached.name)
+        assertEquals("DE", cached.countryCode)
+        assertEquals("Reg\nion", cached.region)
+        assertEquals("City\\Name", cached.city)
+        assertEquals(1, cached.providerCount)
+        assertEquals(false, cached.isStable)
+        assertEquals(true, cached.isStrongPrivacy)
+    }
+
+    @Test
+    fun `line cache truncates on raw 500 row payload`() = runTest {
+        val (_, ds) = newStore()
+        val raw = (1..502).joinToString("\n") { index -> "N$index\tde" }
+        ds.editRaw("urnetwork_cached_best_matches" to raw)
+
+        val cached = DataStoreUrnetworkConfigStore(ds).config().first().cachedBestMatches
+
+        assertEquals(500, cached.size)
+        assertEquals("N1", cached.first().name)
+        assertEquals("N500", cached.last().name)
     }
 
     @Test

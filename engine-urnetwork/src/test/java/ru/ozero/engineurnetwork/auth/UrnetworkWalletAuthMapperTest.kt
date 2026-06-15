@@ -187,6 +187,56 @@ class UrnetworkWalletAuthMapperTest {
     }
 
     @Test
+    fun `mapLoginOutcomeSnapshot handles fallback transport error when null`() {
+        val transport = UrnetworkWalletAuthMapper.mapLoginOutcomeSnapshot(
+            transportError = null,
+            transportFailed = true,
+            responsePresent = false,
+            sdkErrorPresent = false,
+            sdkErrorMessage = null,
+            byJwt = null,
+            walletAuthEchoed = false,
+        )
+        val create = UrnetworkWalletAuthMapper.mapLoginOutcomeSnapshot(
+            transportError = "",
+            transportFailed = false,
+            responsePresent = true,
+            sdkErrorPresent = false,
+            sdkErrorMessage = null,
+            byJwt = "",
+            walletAuthEchoed = true,
+        )
+
+        assertEquals("authLogin failed", assertIs<LoginOutcome.Error>(transport).message)
+        assertIs<LoginOutcome.NeedCreate>(create)
+    }
+
+    @Test
+    fun `mapLoginOutcomeSnapshot differentiates walletAuthEchoed branch when jwt absent`() {
+        val needCreate = UrnetworkWalletAuthMapper.mapLoginOutcomeSnapshot(
+            transportError = null,
+            transportFailed = false,
+            responsePresent = true,
+            sdkErrorPresent = false,
+            sdkErrorMessage = null,
+            byJwt = " ",
+            walletAuthEchoed = true,
+        )
+        val unexpected = UrnetworkWalletAuthMapper.mapLoginOutcomeSnapshot(
+            transportError = null,
+            transportFailed = false,
+            responsePresent = true,
+            sdkErrorPresent = false,
+            sdkErrorMessage = null,
+            byJwt = " ",
+            walletAuthEchoed = false,
+        )
+
+        assertIs<LoginOutcome.NeedCreate>(needCreate)
+        assertEquals("unrecognized authLogin response", assertIs<LoginOutcome.Error>(unexpected).message)
+    }
+
+    @Test
     fun `mapCreateOutcome maps transport and empty responses to errors`() {
         val transport = UrnetworkWalletAuthMapper.mapCreateOutcome(null, IllegalStateException())
         val transportFallback = UrnetworkWalletAuthMapper.mapCreateOutcome(null, IllegalStateException(null as String?))
@@ -270,6 +320,35 @@ class UrnetworkWalletAuthMapperTest {
 
         assertEquals("networkCreate returned empty jwt", assertIs<DeviceWalletJwtResult.Error>(nullJwt).message)
         assertEquals("networkCreate failed", assertIs<DeviceWalletJwtResult.Error>(fallbackTransport).message)
+    }
+
+    @Test
+    fun `mapCreateOutcomeSnapshot uses fallback and fallback-by-empty-jwt branches`() {
+        val transportFailureFallback = UrnetworkWalletAuthMapper.mapCreateOutcomeSnapshot(
+            transportError = null,
+            transportFailed = true,
+            responsePresent = true,
+            sdkErrorPresent = false,
+            sdkErrorMessage = null,
+            byJwt = "ignored",
+        )
+        val blankJwtFromNetworkCreate = UrnetworkWalletAuthMapper.mapCreateOutcomeSnapshot(
+            transportError = null,
+            transportFailed = false,
+            responsePresent = true,
+            sdkErrorPresent = false,
+            sdkErrorMessage = null,
+            byJwt = "\n",
+        )
+
+        assertEquals(
+            "networkCreate failed",
+            assertIs<DeviceWalletJwtResult.Error>(transportFailureFallback).message,
+        )
+        assertEquals(
+            "networkCreate returned empty jwt",
+            assertIs<DeviceWalletJwtResult.Error>(blankJwtFromNetworkCreate).message,
+        )
     }
 
     private class FakeIdentity(

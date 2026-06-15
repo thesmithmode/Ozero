@@ -49,6 +49,17 @@ class OzeroVpnServiceActionDispatcherTest {
     }
 
     @Test
+    fun `start clears stopping before start`() {
+        val order = mutableListOf<String>()
+        val calls = Calls(clearStopping = { order += "clear" }, startAction = { order += "start" })
+
+        val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_START, 12)
+
+        assertEquals(OzeroVpnServiceStartResult.STICKY, result)
+        assertEquals(listOf("clear", "start"), order)
+    }
+
+    @Test
     fun `stop action delegates to stop vpn without clearing start state`() {
         val calls = Calls()
 
@@ -90,6 +101,25 @@ class OzeroVpnServiceActionDispatcherTest {
     }
 
     @Test
+    fun `repeated actions update latest start id each time and keep callbacks isolated`() {
+        val calls = Calls(idle = true)
+        val dispatcher = calls.dispatcher()
+        dispatcher.dispatch(OzeroVpnService.ACTION_START, 1)
+        dispatcher.dispatch(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG, 2)
+        dispatcher.dispatch(OzeroVpnService.ACTION_STOP, 3)
+        dispatcher.dispatch(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG, 4)
+        dispatcher.dispatch(null, 5)
+
+        assertEquals(listOf(1, 2, 3, 4, 5), calls.latestStartIds)
+        assertEquals(2, calls.startCalls)
+        assertEquals(1, calls.stopCalls)
+        assertEquals(0, calls.restartCalls)
+        assertEquals(2, calls.stopSelfIds.size)
+        assertEquals(2, calls.clearStoppingCalls)
+        assertEquals(listOf(2, 4), calls.stopSelfIds)
+    }
+
+    @Test
     fun `exception during action maps to not sticky and requests stop`() {
         val calls = Calls(throwOnStart = true)
 
@@ -105,6 +135,8 @@ class OzeroVpnServiceActionDispatcherTest {
         private val injected: Boolean = true,
         private val idle: Boolean = false,
         private val throwOnStart: Boolean = false,
+        private val startAction: () -> Unit = {},
+        private val clearStopping: () -> Unit = {},
     ) {
         val latestStartIds = mutableListOf<Int>()
         val stopSelfIds = mutableListOf<Int>()
@@ -118,11 +150,17 @@ class OzeroVpnServiceActionDispatcherTest {
             isChainOrchestratorReady = { injected },
             enterForeground = { foreground },
             isTunnelIdle = { idle },
-            clearStopping = { clearStoppingCalls++ },
+            clearStopping = {
+                clearStoppingCalls++
+                clearStopping()
+            },
             stopSelf = { stopSelfIds += it },
             startVpn = {
                 startCalls++
-                if (throwOnStart) error("start failed")
+                if (throwOnStart) {
+                    error("start failed")
+                }
+                startAction()
             },
             stopVpn = { stopCalls++ },
             restartVpn = { restartCalls++ },

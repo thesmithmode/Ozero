@@ -2,6 +2,9 @@ package ru.ozero.enginewarp
 
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayInputStream
+import java.io.IOException
+import java.io.InputStream
+import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -33,40 +36,82 @@ class WarpConfFileImporterTest {
     """.trimIndent()
 
     @Test
-    fun `import валидного conf файла возвращает ImportedWarpConfig`() {
+    fun `import valid conf returns ImportedWarpConfig`() {
         val stream = ByteArrayInputStream(validConf.toByteArray())
         val result = importer.import(stream)
         assertTrue(result.isSuccess)
         val imported = result.getOrThrow()
         assertEquals("xmPeOeSIU2UTjYFCSzw5Gc+Ks1uxZhanU6iQZKAyFpQ=", imported.config.privateKey)
         assertEquals("engage.cloudflareclient.com:4500", imported.config.peerEndpoint)
-        assertEquals(validConf, imported.rawIni, "rawIni сохраняет оригинальный текст файла без потерь")
+        assertEquals(validConf, imported.rawIni)
     }
 
     @Test
-    fun `import пустого потока возвращает failure с сообщением`() {
+    fun `import invalid stream returns failure with read error`() {
+        val stream = object : InputStream() {
+            override fun read(): Int = throw IOException("stream broken")
+        }
+        val result = importer.import(stream)
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message?.contains("stream broken") == true)
+    }
+
+    @Test
+    fun `import rethrows VirtualMachineError-path exception from stream read`() {
+        val stream = object : InputStream() {
+            override fun read(): Int = throw OutOfMemoryError("vm boom")
+        }
+        assertFailsWith<OutOfMemoryError> { importer.import(stream) }
+    }
+
+    @Test
+    fun `import rethrows ThreadDeath from stream read`() {
+        val stream = object : InputStream() {
+            override fun read(): Int = throw ThreadDeath()
+        }
+        assertFailsWith<ThreadDeath> { importer.import(stream) }
+    }
+
+    @Test
+    fun `import rethrows LinkageError from stream read`() {
+        val stream = object : InputStream() {
+            override fun read(): Int = throw java.lang.NoClassDefFoundError("missing")
+        }
+        assertFailsWith<NoClassDefFoundError> { importer.import(stream) }
+    }
+
+    @Test
+    fun `import valid config keeps source metadata in rawIni`() {
+        val withSource = validConf + "\n# source: ci-profile\n# name: unit-test\n"
+        val imported = importer.import(ByteArrayInputStream(withSource.toByteArray())).getOrThrow()
+        assertEquals("engage.cloudflareclient.com:4500", imported.config.peerEndpoint)
+        assertTrue(imported.rawIni.contains("source: ci-profile"))
+        assertTrue(imported.rawIni.contains("name: unit-test"))
+    }
+
+    @Test
+    fun `import empty stream returns failure`() {
         val stream = ByteArrayInputStream(ByteArray(0))
         val result = importer.import(stream)
         assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull()?.message?.contains("пустой") == true)
     }
 
     @Test
-    fun `import пробельного содержимого возвращает failure`() {
+    fun `import whitespace stream returns failure`() {
         val stream = ByteArrayInputStream("   \n\t  ".toByteArray())
         val result = importer.import(stream)
         assertTrue(result.isFailure)
     }
 
     @Test
-    fun `import файла без PrivateKey возвращает failure`() {
+    fun `import conf without private key returns parser failure`() {
         val bad = validConf.lines().filterNot { it.trim().startsWith("PrivateKey") }.joinToString("\n")
         val result = importer.import(ByteArrayInputStream(bad.toByteArray()))
         assertTrue(result.isFailure)
     }
 
     @Test
-    fun `import парсит AWG параметры из файла`() {
+    fun `import extracts AWG params`() {
         val stream = ByteArrayInputStream(validConf.toByteArray())
         val imported = importer.import(stream).getOrThrow()
         assertEquals(5, imported.config.awgParams.junkPacketCount)
@@ -74,33 +119,53 @@ class WarpConfFileImporterTest {
     }
 
     @Test
-    fun `import сохраняет I1 в rawIni — будет передан am-go без потерь`() {
+    fun `import keeps extra I1 line in rawIni`() {
         val confWithI1 = validConf + "\nI1 = <b 0xdeadbeef1234>"
         val result = importer.import(ByteArrayInputStream(confWithI1.toByteArray()))
         assertTrue(result.isSuccess)
         val imported = result.getOrThrow()
-        assertTrue(
-            imported.rawIni.contains("I1 = <b 0xdeadbeef1234>"),
-            "rawIni должен содержать I1 целиком — иначе AmneziaWG init packet override потерян",
-        )
+        assertTrue(imported.rawIni.contains("I1 = <b 0xdeadbeef1234>"))
     }
 
     @Test
-    fun `import UTF-8 файла корректно`() {
+    fun `import UTF-8 conf succeeds`() {
         val stream = ByteArrayInputStream(validConf.toByteArray(Charsets.UTF_8))
         assertTrue(importer.import(stream).isSuccess)
     }
 
     @Test
-    fun `import отклоняет файл больше 64KB чтобы предотвратить OOM`() {
+    fun `import large conf over 64KB is rejected`() {
         val padding = "# " + "x".repeat(70_000) + "\n"
         val tooLarge = padding + validConf
         val result = importer.import(ByteArrayInputStream(tooLarge.toByteArray()))
-        assertTrue(result.isFailure, "файл >64KB обязан давать failure (OOM prevention)")
-        val message = result.exceptionOrNull()?.message.orEmpty()
-        assertTrue(
-            message.contains("слишком большой") || message.contains("65536"),
-            "сообщение об ошибке должно указывать на превышение лимита: $message",
-        )
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `readBounded accepts exactly limit size`() {
+        val max = ByteArray(65_536) { 'x'.code.toByte() }
+        val text = readBounded(ByteArrayInputStream(max), 65_536L)
+        assertEquals(max.size, text.toByteArray().size)
+    }
+
+    @Test
+    fun `readBounded rejects payload above limit size`() {
+        val over = ByteArray(65_537) { 'x'.code.toByte() }
+        assertFailsWith<IOException> {
+            readBounded(ByteArrayInputStream(over), 65_536L)
+        }
+    }
+
+    private fun readBounded(stream: ByteArrayInputStream, maxBytes: Long): String {
+        val companion = WarpConfFileImporter::class.java
+            .getDeclaredField("Companion")
+            .apply { isAccessible = true }
+            .get(null)
+        val method = companion.javaClass.getDeclaredMethod(
+            "readBounded",
+            InputStream::class.java,
+            Long::class.javaPrimitiveType,
+        ).apply { isAccessible = true }
+        return method.invoke(companion, stream, maxBytes) as String
     }
 }

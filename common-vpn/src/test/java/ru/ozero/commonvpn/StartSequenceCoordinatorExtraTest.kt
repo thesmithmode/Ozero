@@ -80,6 +80,55 @@ class StartSequenceCoordinatorExtraTest {
     }
 
     @Test
+    fun `manual proxy with zero socks port stops chain and reports endpoint failure`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.SINGBOX,
+            socksPort = 0,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.PROXY,
+                manualEngine = EngineId.SINGBOX,
+            ),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.startedConfigs.size)
+        assertEquals(1, engine.stopCalls)
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.SINGBOX,
+                "engine does not expose local proxy endpoint",
+            )
+        }
+    }
+
+    @Test
+    fun `manual proxy start failure reports runtime reason without health or stats`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.MASTERDNS,
+            startResult = StartResult.Failure("native missing"),
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.PROXY,
+                manualEngine = EngineId.MASTERDNS,
+            ),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.startedConfigs.size)
+        verify(exactly = 1) { fixture.engineWatchdog.handleEngineFailure(EngineId.MASTERDNS, "native missing") }
+        verify(exactly = 0) { fixture.statsLogger.start() }
+    }
+
+    @Test
     fun `manual proxy without matching plugin requests stop`() = runTest {
         val fixture = startFixture(
             settings = SettingsModel(
@@ -218,6 +267,33 @@ class StartSequenceCoordinatorExtraTest {
     }
 
     @Test
+    fun `manual tun native tunnel nonzero code stops chain and reports failure`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2123,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.BYEDPI,
+            ),
+        )
+        fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 9
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.startedConfigs.size)
+        assertEquals(1, engine.stopCalls)
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(EngineId.BYEDPI, "tunnel code=9")
+        }
+        verify(exactly = 0) { fixture.statsLogger.start() }
+    }
+
+    @Test
     fun `blocklist failure falls back to empty set and still starts engine`() = runTest {
         val engine = FakeEnginePlugin(
             id = EngineId.BYEDPI,
@@ -315,6 +391,7 @@ class StartSequenceCoordinatorExtraTest {
             tunnelGateway = tunnelGateway,
             tunBuilderHelper = tunBuilderHelper,
             engineWatchdog = engineWatchdog,
+            statsLogger = statsLogger,
         )
     }
 
@@ -325,6 +402,7 @@ class StartSequenceCoordinatorExtraTest {
         val tunnelGateway: HevTunnelGateway,
         val tunBuilderHelper: TunBuilderHelper,
         val engineWatchdog: EngineWatchdogCoordinator,
+        val statsLogger: TunnelStatsLogger,
         val settingsRepository: StaticSettingsRepository,
         val stopRequested: AtomicBoolean,
     ) {

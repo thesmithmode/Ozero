@@ -71,6 +71,14 @@ class EngineWarpContractTest {
     }
 
     @Test
+    fun `preflight before start uses fallback target`() = runTest {
+        val (e, _, _) = engine()
+        val (host, port) = (e.preflight() as WarpPreflight).resolveTarget()
+        assertEquals("1.1.1.1", host)
+        assertEquals(443, port)
+    }
+
+    @Test
     fun `EngineWarp implements TunFdAcceptor`() {
         val (e, _, _) = engine()
         assertTrue(e is TunFdAcceptor)
@@ -123,11 +131,37 @@ class EngineWarpContractTest {
     }
 
     @Test
+    fun `preflight after start resolves configured peer endpoint`() = runTest {
+        val (e, _, _) = engine(activeConfig = sampleConfig)
+        val startResult = e.start(EngineConfig.Warp, Upstream.None)
+        assertIs<StartResult.Success>(startResult)
+        val (host, port) = (e.preflight() as WarpPreflight).resolveTarget()
+        assertEquals("162.159.192.1", host)
+        assertEquals(443, port)
+    }
+
+    @Test
     fun `start с active config пропускает register`() = runTest {
         val (e, auto, _) = engine(activeConfig = sampleConfig)
         val r = e.start(EngineConfig.Warp, Upstream.None)
         assertIs<StartResult.Success>(r)
         assertEquals(0, auto.registerCalls)
+    }
+
+    @Test
+    fun `start without cached config resolves fresh and cached start skips auto register`() = runTest {
+        val (e, auto, store) = engine(
+            activeConfig = null,
+            autoConfigResult = Result.success(RegisteredWarpConfig(sampleConfig, "[Interface]\n[Peer]\n")),
+        )
+
+        val first = e.start(EngineConfig.Warp, Upstream.None)
+        store.clear()
+        val second = e.start(EngineConfig.Warp, Upstream.None)
+
+        assertIs<StartResult.Success>(first)
+        assertIs<StartResult.Success>(second)
+        assertEquals(1, auto.registerCalls)
     }
 
     @Test

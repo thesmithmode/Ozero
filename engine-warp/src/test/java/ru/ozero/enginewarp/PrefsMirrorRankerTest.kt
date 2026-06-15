@@ -26,6 +26,27 @@ class PrefsMirrorRankerTest {
     }
 
     @Test
+    fun `order with empty prefs keeps all mirrors and treats them as neutral`() {
+        val prefs = FakePrefs(mutableMapOf())
+        val ranker = PrefsMirrorRanker(prefs)
+
+        val ordered = ranker.order(listOf("alpha", "beta", "gamma"))
+
+        assertEquals(3, ordered.size)
+        assertTrue(ordered.containsAll(listOf("alpha", "beta", "gamma")))
+    }
+
+    @Test
+    fun `order preserves duplicate mirrors and sorts by score with stable ordering`() {
+        val prefs = FakePrefs(mutableMapOf("mirror_score:good" to 4, "mirror_score:bad" to -4))
+        val ranker = PrefsMirrorRanker(prefs)
+
+        val ordered = ranker.order(listOf("bad", "good", "good", "bad", "unknown"))
+
+        assertEquals(listOf("good", "good", "unknown", "bad", "bad"), ordered)
+    }
+
+    @Test
     fun `recordSuccess and recordFailure clamp scores`() {
         val prefs = FakePrefs(mutableMapOf("mirror_score:x" to 19, "mirror_score:y" to -20))
         val ranker = PrefsMirrorRanker(prefs)
@@ -35,6 +56,17 @@ class PrefsMirrorRankerTest {
 
         assertEquals(20, prefs.map["mirror_score:x"])
         assertEquals(-20, prefs.map["mirror_score:y"])
+    }
+
+    @Test
+    fun `recording unknown mirror can be added and read as current value`() {
+        val prefs = FakePrefs(mutableMapOf())
+        val ranker = PrefsMirrorRanker(prefs)
+
+        ranker.recordSuccess("new")
+        assertEquals(2, prefs.map["mirror_score:new"])
+        ranker.recordFailure("new")
+        assertEquals(1, prefs.map["mirror_score:new"])
     }
 
     private class FakePrefs(

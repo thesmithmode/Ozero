@@ -109,6 +109,17 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `exitNodeStrategy with null resolved ip omits ip`() = runTest {
+        engine.setPrivate("_currentServer", server("S1").copy(countryCode = "de"))
+        engine.setPrivate("_currentServerIp", null)
+
+        val strategy = assertIs<ExitNodeStrategy.ProviderLabel>(engine.exitNodeStrategy(0))
+
+        assertEquals("DE", strategy.countryCode)
+        assertNull(strategy.ip)
+    }
+
+    @Test
     fun `attachTun fails before start`() = runTest {
         val result = engine.attachTun(42)
 
@@ -333,6 +344,57 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `start aborts auth loop when startup auth deadline has already passed`() = runTest {
+        mockkStatic(System::class)
+        try {
+            var calls = 0
+            every { System.currentTimeMillis() } answers {
+                calls++
+                when (calls) {
+                    1 -> 0L
+                    else -> 20_000L
+                }
+            }
+            val result = FptnEngine(
+                store,
+                wsClient = FakeWebSocketClient(),
+                httpsClient = FakeHttpsClient(
+                    postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
+                ),
+            ).start(
+                EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"),
+                Upstream.None,
+            )
+            assertIs<StartResult.Failure>(result)
+            assertEquals(FptnEngine.FPTN_AUTH_TIMEOUT, result.reason)
+        } finally {
+            unmockkStatic(System::class)
+        }
+    }
+
+    @Test
+    fun `start reports dns failure when resolve has no IPv4 address`() = runTest {
+        mockkStatic(System::class)
+        try {
+            every { System.currentTimeMillis() } returns 0L
+            val result = FptnEngine(
+                store,
+                wsClient = FakeWebSocketClient(),
+                httpsClient = FakeHttpsClient(
+                    postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
+                ),
+            ).start(
+                EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "::1")}"),
+                Upstream.None,
+            )
+            assertIs<StartResult.Failure>(result)
+            assertEquals(FptnEngine.FPTN_DNS_FAILED, result.reason)
+        } finally {
+            unmockkStatic(System::class)
+        }
+    }
+
+    @Test
     fun `attachTun fails when authenticated state has no resolved ip or access token`() = runTest {
         engine.setPrivate("_currentServer", server("S1"))
 
@@ -381,6 +443,32 @@ class FptnEngineTest {
 
         assertEquals(listOf(11L), ws.stoppedHandles)
         assertEquals(listOf(11L), ws.destroyedHandles)
+    }
+
+    @Test
+    fun `attachTun cancels previous tun scope before reconnecting`() = runTest {
+        val ws = FakeWebSocketClient()
+        engine = FptnEngine(
+            store,
+            wsClient = ws,
+            httpsClient = FakeHttpsClient(
+                postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
+            ),
+            tunIo = fakeTunIo(),
+        )
+        assertIs<StartResult.Success>(
+            engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
+        )
+
+        val first = engine.attachTun(DETACHED_READ_WRITE_FD)
+        val second = engine.attachTun(DETACHED_READ_WRITE_FD)
+
+        assertIs<TunAttachResult.Success>(first)
+        assertIs<TunAttachResult.Success>(second)
+        assertEquals(listOf(11L, 11L), ws.createdServerIps)
+        assertEquals(listOf("access", "access"), ws.createdAccessTokens)
+
+        engine.stop()
     }
 
     @Test
@@ -959,6 +1047,19 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `exit node strategy falls back label when country display name is unavailable`() {
+        val strategy = fptnExitNodeStrategy(
+            server("Fallback").copy(countryCode = "ZZ"),
+            serverIp = "203.0.113.10",
+            displayLocale = Locale.ROOT,
+        )
+
+        val label = assertIs<ExitNodeStrategy.ProviderLabel>(strategy)
+        assertEquals("Fallback", label.label)
+        assertEquals("ZZ", label.countryCode)
+    }
+
+    @Test
     fun `authentication fallback is cancellation cooperative`() {
         val source = File(
             System.getProperty("user.dir") ?: ".",
@@ -1093,6 +1194,22 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `auth failure classifier maps every token rejection alias before timeout and dns`() {
+        listOf(
+            "unauthorized",
+            "forbidden",
+            "auth failed",
+            "Authentication Failed",
+        ).forEach { signal ->
+            assertEquals(FptnEngine.FPTN_TOKEN_REJECTED, classifyFptnAuthFailure(error = signal))
+        }
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            classifyFptnAuthFailure(error = "forbidden timeout dns"),
+        )
+    }
+
+    @Test
     fun `auth failure classifier prefers response code over ambiguous text`() {
         assertEquals(
             FptnEngine.FPTN_TOKEN_REJECTED,
@@ -1105,6 +1222,26 @@ class FptnEngineTest {
         assertEquals(
             FptnEngine.FPTN_TOKEN_REJECTED,
             classifyFptnAuthFailure(FptnNativeResponse(502, "forbidden", "")),
+        )
+    }
+
+    @Test
+    fun `auth failure classifier keeps timeout on HTTP 200 responses`() {
+        assertEquals(
+            FptnEngine.FPTN_AUTH_TIMEOUT,
+            classifyFptnAuthFailure(FptnNativeResponse(200, "operation timeout", "temporary network issue")),
+        )
+    }
+
+    @Test
+    fun `auth failure classifier maps text signals before generic non-success code`() {
+        assertEquals(
+            FptnEngine.FPTN_AUTH_TIMEOUT,
+            classifyFptnAuthFailure(FptnNativeResponse(500, "operation timeout", "dns unresolved")),
+        )
+        assertEquals(
+            FptnEngine.FPTN_DNS_FAILED,
+            classifyFptnAuthFailure(FptnNativeResponse(500, "", "nodename nor servname")),
         )
     }
 
@@ -1122,6 +1259,68 @@ class FptnEngineTest {
             FptnEngine.FPTN_TOKEN_REJECTED,
             startupFptnFailureReason(
                 listOf(FptnEngine.FPTN_AUTH_TIMEOUT, FptnEngine.FPTN_TOKEN_REJECTED),
+                candidateCount = 2,
+            ),
+        )
+    }
+
+    @Test
+    fun `startup failure reason wraps empty failure list for multi candidates`() {
+        assertEquals(
+            "${FptnEngine.FPTN_ALL_CANDIDATES_FAILED}: ${FptnEngine.FPTN_AUTH_TIMEOUT}",
+            startupFptnFailureReason(emptyList(), candidateCount = 4),
+        )
+    }
+
+    @Test
+    fun `startup auth per candidate timeout keeps auth timeout for single candidate`() {
+        assertEquals(
+            FptnEngine.AUTH_TIMEOUT_S,
+            fptnStartupAuthPerCandidateTimeoutS(1),
+        )
+        assertEquals(FptnEngine.AUTH_TIMEOUT_S, fptnStartupAuthPerCandidateTimeoutS(0))
+        assertEquals(
+            FptnEngine.AUTO_AUTH_CANDIDATE_TIMEOUT_S,
+            fptnStartupAuthPerCandidateTimeoutS(2),
+        )
+    }
+
+    @Test
+    fun `startup auth helpers cover single and multi candidate policies`() {
+        val first = server("S1")
+        val second = server("S2")
+        val candidates = listOf(first, second)
+
+        assertEquals(candidates, fptnStartupAuthCandidates(candidates))
+        assertEquals(FptnEngine.AUTH_TIMEOUT_S, fptnStartupAuthPerCandidateTimeoutS(0))
+        assertEquals(FptnEngine.AUTH_TIMEOUT_S, fptnStartupAuthPerCandidateTimeoutS(1))
+        assertEquals(FptnEngine.AUTO_AUTH_CANDIDATE_TIMEOUT_S, fptnStartupAuthPerCandidateTimeoutS(2))
+    }
+
+    @Test
+    fun `startup failure reason prefers dns before api and timeout after api`() {
+        assertEquals(
+            FptnEngine.FPTN_AUTH_TIMEOUT,
+            startupFptnFailureReason(emptyList(), candidateCount = 1),
+        )
+        assertEquals(
+            FptnEngine.FPTN_AUTH_TIMEOUT,
+            startupFptnFailureReason(
+                listOf(FptnEngine.FPTN_AUTH_TIMEOUT, FptnEngine.FPTN_AUTH_TIMEOUT),
+                candidateCount = 1,
+            ),
+        )
+        assertEquals(
+            "${FptnEngine.FPTN_ALL_CANDIDATES_FAILED}: ${FptnEngine.FPTN_DNS_FAILED}",
+            startupFptnFailureReason(
+                listOf(FptnEngine.FPTN_AUTH_TIMEOUT, FptnEngine.FPTN_DNS_FAILED),
+                candidateCount = 2,
+            ),
+        )
+        assertEquals(
+            "${FptnEngine.FPTN_ALL_CANDIDATES_FAILED}: ${FptnEngine.FPTN_API_ERROR}",
+            startupFptnFailureReason(
+                listOf(FptnEngine.FPTN_AUTH_TIMEOUT, FptnEngine.FPTN_API_ERROR),
                 candidateCount = 2,
             ),
         )

@@ -1,7 +1,15 @@
+@file:Suppress("LargeClass")
+
 package ru.ozero.singboxsubscription
 
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
+import okhttp3.Call
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.jupiter.api.AfterEach
@@ -11,8 +19,8 @@ import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
-import ru.ozero.singboxsubscription.parser.RawShareLinksParser
 import ru.ozero.singboxroom.entity.SubscriptionGroup
+import ru.ozero.singboxsubscription.parser.RawShareLinksParser
 import java.util.Base64
 import javax.net.ssl.SSLHandshakeException
 import kotlin.test.assertEquals
@@ -295,16 +303,57 @@ class RawUpdaterTest {
 
         val result = rawUpdater.refresh(g)
 
-        assertTrue(result.isSuccess)
+        assertEquals(true, result.isSuccess, "Expected success but got ${result.exceptionOrNull()}")
         assertEquals(0, result.getOrNull())
         assertEquals(0, profileDao.profiles.size)
     }
 
     @Test
     fun `should treat bodyless successful response as empty subscription`() = runBlocking {
-        server.enqueue(MockResponse().setResponseCode(204))
+        rawUpdater = RawUpdater(
+            okHttpClient = OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    Response.Builder()
+                        .request(chain.request())
+                        .protocol(Protocol.HTTP_1_1)
+                        .code(204)
+                        .message("No Content")
+                        .body("".toResponseBody())
+                        .build()
+                }
+                .build(),
+            groupDao = groupDao,
+            profileDao = profileDao,
+        )
         val g = group()
 
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isSuccess, "Expected success but got ${result.exceptionOrNull()}")
+        assertEquals(0, result.getOrNull())
+        assertEquals(0, profileDao.profiles.size)
+    }
+
+    @Test
+    fun `should treat null body successful response as empty subscription`() = runBlocking {
+        val mockedResponse = mockk<Response>(relaxed = true).apply {
+            every { body } returns null
+            every { isSuccessful } returns true
+            every { header("Subscription-Userinfo") } returns null
+            every { code } returns 200
+        }
+        val mockedCall = mockk<Call>(relaxed = true)
+        every { mockedCall.execute() } returns mockedResponse
+
+        val mockedClient = mockk<OkHttpClient>()
+        every { mockedClient.newCall(any()) } returns mockedCall
+        rawUpdater = RawUpdater(
+            okHttpClient = mockedClient,
+            groupDao = groupDao,
+            profileDao = profileDao,
+        )
+
+        val g = group()
         val result = rawUpdater.refresh(g)
 
         assertTrue(result.isSuccess)
@@ -590,6 +639,68 @@ class RawUpdaterTest {
 
             assertEquals(insecureId, secondByName.getValue("Insecure").id)
             assertEquals(strictId, secondByName.getValue("Strict").id)
+        }
+
+    @Test
+    fun `should use full identity when existing profiles share same base key`() = runBlocking {
+        val ws =
+            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup-existing.example.com:443" +
+                "?type=ws&security=tls&sni=dup.example.com&host=front.example.com&path=/ws#WS"
+        val grpc =
+            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup-existing.example.com:443" +
+                "?type=grpc&security=tls&sni=dup.example.com&serviceName=grpc-svc#GRPC"
+        server.enqueue(MockResponse().setBody("$ws\n$grpc"))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val firstByName = profileDao.profiles.associateBy { it.name }
+        val grpcId = firstByName.getValue("GRPC").id
+
+        server.enqueue(MockResponse().setBody(grpc))
+        rawUpdater.refresh(g)
+
+        val onlyProfile = profileDao.profiles.single()
+        assertEquals("GRPC", onlyProfile.name)
+        assertEquals(grpcId, onlyProfile.id)
+    }
+
+    @Test
+    fun `should reuse existing profile by full identity when base key is duplicated in existing data`() =
+        runBlocking {
+            val g = group()
+            val withVisionFlow =
+                "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup-full.example.com:443" +
+                    "?type=tcp&security=reality&pbk=pub&sid=01&flow=xtls-rprx-vision#Vision"
+            val withNoFlow =
+                "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup-full.example.com:443" +
+                    "?type=tcp&security=reality&pbk=pub&sid=01#NoFlow"
+            val existingVisionProfile = ru.ozero.singboxroom.entity.ProxyProfile(
+                groupId = g.id,
+                name = "Vision",
+                beanBlob = ru.ozero.singboxfmt.KryoSerializer.serialize(
+                    RawShareLinksParser.parse(withVisionFlow).single(),
+                ),
+                protocolType = RawUpdater.PROTOCOL_VLESS,
+            )
+            val existingNoFlowProfile = ru.ozero.singboxroom.entity.ProxyProfile(
+                groupId = g.id,
+                name = "NoFlow",
+                beanBlob = ru.ozero.singboxfmt.KryoSerializer.serialize(
+                    RawShareLinksParser.parse(withNoFlow).single(),
+                ),
+                protocolType = RawUpdater.PROTOCOL_VLESS,
+            )
+            val noFlowId = profileDao.insert(existingNoFlowProfile)
+            profileDao.insert(existingVisionProfile)
+
+            server.enqueue(MockResponse().setBody(withNoFlow))
+
+            rawUpdater.refresh(g)
+
+            assertEquals(1, profileDao.profiles.size)
+            val keptProfile = profileDao.profiles.single()
+            assertEquals("NoFlow", keptProfile.name)
+            assertEquals(noFlowId, keptProfile.id)
         }
 
     @Test

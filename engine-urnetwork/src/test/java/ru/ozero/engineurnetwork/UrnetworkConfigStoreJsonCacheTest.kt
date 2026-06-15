@@ -127,6 +127,70 @@ class UrnetworkConfigStoreJsonCacheTest {
         assertEquals("Madrid", cached[1].city)
     }
 
+    @Test
+    fun `line cache roundtrip escapes fields normalizes codes and trims empty lists`() = runTest {
+        val ds = FakePreferencesDataStore()
+        val store = DataStoreUrnetworkConfigStore(ds)
+        val locations = listOf(
+            UrnetworkCachedLocation(
+                name = "North\tQuoted\\Name",
+                countryCode = "de",
+                region = "Line\nRegion",
+                city = "",
+                providerCount = 7,
+                isStable = false,
+                isStrongPrivacy = true,
+            ),
+        )
+
+        store.update {
+            it.copy(
+                cachedCountries = locations,
+                cachedRegions = locations,
+                cachedCities = emptyList(),
+                cachedBestMatches = locations,
+            )
+        }
+
+        val snap = store.config().first()
+
+        assertEquals("North\tQuoted\\Name", snap.cachedCountries.single().name)
+        assertEquals("DE", snap.cachedCountries.single().countryCode)
+        assertEquals("Line\nRegion", snap.cachedCountries.single().region)
+        assertNull(snap.cachedCountries.single().city)
+        assertEquals(7, snap.cachedCountries.single().providerCount)
+        assertEquals(false, snap.cachedCountries.single().isStable)
+        assertEquals(true, snap.cachedCountries.single().isStrongPrivacy)
+        assertEquals("DE", snap.cachedRegions.single().countryCode)
+        assertTrue(snap.cachedCities.isEmpty())
+        assertEquals("DE", snap.cachedBestMatches.single().countryCode)
+    }
+
+    @Test
+    fun `line cache skips invalid rows and defaults malformed optional fields`() = runTest {
+        val ds = FakePreferencesDataStore()
+        ds.editRaw(
+            "urnetwork_cached_countries" to listOf(
+                "",
+                "\tde",
+                "BadCode\tdeu",
+                "Defaults\tbr\t\t\tNaN\tmaybe\tnope",
+                "TrailingSlash\tfr\\\\",
+            ).joinToString("\n"),
+        )
+
+        val cached = DataStoreUrnetworkConfigStore(ds).config().first().cachedCountries
+
+        assertEquals(2, cached.size)
+        assertEquals("Defaults", cached[0].name)
+        assertEquals("BR", cached[0].countryCode)
+        assertEquals(0, cached[0].providerCount)
+        assertEquals(true, cached[0].isStable)
+        assertEquals(false, cached[0].isStrongPrivacy)
+        assertEquals("TrailingSlash", cached[1].name)
+        assertEquals("FR", cached[1].countryCode)
+    }
+
     private class FakePreferencesDataStore : DataStore<Preferences> {
         private val state = MutableStateFlow<Preferences>(emptyPreferences())
         override val data: Flow<Preferences> get() = state

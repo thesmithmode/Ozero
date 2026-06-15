@@ -50,6 +50,7 @@ class RawUpdaterStableIdentityTest {
             },
         )
         val corruptedKeys = corruptedStableIdentityKeysForTest(byteArrayOf(9, 8, 7), groupId = 3L)
+        val defaultGroupCorruptedKeys = corruptedStableIdentityKeysForTest(byteArrayOf(1, 2, 3))
 
         assertEquals("uuid=uuid", standardKeys.first)
         assertTrue(standardKeys.second.contains("type=ws"))
@@ -58,5 +59,35 @@ class RawUpdaterStableIdentityTest {
         assertTrue(vlessKeys.first.contains("vless.example.com|443|uuid=vless-uuid"))
         assertTrue(corruptedKeys.first.startsWith("3|0|"))
         assertTrue(corruptedKeys.second.endsWith("|"))
+        assertTrue(defaultGroupCorruptedKeys.first.startsWith("1|0|"))
+    }
+
+    @Test
+    fun `stable base identity falls back to blob hash for invalid serialized profile`() {
+        val corruptedKeys = corruptedStableIdentityKeysForTest(byteArrayOf(), groupId = 7L)
+
+        assertTrue(corruptedKeys.first.startsWith("7|0|"))
+        val hashPart = corruptedKeys.first.removePrefix("7|0|")
+        assertTrue(hashPart.isNotEmpty())
+        assertTrue(hashPart.all { it.isDigit() || it == '-' })
+        assertTrue(corruptedKeys.second.endsWith("|"))
+    }
+
+    @Test
+    fun `stable full identity includes runtime key when bean is deserializable`() {
+        val flowBean = VLESSBean().apply {
+            name = "VLESS"
+            serverAddress = "runtime.example.com"
+            serverPort = 443
+            uuid = "runtime-uuid"
+            flow = "xtls-rprx-vision"
+            sni = "runtime.example.com"
+            host = "host.example.com"
+        }
+
+        val keys = stableIdentityKeysForTest(flowBean)
+
+        assertTrue(keys.second.contains("flow=xtls-rprx-vision"))
+        assertTrue(keys.first.contains("runtime.example.com|443|uuid=runtime-uuid"))
     }
 }

@@ -12,6 +12,7 @@ import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.Upstream
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -156,6 +157,41 @@ class EngineWarpStartAttachTest {
 
         val ini = bridge.lastIni ?: error("ini missing")
         assertTrue(ini.contains("Endpoint = 127.0.0.1:2408") || ini.contains("Endpoint = 0:0:0:0:0:0:0:1:2408"))
+    }
+
+    @Test
+    fun `proxy start first then normal start rebuilds ini without socks block`() = runTest {
+        val bridge = FakeBridge(proxyResult = WarpSdkBridge.ProxyResult.Success)
+        val engine = newEngine(
+            bridge = bridge,
+            reader = FixedReader(null),
+            scope = backgroundScope,
+        )
+
+        val proxy = engine.start(EngineConfig.WarpProxy(socksPort = SOCKS_PORT), Upstream.None)
+        val regular = engine.start(EngineConfig.Warp, Upstream.None)
+        val attach = engine.attachTun(tunFd = 12)
+
+        assertIs<StartResult.Success>(proxy)
+        assertIs<StartResult.Success>(regular)
+        assertIs<TunAttachResult.Success>(attach)
+        val ini = bridge.lastIni ?: error("ini missing")
+        assertFalse(
+            ini.contains("[Socks5]"),
+            "cached proxy ini must be bypassed after activeSocksPort cleanup",
+        )
+        assertTrue(
+            ini.contains("Endpoint = ${sampleConfig.peerEndpoint}"),
+            "endpoint should come from active slot config",
+        )
+    }
+
+    @Test
+    fun `attachTun before start returns TunAttachResult failure`() = runTest {
+        val engine = newEngine(bridge = FakeBridge(), reader = FixedReader(null), scope = backgroundScope)
+        val result = engine.attachTun(tunFd = 17)
+        val failure = assertIs<TunAttachResult.Failure>(result)
+        assertEquals("attachTun before start - no ini config", failure.reason)
     }
 
     private fun interface WarpUapiStateReader {

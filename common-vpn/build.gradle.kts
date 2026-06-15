@@ -26,4 +26,6 @@ dependencies {
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.bundles.testing.unit)
     testImplementation(libs.robolectric)
+    testImplementation(libs.junit4)
+    testRuntimeOnly(libs.junit.vintage.engine)
 }

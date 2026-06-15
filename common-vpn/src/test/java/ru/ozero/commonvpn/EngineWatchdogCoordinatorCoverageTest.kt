@@ -325,6 +325,60 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
+    fun `handleEngineFailure active with killswitch enters killswitch and cancels jobs`() = runTest {
+        val plugin = FakeWatchdogPlugin(
+            id = EngineId.BYEDPI,
+            stats = listOf(
+                EngineStats(activeConnections = 1),
+                EngineStats(activeConnections = 0),
+            ),
+            recoverResults = listOf(EnginePlugin.RecoverResult.Success),
+        )
+        val controller = connectedController(EngineId.BYEDPI)
+        val statsJob = Job()
+        val stopCount = AtomicReference(0)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            plugins = setOf(plugin),
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            statsJob = statsJob,
+            killswitch = true,
+            stopCount = stopCount,
+        )
+
+        watchdog.startPeerWatchdog(EngineId.BYEDPI)
+
+        val handled = watchdog.handleEngineFailure(EngineId.BYEDPI, "peer watchdog")
+
+        assertTrue(handled)
+        assertEquals(0, stopCount.get())
+        assertIs<TunnelState.Failed>(controller.state.value)
+        assertTrue(controller.killswitchActive.value)
+        assertTrue(statsJob.isCancelled)
+        assertEquals(0, plugin.recoverCalls)
+    }
+
+    @Test
+    fun `handleEngineFailure probing state without engine id is treated as active`() = runTest {
+        val controller = TunnelController().apply { onProbing() }
+        val stopCount = AtomicReference(0)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+            stopCount = stopCount,
+        )
+
+        val handled = watchdog.handleEngineFailure(EngineId.BYEDPI, "startup")
+
+        assertTrue(handled)
+        assertEquals(0, stopCount.get())
+        assertTrue(controller.killswitchActive.value)
+    }
+
+    @Test
     fun `handleEngineFailure stops vpn when tun missing and killswitch enabled`() = runTest {
         val controller = connectedController(EngineId.BYEDPI)
         val statsJob = Job()
