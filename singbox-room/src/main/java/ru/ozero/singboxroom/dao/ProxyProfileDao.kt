@@ -18,6 +18,9 @@ interface ProxyProfileDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(profiles: List<ProxyProfile>)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long>
+
     @Query("SELECT * FROM proxy_profiles WHERE id = :id")
     suspend fun getById(id: Long): ProxyProfile?
 
@@ -57,7 +60,10 @@ interface ProxyProfileDao {
             profile.id != 0L && profile.id in existingIds
         }
         existingProfiles.forEach { profile -> update(profile) }
-        insertAll(newProfiles)
+        val inserted = insertAllIgnoringConflicts(newProfiles)
+        newProfiles.zip(inserted).forEach { (profile, rowId) ->
+            if (rowId == -1L && profile.id != 0L) update(profile)
+        }
     }
 
     companion object {

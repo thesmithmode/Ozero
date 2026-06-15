@@ -971,6 +971,8 @@ class EngineRuntimeConfigRestartObserverTest {
         object : ProxyProfileDao {
             override suspend fun insert(profile: ProxyProfile): Long = profile.id
             override suspend fun insertAll(profiles: List<ProxyProfile>) = Unit
+            override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
+                profiles.map { it.id.takeIf { id -> id != 0L } ?: 1L }
             override suspend fun getById(id: Long): ProxyProfile? = lookupById(id)
             override fun getAllFlow() = flow
             override fun getByGroupIdFlow(groupId: Long) = flow

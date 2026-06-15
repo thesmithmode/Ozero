@@ -462,6 +462,8 @@ class SingboxEngineProbeTest {
             override suspend fun getById(id: Long): ProxyProfile? = null
             override suspend fun insert(profile: ProxyProfile): Long = profile.id
             override suspend fun insertAll(profiles: List<ProxyProfile>) = Unit
+            override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
+                profiles.map { it.id.takeIf { id -> id != 0L } ?: 1L }
             override suspend fun deleteByGroupId(groupId: Long) = Unit
             override suspend fun getIdsByGroupId(groupId: Long): List<Long> = emptyList()
             override suspend fun deleteByIds(ids: List<Long>) = Unit

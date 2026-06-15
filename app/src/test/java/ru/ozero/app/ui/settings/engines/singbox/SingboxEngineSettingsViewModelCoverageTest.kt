@@ -990,6 +990,15 @@ class SingboxEngineSettingsViewModelCoverageTest {
             }
         }
 
+        override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
+            profiles.map { profile ->
+                if (profile.id != 0L && flow.value.any { it.id == profile.id }) {
+                    -1L
+                } else {
+                    insert(profile)
+                }
+            }
+
         override suspend fun deleteByGroupId(groupId: Long) {
             flow.value = flow.value.filterNot { it.groupId == groupId }
         }

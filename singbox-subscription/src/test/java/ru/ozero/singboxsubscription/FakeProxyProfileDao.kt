@@ -20,6 +20,15 @@ class FakeProxyProfileDao : ProxyProfileDao {
         profiles.forEach { insert(it) }
     }
 
+    override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
+        profiles.map { profile ->
+            if (profile.id != 0L && this.profiles.any { it.id == profile.id }) {
+                -1L
+            } else {
+                insert(profile)
+            }
+        }
+
     override suspend fun getById(id: Long): ProxyProfile? =
         profiles.firstOrNull { it.id == id }
 

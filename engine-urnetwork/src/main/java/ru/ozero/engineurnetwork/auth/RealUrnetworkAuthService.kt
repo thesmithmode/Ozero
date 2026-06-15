@@ -187,36 +187,58 @@ internal object UrnetworkWalletAuthMapper {
         )
     }
 
-    fun mapLoginOutcome(result: AuthLoginResult?, err: Exception?): LoginOutcome = when {
-        err != null -> LoginOutcome.Error(err.message ?: "authLogin failed")
-        result == null -> LoginOutcome.Error("empty authLogin response")
-        result.error != null -> LoginOutcome.Error(result.error?.message ?: "authLogin error")
-        else -> {
-            val byJwt = runCatching { result.network?.byJwt }.getOrNull()
-            val echoed = runCatching { result.walletAuth }.getOrNull()
-            when {
-                !byJwt.isNullOrBlank() -> LoginOutcome.Existing(byJwt)
-                echoed != null -> LoginOutcome.NeedCreate
-                else -> LoginOutcome.Error("unrecognized authLogin response")
-            }
-        }
+    fun mapLoginOutcome(result: AuthLoginResult?, err: Exception?): LoginOutcome =
+        mapLoginOutcomeSnapshot(
+            transportError = err?.message,
+            transportFailed = err != null,
+            responsePresent = result != null,
+            sdkErrorPresent = result?.error != null,
+            sdkErrorMessage = runCatching { result?.error?.message }.getOrNull(),
+            byJwt = runCatching { result?.network?.byJwt }.getOrNull(),
+            walletAuthEchoed = runCatching { result?.walletAuth != null }.getOrDefault(false),
+        )
+
+    internal fun mapLoginOutcomeSnapshot(
+        transportError: String?,
+        transportFailed: Boolean,
+        responsePresent: Boolean,
+        sdkErrorPresent: Boolean,
+        sdkErrorMessage: String?,
+        byJwt: String?,
+        walletAuthEchoed: Boolean,
+    ): LoginOutcome = when {
+        transportFailed -> LoginOutcome.Error(transportError ?: "authLogin failed")
+        !responsePresent -> LoginOutcome.Error("empty authLogin response")
+        sdkErrorPresent -> LoginOutcome.Error(sdkErrorMessage ?: "authLogin error")
+        !byJwt.isNullOrBlank() -> LoginOutcome.Existing(byJwt)
+        walletAuthEchoed -> LoginOutcome.NeedCreate
+        else -> LoginOutcome.Error("unrecognized authLogin response")
     }
 
     fun mapCreateOutcome(result: NetworkCreateResult?, err: Exception?): DeviceWalletJwtResult =
-        when {
-            err != null -> DeviceWalletJwtResult.Error(err.message ?: "networkCreate failed")
-            result == null -> DeviceWalletJwtResult.Error("empty networkCreate response")
-            result.error != null ->
-                DeviceWalletJwtResult.Error(result.error?.message ?: "networkCreate error")
-            else -> {
-                val jwt = runCatching { result.network?.byJwt }.getOrNull()
-                if (jwt.isNullOrBlank()) {
-                    DeviceWalletJwtResult.Error("networkCreate returned empty jwt")
-                } else {
-                    DeviceWalletJwtResult.Success(byJwt = jwt, isNewNetwork = true)
-                }
-            }
-        }
+        mapCreateOutcomeSnapshot(
+            transportError = err?.message,
+            transportFailed = err != null,
+            responsePresent = result != null,
+            sdkErrorPresent = result?.error != null,
+            sdkErrorMessage = runCatching { result?.error?.message }.getOrNull(),
+            byJwt = runCatching { result?.network?.byJwt }.getOrNull(),
+        )
+
+    internal fun mapCreateOutcomeSnapshot(
+        transportError: String?,
+        transportFailed: Boolean,
+        responsePresent: Boolean,
+        sdkErrorPresent: Boolean,
+        sdkErrorMessage: String?,
+        byJwt: String?,
+    ): DeviceWalletJwtResult = when {
+        transportFailed -> DeviceWalletJwtResult.Error(transportError ?: "networkCreate failed")
+        !responsePresent -> DeviceWalletJwtResult.Error("empty networkCreate response")
+        sdkErrorPresent -> DeviceWalletJwtResult.Error(sdkErrorMessage ?: "networkCreate error")
+        byJwt.isNullOrBlank() -> DeviceWalletJwtResult.Error("networkCreate returned empty jwt")
+        else -> DeviceWalletJwtResult.Success(byJwt = byJwt, isNewNetwork = true)
+    }
 
     const val WALLET_BLOCKCHAIN_SOLANA = "solana"
     const val WALLET_MESSAGE_PREFIX = "ozero-auth-v1:"

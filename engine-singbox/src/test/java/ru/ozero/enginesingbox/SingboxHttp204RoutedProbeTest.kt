@@ -73,6 +73,19 @@ class SingboxHttp204RoutedProbeTest {
         }
     }
 
+    @Test
+    fun `routed probe returns failed when socks port is closed`() = runTest {
+        val closedPort = ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { it.localPort }
+        val probe = SingboxHttp204RoutedProbe(
+            probeUrl = URL("http://127.0.0.1/generate_204"),
+            timeoutMs = 100,
+        )
+
+        val latency = probe.probeLatencyMs(closedPort)
+
+        assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
+    }
+
     private class SocksHttpServer(
         private val statusCode: Int,
         private val reason: String,

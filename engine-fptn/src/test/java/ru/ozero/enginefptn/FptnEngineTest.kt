@@ -21,6 +21,8 @@ import ru.ozero.enginescore.Upstream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
+import java.io.InputStream
 import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -370,6 +372,32 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `attachTun forwards readable tun bytes to websocket native send`() = runTest {
+        val ws = FakeWebSocketClient()
+        engine = FptnEngine(
+            store,
+            wsClient = ws,
+            httpsClient = FakeHttpsClient(
+                postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
+            ),
+            tunIo = fakeTunIo(byteArrayOf(9, 8, 7, 6)),
+        )
+        assertIs<StartResult.Success>(
+            engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
+        )
+
+        val attach = engine.attachTun(DETACHED_READ_WRITE_FD)
+        val delivered = waitUntil { ws.sentPayloads.isNotEmpty() }
+
+        engine.stop()
+
+        assertIs<TunAttachResult.Success>(attach)
+        assertTrue(delivered)
+        assertEquals(listOf(listOf(9, 8, 7, 6)), ws.sentPayloads.map { it.toList() })
+        assertEquals(listOf(4L), ws.sentLengths)
+    }
+
+    @Test
     fun `attachTun maps native create exception to attach failure`() = runTest {
         val ws = FakeWebSocketClient(createFailure = IllegalStateException("create boom"))
         engine = FptnEngine(
@@ -495,6 +523,60 @@ class FptnEngineTest {
         store.inject { it.copy(token = "fptn:${validTokenB64()}") }
         val result = engine.probe()
         assertIs<ProbeResult.Success>(result)
+    }
+
+    @Test
+    fun `FptnToken parses snake case country code and optional fields`() {
+        val json = """{"version":2,"username":"u","password":"p",
+            "servers":[{"name":"S1","host":"h.example","port":8443,"md5_fingerprint":"abc","country_code":" br "}]}"""
+        val token = "fptn:${java.util.Base64.getEncoder().encodeToString(json.toByteArray())}"
+
+        val parsed = assertNotNull(FptnToken.parse(token))
+
+        assertEquals(2, parsed.version)
+        assertEquals("u", parsed.username)
+        assertEquals("p", parsed.password)
+        val server = parsed.servers.single()
+        assertEquals("S1", server.name)
+        assertEquals("h.example", server.host)
+        assertEquals(8443, server.port)
+        assertEquals("abc", server.md5Fingerprint)
+        assertEquals("BR", server.countryCode)
+    }
+
+    @Test
+    fun `FptnToken rejects missing and malformed server payloads`() {
+        val missingServers = java.util.Base64.getEncoder().encodeToString(
+            """{"version":1,"username":"u","password":"p"}""".toByteArray(),
+        )
+        val badServer = java.util.Base64.getEncoder().encodeToString(
+            """{"version":1,"username":"u","password":"p","servers":[{"name":"S1"}]}""".toByteArray(),
+        )
+        val invalidCountry = java.util.Base64.getEncoder().encodeToString(
+            """{"version":1,"username":"u","password":"p",
+                "servers":[{"name":"S1","host":"h","port":443,"countryCode":"USA"}]}""".toByteArray(),
+        )
+
+        assertNull(FptnToken.parse("fptn:$missingServers"))
+        assertNull(FptnToken.parse("fptn:$badServer"))
+        assertNull(FptnToken.parse("unknown:$missingServers"))
+        assertNull(FptnToken.parse("fptnb:not-brotli"))
+        val parsed = assertNotNull(FptnToken.parse("fptn:$invalidCountry"))
+        assertNull(parsed.servers.single().countryCode)
+    }
+
+    @Test
+    fun `FptnToken readBounded stops at eof and rejects overflow`() {
+        val exact = FptnToken.readBounded(ByteArrayInputStream(byteArrayOf(1, 2, 3)), maxBytes = 3)
+        val empty = FptnToken.readBounded(ByteArrayInputStream(ByteArray(0)), maxBytes = 3)
+        val overflow = object : InputStream() {
+            private var next = 0
+            override fun read(): Int = if (next++ < 4) next else -1
+        }
+
+        assertEquals(listOf(1, 2, 3), exact.toList())
+        assertEquals(emptyList(), empty.toList())
+        assertTrue(runCatching { FptnToken.readBounded(overflow, maxBytes = 3) }.isFailure)
     }
 
     @Test
@@ -889,6 +971,23 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `auth failure classifier maps remaining dns and timeout aliases`() {
+        listOf(
+            "operation timeout",
+            "Timeout while waiting",
+        ).forEach { signal ->
+            assertEquals(FptnEngine.FPTN_AUTH_TIMEOUT, classifyFptnAuthFailure(error = signal))
+        }
+        listOf(
+            "dns lookup failed",
+            "NoDataException nodename nor servname",
+            "resolve server failed",
+        ).forEach { signal ->
+            assertEquals(FptnEngine.FPTN_DNS_FAILED, classifyFptnAuthFailure(error = signal))
+        }
+    }
+
+    @Test
     fun `auth failure classifier prefers response code over ambiguous text`() {
         assertEquals(
             FptnEngine.FPTN_TOKEN_REJECTED,
@@ -902,6 +1001,51 @@ class FptnEngineTest {
             FptnEngine.FPTN_TOKEN_REJECTED,
             classifyFptnAuthFailure(FptnNativeResponse(502, "forbidden", "")),
         )
+    }
+
+    @Test
+    fun `startup failure reason covers unknown fallback and single candidate wrapping`() {
+        assertEquals(
+            FptnEngine.FPTN_API_ERROR,
+            startupFptnFailureReason(listOf("unexpected"), candidateCount = 1),
+        )
+        assertEquals(
+            "${FptnEngine.FPTN_ALL_CANDIDATES_FAILED}: ${FptnEngine.FPTN_API_ERROR}",
+            startupFptnFailureReason(listOf("unexpected"), candidateCount = 2),
+        )
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            startupFptnFailureReason(
+                listOf(FptnEngine.FPTN_AUTH_TIMEOUT, FptnEngine.FPTN_TOKEN_REJECTED),
+                candidateCount = 2,
+            ),
+        )
+    }
+
+    @Test
+    fun `fptn tun streams close swallows every stream close failure`() {
+        var inputClosed = false
+        var outputClosed = false
+        val streams = FptnTunStreams(
+            pfd = null,
+            input = object : ByteArrayInputStream(byteArrayOf(1)) {
+                override fun close() {
+                    inputClosed = true
+                    throw IOException("input close")
+                }
+            },
+            output = object : ByteArrayOutputStream() {
+                override fun close() {
+                    outputClosed = true
+                    throw IOException("output close")
+                }
+            },
+        )
+
+        streams.close()
+
+        assertTrue(inputClosed)
+        assertTrue(outputClosed)
     }
 
     @Test
@@ -1088,15 +1232,24 @@ class FptnEngineTest {
         const val DETACHED_READ_WRITE_FD = 42
     }
 
-    private fun fakeTunIo(): FptnTunIo =
+    private fun fakeTunIo(inputBytes: ByteArray = ByteArray(0)): FptnTunIo =
         object : FptnTunIo {
             override fun open(tunFd: Int): FptnTunStreams =
                 FptnTunStreams(
                     pfd = null,
-                    input = ByteArrayInputStream(ByteArray(0)),
+                    input = ByteArrayInputStream(inputBytes),
                     output = ByteArrayOutputStream(),
                 )
         }
+
+    private fun waitUntil(timeoutMs: Long = 2_000L, predicate: () -> Boolean): Boolean {
+        val deadline = System.nanoTime() + timeoutMs * 1_000_000
+        while (System.nanoTime() < deadline) {
+            if (predicate()) return true
+            Thread.sleep(10)
+        }
+        return predicate()
+    }
 
     private fun Any.setPrivate(name: String, value: Any?) {
         val field = javaClass.getDeclaredField(name)
@@ -1119,6 +1272,8 @@ class FptnEngineTest {
         val runHandles = mutableListOf<Long>()
         val destroyedHandles = mutableListOf<Long>()
         val stoppedHandles = mutableListOf<Long>()
+        val sentPayloads = mutableListOf<ByteArray>()
+        val sentLengths = mutableListOf<Long>()
 
         override fun loadOnce() {
             loadCalls++
@@ -1155,7 +1310,11 @@ class FptnEngineTest {
             return true
         }
 
-        override fun nativeSend(handle: Long, data: ByteArray, length: Long): Boolean = true
+        override fun nativeSend(handle: Long, data: ByteArray, length: Long): Boolean {
+            sentPayloads += data.copyOf(length.toInt())
+            sentLengths += length
+            return true
+        }
         override fun nativeIsStarted(handle: Long): Boolean = true
     }
 

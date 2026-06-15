@@ -99,6 +99,8 @@ class SingboxEngineAutoSelectTest {
             override suspend fun getById(id: Long): ProxyProfile? = allProfiles.find { it.id == id }
             override suspend fun insert(profile: ProxyProfile): Long = profile.id
             override suspend fun insertAll(profiles: List<ProxyProfile>) {}
+            override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
+                profiles.map { it.id.takeIf { id -> id != 0L } ?: 1L }
             override suspend fun deleteByGroupId(groupId: Long) {}
             override suspend fun getIdsByGroupId(groupId: Long): List<Long> =
                 profilesByGroup[groupId]?.map { it.id } ?: emptyList()
