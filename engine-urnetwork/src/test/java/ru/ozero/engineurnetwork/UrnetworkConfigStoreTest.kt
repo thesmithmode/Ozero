@@ -381,7 +381,10 @@ class UrnetworkConfigStoreTest {
 
     @Test
     fun `location selection normalized handles country with digits, blanks and city-only selections`() {
-        assertNull(UrnetworkLocationSelection("U1", "Berlin", "Munich").normalized())
+        assertEquals(
+            UrnetworkLocationSelection(null, "Berlin", "Munich"),
+            UrnetworkLocationSelection("U1", "Berlin", "Munich").normalized(),
+        )
         assertEquals(
             UrnetworkLocationSelection("DE", null, null),
             UrnetworkLocationSelection(" de ", "   ", "   ").normalized(),

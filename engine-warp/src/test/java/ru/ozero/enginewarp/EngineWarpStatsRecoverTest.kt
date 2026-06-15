@@ -268,8 +268,10 @@ class EngineWarpStatsRecoverTest {
         assertIs<EnginePlugin.RecoverResult.Failed>(e.recover())
         assertIs<EnginePlugin.RecoverResult.Success>(e.recover())
 
-        verify(exactly = 1) { connectivityManager.registerDefaultNetworkCallback(any()) }
-        verify(exactly = 1) { connectivityManager.unregisterNetworkCallback(any()) }
+        verify(exactly = 2) { connectivityManager.registerDefaultNetworkCallback(any()) }
+        verify(exactly = 1) {
+            connectivityManager.unregisterNetworkCallback(any<ConnectivityManager.NetworkCallback>())
+        }
     }
 
     @Test

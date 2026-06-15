@@ -164,6 +164,22 @@ class UrnetworkConfigModelCoverageTest {
     }
 
     @Test
+    fun `location normalization rejects non letter country but keeps valid region city combinations`() {
+        assertEquals(
+            UrnetworkLocationSelection(null, "Region", "City"),
+            UrnetworkLocationSelection("9?", " Region ", " City ").normalized(),
+        )
+        assertEquals(
+            UrnetworkLocationSelection(null, null, "City"),
+            UrnetworkLocationSelection("-", " ", " City ").normalized(),
+        )
+        assertEquals(
+            UrnetworkLocationSelection(null, "Region", null),
+            UrnetworkLocationSelection("A1", " Region ", null).normalized(),
+        )
+    }
+
+    @Test
     fun `location summary keeps placeholders only for missing country`() {
         assertEquals("??", UrnetworkLocationSelection(null, null, null).summary())
         assertEquals("DE", UrnetworkLocationSelection("DE", null, null).summary())
@@ -179,6 +195,17 @@ class UrnetworkConfigModelCoverageTest {
         store.setSelectedLocation(UrnetworkLocationSelection(" br ", " ", "\t"))
 
         assertEquals(UrnetworkLocationSelection("BR", null, null), store.selectedLocation().first())
+    }
+
+    @Test
+    fun `setSelectedLocation clears each blank field independently`() = runTest {
+        val store = InMemoryUrnetworkConfigStore()
+
+        store.setSelectedLocation(UrnetworkLocationSelection(" ", "\n", " City "))
+        assertEquals(UrnetworkLocationSelection(null, null, "City"), store.selectedLocation().first())
+
+        store.setSelectedLocation(UrnetworkLocationSelection(null, " Region ", "\t"))
+        assertEquals(UrnetworkLocationSelection(null, "Region", null), store.selectedLocation().first())
     }
 
     @Test
@@ -202,5 +229,17 @@ class UrnetworkConfigModelCoverageTest {
             UrnetworkConfig(walletOverride = "   ").walletAddress,
         )
         assertEquals("custom-wallet", UrnetworkConfig(walletOverride = "custom-wallet").walletAddress)
+    }
+
+    @Test
+    fun `cached location defaults cover null metadata and boolean defaults`() {
+        val location = UrnetworkCachedLocation(name = "Anywhere", countryCode = null)
+
+        assertNull(location.countryCode)
+        assertNull(location.region)
+        assertNull(location.city)
+        assertEquals(0, location.providerCount)
+        assertTrue(location.isStable)
+        assertFalse(location.isStrongPrivacy)
     }
 }

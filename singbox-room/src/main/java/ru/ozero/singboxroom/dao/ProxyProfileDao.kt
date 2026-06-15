@@ -15,7 +15,7 @@ interface ProxyProfileDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(profile: ProxyProfile): Long
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(profiles: List<ProxyProfile>)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)

@@ -11,6 +11,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import java.io.ByteArrayInputStream
 import java.io.IOException
+import java.lang.reflect.InvocationTargetException
 
 class HttpUrlConnectionClientTest {
 
@@ -144,9 +145,10 @@ class HttpUrlConnectionClientTest {
     @Test
     fun `readBounded throws when response exceeds max`() {
         val over = ByteArray(524_289) { 'x'.code.toByte() }
-        assertFailsWith<IOException> {
+        val thrown = assertFailsWith<InvocationTargetException> {
             readBounded(ByteArrayInputStream(over), 524_288L)
         }
+        assertTrue(thrown.cause is IOException)
     }
 
     private fun readBounded(stream: ByteArrayInputStream, maxBytes: Long): String {

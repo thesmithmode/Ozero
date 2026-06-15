@@ -27,7 +27,9 @@ import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.util.Locale
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 
@@ -141,6 +143,21 @@ class FptnEngineBranchCoverageTest {
     }
 
     @Test
+    fun `tun streams close handles null pfd and regular stream close paths`() {
+        val output = ByteArrayOutputStream()
+        val streams = FptnTunStreams(
+            pfd = null,
+            input = ByteArrayInputStream(byteArrayOf(1, 2, 3)),
+            output = output,
+        )
+
+        streams.close()
+
+        output.write(7)
+        assertEquals(1, output.size())
+    }
+
+    @Test
     fun `exitNodeStrategy uses resolved ip when available`() = runTest {
         val engine = FptnEngine(InMemoryFptnConfigStore())
         engine.setPrivate("_currentServer", server("Node-1").copy(countryCode = "de"))
@@ -180,6 +197,120 @@ class FptnEngineBranchCoverageTest {
             FptnEngine.FPTN_API_ERROR,
             classifyFptnAuthFailure(FptnNativeResponse(200, "", "")),
         )
+    }
+
+    @Test
+    fun `classify auth failure covers code body error and exception signals`() {
+        val cases = listOf(
+            FptnNativeResponse(401, "", "") to FptnEngine.FPTN_TOKEN_REJECTED,
+            FptnNativeResponse(403, "", "") to FptnEngine.FPTN_TOKEN_REJECTED,
+            FptnNativeResponse(608, "", "") to FptnEngine.FPTN_AUTH_TIMEOUT,
+            FptnNativeResponse(500, "authentication failed", "") to FptnEngine.FPTN_TOKEN_REJECTED,
+            FptnNativeResponse(500, "", "timed out") to FptnEngine.FPTN_AUTH_TIMEOUT,
+            FptnNativeResponse(500, "resolve failed", "") to FptnEngine.FPTN_DNS_FAILED,
+            FptnNativeResponse(429, "", "") to FptnEngine.FPTN_API_ERROR,
+        )
+
+        cases.forEach { (response, expected) ->
+            assertEquals(expected, classifyFptnAuthFailure(response))
+        }
+        assertEquals(FptnEngine.FPTN_TOKEN_REJECTED, classifyFptnAuthFailure(error = "Forbidden by token issuer"))
+        assertEquals(FptnEngine.FPTN_DNS_FAILED, classifyFptnAuthFailure(exceptionName = "UnknownHostException"))
+        assertEquals(FptnEngine.FPTN_AUTH_TIMEOUT, classifyFptnAuthFailure(body = "request timeout while logging in"))
+    }
+
+    @Test
+    fun `buildManualConfig returns null for blank token and full config for populated store`() {
+        val blank = FptnEngine(InMemoryFptnConfigStore())
+
+        assertNull(blank.buildManualConfig(null))
+
+        val populated = InMemoryFptnConfigStore(
+            FptnConfig(
+                token = "token",
+                selectedServerName = "S1",
+                bypassMethod = "strategy",
+                sniDomain = "sni.example.com",
+                autoSelect = false,
+                reconnectOnNetworkChange = false,
+                reconnectOnIpChange = true,
+                maxReconnectAttempts = 9,
+                reconnectPauseSeconds = 4,
+                resetServerOnDisconnect = false,
+            ),
+        )
+        val config = assertIs<EngineConfig.Fptn>(FptnEngine(populated).buildManualConfig(null))
+
+        assertEquals("token", config.token)
+        assertEquals("S1", config.selectedServerName)
+        assertEquals("strategy", config.bypassMethod)
+        assertEquals("sni.example.com", config.sniDomain)
+        assertEquals(false, config.autoSelect)
+        assertEquals(false, config.reconnectOnNetworkChange)
+        assertEquals(true, config.reconnectOnIpChange)
+        assertEquals(9, config.maxReconnectAttempts)
+        assertEquals(4, config.reconnectPauseSeconds)
+        assertEquals(false, config.resetServerOnDisconnect)
+    }
+
+    @Test
+    fun `exitNodeStrategy is unavailable before start and omits blank resolved ip`() = runTest {
+        val engine = FptnEngine(InMemoryFptnConfigStore())
+
+        assertIs<ExitNodeStrategy.Unavailable>(engine.exitNodeStrategy(0))
+
+        engine.setPrivate("_currentServer", server("Node").copy(countryCode = "fr"))
+        engine.setPrivate("_currentServerIp", " ")
+
+        val strategy = assertIs<ExitNodeStrategy.ProviderLabel>(engine.exitNodeStrategy(0))
+        assertEquals("FR", strategy.countryCode)
+        assertNull(strategy.ip)
+    }
+
+    @Test
+    fun `stop with no descriptor scope or handle is a no-op reset`() = runTest {
+        val engine = FptnEngine(InMemoryFptnConfigStore(), wsClient = FakeFastWsClient())
+
+        engine.stop()
+
+        assertEquals(0L, engine.getPrivate("_nativeHandle") as Long)
+        assertNull(engine.getPrivate("_pfd"))
+        assertNull(engine.getPrivate("tunScope"))
+    }
+
+    @Test
+    fun `startup failure reason covers token rejection across single and multi candidates`() {
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            startupFptnFailureReason(
+                listOf(FptnEngine.FPTN_API_ERROR, FptnEngine.FPTN_TOKEN_REJECTED),
+                candidateCount = 1,
+            ),
+        )
+        assertEquals(
+            FptnEngine.FPTN_TOKEN_REJECTED,
+            startupFptnFailureReason(
+                listOf(FptnEngine.FPTN_DNS_FAILED, FptnEngine.FPTN_TOKEN_REJECTED),
+                candidateCount = 5,
+            ),
+        )
+    }
+
+    @Test
+    fun `exit node strategy falls back to server name for root display locale edge cases`() {
+        listOf("ZZ", "QZ").forEach { code ->
+            val strategy = assertIs<ExitNodeStrategy.ProviderLabel>(
+                fptnExitNodeStrategy(
+                    server = server("Fallback-$code").copy(countryCode = code),
+                    serverIp = "",
+                    displayLocale = Locale.ROOT,
+                ),
+            )
+
+            assertEquals("Fallback-$code", strategy.label)
+            assertEquals(code, strategy.countryCode)
+            assertNull(strategy.ip)
+        }
     }
 
     @Test

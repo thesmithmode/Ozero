@@ -130,11 +130,34 @@ class OzeroVpnServiceActionDispatcherTest {
         assertFalse(calls.stopSelfIds.contains(9))
     }
 
+    @Test
+    fun `exception during stop action is caught and stop fallback is attempted`() {
+        val calls = Calls(throwOnStop = true)
+
+        val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_STOP, 10)
+
+        assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
+        assertEquals(2, calls.stopCalls)
+    }
+
+    @Test
+    fun `exception during restart action is caught and stop fallback is attempted`() {
+        val calls = Calls(throwOnRestart = true)
+
+        val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG, 11)
+
+        assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
+        assertEquals(1, calls.restartCalls)
+        assertEquals(1, calls.stopCalls)
+    }
+
     private class Calls(
         private val foreground: Boolean = true,
         private val injected: Boolean = true,
         private val idle: Boolean = false,
         private val throwOnStart: Boolean = false,
+        private val throwOnStop: Boolean = false,
+        private val throwOnRestart: Boolean = false,
         private val startAction: () -> Unit = {},
         private val clearStopping: () -> Unit = {},
     ) {
@@ -162,8 +185,18 @@ class OzeroVpnServiceActionDispatcherTest {
                 }
                 startAction()
             },
-            stopVpn = { stopCalls++ },
-            restartVpn = { restartCalls++ },
+            stopVpn = {
+                stopCalls++
+                if (throwOnStop && stopCalls == 1) {
+                    error("stop failed")
+                }
+            },
+            restartVpn = {
+                restartCalls++
+                if (throwOnRestart) {
+                    error("restart failed")
+                }
+            },
         )
     }
 }

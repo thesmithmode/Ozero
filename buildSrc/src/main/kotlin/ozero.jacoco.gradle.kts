@@ -238,10 +238,9 @@ if (isAndroid) {
             layout.projectDirectory.files("src/main/java", "src/main/kotlin")
         )
         classDirectories.setFrom(
-            files(
-                layout.buildDirectory.dir("tmp/kotlin-classes/debug"),
-                layout.buildDirectory.dir("intermediates/javac/debug/classes")
-            ).asFileTree.matching { exclude(excludedClasses) }
+            layout.buildDirectory
+                .dir("intermediates/classes/debug/transformDebugClassesWithAsm/dirs")
+                .map { it.asFileTree.matching { exclude(excludedClasses) } }
         )
         executionData.setFrom(
             fileTree(layout.buildDirectory) {
@@ -270,10 +269,9 @@ if (isAndroid) {
             layout.projectDirectory.files("src/main/java", "src/main/kotlin")
         )
         classDirectories.setFrom(
-            files(
-                layout.buildDirectory.dir("tmp/kotlin-classes/debug"),
-                layout.buildDirectory.dir("intermediates/javac/debug/classes")
-            ).asFileTree.matching { exclude(excludedClasses) }
+            layout.buildDirectory
+                .dir("intermediates/classes/debug/transformDebugClassesWithAsm/dirs")
+                .map { it.asFileTree.matching { exclude(excludedClasses) } }
         )
         executionData.setFrom(
             fileTree(layout.buildDirectory) {

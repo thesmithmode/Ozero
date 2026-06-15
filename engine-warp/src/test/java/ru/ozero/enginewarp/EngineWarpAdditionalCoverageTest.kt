@@ -449,8 +449,12 @@ class EngineWarpAdditionalCoverageTest {
         engine.start(EngineConfig.Warp, Upstream.None)
         assertIs<TunAttachResult.Success>(engine.attachTun(58))
 
-        verify(exactly = 1) { connectivityManager.registerDefaultNetworkCallback(any()) }
-        verify(exactly = 0) { connectivityManager.unregisterNetworkCallback(any()) }
+        verify(exactly = 1) {
+            connectivityManager.registerDefaultNetworkCallback(any<ConnectivityManager.NetworkCallback>())
+        }
+        verify(exactly = 0) {
+            connectivityManager.unregisterNetworkCallback(any<ConnectivityManager.NetworkCallback>())
+        }
         engine.stop()
     }
 
@@ -459,7 +463,9 @@ class EngineWarpAdditionalCoverageTest {
         val connectivityManager = mockk<ConnectivityManager>(relaxed = true)
         val context = mockk<Context>(relaxed = true)
         every { context.getSystemService(Context.CONNECTIVITY_SERVICE) } returns connectivityManager
-        every { connectivityManager.unregisterNetworkCallback(any()) } throws IllegalStateException("unregister failed")
+        every {
+            connectivityManager.unregisterNetworkCallback(any<ConnectivityManager.NetworkCallback>())
+        } throws IllegalStateException("unregister failed")
 
         val bridge = FakeBridge()
         val engine = newEngine(

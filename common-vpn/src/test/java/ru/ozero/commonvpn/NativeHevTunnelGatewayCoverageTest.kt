@@ -5,6 +5,8 @@ import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import ru.ozero.enginescore.PersistentLogger
+import ru.ozero.enginescore.PersistentLoggers
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.CopyOnWriteArrayList
@@ -188,6 +190,27 @@ class NativeHevTunnelGatewayCoverageTest {
     }
 
     @Test
+    fun `start creates missing cache directory before writing config`(@TempDir tmp: File) {
+        val cacheDir = File(tmp, "nested-cache")
+        var capturedPath: String? = null
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = cacheDir,
+            loader = loader,
+            nativeStart = { path, _ ->
+                capturedPath = path
+                0
+            },
+            nativeStop = {},
+        )
+
+        val rc = gateway.start(HevTunnelConfig(tunPfd = pfd(17), socksAddress = "127.0.0.1", socksPort = 1080))
+
+        assertEquals(0, rc)
+        assertTrue(cacheDir.isDirectory)
+        assertTrue(File(assertNotNull(capturedPath)).isFile)
+    }
+
+    @Test
     fun `stats poller disabled never calls nativeStats`(@TempDir tmp: File) {
         val statsCalls = AtomicInteger(0)
         val observed = CountDownLatch(2)
@@ -308,6 +331,31 @@ class NativeHevTunnelGatewayCoverageTest {
     }
 
     @Test
+    fun `stats poller survives repeated idle samples until stop`(@TempDir tmp: File) {
+        val statsCalls = AtomicInteger(0)
+        val observed = CountDownLatch(7)
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = loader,
+            nativeStart = { _, _ -> 0 },
+            nativeStop = {},
+            nativeStats = {
+                observed.countDown()
+                statsCalls.incrementAndGet()
+                longArrayOf(1L, 10L, 2L, 20L)
+            },
+            pollIntervalMs = 1L,
+            statsPollerEnabled = true,
+        )
+
+        gateway.start(HevTunnelConfig(tunPfd = pfd(18), socksAddress = "127.0.0.1", socksPort = 1080))
+        assertTrue(waitUntil { observed.count == 0L })
+        gateway.stop()
+
+        assertTrue(statsCalls.get() >= 7)
+    }
+
+    @Test
     fun `stats poller stops when nativeStats throws`(@TempDir tmp: File) {
         val statsCalls = AtomicInteger(0)
         val observed = CountDownLatch(1)
@@ -330,5 +378,63 @@ class NativeHevTunnelGatewayCoverageTest {
         gateway.stop()
 
         assertEquals(1, statsCalls.get())
+    }
+
+    @Test
+    fun `persistent logger receives load start stop movement idle and failure branches`(@TempDir tmp: File) {
+        val logger = RecordingLogger()
+        val previous = PersistentLoggers.instance
+        PersistentLoggers.instance = logger
+        try {
+            val statsCalls = AtomicInteger(0)
+            val observed = CountDownLatch(8)
+            val gateway = NativeHevTunnelGateway(
+                cacheDir = File(tmp, "cache"),
+                loader = loader,
+                nativeStart = { _, _ -> 0 },
+                nativeStop = { error("stop failed") },
+                nativeStats = {
+                    observed.countDown()
+                    when (statsCalls.incrementAndGet()) {
+                        1 -> longArrayOf(0L, 0L, 0L, 0L)
+                        2 -> longArrayOf(1L, 10L, 2L, 20L)
+                        else -> longArrayOf(1L, 10L, 2L, 20L)
+                    }
+                },
+                pollIntervalMs = 1L,
+                statsPollerEnabled = true,
+            )
+
+            assertEquals(
+                0,
+                gateway.start(HevTunnelConfig(tunPfd = pfd(19), socksAddress = "127.0.0.1", socksPort = 1080)),
+            )
+            assertTrue(waitUntil { observed.count == 0L && logger.warns.any { it.contains("hev stats IDLE") } })
+            gateway.stop()
+
+            assertTrue(logger.infos.any { it.contains("checkpoint loadOnce returned") })
+            assertTrue(logger.infos.any { it.contains("hev stats tx=") })
+            assertTrue(logger.warns.any { it.contains("hev stats IDLE") })
+            assertTrue(logger.warns.any { it.contains("TProxyStopService threw") })
+        } finally {
+            PersistentLoggers.instance = previous
+        }
+    }
+
+    private class RecordingLogger : PersistentLogger {
+        val infos = CopyOnWriteArrayList<String>()
+        val warns = CopyOnWriteArrayList<String>()
+
+        override fun trace(tag: String, msg: String) = Unit
+        override fun debug(tag: String, msg: String) = Unit
+        override fun info(tag: String, msg: String) {
+            infos += msg
+        }
+
+        override fun warn(tag: String, msg: String, t: Throwable?) {
+            warns += msg
+        }
+
+        override fun error(tag: String, msg: String, t: Throwable?) = Unit
     }
 }

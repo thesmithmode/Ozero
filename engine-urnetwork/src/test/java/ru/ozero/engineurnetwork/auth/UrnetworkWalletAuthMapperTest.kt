@@ -86,6 +86,21 @@ class UrnetworkWalletAuthMapperTest {
     }
 
     @Test
+    fun `default auth service wallet jwt path returns explicit unsupported error`() = runTest {
+        val service = object : UrnetworkAuthService {
+            override suspend fun acquireGuestJwt(): GuestJwtResult = GuestJwtResult.Error("unused")
+            override suspend fun acquireClientJwt(byJwt: String): ClientJwtResult = ClientJwtResult.Error("unused")
+        }
+
+        val result = service.acquireDeviceWalletJwt(FakeIdentity(), "network")
+
+        assertEquals(
+            "acquireDeviceWalletJwt not implemented",
+            assertIs<DeviceWalletJwtResult.Error>(result).message,
+        )
+    }
+
+    @Test
     fun `mapLoginOutcome maps transport and empty responses to errors`() {
         val transport = UrnetworkWalletAuthMapper.mapLoginOutcome(null, IllegalStateException())
         val transportFallback = UrnetworkWalletAuthMapper.mapLoginOutcome(null, IllegalStateException(null as String?))
@@ -237,6 +252,41 @@ class UrnetworkWalletAuthMapperTest {
     }
 
     @Test
+    fun `mapLoginOutcomeSnapshot preserves blank transport and sdk error strings`() {
+        val blankTransport = UrnetworkWalletAuthMapper.mapLoginOutcomeSnapshot(
+            transportError = "",
+            transportFailed = true,
+            responsePresent = true,
+            sdkErrorPresent = false,
+            sdkErrorMessage = null,
+            byJwt = "ignored",
+            walletAuthEchoed = true,
+        )
+        val blankSdkError = UrnetworkWalletAuthMapper.mapLoginOutcomeSnapshot(
+            transportError = null,
+            transportFailed = false,
+            responsePresent = true,
+            sdkErrorPresent = true,
+            sdkErrorMessage = "",
+            byJwt = "ignored",
+            walletAuthEchoed = true,
+        )
+        val tabJwt = UrnetworkWalletAuthMapper.mapLoginOutcomeSnapshot(
+            transportError = null,
+            transportFailed = false,
+            responsePresent = true,
+            sdkErrorPresent = false,
+            sdkErrorMessage = null,
+            byJwt = "\t",
+            walletAuthEchoed = false,
+        )
+
+        assertEquals("", assertIs<LoginOutcome.Error>(blankTransport).message)
+        assertEquals("", assertIs<LoginOutcome.Error>(blankSdkError).message)
+        assertEquals("unrecognized authLogin response", assertIs<LoginOutcome.Error>(tabJwt).message)
+    }
+
+    @Test
     fun `mapCreateOutcome maps transport and empty responses to errors`() {
         val transport = UrnetworkWalletAuthMapper.mapCreateOutcome(null, IllegalStateException())
         val transportFallback = UrnetworkWalletAuthMapper.mapCreateOutcome(null, IllegalStateException(null as String?))
@@ -349,6 +399,38 @@ class UrnetworkWalletAuthMapperTest {
             "networkCreate returned empty jwt",
             assertIs<DeviceWalletJwtResult.Error>(blankJwtFromNetworkCreate).message,
         )
+    }
+
+    @Test
+    fun `mapCreateOutcomeSnapshot preserves blank transport sdk errors and whitespace jwt`() {
+        val blankTransport = UrnetworkWalletAuthMapper.mapCreateOutcomeSnapshot(
+            transportError = "",
+            transportFailed = true,
+            responsePresent = true,
+            sdkErrorPresent = false,
+            sdkErrorMessage = null,
+            byJwt = "ignored",
+        )
+        val blankSdkError = UrnetworkWalletAuthMapper.mapCreateOutcomeSnapshot(
+            transportError = null,
+            transportFailed = false,
+            responsePresent = true,
+            sdkErrorPresent = true,
+            sdkErrorMessage = "",
+            byJwt = "ignored",
+        )
+        val tabJwt = UrnetworkWalletAuthMapper.mapCreateOutcomeSnapshot(
+            transportError = null,
+            transportFailed = false,
+            responsePresent = true,
+            sdkErrorPresent = false,
+            sdkErrorMessage = null,
+            byJwt = "\t",
+        )
+
+        assertEquals("", assertIs<DeviceWalletJwtResult.Error>(blankTransport).message)
+        assertEquals("", assertIs<DeviceWalletJwtResult.Error>(blankSdkError).message)
+        assertEquals("networkCreate returned empty jwt", assertIs<DeviceWalletJwtResult.Error>(tabJwt).message)
     }
 
     private class FakeIdentity(

@@ -166,6 +166,32 @@ class ProxyProfileDaoTest {
     }
 
     @Test
+    fun `insertAll should ignore stable id conflicts without cascading chain steps`() = runBlocking {
+        val groupId = insertGroup()
+        val profileDao = db.proxyProfileDao()
+        val chainDao = db.proxyChainDao()
+        val id = profileDao.insert(
+            ProxyProfile(groupId = groupId, name = "Stable", beanBlob = byteArrayOf(0), protocolType = 1),
+        )
+        chainDao.replace(listOf(id))
+
+        profileDao.insertAll(
+            listOf(
+                ProxyProfile(
+                    id = id,
+                    groupId = groupId,
+                    name = "Conflicting refresh row",
+                    beanBlob = byteArrayOf(1),
+                    protocolType = 1,
+                ),
+            ),
+        )
+
+        assertEquals(listOf(id), chainDao.getAll().map { it.profileId })
+        assertEquals("Stable", profileDao.getById(id)!!.name)
+    }
+
+    @Test
     fun `should not return profiles from other groups`() = runBlocking {
         val group1 = insertGroup("Group 1")
         val group2 = insertGroup("Group 2")

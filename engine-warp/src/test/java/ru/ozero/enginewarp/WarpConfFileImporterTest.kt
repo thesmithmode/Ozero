@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream
+import java.lang.reflect.InvocationTargetException
 import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -151,9 +152,10 @@ class WarpConfFileImporterTest {
     @Test
     fun `readBounded rejects payload above limit size`() {
         val over = ByteArray(65_537) { 'x'.code.toByte() }
-        assertFailsWith<IOException> {
+        val thrown = assertFailsWith<InvocationTargetException> {
             readBounded(ByteArrayInputStream(over), 65_536L)
         }
+        assertTrue(thrown.cause is IOException)
     }
 
     private fun readBounded(stream: ByteArrayInputStream, maxBytes: Long): String {

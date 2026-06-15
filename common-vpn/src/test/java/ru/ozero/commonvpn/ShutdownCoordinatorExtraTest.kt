@@ -141,11 +141,32 @@ class ShutdownCoordinatorExtraTest {
         assertIs<TunnelState.Idle>(fixture.tunnelController.state.value)
     }
 
+    @Test
+    fun `stopVpn without stopSelf closes lockdown fd cancels start job and tolerates health stop failure`() = runTest {
+        val lockdownFd = mockk<ParcelFileDescriptor>(relaxed = true)
+        val startJob = Job()
+        val fixture = shutdownFixture(this, sessionId = -1L, lockdownFd = lockdownFd, startJob = startJob)
+        every { fixture.healthMonitor.stop() } throws RuntimeException("health stop failed")
+
+        fixture.coordinator.stopVpn(callStopSelf = false)
+        advanceUntilIdle()
+
+        assertTrue(startJob.isCancelled)
+        verify(exactly = 1) { lockdownFd.close() }
+        verify(exactly = 1) { fixture.healthMonitor.stop() }
+        verify(exactly = 1) { fixture.stopForegroundRequest.invoke() }
+        verify(exactly = 0) { fixture.stopSelfRequest.invoke(any()) }
+        assertFalse(fixture.state.stopping.get())
+        assertFalse(fixture.state.stopSignal.get())
+    }
+
     private fun shutdownFixture(
         scope: kotlinx.coroutines.CoroutineScope,
         sessionId: Long = -1L,
         sessionStartedAt: Long = 0L,
         tunFd: ParcelFileDescriptor? = null,
+        lockdownFd: ParcelFileDescriptor? = null,
+        startJob: Job? = null,
     ): ShutdownFixture {
         val tunnelController = TunnelController()
         val healthMonitor = mockk<HealthMonitor>(relaxed = true)
@@ -157,10 +178,10 @@ class ShutdownCoordinatorExtraTest {
         val state = ShutdownState(
             tunFdRef = AtomicReference(tunFd),
             tunIfaceNameRef = AtomicReference<String?>(null),
-            lockdownStartupFdRef = AtomicReference<ParcelFileDescriptor?>(null),
+            lockdownStartupFdRef = AtomicReference(lockdownFd),
             sessionStartMsRef = AtomicReference(sessionStartedAt),
             sessionIdRef = AtomicReference(sessionId),
-            startJobRef = AtomicReference<Job?>(null),
+            startJobRef = AtomicReference(startJob),
             shutdownJobRef = AtomicReference<Job?>(null),
             starting = AtomicBoolean(false),
             stopping = AtomicBoolean(false),
@@ -197,6 +218,7 @@ class ShutdownCoordinatorExtraTest {
             tunnelController = tunnelController,
             chainOrchestrator = chainOrchestrator,
             tunnelGateway = tunnelGateway,
+            healthMonitor = healthMonitor,
             engineWatchdog = engineWatchdog,
             sessionRecorder = sessionRecorder,
             stopForegroundRequest = stopForegroundRequest,
@@ -210,6 +232,7 @@ class ShutdownCoordinatorExtraTest {
         val tunnelController: TunnelController,
         val chainOrchestrator: ChainOrchestrator,
         val tunnelGateway: HevTunnelGateway,
+        val healthMonitor: HealthMonitor,
         val engineWatchdog: EngineWatchdogCoordinator,
         val sessionRecorder: RecordingSessionStatsRecorder,
         val stopForegroundRequest: () -> Unit,

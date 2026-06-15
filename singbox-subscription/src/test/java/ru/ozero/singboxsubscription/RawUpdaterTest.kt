@@ -24,6 +24,7 @@ import ru.ozero.singboxsubscription.parser.RawShareLinksParser
 import java.util.Base64
 import javax.net.ssl.SSLHandshakeException
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class RawUpdaterTest {
@@ -830,5 +831,85 @@ class RawUpdaterTest {
         assertEquals(1, profileDao.profiles.size)
         assertTrue(profileDao.profiles.none { it.id == 501L })
         assertEquals("S1", profileDao.profiles.single().name)
+    }
+
+    @Test
+    fun `should preserve single existing stable id without forcing full identity`() = runBlocking {
+        server.enqueue(MockResponse().setBody(vless1))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val first = profileDao.profiles.single()
+
+        val renamed =
+            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443?type=tcp&security=none#RenamedAgain"
+        server.enqueue(MockResponse().setBody(renamed))
+        rawUpdater.refresh(g)
+
+        val refreshed = profileDao.profiles.single()
+        assertEquals(first.id, refreshed.id)
+        assertEquals("RenamedAgain", refreshed.name)
+    }
+
+    @Test
+    fun `should delete stale rows when successful response has null body`() = runBlocking {
+        val mockedResponse = mockk<Response>(relaxed = true).apply {
+            every { body } returns null
+            every { isSuccessful } returns true
+            every { header("Subscription-Userinfo") } returns null
+            every { code } returns 200
+        }
+        val mockedCall = mockk<Call>(relaxed = true)
+        every { mockedCall.execute() } returns mockedResponse
+        val mockedClient = mockk<OkHttpClient>()
+        every { mockedClient.newCall(any()) } returns mockedCall
+        rawUpdater = RawUpdater(mockedClient, groupDao, profileDao)
+        val g = group()
+        profileDao.profiles.add(
+            ru.ozero.singboxroom.entity.ProxyProfile(
+                id = 701L,
+                groupId = g.id,
+                name = "Stale",
+                beanBlob = byteArrayOf(1, 2, 3),
+                protocolType = RawUpdater.PROTOCOL_VLESS,
+            ),
+        )
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isSuccess)
+        assertEquals(0, result.getOrNull())
+        assertTrue(profileDao.profiles.isEmpty())
+    }
+
+    @Test
+    fun `should leave unrelated group rows when refresh removes stale rows`() = runBlocking {
+        server.enqueue(MockResponse().setBody(vless1))
+        val target = group(id = 10L)
+        val other = group(id = 11L)
+        profileDao.profiles.add(
+            ru.ozero.singboxroom.entity.ProxyProfile(
+                id = 801L,
+                groupId = target.id,
+                name = "Target stale",
+                beanBlob = byteArrayOf(8, 0, 1),
+                protocolType = RawUpdater.PROTOCOL_VLESS,
+            ),
+        )
+        profileDao.profiles.add(
+            ru.ozero.singboxroom.entity.ProxyProfile(
+                id = 802L,
+                groupId = other.id,
+                name = "Other",
+                beanBlob = byteArrayOf(8, 0, 2),
+                protocolType = RawUpdater.PROTOCOL_VLESS,
+            ),
+        )
+
+        rawUpdater.refresh(target)
+
+        assertFalse(profileDao.profiles.any { it.id == 801L })
+        assertTrue(profileDao.profiles.any { it.id == 802L && it.groupId == other.id })
+        assertTrue(profileDao.profiles.any { it.groupId == target.id && it.name == "S1" })
     }
 }

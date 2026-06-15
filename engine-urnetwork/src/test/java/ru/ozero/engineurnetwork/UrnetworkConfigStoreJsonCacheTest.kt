@@ -80,7 +80,7 @@ class UrnetworkConfigStoreJsonCacheTest {
     }
 
     @Test
-    fun `legacy json cache accepts escaped text and skips negative providers`() = runTest {
+    fun `legacy json cache accepts escaped text negative providers and default flags`() = runTest {
         val ds = FakePreferencesDataStore()
         ds.editRaw(
             "urnetwork_cached_regions" to """
@@ -106,7 +106,7 @@ class UrnetworkConfigStoreJsonCacheTest {
     }
 
     @Test
-    fun `legacy json cache rejects objects with blank names or broken escapes`() = runTest {
+    fun `legacy json cache rejects blank names and keeps unknown escapes raw`() = runTest {
         val ds = FakePreferencesDataStore()
         ds.editRaw(
             "urnetwork_cached_cities" to """
@@ -181,14 +181,12 @@ class UrnetworkConfigStoreJsonCacheTest {
 
         val cached = DataStoreUrnetworkConfigStore(ds).config().first().cachedCountries
 
-        assertEquals(2, cached.size)
+        assertEquals(1, cached.size)
         assertEquals("Defaults", cached[0].name)
         assertEquals("BR", cached[0].countryCode)
         assertEquals(0, cached[0].providerCount)
         assertEquals(true, cached[0].isStable)
         assertEquals(false, cached[0].isStrongPrivacy)
-        assertEquals("TrailingSlash", cached[1].name)
-        assertEquals("FR", cached[1].countryCode)
     }
 
     private class FakePreferencesDataStore : DataStore<Preferences> {

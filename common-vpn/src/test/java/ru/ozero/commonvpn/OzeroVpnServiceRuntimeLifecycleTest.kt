@@ -1,6 +1,8 @@
 package ru.ozero.commonvpn
 
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.Looper
 import android.os.ParcelFileDescriptor
@@ -16,12 +18,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.jupiter.api.assertThrows
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows
+import org.robolectric.shadows.ShadowConnectivityManager
+import org.robolectric.shadows.ShadowNetwork
+import org.robolectric.shadows.ShadowNetworkCapabilities
 import ru.ozero.enginescore.ChainOrchestrator
+import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.TrafficMode
@@ -30,12 +38,192 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(RobolectricTestRunner::class)
+@Suppress("LargeClass")
 class OzeroVpnServiceRuntimeLifecycleTest {
 
     @Test
     fun `service can be prepared with injected runtime dependencies`() {
         preparedService()
         assertTrue(true)
+    }
+
+    @Test
+    fun `injected property accessors accept all runtime collaborators`() {
+        val service = Robolectric.buildService(OzeroVpnService::class.java).get()
+        val chain = mockk<ChainOrchestrator>(relaxed = true)
+        val gateway = mockk<HevTunnelGateway>(relaxed = true)
+        val controller = TunnelController()
+        val settingsRepository = mockk<SettingsRepository>(relaxed = true)
+        val sessionRecorder = SessionStatsRecorder.NoOp
+        val splitRules = SplitTunnelRulesProvider.NoOp
+        val health = HealthMonitor()
+        val plugins = emptySet<EnginePlugin>()
+        val router = RuntimeFailureRouter()
+
+        service.chainOrchestrator = chain
+        service.tunnelGateway = gateway
+        service.tunnelController = controller
+        service.settingsRepository = settingsRepository
+        service.sessionStatsRecorder = sessionRecorder
+        service.splitTunnelRulesProvider = splitRules
+        service.healthMonitor = health
+        service.enginePlugins = plugins
+        service.runtimeFailureRouter = router
+        val killedPids = mutableListOf<Int>()
+        service.processKiller = ProcessKiller { killedPids += it }
+
+        assertEquals(chain, service.chainOrchestrator)
+        assertEquals(gateway, service.tunnelGateway)
+        assertEquals(controller, service.tunnelController)
+        assertEquals(settingsRepository, service.settingsRepository)
+        assertEquals(sessionRecorder, service.sessionStatsRecorder)
+        assertEquals(splitRules, service.splitTunnelRulesProvider)
+        assertEquals(health, service.healthMonitor)
+        assertEquals(plugins, service.enginePlugins)
+        assertEquals(router, service.runtimeFailureRouter)
+        service.processKiller.kill(123)
+        assertEquals(listOf(123), killedPids)
+    }
+
+    @Test
+    fun `logActiveExternalVpn returns false when connectivity service is absent`() {
+        val service = Robolectric.buildService(OzeroVpnService::class.java).get()
+
+        assertFalse(service.callLogActiveExternalVpn())
+    }
+
+    @Test
+    fun `logActiveExternalVpn ignores networks without capabilities and non vpn networks`() {
+        val service = preparedService()
+        val connectivityManager = RuntimeEnvironment.getApplication()
+            .getSystemService(ConnectivityManager::class.java)
+        val shadowConnectivity = Shadows.shadowOf(connectivityManager) as ShadowConnectivityManager
+        val noCapsNetwork = ShadowNetwork.newInstance(101)
+        val wifiNetwork = ShadowNetwork.newInstance(102)
+        val wifiCaps = ShadowNetworkCapabilities.newInstance()
+        Shadows.shadowOf(wifiCaps).addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+        shadowConnectivity.addNetwork(noCapsNetwork, null)
+        shadowConnectivity.addNetwork(wifiNetwork, null)
+        shadowConnectivity.setNetworkCapabilities(wifiNetwork, wifiCaps)
+
+        assertFalse(service.callLogActiveExternalVpn())
+    }
+
+    @Test
+    fun `logActiveExternalVpn detects external vpn network`() {
+        val service = preparedService()
+        val connectivityManager = RuntimeEnvironment.getApplication()
+            .getSystemService(ConnectivityManager::class.java)
+        val shadowConnectivity = Shadows.shadowOf(connectivityManager) as ShadowConnectivityManager
+        val vpnNetwork = ShadowNetwork.newInstance(103)
+        val vpnCaps = ShadowNetworkCapabilities.newInstance()
+        Shadows.shadowOf(vpnCaps).addTransportType(NetworkCapabilities.TRANSPORT_VPN)
+        shadowConnectivity.addNetwork(vpnNetwork, null)
+        shadowConnectivity.setNetworkCapabilities(vpnNetwork, vpnCaps)
+
+        assertTrue(service.callLogActiveExternalVpn())
+    }
+
+    @Test
+    fun `logActiveExternalVpn ignores self owned vpn network when owner uid is available`() {
+        val service = preparedService()
+        val connectivityManager = RuntimeEnvironment.getApplication()
+            .getSystemService(ConnectivityManager::class.java)
+        val shadowConnectivity = Shadows.shadowOf(connectivityManager) as ShadowConnectivityManager
+        val vpnNetwork = ShadowNetwork.newInstance(104)
+        val vpnCaps = ShadowNetworkCapabilities.newInstance()
+        Shadows.shadowOf(vpnCaps).addTransportType(NetworkCapabilities.TRANSPORT_VPN)
+        val ownerSet = vpnCaps.trySetOwnerUid(android.os.Process.myUid())
+        shadowConnectivity.addNetwork(vpnNetwork, null)
+        shadowConnectivity.setNetworkCapabilities(vpnNetwork, vpnCaps)
+
+        if (ownerSet) {
+            assertFalse(service.callLogActiveExternalVpn())
+        } else {
+            assertTrue(service.callLogActiveExternalVpn())
+        }
+    }
+
+    @Test
+    fun `onCreate rethrows Hilt attach failure in plain Robolectric application`() {
+        val settingsRepository = mockk<SettingsRepository>(relaxed = true)
+        val settingsFlow = MutableStateFlow(SettingsModel(trafficMode = TrafficMode.TUN, killswitchEnabled = false))
+        every { settingsRepository.settings } returns settingsFlow
+        val runtimeFailureRouter = mockk<RuntimeFailureRouter>(relaxed = true)
+        val controller = Robolectric.buildService(OzeroVpnService::class.java)
+        val service = controller.get()
+        service.setDependency("runtimeFailureRouter", runtimeFailureRouter)
+        service.setDependency("settingsRepository", settingsRepository)
+        service.setDependency("healthMonitor", HealthMonitor())
+        service.setDependency("chainOrchestrator", mockk<ChainOrchestrator>(relaxed = true))
+        service.setDependency("tunnelGateway", mockk<HevTunnelGateway>())
+
+        assertThrows<IllegalStateException> { service.onCreate() }
+        verify(exactly = 0) { runtimeFailureRouter.bind(any()) }
+    }
+
+    @Test
+    fun `engineExtras returns blank before chain orchestrator injection and joined names after`() {
+        val rawService = Robolectric.buildService(OzeroVpnService::class.java).get()
+        assertEquals("", rawService.callEngineExtras())
+
+        val service = preparedService()
+        val chainOrchestrator = mockk<ChainOrchestrator>(relaxed = true)
+        val first = mockk<EnginePlugin> { every { id } returns EngineId.BYEDPI }
+        val second = mockk<EnginePlugin> { every { id } returns EngineId.WARP }
+        every { chainOrchestrator.activeEngines() } returns listOf(first, second)
+        service.setDependency("chainOrchestrator", chainOrchestrator)
+
+        assertEquals("ByeDPI + WARP", service.callEngineExtras())
+    }
+
+    @Test
+    fun `runtime failure handler delegates to watchdog and returns unit`() {
+        val service = preparedService()
+        val watchdog = mockk<EngineWatchdogCoordinator>(relaxed = true)
+        service.setLazy("engineWatchdog", watchdog)
+
+        service.callRuntimeFailureHandler(EngineId.WARP, "runtime died")
+
+        verify(exactly = 1) { watchdog.handleEngineFailure(EngineId.WARP, "runtime died") }
+    }
+
+    @Test
+    fun `lazy runtime collaborators are constructed from injected dependencies`() {
+        val service = preparedService()
+        service.setDependency("tunnelController", TunnelController())
+        service.setDependency("sessionStatsRecorder", SessionStatsRecorder.NoOp)
+        service.setDependency("splitTunnelRulesProvider", SplitTunnelRulesProvider.NoOp)
+        service.setDependency("enginePlugins", emptySet<EnginePlugin>())
+
+        assertTrue(service.forceLazy("notificationFactory") is OzeroNotificationFactory)
+        assertTrue(service.forceLazy("tunBuilderHelper") is TunBuilderHelper)
+        assertTrue(service.forceLazy("statsLogger") is TunnelStatsLogger)
+        assertTrue(service.forceLazy("engineWatchdog") is EngineWatchdogCoordinator)
+        assertTrue(service.forceLazy("shutdownCoord") is ShutdownCoordinator)
+        assertTrue(service.forceLazy("actionDispatcher") is OzeroVpnServiceActionDispatcher)
+        assertTrue(service.forceLazy("startSequence") is StartSequenceCoordinator)
+        assertTrue(service.forceLazy("startCoordinator") is OzeroVpnServiceStartCoordinator)
+    }
+
+    @Test
+    fun `startVpn coordinator lambdas close stale tun and run start sequence`() {
+        val service = preparedService()
+        val staleTun = mockk<ParcelFileDescriptor>(relaxed = true)
+        val startSequence = mockk<StartSequenceCoordinator>(relaxed = true)
+        service.setDependency("tunnelController", TunnelController())
+        service.setDependency("sessionStatsRecorder", SessionStatsRecorder.NoOp)
+        service.setDependency("splitTunnelRulesProvider", SplitTunnelRulesProvider.NoOp)
+        service.setDependency("enginePlugins", emptySet<EnginePlugin>())
+        service.setLazy("startSequence", startSequence)
+        service.setAtomicReference("tunFdRef", staleTun)
+
+        service.callStartVpn()
+
+        assertTrue(waitUntil { !service.getAtomicBoolean("starting") })
+        verify(exactly = 1) { staleTun.close() }
+        coVerify(exactly = 1) { startSequence.run() }
+        assertFalse(service.getAtomicBoolean("runtimeConfigRestartInProgress"))
     }
 
     @Test
@@ -71,6 +259,25 @@ class OzeroVpnServiceRuntimeLifecycleTest {
         settingsFlow.value = SettingsModel(trafficMode = TrafficMode.TUN, killswitchEnabled = true)
 
         assertTrue(waitUntil { service.getVolatileBoolean("killswitchCached") })
+    }
+
+    @Test
+    fun `observeKillswitchSetting keeps killswitch disabled for proxy traffic mode`() {
+        val settingsRepository = mockk<SettingsRepository>(relaxed = true)
+        val settingsFlow = MutableStateFlow(
+            SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                killswitchEnabled = true,
+            ),
+        )
+        every { settingsRepository.settings } returns settingsFlow
+        val service = preparedService(settingsRepository)
+        service.callObserveKillswitchSetting()
+        assertTrue(waitUntil { service.getVolatileBoolean("killswitchCached") })
+
+        settingsFlow.value = SettingsModel(trafficMode = TrafficMode.PROXY, killswitchEnabled = true)
+
+        assertTrue(waitUntil { !service.getVolatileBoolean("killswitchCached") })
     }
 
     @Test
@@ -143,6 +350,159 @@ class OzeroVpnServiceRuntimeLifecycleTest {
 
         assertEquals(android.app.Service.START_STICKY, result)
         assertEquals(11, latestStartId)
+    }
+
+    @Test
+    fun `real action dispatcher start action clears stopping and starts coordinator`() {
+        val service = preparedServiceForRealDispatcher()
+        val startCoordinator = mockk<OzeroVpnServiceStartCoordinator>(relaxed = true)
+        service.setLazy("startCoordinator", startCoordinator)
+        service.setAtomicBoolean("stopping", true)
+
+        val result = service.onStartCommand(
+            Intent(RuntimeEnvironment.getApplication(), OzeroVpnService::class.java).apply {
+                action = OzeroVpnService.ACTION_START
+            },
+            0,
+            21,
+        )
+
+        assertEquals(android.app.Service.START_STICKY, result)
+        assertFalse(service.getAtomicBoolean("stopping"))
+        assertEquals(21, service.getAtomicInteger("latestStartId"))
+        verify(exactly = 1) { startCoordinator.start() }
+    }
+
+    @Test
+    fun `real action dispatcher refuses start when chain orchestrator is not injected`() {
+        val service = Robolectric.buildService(OzeroVpnService::class.java).get()
+        val notificationFactory = mockk<OzeroNotificationFactory>(relaxed = true)
+        every { notificationFactory.enterForeground(any()) } returns true
+        service.setLazy("notificationFactory", notificationFactory)
+
+        val result = service.onStartCommand(
+            Intent(RuntimeEnvironment.getApplication(), OzeroVpnService::class.java).apply {
+                action = OzeroVpnService.ACTION_START
+            },
+            0,
+            25,
+        )
+
+        assertEquals(android.app.Service.START_NOT_STICKY, result)
+    }
+
+    @Test
+    fun `real action dispatcher stop action delegates to shutdown coordinator`() {
+        val service = preparedServiceForRealDispatcher()
+        val shutdownCoordinator = mockk<ShutdownCoordinator>(relaxed = true)
+        service.setLazy("shutdownCoord", shutdownCoordinator)
+
+        val result = service.onStartCommand(
+            Intent(RuntimeEnvironment.getApplication(), OzeroVpnService::class.java).apply {
+                action = OzeroVpnService.ACTION_STOP
+            },
+            0,
+            22,
+        )
+
+        assertEquals(android.app.Service.START_STICKY, result)
+        assertEquals(22, service.getAtomicInteger("latestStartId"))
+        verify(exactly = 1) { shutdownCoordinator.stopVpn() }
+    }
+
+    @Test
+    fun `real action dispatcher idle restart stops self without restart flow`() {
+        val service = preparedServiceForRealDispatcher()
+        val shutdownCoordinator = mockk<ShutdownCoordinator>(relaxed = true)
+        service.setLazy("shutdownCoord", shutdownCoordinator)
+
+        val result = service.onStartCommand(
+            Intent(RuntimeEnvironment.getApplication(), OzeroVpnService::class.java).apply {
+                action = OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG
+            },
+            0,
+            23,
+        )
+
+        assertEquals(android.app.Service.START_STICKY, result)
+        assertEquals(23, service.getAtomicInteger("latestStartId"))
+        verify(exactly = 0) { shutdownCoordinator.stopVpn(false) }
+    }
+
+    @Test
+    fun `real action dispatcher active restart enters restart flow`() {
+        val service = preparedServiceForRealDispatcher()
+        val shutdownCoordinator = mockk<ShutdownCoordinator>(relaxed = true)
+        val notificationFactory = mockk<OzeroNotificationFactory>(relaxed = true)
+        val startCoordinator = mockk<OzeroVpnServiceStartCoordinator>(relaxed = true)
+        every { notificationFactory.enterForeground(any()) } returnsMany listOf(true, false)
+        service.setLazy("shutdownCoord", shutdownCoordinator)
+        service.setLazy("notificationFactory", notificationFactory)
+        service.setLazy("startCoordinator", startCoordinator)
+        service.setDependency(
+            "tunnelController",
+            TunnelController().apply {
+                onProbing(EngineId.WARP)
+                onConnecting(EngineId.WARP)
+                onEngineStarted(EngineId.WARP, 2080)
+            },
+        )
+
+        val result = service.onStartCommand(
+            Intent(RuntimeEnvironment.getApplication(), OzeroVpnService::class.java).apply {
+                action = OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG
+            },
+            0,
+            24,
+        )
+
+        assertEquals(android.app.Service.START_STICKY, result)
+        assertEquals(24, service.getAtomicInteger("latestStartId"))
+        verify(exactly = 1) { shutdownCoordinator.stopVpn(false) }
+    }
+
+    @Test
+    fun `restartVpn aborts relaunch when stop is requested during shutdown wait`() {
+        val service = preparedService()
+        val shutdownCoordinator = mockk<ShutdownCoordinator>(relaxed = true)
+        val startCoordinator = mockk<OzeroVpnServiceStartCoordinator>(relaxed = true)
+        val notificationFactory = mockk<OzeroNotificationFactory>(relaxed = true)
+        every { notificationFactory.enterForeground(any()) } returns true
+        service.setDependency("shutdownCoord", shutdownCoordinator)
+        service.setDependency("startCoordinator", startCoordinator)
+        service.setLazy("notificationFactory", notificationFactory)
+        val shutdownJob = Job()
+        service.setAtomicReference("shutdownJobRef", shutdownJob)
+        service.setAtomicBoolean("stopping", false)
+
+        service.callRestartVpn()
+        service.setAtomicBoolean("stopping", true)
+        shutdownJob.complete()
+
+        assertTrue(waitUntil { !service.getAtomicBoolean("runtimeConfigRestartInProgress") })
+        coVerify(exactly = 0) { startCoordinator.start() }
+    }
+
+    @Test
+    fun `restartVpn aborts relaunch when restart was cancelled during shutdown wait`() {
+        val service = preparedService()
+        val shutdownCoordinator = mockk<ShutdownCoordinator>(relaxed = true)
+        val startCoordinator = mockk<OzeroVpnServiceStartCoordinator>(relaxed = true)
+        val notificationFactory = mockk<OzeroNotificationFactory>(relaxed = true)
+        every { notificationFactory.enterForeground(any()) } returns true
+        service.setDependency("shutdownCoord", shutdownCoordinator)
+        service.setDependency("startCoordinator", startCoordinator)
+        service.setLazy("notificationFactory", notificationFactory)
+        val shutdownJob = Job()
+        service.setAtomicReference("shutdownJobRef", shutdownJob)
+
+        service.callRestartVpn()
+        service.setAtomicBoolean("runtimeConfigRestartCancelled", true)
+        shutdownJob.complete()
+
+        assertTrue(waitUntil { !service.getAtomicBoolean("runtimeConfigRestartInProgress") })
+        assertFalse(service.getAtomicBoolean("runtimeConfigRestartCancelled"))
+        coVerify(exactly = 0) { startCoordinator.start() }
     }
 
     @Test
@@ -273,6 +633,21 @@ class OzeroVpnServiceRuntimeLifecycleTest {
     }
 
     @Test
+    fun `onDestroy closes remaining tun fd after shutdown cleanup`() {
+        val service = preparedService()
+        val shutdownCoordinator = mockk<ShutdownCoordinator>(relaxed = true)
+        val tunFd = mockk<ParcelFileDescriptor>(relaxed = true)
+        service.setDependency("shutdownCoord", shutdownCoordinator)
+        service.setAtomicReference("shutdownJobRef", Job().apply { complete() })
+        service.setAtomicReference("tunFdRef", tunFd)
+
+        service.onDestroy()
+
+        verify(exactly = 1) { tunFd.close() }
+        assertEquals(null, service.getAtomicReference("tunFdRef"))
+    }
+
+    @Test
     fun `onDestroy performs shutdown when no shutdown job in flight`() {
         val service = preparedService()
         val shutdownCoordinator = mockk<ShutdownCoordinator>(relaxed = true)
@@ -333,8 +708,24 @@ class OzeroVpnServiceRuntimeLifecycleTest {
         return service
     }
 
+    private fun preparedServiceForRealDispatcher(): OzeroVpnService {
+        val service = preparedService()
+        val notificationFactory = mockk<OzeroNotificationFactory>(relaxed = true)
+        every { notificationFactory.enterForeground(any()) } returns true
+        service.setLazy("notificationFactory", notificationFactory)
+        service.setDependency("chainOrchestrator", mockk<ChainOrchestrator>(relaxed = true))
+        service.setDependency("tunnelController", TunnelController())
+        return service
+    }
+
     private fun OzeroVpnService.callStopVpn() {
         val method = OzeroVpnService::class.java.getDeclaredMethod("stopVpn")
+        method.isAccessible = true
+        method.invoke(this)
+    }
+
+    private fun OzeroVpnService.callStartVpn() {
+        val method = OzeroVpnService::class.java.getDeclaredMethod("startVpn")
         method.isAccessible = true
         method.invoke(this)
     }
@@ -357,6 +748,26 @@ class OzeroVpnServiceRuntimeLifecycleTest {
         method.invoke(this)
     }
 
+    private fun OzeroVpnService.callEngineExtras(): String {
+        val method = OzeroVpnService::class.java.getDeclaredMethod("engineExtras")
+        method.isAccessible = true
+        return method.invoke(this) as String
+    }
+
+    private fun OzeroVpnService.callLogActiveExternalVpn(): Boolean {
+        val method = OzeroVpnService::class.java.getDeclaredMethod("logActiveExternalVpn")
+        method.isAccessible = true
+        return method.invoke(this) as Boolean
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun OzeroVpnService.callRuntimeFailureHandler(engineId: EngineId, reason: String) {
+        val field = OzeroVpnService::class.java.getDeclaredField("runtimeFailureHandler\$delegate")
+        field.isAccessible = true
+        val handler = (field.get(this) as Lazy<(EngineId, String) -> Unit>).value
+        handler(engineId, reason)
+    }
+
     private fun OzeroVpnService.setDependency(name: String, value: Any) {
         val field = try {
             OzeroVpnService::class.java.getDeclaredField(name)
@@ -377,6 +788,12 @@ class OzeroVpnServiceRuntimeLifecycleTest {
         field.set(this, lazy { value })
     }
 
+    private fun OzeroVpnService.forceLazy(name: String): Any {
+        val field = OzeroVpnService::class.java.getDeclaredField("${name}\$delegate")
+        field.isAccessible = true
+        return (field.get(this) as Lazy<*>).value as Any
+    }
+
     private fun OzeroVpnService.setAtomicBoolean(name: String, value: Boolean) {
         val field = OzeroVpnService::class.java.getDeclaredField(name)
         field.isAccessible = true
@@ -394,6 +811,21 @@ class OzeroVpnServiceRuntimeLifecycleTest {
         field.isAccessible = true
         @Suppress("UNCHECKED_CAST")
         (field.get(this) as AtomicReference<Any?>).set(value)
+    }
+
+    private fun OzeroVpnService.getAtomicReference(name: String): Any? {
+        val field = OzeroVpnService::class.java.getDeclaredField(name)
+        field.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        return (field.get(this) as AtomicReference<Any?>).get()
+    }
+
+    private fun NetworkCapabilities.trySetOwnerUid(uid: Int): Boolean {
+        return runCatching {
+            val method = NetworkCapabilities::class.java.getDeclaredMethod("setOwnerUid", Int::class.javaPrimitiveType)
+            method.isAccessible = true
+            method.invoke(this, uid)
+        }.isSuccess
     }
 
     private fun OzeroVpnService.getAtomicBoolean(name: String): Boolean {
