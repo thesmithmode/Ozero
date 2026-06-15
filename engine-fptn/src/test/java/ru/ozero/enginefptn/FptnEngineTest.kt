@@ -23,6 +23,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import java.io.OutputStream
 import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -392,9 +393,36 @@ class FptnEngineTest {
         engine.stop()
 
         assertIs<TunAttachResult.Success>(attach)
-        assertTrue(delivered)
-        assertEquals(listOf(listOf(9, 8, 7, 6)), ws.sentPayloads.map { it.toList() })
+        assertEquals(true, delivered)
+        assertEquals(
+            listOf(listOf(9.toByte(), 8.toByte(), 7.toByte(), 6.toByte())),
+            ws.sentPayloads.map { it.toList() },
+        )
         assertEquals(listOf(4L), ws.sentLengths)
+    }
+
+    @Test
+    fun `attachTun ignores websocket message write failure and keeps session alive`() = runTest {
+        val ws = FakeWebSocketClient()
+        engine = FptnEngine(
+            store,
+            wsClient = ws,
+            httpsClient = FakeHttpsClient(
+                postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
+            ),
+            tunIo = fakeTunIo(output = failingOutputStream()),
+        )
+        assertIs<StartResult.Success>(
+            engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
+        )
+
+        val attach = engine.attachTun(DETACHED_READ_WRITE_FD)
+        ws.onOpen()
+        ws.onMessage(byteArrayOf(1, 2, 3))
+
+        assertIs<TunAttachResult.Success>(attach)
+        assertEquals(1, engine.stats().first().activeConnections)
+        engine.stop()
     }
 
     @Test
@@ -566,6 +594,26 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `FptnToken normalizes camel country code and rejects missing credentials`() {
+        val camelCountry = tokenFromJson(
+            """{"version":1,"username":"u","password":"p",
+                "servers":[{"name":"S1","host":"h.example","port":443,"countryCode":" us "}]}""",
+        )
+        val missingUsername = tokenFromJson(
+            """{"version":1,"password":"p",
+                "servers":[{"name":"S1","host":"h.example","port":443}]}""",
+        )
+        val missingPassword = tokenFromJson(
+            """{"version":1,"username":"u",
+                "servers":[{"name":"S1","host":"h.example","port":443}]}""",
+        )
+
+        assertEquals("US", assertNotNull(FptnToken.parse("fptn:$camelCountry")).servers.single().countryCode)
+        assertNull(FptnToken.parse("fptn:$missingUsername"))
+        assertNull(FptnToken.parse("fptn:$missingPassword"))
+    }
+
+    @Test
     fun `FptnToken readBounded stops at eof and rejects overflow`() {
         val exact = FptnToken.readBounded(ByteArrayInputStream(byteArrayOf(1, 2, 3)), maxBytes = 3)
         val empty = FptnToken.readBounded(ByteArrayInputStream(ByteArray(0)), maxBytes = 3)
@@ -574,9 +622,21 @@ class FptnEngineTest {
             override fun read(): Int = if (next++ < 4) next else -1
         }
 
-        assertEquals(listOf(1, 2, 3), exact.toList())
-        assertEquals(emptyList(), empty.toList())
-        assertTrue(runCatching { FptnToken.readBounded(overflow, maxBytes = 3) }.isFailure)
+        assertEquals(listOf(1.toByte(), 2.toByte(), 3.toByte()), exact.toList())
+        assertEquals(emptyList<Byte>(), empty.toList())
+        assertEquals(true, runCatching { FptnToken.readBounded(overflow, maxBytes = 3) }.isFailure)
+    }
+
+    @Test
+    fun `FptnToken readBounded treats zero read as end of stream`() {
+        val zeroRead = object : InputStream() {
+            override fun read(): Int = error("bulk read is used")
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int = 0
+        }
+
+        val bytes = FptnToken.readBounded(zeroRead, maxBytes = 3)
+
+        assertEquals(emptyList<Byte>(), bytes.toList())
     }
 
     @Test
@@ -975,6 +1035,7 @@ class FptnEngineTest {
         listOf(
             "operation timeout",
             "Timeout while waiting",
+            "request TIMED OUT",
         ).forEach { signal ->
             assertEquals(FptnEngine.FPTN_AUTH_TIMEOUT, classifyFptnAuthFailure(error = signal))
         }
@@ -982,6 +1043,7 @@ class FptnEngineTest {
             "dns lookup failed",
             "NoDataException nodename nor servname",
             "resolve server failed",
+            "host unresolved",
         ).forEach { signal ->
             assertEquals(FptnEngine.FPTN_DNS_FAILED, classifyFptnAuthFailure(error = signal))
         }
@@ -1196,11 +1258,24 @@ class FptnEngineTest {
         assertEquals(false, FptnBypassMethod.REALITY_METHODS.contains(FptnBypassMethod.OBFUSCATION))
     }
 
+    @Test
+    fun `FptnBypassMethod resolves known and unknown strategy names`() {
+        assertEquals(FptnBypassMethod.SNI_REALITY_YANDEX_25, FptnBypassMethod.DEFAULT_REALITY)
+        FptnBypassMethod.entries.forEach { method ->
+            assertEquals(method, FptnBypassMethod.fromStrategyName(method.strategyName))
+            assertTrue(method.displayName.isNotBlank())
+        }
+        assertEquals(FptnBypassMethod.DEFAULT, FptnBypassMethod.fromStrategyName("missing"))
+    }
+
     private fun validTokenB64(host: String = "1.2.3.4", countryCode: String = ""): String {
         val json = """{"version":1,"username":"u","password":"p",
             "servers":[{"name":"S1","host":"$host","port":443,"countryCode":"$countryCode"}]}"""
         return java.util.Base64.getEncoder().encodeToString(json.toByteArray())
     }
+
+    private fun tokenFromJson(json: String): String =
+        java.util.Base64.getEncoder().encodeToString(json.toByteArray())
 
     private fun multiServerTokenB64(): String {
         val json = """{"version":1,"username":"u","password":"p",
@@ -1232,14 +1307,28 @@ class FptnEngineTest {
         const val DETACHED_READ_WRITE_FD = 42
     }
 
-    private fun fakeTunIo(inputBytes: ByteArray = ByteArray(0)): FptnTunIo =
+    private fun fakeTunIo(
+        inputBytes: ByteArray = ByteArray(0),
+        output: OutputStream = ByteArrayOutputStream(),
+    ): FptnTunIo =
         object : FptnTunIo {
             override fun open(tunFd: Int): FptnTunStreams =
                 FptnTunStreams(
                     pfd = null,
                     input = ByteArrayInputStream(inputBytes),
-                    output = ByteArrayOutputStream(),
+                    output = output,
                 )
+        }
+
+    private fun failingOutputStream(): OutputStream =
+        object : OutputStream() {
+            override fun write(value: Int) {
+                throw IOException("write failed")
+            }
+
+            override fun write(buffer: ByteArray, offset: Int, length: Int) {
+                throw IOException("write failed")
+            }
         }
 
     private fun waitUntil(timeoutMs: Long = 2_000L, predicate: () -> Boolean): Boolean {

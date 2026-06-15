@@ -108,6 +108,71 @@ class UrnetworkJwtBootstrapperCoverageTest {
         assertEquals(1, auth.guestCalls)
     }
 
+    @Test
+    fun deviceWalletSuccessPersistsPubkeyNetworkNameAndClientJwt() = runTest {
+        val store = InMemoryUrnetworkConfigStore()
+        val auth = RecordingAuth(
+            client = ClientJwtResult.Success("client-from-device"),
+            device = DeviceWalletJwtResult.Success("device-by-jwt", isNewNetwork = true),
+        )
+        val identity = RecordingIdentity(pubkey = "pub-device")
+
+        val result = bootstrapper(store, auth, identity).ensureClientJwt()
+
+        assertIs<UrnetworkJwtBootstrapper.Result.Acquired>(result)
+        assertEquals("device-by-jwt", store.byJwt().first())
+        assertEquals("client-from-device", store.byClientJwt().first())
+        assertEquals("pub-device", store.devicePubkey().first())
+        assertEquals("n-fixed", store.deviceNetworkName().first())
+        assertEquals(0, auth.guestCalls)
+        assertEquals(1, auth.deviceCalls)
+        assertEquals(listOf("n-fixed"), auth.deviceNetworkNames)
+    }
+
+    @Test
+    fun deviceWalletMigrationClearsLegacyClientJwtAndKeepsLegacyJwtWhenPubkeyUnavailable() = runTest {
+        val store = InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                byJwt = "legacy-by",
+                byClientJwt = "legacy-client",
+                deviceNetworkName = "stored-network",
+            ),
+        )
+        val auth = RecordingAuth(
+            client = ClientJwtResult.Success("client-after-migration"),
+            device = DeviceWalletJwtResult.Success("device-by", isNewNetwork = false),
+        )
+        val identity = RecordingIdentity(pubkeyFailure = IllegalStateException("pubkey failed"))
+
+        val result = bootstrapper(store, auth, identity).ensureClientJwt()
+
+        assertIs<UrnetworkJwtBootstrapper.Result.Acquired>(result)
+        assertEquals("device-by", store.byJwt().first())
+        assertEquals("client-after-migration", store.byClientJwt().first())
+        assertNull(store.devicePubkey().first())
+        assertEquals("stored-network", store.deviceNetworkName().first())
+        assertEquals(0, auth.guestCalls)
+        assertEquals(1, auth.deviceCalls)
+        assertEquals(listOf("stored-network"), auth.deviceNetworkNames)
+    }
+
+    @Test
+    fun legacyJwtUsesGuestFallbackWhenDeviceWalletFails() = runTest {
+        val store = InMemoryUrnetworkConfigStore(UrnetworkConfig(byJwt = "legacy-by"))
+        val auth = RecordingAuth(
+            client = ClientJwtResult.Success("client-from-legacy"),
+            device = DeviceWalletJwtResult.Error("wallet rejected"),
+        )
+
+        val result = bootstrapper(store, auth, RecordingIdentity()).ensureClientJwt()
+
+        assertIs<UrnetworkJwtBootstrapper.Result.Acquired>(result)
+        assertEquals("legacy-by", store.byJwt().first())
+        assertEquals("client-from-legacy", store.byClientJwt().first())
+        assertEquals(0, auth.guestCalls)
+        assertEquals(1, auth.deviceCalls)
+    }
+
     private fun bootstrapper(
         store: UrnetworkConfigStore,
         auth: UrnetworkAuthService,
@@ -127,6 +192,7 @@ class UrnetworkJwtBootstrapperCoverageTest {
         var guestCalls = 0
         var clientCalls = 0
         var deviceCalls = 0
+        val deviceNetworkNames = mutableListOf<String>()
 
         override suspend fun acquireGuestJwt(): GuestJwtResult {
             guestCalls++
@@ -143,12 +209,20 @@ class UrnetworkJwtBootstrapperCoverageTest {
             networkName: String,
         ): DeviceWalletJwtResult {
             deviceCalls++
+            deviceNetworkNames += networkName
             return device
         }
     }
 
-    private class RecordingIdentity : UrnetworkDeviceIdentity {
-        override suspend fun pubkeyBase58(): String = "pub"
+    private class RecordingIdentity(
+        private val pubkey: String = "pub",
+        private val pubkeyFailure: Throwable? = null,
+    ) : UrnetworkDeviceIdentity {
+        override suspend fun pubkeyBase58(): String {
+            pubkeyFailure?.let { throw it }
+            return pubkey
+        }
+
         override suspend fun sign(message: ByteArray): ByteArray = message.copyOf()
     }
 

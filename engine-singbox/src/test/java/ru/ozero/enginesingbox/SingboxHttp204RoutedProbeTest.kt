@@ -28,15 +28,38 @@ class SingboxHttp204RoutedProbeTest {
 
     @Test
     fun `routed probe succeeds after HTTP 204 through SOCKS`() = runTest {
+        val ticks = 1_000L
         SocksHttpServer(statusCode = 204, reason = "No Content").use { socks ->
             val probe = SingboxHttp204RoutedProbe(
                 probeUrl = URL("http://127.0.0.1/generate_204"),
                 timeoutMs = 1_000,
+                nanoTime = { ticks },
             )
 
             val latency = probe.probeLatencyMs(socks.port)
 
-            assertTrue(latency >= 0)
+            assertEquals(1L, latency)
+            assertTrue(socks.requestText.startsWith("GET /generate_204 "))
+        }
+    }
+
+    @Test
+    fun `routed probe keeps measured latency above minimum`() = runTest {
+        var ticks = 1_000L
+        SocksHttpServer(statusCode = 204, reason = "No Content").use { socks ->
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("http://127.0.0.1/generate_204"),
+                timeoutMs = 1_000,
+                nanoTime = {
+                    val current = ticks
+                    ticks += 3_000_000L
+                    current
+                },
+            )
+
+            val latency = probe.probeLatencyMs(socks.port)
+
+            assertEquals(3L, latency)
             assertTrue(socks.requestText.startsWith("GET /generate_204 "))
         }
     }

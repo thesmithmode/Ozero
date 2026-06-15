@@ -48,6 +48,7 @@ class JacocoExcludesContractTest {
             "SubscriptionVerifier",
             "LogSanitizer",
             "PersistentLoggers",
+            "OzeroVpnService",
             "BinaryDownloader",
             "LockFileParser",
             "WarpConfParser",

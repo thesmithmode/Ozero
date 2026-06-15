@@ -821,6 +821,26 @@ jobs:
           path: engine-fptn/build/reports/tests/**
           retention-days: 14
 
+  test-engines-urnetwork-byedpi:
+    name: Tests — engine-urnetwork + engine-byedpi
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      - test-engine-urnetwork
+      - test-engine-byedpi
+      - test-engine-fptn
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Verify split engine checks
+        run: |
+          set -euo pipefail
+          test "${{ needs.test-engine-urnetwork.result }}" = "success"
+          test "${{ needs.test-engine-byedpi.result }}" = "success"
+          test "${{ needs.test-engine-fptn.result }}" = "success"
+
   test-core-modules:
     name: Tests — core + common modules
     runs-on: ubuntu-latest
@@ -1644,3 +1664,35 @@ jobs:
           name: test-reports-shared-warp-settings
           path: shared-warp-settings/build/reports/tests/**
           retention-days: 14
+
+  test-singbox-and-extra-modules:
+    name: Tests — singbox + extra modules
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      - test-engine-masterdns
+      - test-engine-singbox
+      - test-singbox-process
+      - test-singbox-core
+      - test-singbox-fmt
+      - test-singbox-config
+      - test-singbox-room
+      - test-singbox-subscription
+      - test-shared-warp-settings
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Verify split singbox checks
+        run: |
+          set -euo pipefail
+          test "${{ needs.test-engine-masterdns.result }}" = "success"
+          test "${{ needs.test-engine-singbox.result }}" = "success"
+          test "${{ needs.test-singbox-process.result }}" = "success"
+          test "${{ needs.test-singbox-core.result }}" = "success"
+          test "${{ needs.test-singbox-fmt.result }}" = "success"
+          test "${{ needs.test-singbox-config.result }}" = "success"
+          test "${{ needs.test-singbox-room.result }}" = "success"
+          test "${{ needs.test-singbox-subscription.result }}" = "success"
+          test "${{ needs.test-shared-warp-settings.result }}" = "success"

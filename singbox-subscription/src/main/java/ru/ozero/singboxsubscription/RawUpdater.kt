@@ -174,6 +174,29 @@ private fun AbstractBean.stableRuntimeKey(): String = when (this) {
     else -> ""
 }
 
+internal fun stableIdentityKeysForTest(bean: AbstractBean, groupId: Long = 1L): Pair<String, String> {
+    val profile = ProxyProfile(
+        groupId = groupId,
+        name = bean.name,
+        beanBlob = KryoSerializer.serialize(bean),
+        protocolType = RawUpdater.protocolTypeOf(bean),
+    )
+    return profile.stableBaseIdentityKey() to profile.stableFullIdentityKey()
+}
+
+internal fun stableBeanKeysForTest(bean: AbstractBean): Pair<String, String> =
+    bean.stableCredentialKey() to bean.stableRuntimeKey()
+
+internal fun corruptedStableIdentityKeysForTest(blob: ByteArray, groupId: Long = 1L): Pair<String, String> {
+    val profile = ProxyProfile(
+        groupId = groupId,
+        name = "corrupted",
+        beanBlob = blob,
+        protocolType = RawUpdater.PROTOCOL_VLESS,
+    )
+    return profile.stableBaseIdentityKey() to profile.stableFullIdentityKey()
+}
+
 private fun StandardV2RayBean.standardV2RayRuntimeKey(): String =
     listOf(
         "type=${type.trim()}",

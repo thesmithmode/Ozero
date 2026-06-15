@@ -138,7 +138,6 @@ val excludedClasses = listOf(
     "**/WarpSdkBridge\$DefaultImpls*.*",
     "**/CrashLogStore*.*",
     "**/RoomSplitTunnelRulesProvider*.*",
-    "**/OzeroVpnService*.*",
     "**/DefaultTProxyLoader*.*",
     "**/TProxyService*.*",
     "**/FptnNativeHttpsClient*.*",
