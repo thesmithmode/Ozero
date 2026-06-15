@@ -413,6 +413,30 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `attachTun read loop swallows active input exception until stop`() = runTest {
+        val ws = FakeWebSocketClient()
+        engine = FptnEngine(
+            store,
+            wsClient = ws,
+            httpsClient = FakeHttpsClient(
+                postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
+            ),
+            tunIo = fakeTunIo(input = failingInputStream()),
+        )
+        assertIs<StartResult.Success>(
+            engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
+        )
+
+        val attach = engine.attachTun(DETACHED_READ_WRITE_FD)
+        val readAttempted = waitUntil { ws.runHandles.isNotEmpty() }
+
+        assertIs<TunAttachResult.Success>(attach)
+        assertTrue(readAttempted)
+        engine.stop()
+        assertEquals(emptyList(), ws.sentPayloads)
+    }
+
+    @Test
     fun `attachTun ignores websocket message write failure and keeps session alive`() = runTest {
         val ws = FakeWebSocketClient()
         engine = FptnEngine(
@@ -1328,15 +1352,27 @@ class FptnEngineTest {
 
     private fun fakeTunIo(
         inputBytes: ByteArray = ByteArray(0),
+        input: InputStream = ByteArrayInputStream(inputBytes),
         output: OutputStream = ByteArrayOutputStream(),
     ): FptnTunIo =
         object : FptnTunIo {
             override fun open(tunFd: Int): FptnTunStreams =
                 FptnTunStreams(
                     pfd = null,
-                    input = ByteArrayInputStream(inputBytes),
+                    input = input,
                     output = output,
                 )
+        }
+
+    private fun failingInputStream(): InputStream =
+        object : InputStream() {
+            override fun read(): Int {
+                throw IOException("read failed")
+            }
+
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                throw IOException("read failed")
+            }
         }
 
     private fun failingOutputStream(): OutputStream =

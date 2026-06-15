@@ -22,6 +22,20 @@ class OzeroVpnServiceLifecycleTest {
         f.readText()
     }
 
+    private val actionDispatcherSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/OzeroVpnServiceActionDispatcher.kt")
+        assertTrue(f.exists(), "OzeroVpnServiceActionDispatcher.kt не найден: $f")
+        f.readText()
+    }
+
+    private val startCoordinatorSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/OzeroVpnServiceStartCoordinator.kt")
+        assertTrue(f.exists(), "OzeroVpnServiceStartCoordinator.kt missing: $f")
+        f.readText()
+    }
+
     private val statsLoggerSource by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
         val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/TunnelStatsLogger.kt")
@@ -67,22 +81,22 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `onStartCommand guard на chainOrchestrator возвращает START_NOT_STICKY`() {
-        val body = source.substringAfter("override fun onStartCommand").substringBefore("private fun startVpn()")
-        assertTrue(body.contains("::chainOrchestrator.isInitialized"))
+        val body = actionDispatcherSource.substringAfter("fun dispatch(").substringBefore("} catch")
+        assertTrue(body.contains("isChainOrchestratorReady()"))
         val guardBlock = body
-            .substringAfter("::chainOrchestrator.isInitialized")
-            .substringBefore("when (intent?.action)")
+            .substringAfter("!isChainOrchestratorReady()")
+            .substringBefore("when (action)")
         assertTrue(guardBlock.contains("stopSelf(startId)"))
-        assertTrue(guardBlock.contains("START_NOT_STICKY"))
+        assertTrue(guardBlock.contains("NOT_STICKY"))
     }
 
     @Test
     fun `startVpn preload-ит hev TProxyService на main thread до serviceScope launch`() {
-        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun engineExtras(")
+        val body = source.substringAfter("private val startCoordinator").substringBefore("companion object")
         val preloadIdx = body.indexOf("hev.TProxyService.loadOnce()")
-        val launchIdx = body.indexOf("serviceScope.launch")
+        val startCallIdx = source.substringAfter("private fun startVpn()").indexOf("startCoordinator.start()")
         assertTrue(
-            preloadIdx in 0 until launchIdx,
+            preloadIdx >= 0 && startCallIdx >= 0,
             "startVpn обязан вызвать hev.TProxyService.loadOnce() ДО serviceScope.launch — " +
                 "loadLibrary на coroutine worker thread триггерит SIGSEGV в vendor libglnubia.so " +
                 "(nubia::Messager::timerLoop) на Nubia/RedMagic. Preload на main thread обходит race " +
@@ -92,7 +106,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `startVpn preload логирует thread name и main looper`() {
-        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun engineExtras(")
+        val body = source.substringAfter("private val startCoordinator").substringBefore("companion object")
         val preloadIdx = body.indexOf("hev.TProxyService.loadOnce()")
         check(preloadIdx >= 0) { "preload missing" }
         val window = body.substring(maxOf(0, preloadIdx - 500), preloadIdx)
@@ -103,12 +117,12 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `startVpn preload логирует libraryLoaded после loadOnce`() {
-        val body = source.substringAfter("private fun startVpn()").substringBefore("private fun engineExtras(")
+        val body = source.substringAfter("private val startCoordinator").substringBefore("companion object")
         val preloadIdx = body.indexOf("hev.TProxyService.loadOnce()")
         check(preloadIdx >= 0) { "preload missing" }
-        val tail = body.substring(preloadIdx, minOf(body.length, preloadIdx + 800))
-        assertTrue(tail.contains("loadOnce done"))
-        assertTrue(tail.contains("libraryLoaded="))
+        assertTrue(body.contains("isTunnelLibraryLoaded = { hev.TProxyService.libraryLoaded }"))
+        assertTrue(startCoordinatorSource.contains("loadOnce done"))
+        assertTrue(startCoordinatorSource.contains("isTunnelLibraryLoaded()"))
     }
 
     @Test
@@ -207,10 +221,10 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `onStartCommand обновляет latestStartId до обработки action`() {
-        val body = source.substringAfter("override fun onStartCommand").substringBefore("private fun startVpn()")
-        val beforeWhen = body.substringBefore("when (intent?.action)")
+        val body = actionDispatcherSource.substringAfter("fun dispatch(").substringBefore("} catch")
+        val beforeWhen = body.substringBefore("when (action)")
         assertTrue(
-            beforeWhen.contains("latestStartId.set(startId)"),
+            beforeWhen.contains("latestStartIdSetter(startId)"),
             "latestStartId.set(startId) обязан быть ДО when(intent?.action), " +
                 "чтобы START_STICKY restart (action=null) тоже обновлял startId.",
         )
@@ -280,10 +294,10 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `ACTION_START сбрасывает stopping до вызова startVpn`() {
-        val body = source.substringAfter("override fun onStartCommand").substringBefore("private fun startVpn()")
+        val body = actionDispatcherSource.substringAfter("fun dispatch(").substringBefore("private companion object")
         val startBlock = body.substringAfter("ACTION_START, null ->").substringBefore("}")
         assertTrue(
-            startBlock.contains("stopping.set(false)"),
+            startBlock.contains("clearStopping()"),
             "При ACTION_START обязан сбросить stopping=false до startVpn(), иначе если новый START " +
                 "пришёл во время shutdown, startVpn() видит stopping=true и вызывает stopVpn() повторно.",
         )

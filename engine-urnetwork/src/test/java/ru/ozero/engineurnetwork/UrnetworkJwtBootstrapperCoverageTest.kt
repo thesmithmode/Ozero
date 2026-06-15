@@ -130,6 +130,51 @@ class UrnetworkJwtBootstrapperCoverageTest {
     }
 
     @Test
+    fun deviceWalletMigrationRunsEvenWhenLegacyClientJwtAlreadyExists() = runTest {
+        val store = InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(
+                byJwt = "legacy-by",
+                byClientJwt = "legacy-client",
+                deviceNetworkName = "  ",
+            ),
+        )
+        val auth = RecordingAuth(
+            client = ClientJwtResult.Success("client-after-device"),
+            device = DeviceWalletJwtResult.Success("device-by-jwt", isNewNetwork = false),
+        )
+        val identity = RecordingIdentity(pubkey = "pub-after-device")
+
+        val result = bootstrapper(store, auth, identity).ensureClientJwt()
+
+        assertIs<UrnetworkJwtBootstrapper.Result.Acquired>(result)
+        assertEquals("device-by-jwt", store.byJwt().first())
+        assertEquals("client-after-device", store.byClientJwt().first())
+        assertEquals("pub-after-device", store.devicePubkey().first())
+        assertEquals("n-fixed", store.deviceNetworkName().first())
+        assertEquals(1, auth.deviceCalls)
+        assertEquals(1, auth.clientCalls)
+        assertEquals(listOf("n-fixed"), auth.deviceNetworkNames)
+    }
+
+    @Test
+    fun deviceWalletSuccessFollowedByClientFailurePersistsDeviceJwtOnly() = runTest {
+        val store = InMemoryUrnetworkConfigStore()
+        val auth = RecordingAuth(
+            client = ClientJwtResult.Error("client failed"),
+            device = DeviceWalletJwtResult.Success("device-by-jwt", isNewNetwork = true),
+        )
+
+        val result = bootstrapper(store, auth, RecordingIdentity()).ensureClientJwt()
+
+        assertIs<UrnetworkJwtBootstrapper.Result.Failed>(result)
+        assertEquals("device-by-jwt", store.byJwt().first())
+        assertNull(store.byClientJwt().first())
+        assertEquals(0, auth.guestCalls)
+        assertEquals(1, auth.deviceCalls)
+        assertEquals(1, auth.clientCalls)
+    }
+
+    @Test
     fun deviceWalletMigrationClearsLegacyClientJwtAndKeepsLegacyJwtWhenPubkeyUnavailable() = runTest {
         val store = InMemoryUrnetworkConfigStore(
             UrnetworkConfig(
@@ -171,6 +216,25 @@ class UrnetworkJwtBootstrapperCoverageTest {
         assertEquals("client-from-legacy", store.byClientJwt().first())
         assertEquals(0, auth.guestCalls)
         assertEquals(1, auth.deviceCalls)
+    }
+
+    @Test
+    fun deviceWalletFailureWithoutLegacyJwtFallsBackToGuestFlow() = runTest {
+        val store = InMemoryUrnetworkConfigStore()
+        val auth = RecordingAuth(
+            guest = GuestJwtResult.Success("guest-by"),
+            client = ClientJwtResult.Success("client-from-guest"),
+            device = DeviceWalletJwtResult.Error("wallet unavailable"),
+        )
+
+        val result = bootstrapper(store, auth, RecordingIdentity()).ensureClientJwt()
+
+        assertIs<UrnetworkJwtBootstrapper.Result.Acquired>(result)
+        assertEquals("guest-by", store.byJwt().first())
+        assertEquals("client-from-guest", store.byClientJwt().first())
+        assertEquals(1, auth.deviceCalls)
+        assertEquals(1, auth.guestCalls)
+        assertEquals(1, auth.clientCalls)
     }
 
     private fun bootstrapper(

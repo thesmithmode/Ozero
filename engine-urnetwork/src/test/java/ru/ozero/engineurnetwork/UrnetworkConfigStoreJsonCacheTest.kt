@@ -79,6 +79,54 @@ class UrnetworkConfigStoreJsonCacheTest {
         assertTrue(snap.cachedCities.isEmpty())
     }
 
+    @Test
+    fun `legacy json cache accepts escaped text and skips negative providers`() = runTest {
+        val ds = FakePreferencesDataStore()
+        ds.editRaw(
+            "urnetwork_cached_regions" to """
+                [
+                  {"name":"North \"Quoted\"","code":"nl","region":"North\\West","providers":0},
+                  {"name":"Negative","code":"br","providers":-1},
+                  {"name":"NullFlags","code":"pt","stable":null,"privacy":null}
+                ]
+            """.trimIndent(),
+        )
+
+        val cached = DataStoreUrnetworkConfigStore(ds).config().first().cachedRegions
+
+        assertEquals(3, cached.size)
+        assertEquals("North \"Quoted\"", cached[0].name)
+        assertEquals("North\\West", cached[0].region)
+        assertEquals(0, cached[0].providerCount)
+        assertEquals("BR", cached[1].countryCode)
+        assertEquals(-1, cached[1].providerCount)
+        assertEquals("PT", cached[2].countryCode)
+        assertEquals(true, cached[2].isStable)
+        assertEquals(false, cached[2].isStrongPrivacy)
+    }
+
+    @Test
+    fun `legacy json cache rejects objects with blank names or broken escapes`() = runTest {
+        val ds = FakePreferencesDataStore()
+        ds.editRaw(
+            "urnetwork_cached_cities" to """
+                [
+                  {"name":"Broken","code":"de","city":"bad\q"},
+                  {"name":"   ","code":"fr","city":"Paris"},
+                  {"name":"Valid","code":"es","city":"Madrid"}
+                ]
+            """.trimIndent(),
+        )
+
+        val cached = DataStoreUrnetworkConfigStore(ds).config().first().cachedCities
+
+        assertEquals(2, cached.size)
+        assertEquals("Broken", cached[0].name)
+        assertEquals("""bad\q""", cached[0].city)
+        assertEquals("Valid", cached[1].name)
+        assertEquals("Madrid", cached[1].city)
+    }
+
     private class FakePreferencesDataStore : DataStore<Preferences> {
         private val state = MutableStateFlow<Preferences>(emptyPreferences())
         override val data: Flow<Preferences> get() = state

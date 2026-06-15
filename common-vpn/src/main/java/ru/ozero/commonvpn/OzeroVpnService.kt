@@ -21,9 +21,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
-import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_START
-import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_RESTART_RUNTIME_CONFIG
-import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_STOP
 import ru.ozero.enginescore.ChainOrchestrator
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.PersistentLoggers
@@ -155,6 +152,50 @@ class OzeroVpnService : android.net.VpnService() {
             stopSelfRequest = { id -> stopSelf(id) },
         )
     }
+    private val actionDispatcher: OzeroVpnServiceActionDispatcher by lazy {
+        OzeroVpnServiceActionDispatcher(
+            latestStartIdSetter = { latestStartId.set(it) },
+            isChainOrchestratorReady = { ::chainOrchestrator.isInitialized },
+            enterForeground = { notificationFactory.enterForeground(this) },
+            isTunnelIdle = { tunnelController.state.value is TunnelState.Idle },
+            clearStopping = { stopping.set(false) },
+            stopSelf = { stopSelf(it) },
+            startVpn = { startVpn() },
+            stopVpn = { stopVpn() },
+            restartVpn = { restartVpn() },
+        )
+    }
+    private val startCoordinator: OzeroVpnServiceStartCoordinator by lazy {
+        OzeroVpnServiceStartCoordinator(
+            deps = OzeroVpnServiceStartCoordinator.Dependencies(
+                scope = serviceScope,
+                startJobRef = startJobRef,
+                shutdownJobRef = shutdownJobRef,
+                starting = starting,
+                stopping = stopping,
+                stopSignal = stopSignal,
+                runtimeConfigRestartCancelled = runtimeConfigRestartCancelled,
+                runtimeConfigRestartInProgress = runtimeConfigRestartInProgress,
+                shutdownJoinTimeoutMs = SHUTDOWN_JOIN_TIMEOUT_MS,
+                externalVpnReleaseDelayMs = EXTERNAL_VPN_RELEASE_DELAY_MS,
+                closeStaleTun = {
+                    runCatching { tunFdRef.getAndSet(null)?.close() }
+                        .onFailure { PersistentLoggers.warn(TAG, "startVpn: stale tunFd close threw: ${it.message}") }
+                },
+                onKillswitchReleased = { tunnelController.onKillswitchReleased() },
+                logActiveExternalVpn = { logActiveExternalVpn() },
+                loadTunnelLibrary = {
+                    val tName = Thread.currentThread().name
+                    val isMain = android.os.Looper.myLooper() === android.os.Looper.getMainLooper()
+                    PersistentLoggers.debug(TAG, "loadOnce begin thread=$tName main=$isMain")
+                    runCatching { hev.TProxyService.loadOnce() }
+                        .onFailure { PersistentLoggers.warn(TAG, "TProxyService.loadOnce threw: ${it.message}") }
+                },
+                isTunnelLibraryLoaded = { hev.TProxyService.libraryLoaded },
+                startSequence = { startSequence.run() },
+            ),
+        )
+    }
 
     companion object {
         const val ACTION_START = "ru.ozero.vpn.ACTION_START"
@@ -253,90 +294,11 @@ class OzeroVpnService : android.net.VpnService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         PersistentLoggers.info(TAG, "onStartCommand action=${intent?.action} startId=$startId")
-        val foregroundOk = notificationFactory.enterForeground(this)
-        if (!foregroundOk) {
-            stopSelf(startId)
-            return START_NOT_STICKY
-        }
-        return try {
-            if (!::chainOrchestrator.isInitialized) {
-                PersistentLoggers.error(TAG, "chainOrchestrator not injected — Hilt graph failure")
-                stopSelf(startId)
-                return START_NOT_STICKY
-            }
-            latestStartId.set(startId)
-            when (intent?.action) {
-                ACTION_STOP -> stopVpn()
-                ACTION_RESTART_RUNTIME_CONFIG -> {
-                    if (tunnelController.state.value is TunnelState.Idle) {
-                        PersistentLoggers.warn(TAG, "runtime config restart ignored because tunnel is idle")
-                        stopSelf(startId)
-                    } else {
-                        restartVpn()
-                    }
-                }
-                ACTION_START, null -> {
-                    stopping.set(false)
-                    startVpn()
-                }
-            }
-            START_STICKY
-        } catch (t: Throwable) {
-            PersistentLoggers.error(TAG, "onStartCommand threw: ${t.message}")
-            runCatching { stopVpn() }
-            START_NOT_STICKY
-        }
+        return actionDispatcher.dispatch(intent?.action, startId)
     }
 
     private fun startVpn() {
-        if (!starting.compareAndSet(false, true)) return
-        stopSignal.set(false)
-        runtimeConfigRestartCancelled.set(false)
-        PersistentLoggers.info(TAG, "startVpn entry")
-        val externalVpnActive = logActiveExternalVpn()
-        runCatching { tunFdRef.getAndSet(null)?.close() }
-            .onFailure { PersistentLoggers.warn(TAG, "startVpn: stale tunFd close threw: ${it.message}") }
-        tunnelController.onKillswitchReleased()
-
-        val tName = Thread.currentThread().name
-        val isMain = android.os.Looper.myLooper() === android.os.Looper.getMainLooper()
-        PersistentLoggers.debug(TAG, "loadOnce begin thread=$tName main=$isMain")
-        // SENTINEL [OzeroVpnServiceLifecycleTest]: loadOnce() для libhev-socks5-tunnel — main thread,
-        // до coroutine-старта ниже. Background-load даёт UnsatisfiedLinkError на старте hev.
-        runCatching { hev.TProxyService.loadOnce() }
-            .onFailure { PersistentLoggers.warn(TAG, "TProxyService.loadOnce threw: ${it.message}") }
-        PersistentLoggers.debug(TAG, "loadOnce done libraryLoaded=${hev.TProxyService.libraryLoaded}")
-
-        val job = serviceScope.launch {
-            try {
-                shutdownJobRef.getAndSet(null)?.let { prev ->
-                    PersistentLoggers.debug(TAG, "startVpn: ожидание завершения предыдущего shutdown")
-                    runCatching {
-                        withTimeoutOrNull(SHUTDOWN_JOIN_TIMEOUT_MS) { prev.join() }
-                    }
-                    PersistentLoggers.debug(TAG, "startVpn: предыдущий shutdown завершён → продолжаем старт")
-                }
-                if (stopping.get()) {
-                    PersistentLoggers.warn(TAG, "startVpn: stopping всё ещё активен после join — отказ старта")
-                    return@launch
-                }
-                if (externalVpnActive) {
-                    PersistentLoggers.warn(
-                        TAG,
-                        "external VPN был активен — даём ОС ${EXTERNAL_VPN_RELEASE_DELAY_MS}ms " +
-                            "на освобождение VPN slot до establish() (избегаем race с onRevoke того VPN)",
-                    )
-                    runCatching {
-                        kotlinx.coroutines.delay(EXTERNAL_VPN_RELEASE_DELAY_MS)
-                    }
-                }
-                startSequence.run()
-            } finally {
-                starting.set(false)
-                runtimeConfigRestartInProgress.set(false)
-            }
-        }
-        startJobRef.set(job)
+        startCoordinator.start()
     }
 
     private fun engineExtras(): String {

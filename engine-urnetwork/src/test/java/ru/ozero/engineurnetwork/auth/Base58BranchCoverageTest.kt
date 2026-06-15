@@ -27,4 +27,23 @@ class Base58BranchCoverageTest {
         assertTrue(ex != null)
         assertTrue(ex.message?.contains("invalid base58 character") == true)
     }
+
+    @Test
+    fun decodeRejectsEveryAmbiguousAsciiCharacterWithIndex() {
+        listOf("0", "O", "I", "l").forEach { value ->
+            val ex = runCatching { Base58.decode("abc$value") }.exceptionOrNull()
+            assertTrue(ex != null)
+            assertTrue(ex.message?.contains("at 3") == true)
+        }
+    }
+
+    @Test
+    fun encodeDecodePreservesLeadingZerosAndHighBytes() {
+        val raw = byteArrayOf(0, 0, 0xff.toByte(), 0x80.toByte(), 1)
+        val encoded = Base58.encode(raw)
+        val decoded = Base58.decode(encoded)
+
+        assertEquals(raw.toList(), decoded.toList())
+        assertTrue(encoded.startsWith("11"))
+    }
 }

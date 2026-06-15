@@ -116,6 +116,18 @@ class SingboxHttp204RoutedProbeTest {
         assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
     }
 
+    @Test
+    fun `routed probe maps non http connection failures to failed latency`() = runTest {
+        val probe = SingboxHttp204RoutedProbe(
+            probeUrl = URL("file:probe-resource"),
+            timeoutMs = 100,
+        )
+
+        val latency = probe.probeLatencyMs(1)
+
+        assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
+    }
+
     private class SocksHttpServer(
         private val statusCode: Int,
         private val reason: String,

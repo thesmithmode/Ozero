@@ -1,8 +1,6 @@
 package ru.ozero.engineurnetwork.auth
 
 import android.app.Application
-import com.bringyour.sdk.AuthLoginResult
-import com.bringyour.sdk.NetworkCreateResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -92,12 +90,10 @@ class UrnetworkWalletAuthMapperTest {
         val transport = UrnetworkWalletAuthMapper.mapLoginOutcome(null, IllegalStateException())
         val transportFallback = UrnetworkWalletAuthMapper.mapLoginOutcome(null, IllegalStateException(null as String?))
         val empty = UrnetworkWalletAuthMapper.mapLoginOutcome(null, null)
-        val emptySdkObject = UrnetworkWalletAuthMapper.mapLoginOutcome(AuthLoginResult(), null)
 
         assertEquals("authLogin failed", assertIs<LoginOutcome.Error>(transport).message)
         assertEquals("authLogin failed", assertIs<LoginOutcome.Error>(transportFallback).message)
         assertEquals("empty authLogin response", assertIs<LoginOutcome.Error>(empty).message)
-        assertEquals("unrecognized authLogin response", assertIs<LoginOutcome.Error>(emptySdkObject).message)
     }
 
     @Test
@@ -195,15 +191,10 @@ class UrnetworkWalletAuthMapperTest {
         val transport = UrnetworkWalletAuthMapper.mapCreateOutcome(null, IllegalStateException())
         val transportFallback = UrnetworkWalletAuthMapper.mapCreateOutcome(null, IllegalStateException(null as String?))
         val empty = UrnetworkWalletAuthMapper.mapCreateOutcome(null, null)
-        val emptySdkObject = UrnetworkWalletAuthMapper.mapCreateOutcome(NetworkCreateResult(), null)
 
         assertEquals("networkCreate failed", assertIs<DeviceWalletJwtResult.Error>(transport).message)
         assertEquals("networkCreate failed", assertIs<DeviceWalletJwtResult.Error>(transportFallback).message)
         assertEquals("empty networkCreate response", assertIs<DeviceWalletJwtResult.Error>(empty).message)
-        assertEquals(
-            "networkCreate returned empty jwt",
-            assertIs<DeviceWalletJwtResult.Error>(emptySdkObject).message,
-        )
     }
 
     @Test

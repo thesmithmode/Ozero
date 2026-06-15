@@ -118,7 +118,7 @@ class EngineUrnetworkCoverageTest {
 
         assertEquals(StartResult.Success(0), result)
         assertEquals(1, bridge.startCalls)
-        assertEquals(UrnetworkLocationSelection("BR", null, null), bridge.recordedPreferredLocation)
+        assertNull(bridge.recordedPreferredLocation)
         fixture.close()
     }
 
@@ -157,6 +157,10 @@ class EngineUrnetworkCoverageTest {
         val pending = fixture(bridge = RecordingBridge(selected = Location("DE"), locationInfo = null))
         assertIs<ExitNodeStrategy.Unavailable>(pending.engine.exitNodeStrategy(0))
         pending.close()
+
+        val bestAvailable = fixture(bridge = RecordingBridge(selected = Location(null, bestAvailable = true)))
+        assertIs<ExitNodeStrategy.AutoSelected>(bestAvailable.engine.exitNodeStrategy(0))
+        bestAvailable.close()
 
         val concrete = fixture(
             bridge = RecordingBridge(
@@ -199,6 +203,36 @@ class EngineUrnetworkCoverageTest {
         val activeConnections = fixture(bridge = RecordingBridge(snapshot = UrnetworkSdkBridge.RuntimeSnapshot()))
         assertEquals("2 peers", activeConnections.engine.statsLabel(EngineStats(activeConnections = 2)))
         activeConnections.close()
+
+        val snapshotFallbackPeers = fixture(
+            bridge = RecordingBridge(
+                snapshotThrows = true,
+                fallbackPeerCount = 4,
+                fallbackConnectionStatus = null,
+            ),
+        )
+        assertEquals("4 peers", snapshotFallbackPeers.engine.statsLabel(EngineStats()))
+        snapshotFallbackPeers.close()
+
+        val snapshotFallbackStatus = fixture(
+            bridge = RecordingBridge(
+                snapshotThrows = true,
+                fallbackPeerCount = 0,
+                fallbackConnectionStatus = "CONNECTED",
+            ),
+        )
+        assertEquals("connected", snapshotFallbackStatus.engine.statsLabel(EngineStats()))
+        snapshotFallbackStatus.close()
+
+        val snapshotFallbackThrows = fixture(
+            bridge = RecordingBridge(
+                snapshotThrows = true,
+                peerCountThrows = true,
+                connectionStatusThrows = true,
+            ),
+        )
+        assertNull(snapshotFallbackThrows.engine.statsLabel(EngineStats()))
+        snapshotFallbackThrows.close()
 
         val empty = fixture(bridge = RecordingBridge(snapshot = UrnetworkSdkBridge.RuntimeSnapshot()))
         assertNull(empty.engine.statsLabel(EngineStats()))
@@ -354,6 +388,10 @@ class EngineUrnetworkCoverageTest {
         private val snapshot: UrnetworkSdkBridge.RuntimeSnapshot = UrnetworkSdkBridge.RuntimeSnapshot(),
         private val connectToThrows: Boolean = false,
         private val throwOptionalConfiguration: Boolean = false,
+        private val snapshotThrows: Boolean = false,
+        private val peerCountThrows: Boolean = false,
+        private val connectionStatusThrows: Boolean = false,
+        private val fallbackPeerCount: Int = snapshot.peers,
         private val fallbackConnectionStatus: String? = snapshot.connectionStatus,
     ) : UrnetworkSdkBridge {
         var startCalls = 0
@@ -419,9 +457,18 @@ class EngineUrnetworkCoverageTest {
             networkMode = mode
             if (throwOptionalConfiguration) error("network failed")
         }
-        override fun runtimeSnapshot(): UrnetworkSdkBridge.RuntimeSnapshot = snapshot
-        override fun peerCount(): Int = snapshot.peers
-        override fun connectionStatus(): String? = fallbackConnectionStatus
+        override fun runtimeSnapshot(): UrnetworkSdkBridge.RuntimeSnapshot {
+            if (snapshotThrows) error("snapshot failed")
+            return snapshot
+        }
+        override fun peerCount(): Int {
+            if (peerCountThrows) error("peers failed")
+            return fallbackPeerCount
+        }
+        override fun connectionStatus(): String? {
+            if (connectionStatusThrows) error("status failed")
+            return fallbackConnectionStatus
+        }
         override fun unpaidByteCount(): Long = 0L
         override fun fetchTransferStats() = Unit
         override suspend fun fetchSubscriptionBalance(): UrnetworkSdkBridge.SubscriptionBalanceSnapshot? = null
