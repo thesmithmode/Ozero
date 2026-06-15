@@ -18,11 +18,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect-open-pr-for-same-sha:
+    name: Detect open PR with same SHA
+    runs-on: ubuntu-latest
+    outputs:
+      skip_push: ${{ steps.detect-open-pr.outputs.skip_push }}
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check open PR to main for current SHA
+        id: detect-open-pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const commitSha = context.sha;
+            const pulls = await github.paginate(
+              github.rest.repos.listPullRequestsAssociatedWithCommit,
+              {
+                owner,
+                repo,
+                commit_sha: commitSha
+              }
+            );
+            const hasOpenPrToMain = pulls.some(
+              (pr) =>
+                pr.state === 'open' &&
+                pr.base?.ref === 'main' &&
+                pr.head?.sha === commitSha
+            );
+            core.setOutput('skip_push', hasOpenPrToMain ? 'true' : 'false');
+
   kotlin-style:
     name: ktlint + detekt
     runs-on: ubuntu-latest
+    needs: detect-open-pr-for-same-sha
     timeout-minutes: 10
-    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && github.ref != 'refs/heads/main') }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && github.ref != 'refs/heads/main' && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true')) }}
     permissions:
       contents: read
 
@@ -51,8 +84,9 @@ jobs:
   extra-checks:
     name: Python + shell + Dockerfile
     runs-on: ubuntu-latest
+    needs: detect-open-pr-for-same-sha
     timeout-minutes: 10
-    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && github.ref != 'refs/heads/main') }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && github.ref != 'refs/heads/main' && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true')) }}
     permissions:
       contents: read
 
@@ -96,8 +130,10 @@ jobs:
     name: Coverage gate
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -229,8 +265,10 @@ jobs:
     name: Tests — buildSrc (supply-chain SHA256)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -279,8 +317,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -398,8 +437,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -523,8 +563,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -576,8 +617,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -629,8 +671,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -720,8 +763,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -773,8 +817,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -826,10 +871,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs:
+      - detect-open-pr-for-same-sha
       - test-engine-urnetwork
       - test-engine-byedpi
       - test-engine-fptn
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -846,8 +892,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -958,8 +1005,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -1011,8 +1059,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -1098,8 +1147,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -1185,8 +1235,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -1272,8 +1323,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -1359,8 +1411,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -1446,8 +1499,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -1533,8 +1587,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -1620,8 +1675,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - detect-open-pr-for-same-sha
       - kotlin-style
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -1670,6 +1726,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs:
+      - detect-open-pr-for-same-sha
       - test-engine-masterdns
       - test-engine-singbox
       - test-singbox-process
@@ -1679,7 +1736,7 @@ jobs:
       - test-singbox-room
       - test-singbox-subscription
       - test-shared-warp-settings
-    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
