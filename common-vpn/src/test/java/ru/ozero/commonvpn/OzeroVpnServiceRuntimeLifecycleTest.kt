@@ -1,15 +1,18 @@
 package ru.ozero.commonvpn
 
 import android.content.Intent
+import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.PowerManager
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.spyk
 import io.mockk.verify
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +27,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows
+import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowConnectivityManager
 import org.robolectric.shadows.ShadowNetwork
 import org.robolectric.shadows.ShadowNetworkCapabilities
@@ -125,6 +129,23 @@ class OzeroVpnServiceRuntimeLifecycleTest {
     }
 
     @Test
+    @Config(sdk = [Build.VERSION_CODES.P])
+    fun `logActiveExternalVpn treats own vpn as external before owner uid API`() {
+        val service = preparedService()
+        val connectivityManager = RuntimeEnvironment.getApplication()
+            .getSystemService(ConnectivityManager::class.java)
+        val shadowConnectivity = Shadows.shadowOf(connectivityManager) as ShadowConnectivityManager
+        val vpnNetwork = ShadowNetwork.newInstance(105)
+        val vpnCaps = ShadowNetworkCapabilities.newInstance()
+        Shadows.shadowOf(vpnCaps).addTransportType(NetworkCapabilities.TRANSPORT_VPN)
+        vpnCaps.trySetOwnerUid(android.os.Process.myUid())
+        shadowConnectivity.addNetwork(vpnNetwork, null)
+        shadowConnectivity.setNetworkCapabilities(vpnNetwork, vpnCaps)
+
+        assertTrue(service.callLogActiveExternalVpn())
+    }
+
+    @Test
     fun `logActiveExternalVpn ignores self owned vpn network when owner uid is available`() {
         val service = preparedService()
         val connectivityManager = RuntimeEnvironment.getApplication()
@@ -142,6 +163,41 @@ class OzeroVpnServiceRuntimeLifecycleTest {
         } else {
             assertTrue(service.callLogActiveExternalVpn())
         }
+    }
+
+    @Test
+    fun `logActiveExternalVpn detects vpn network owned by another uid`() {
+        val service = preparedService()
+        val connectivityManager = RuntimeEnvironment.getApplication()
+            .getSystemService(ConnectivityManager::class.java)
+        val shadowConnectivity = Shadows.shadowOf(connectivityManager) as ShadowConnectivityManager
+        val vpnNetwork = ShadowNetwork.newInstance(106)
+        val vpnCaps = ShadowNetworkCapabilities.newInstance()
+        Shadows.shadowOf(vpnCaps).addTransportType(NetworkCapabilities.TRANSPORT_VPN)
+        vpnCaps.trySetOwnerUid(android.os.Process.myUid() + 1)
+        shadowConnectivity.addNetwork(vpnNetwork, null)
+        shadowConnectivity.setNetworkCapabilities(vpnNetwork, vpnCaps)
+
+        assertTrue(service.callLogActiveExternalVpn())
+    }
+
+    @Test
+    @Config(sdk = [29])
+    fun `isOwnVpnNetwork matches only current uid on owner uid capable sdk`() {
+        val caps = ShadowNetworkCapabilities.newInstance()
+        val ownerSet = caps.trySetOwnerUid(1234)
+
+        assertEquals(ownerSet, isOwnVpnNetwork(caps, 1234))
+        assertFalse(isOwnVpnNetwork(caps, 5678))
+    }
+
+    @Test
+    @Config(sdk = [28])
+    fun `isOwnVpnNetwork is disabled before owner uid api`() {
+        val caps = ShadowNetworkCapabilities.newInstance()
+        caps.trySetOwnerUid(1234)
+
+        assertFalse(isOwnVpnNetwork(caps, 1234))
     }
 
     @Test
@@ -227,6 +283,62 @@ class OzeroVpnServiceRuntimeLifecycleTest {
     }
 
     @Test
+    fun `startVpn coordinator ignores stale tun close failure and still runs start sequence`() {
+        val service = preparedService()
+        val staleTun = mockk<ParcelFileDescriptor>(relaxed = true)
+        val startSequence = mockk<StartSequenceCoordinator>(relaxed = true)
+        every { staleTun.close() } throws IllegalStateException("close failed")
+        service.setDependency("tunnelController", TunnelController())
+        service.setDependency("sessionStatsRecorder", SessionStatsRecorder.NoOp)
+        service.setDependency("splitTunnelRulesProvider", SplitTunnelRulesProvider.NoOp)
+        service.setDependency("enginePlugins", emptySet<EnginePlugin>())
+        service.setLazy("startSequence", startSequence)
+        service.setAtomicReference("tunFdRef", staleTun)
+
+        service.callStartVpn()
+
+        assertTrue(waitUntil { !service.getAtomicBoolean("starting") })
+        coVerify(exactly = 1) { startSequence.run() }
+        assertEquals(null, service.getAtomicReference("tunFdRef"))
+    }
+
+    @Test
+    fun `startCoordinator close stale tun handles null fd`() {
+        val service = preparedService()
+        service.setAtomicReference("tunFdRef", null)
+
+        service.getStartCoordinatorDeps().closeStaleTun()
+
+        assertEquals(null, service.getAtomicReference("tunFdRef"))
+    }
+
+    @Test
+    fun `startCoordinator loadTunnelLibrary can run off main thread`() {
+        val service = preparedService()
+        var thrown: Throwable? = null
+        val thread = Thread {
+            try {
+                service.getStartCoordinatorDeps().loadTunnelLibrary()
+            } catch (t: Throwable) {
+                thrown = t
+            }
+        }
+
+        thread.start()
+        thread.join()
+
+        assertEquals(null, thrown)
+    }
+
+    @Test
+    fun `logActiveExternalVpn returns false for wrong connectivity service type`() {
+        val service = spyk(preparedService())
+        every { service.getSystemService(Context.CONNECTIVITY_SERVICE) } returns "not connectivity"
+
+        assertFalse(service.callLogActiveExternalVpn())
+    }
+
+    @Test
     fun `onDestroy unbinds runtime failure handler and releases socket protector binding`() {
         val runtimeFailureRouter = mockk<RuntimeFailureRouter>(relaxed = true)
         val socketProtector = mockk<ru.ozero.enginescore.VpnSocketProtector>()
@@ -297,6 +409,52 @@ class OzeroVpnServiceRuntimeLifecycleTest {
     }
 
     @Test
+    fun `releaseLocks tolerates absent locks`() {
+        val service = preparedService()
+
+        assertTrue(runCatching { service.callReleaseLocks() }.isSuccess)
+        assertEquals(null, service.getWakeLock())
+        assertEquals(null, service.getWifiLock())
+    }
+
+    @Test
+    fun `releaseLocks clears real locks after they were released externally`() {
+        val service = preparedService()
+        service.callAcquireLocks()
+        service.getWakeLock()?.release()
+        service.getWifiLock()?.release()
+
+        service.callReleaseLocks()
+
+        assertEquals(null, service.getWakeLock())
+        assertEquals(null, service.getWifiLock())
+    }
+
+    @Test
+    fun `acquireLocks tolerates missing power service`() {
+        val service = spyk(preparedService())
+        every { service.getSystemService(Context.POWER_SERVICE) } returns null
+
+        service.callAcquireLocks()
+
+        assertEquals(null, service.getWakeLock())
+    }
+
+    @Test
+    @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE])
+    fun `acquireLocks uses modern wifi mode on upside down cake`() {
+        val service = preparedService()
+        assertTrue(runCatching { service.callAcquireLocks() }.isSuccess)
+    }
+
+    @Test
+    @Config(sdk = [Build.VERSION_CODES.TIRAMISU])
+    fun `acquireLocks uses legacy wifi mode before upside down cake`() {
+        val service = preparedService()
+        assertTrue(runCatching { service.callAcquireLocks() }.isSuccess)
+    }
+
+    @Test
     fun `onStartCommand returns NOT_STICKY when action dispatcher refuses foreground`() {
         val service = preparedService()
         val actionDispatcher = OzeroVpnServiceActionDispatcher(
@@ -350,6 +508,29 @@ class OzeroVpnServiceRuntimeLifecycleTest {
 
         assertEquals(android.app.Service.START_STICKY, result)
         assertEquals(11, latestStartId)
+    }
+
+    @Test
+    fun `onStartCommand handles null intent as unknown action and records latest id`() {
+        val service = preparedService()
+        var latestStartId = Int.MIN_VALUE
+        val actionDispatcher = OzeroVpnServiceActionDispatcher(
+            latestStartIdSetter = { latestStartId = it },
+            isChainOrchestratorReady = { true },
+            enterForeground = { true },
+            isTunnelIdle = { false },
+            clearStopping = {},
+            stopSelf = {},
+            startVpn = {},
+            stopVpn = {},
+            restartVpn = {},
+        )
+        service.setDependency("actionDispatcher", actionDispatcher)
+
+        val result = service.onStartCommand(null, 0, 101)
+
+        assertEquals(android.app.Service.START_STICKY, result)
+        assertEquals(101, latestStartId)
     }
 
     @Test
@@ -633,6 +814,21 @@ class OzeroVpnServiceRuntimeLifecycleTest {
     }
 
     @Test
+    fun `onDestroy timeout path still releases runtime failure handler`() {
+        val service = preparedService()
+        val runtimeFailureRouter = mockk<RuntimeFailureRouter>(relaxed = true)
+        val shutdownJob = Job()
+        service.setDependency("runtimeFailureRouter", runtimeFailureRouter)
+        service.setAtomicReference("shutdownJobRef", shutdownJob)
+        service.setAtomicBoolean("stopping", false)
+
+        service.onDestroy()
+        shutdownJob.cancel()
+
+        coVerify(exactly = 1) { runtimeFailureRouter.unbind(any()) }
+    }
+
+    @Test
     fun `onDestroy closes remaining tun fd after shutdown cleanup`() {
         val service = preparedService()
         val shutdownCoordinator = mockk<ShutdownCoordinator>(relaxed = true)
@@ -692,6 +888,49 @@ class OzeroVpnServiceRuntimeLifecycleTest {
         assertEquals(android.os.Process.myPid(), killedPids.single())
     }
 
+    @Test
+    fun `onRevoke ignores close exceptions before killing own process`() {
+        val service = preparedService()
+        val shutdownCoordinator = mockk<ShutdownCoordinator>(relaxed = true)
+        val tunFd = mockk<ParcelFileDescriptor>()
+        every { tunFd.close() } throws RuntimeException("close failed")
+        val killedPids = mutableListOf<Int>()
+        service.setDependency("shutdownCoord", shutdownCoordinator)
+        service.setAtomicReference("tunFdRef", tunFd)
+        service.processKiller = ProcessKiller { pid -> killedPids.add(pid) }
+
+        service.onRevoke()
+        Shadows.shadowOf(Looper.getMainLooper()).runToEndOfTasks()
+
+        verify(exactly = 1) { tunFd.close() }
+        assertEquals(1, killedPids.size)
+        assertEquals(android.os.Process.myPid(), killedPids.single())
+    }
+
+    @Test
+    fun `onRevoke handles missing tun fd before killing own process`() {
+        val service = preparedService()
+        val shutdownCoordinator = mockk<ShutdownCoordinator>(relaxed = true)
+        val killedPids = mutableListOf<Int>()
+        service.setDependency("shutdownCoord", shutdownCoordinator)
+        service.setAtomicReference("tunFdRef", null)
+        service.processKiller = ProcessKiller { pid -> killedPids.add(pid) }
+
+        service.onRevoke()
+        Shadows.shadowOf(Looper.getMainLooper()).runToEndOfTasks()
+
+        verify(exactly = 1) { shutdownCoordinator.stopVpn() }
+        assertEquals(listOf(android.os.Process.myPid()), killedPids)
+    }
+
+    @Test
+    fun `logActiveExternalVpn swallows unexpected system failures`() {
+        val service = spyk(preparedService())
+        every { service.getSystemService(any<String>()) } throws RuntimeException("cm failed")
+
+        assertFalse(service.callLogActiveExternalVpn())
+    }
+
     private fun preparedService(
         settingsRepository: SettingsRepository? = null,
     ): OzeroVpnService {
@@ -742,8 +981,21 @@ class OzeroVpnServiceRuntimeLifecycleTest {
         method.invoke(this)
     }
 
+    private fun OzeroVpnService.getStartCoordinatorDeps(): OzeroVpnServiceStartCoordinator.Dependencies {
+        val coordinator = forceLazy("startCoordinator") as OzeroVpnServiceStartCoordinator
+        val field = OzeroVpnServiceStartCoordinator::class.java.getDeclaredField("deps")
+        field.isAccessible = true
+        return field.get(coordinator) as OzeroVpnServiceStartCoordinator.Dependencies
+    }
+
     private fun OzeroVpnService.callAcquireLocks() {
         val method = OzeroVpnService::class.java.getDeclaredMethod("acquireLocks")
+        method.isAccessible = true
+        method.invoke(this)
+    }
+
+    private fun OzeroVpnService.callReleaseLocks() {
+        val method = OzeroVpnService::class.java.getDeclaredMethod("releaseLocks")
         method.isAccessible = true
         method.invoke(this)
     }

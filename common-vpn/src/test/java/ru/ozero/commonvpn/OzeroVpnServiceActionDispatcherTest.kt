@@ -151,6 +151,66 @@ class OzeroVpnServiceActionDispatcherTest {
         assertEquals(1, calls.stopCalls)
     }
 
+    @Test
+    fun `exception fallback still returns not sticky when stop also throws`() {
+        val calls = Calls(throwOnStart = true, throwOnStop = true)
+
+        val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_START, 13)
+
+        assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
+        assertEquals(1, calls.startCalls)
+        assertEquals(1, calls.stopCalls)
+    }
+
+    @Test
+    fun `exception before action dispatch is caught and stop fallback runs`() {
+        val calls = Calls(throwOnLatestStartId = true)
+
+        val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_START, 14)
+
+        assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
+        assertEquals(listOf(14), calls.latestStartIds)
+        assertEquals(0, calls.startCalls)
+        assertEquals(1, calls.stopCalls)
+    }
+
+    @Test
+    fun `exception from readiness guard is caught after foreground promotion`() {
+        val calls = Calls(throwOnReadyCheck = true)
+
+        val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_STOP, 15)
+
+        assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
+        assertEquals(0, calls.latestStartIds.size)
+        assertEquals(1, calls.stopCalls)
+    }
+
+    @Test
+    fun `null action exception from clearStopping is caught before start`() {
+        val calls = Calls(throwOnClearStopping = true)
+
+        val result = calls.dispatcher().dispatch(null, 16)
+
+        assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
+        assertEquals(listOf(16), calls.latestStartIds)
+        assertEquals(1, calls.clearStoppingCalls)
+        assertEquals(0, calls.startCalls)
+        assertEquals(1, calls.stopCalls)
+    }
+
+    @Test
+    fun `restart idle stopSelf exception is caught and falls back to stop`() {
+        val calls = Calls(idle = true, throwOnStopSelf = true)
+
+        val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG, 17)
+
+        assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
+        assertEquals(listOf(17), calls.latestStartIds)
+        assertEquals(listOf(17), calls.stopSelfIds)
+        assertEquals(0, calls.restartCalls)
+        assertEquals(1, calls.stopCalls)
+    }
+
     private class Calls(
         private val foreground: Boolean = true,
         private val injected: Boolean = true,
@@ -158,6 +218,10 @@ class OzeroVpnServiceActionDispatcherTest {
         private val throwOnStart: Boolean = false,
         private val throwOnStop: Boolean = false,
         private val throwOnRestart: Boolean = false,
+        private val throwOnLatestStartId: Boolean = false,
+        private val throwOnReadyCheck: Boolean = false,
+        private val throwOnClearStopping: Boolean = false,
+        private val throwOnStopSelf: Boolean = false,
         private val startAction: () -> Unit = {},
         private val clearStopping: () -> Unit = {},
     ) {
@@ -169,15 +233,33 @@ class OzeroVpnServiceActionDispatcherTest {
         var restartCalls = 0
 
         fun dispatcher() = OzeroVpnServiceActionDispatcher(
-            latestStartIdSetter = { latestStartIds += it },
-            isChainOrchestratorReady = { injected },
+            latestStartIdSetter = {
+                latestStartIds += it
+                if (throwOnLatestStartId) {
+                    error("latest failed")
+                }
+            },
+            isChainOrchestratorReady = {
+                if (throwOnReadyCheck) {
+                    error("ready failed")
+                }
+                injected
+            },
             enterForeground = { foreground },
             isTunnelIdle = { idle },
             clearStopping = {
                 clearStoppingCalls++
+                if (throwOnClearStopping) {
+                    error("clear failed")
+                }
                 clearStopping()
             },
-            stopSelf = { stopSelfIds += it },
+            stopSelf = {
+                stopSelfIds += it
+                if (throwOnStopSelf) {
+                    error("stopSelf failed")
+                }
+            },
             startVpn = {
                 startCalls++
                 if (throwOnStart) {

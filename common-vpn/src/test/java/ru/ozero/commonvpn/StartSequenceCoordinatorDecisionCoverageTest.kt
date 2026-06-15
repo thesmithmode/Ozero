@@ -10,6 +10,7 @@ import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.EnginePreflight
 import ru.ozero.enginescore.EngineStats
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
@@ -99,7 +100,7 @@ class StartSequenceCoordinatorDecisionCoverageTest {
     }
 
     @Test
-    fun `auto candidates use default priority when settings are absent`() {
+    fun `auto candidates use effective settings default priority`() {
         val byedpi = DecisionPlugin(
             EngineId.BYEDPI,
             manualConfig = EngineConfig.ByeDpi(socksPort = 2081),
@@ -107,12 +108,65 @@ class StartSequenceCoordinatorDecisionCoverageTest {
         )
         val coordinator = coordinator(byedpi)
 
-        val candidates = coordinator.autoCandidates(null, TrafficMode.TUN)
+        val candidates = coordinator.autoCandidates(SettingsModel(), TrafficMode.TUN)
 
         assertEquals(listOf(EngineId.BYEDPI), candidates.map { it.first })
     }
 
-    private fun coordinator(vararg plugins: EnginePlugin): StartSequenceCoordinator {
+    @Test
+    fun `build config returns null for missing plugin and selects proxy config only in proxy mode`() {
+        val plugin = DecisionPlugin(
+            EngineId.WARP,
+            manualConfig = EngineConfig.WarpProxy(2080),
+            proxyConfig = EngineConfig.WarpProxy(2081),
+            capabilities = proxyCapabilities(providesStandalone = true),
+        )
+        val coordinator = coordinator(plugin)
+
+        assertEquals(EngineConfig.WarpProxy(2080), coordinator.buildConfig(EngineId.WARP, TrafficMode.TUN))
+        assertEquals(EngineConfig.WarpProxy(2081), coordinator.buildConfig(EngineId.WARP, TrafficMode.PROXY))
+        assertEquals(null, coordinator.buildConfig(EngineId.BYEDPI, TrafficMode.TUN))
+    }
+
+    @Test
+    fun `resolve target falls back to first plugin only when priority has no registered plugin`() {
+        val first = DecisionPlugin(
+            EngineId.SINGBOX,
+            manualConfig = EngineConfig.Singbox(beanBlob = byteArrayOf(1), protocolType = 1, proxyMode = true),
+        )
+        val coordinator = coordinator(first)
+
+        assertEquals(EngineId.SINGBOX, coordinator.resolveTarget(null, SettingsModel()))
+        assertEquals(null, coordinator().resolveTarget(null, SettingsModel()))
+    }
+
+    @Test
+    fun `engine custom tun detection covers missing regular and tun acceptor plugins`() =
+        kotlinx.coroutines.test.runTest {
+            val regular = DecisionPlugin(EngineId.BYEDPI, manualConfig = EngineConfig.ByeDpi(socksPort = 2082))
+            val tun = DecisionTunPlugin(EngineId.WARP)
+            val coordinator = coordinator(regular, tun)
+
+            assertFalse(coordinator.engineNeedsCustomTun(EngineId.BYEDPI))
+            assertTrue(coordinator.engineNeedsCustomTun(EngineId.WARP))
+            assertFalse(coordinator.engineNeedsCustomTun(EngineId.MASTERDNS))
+        }
+
+    @Test
+    fun `reportEngineFailure can suppress watchdog notification`() {
+        val watchdog = mockk<EngineWatchdogCoordinator>(relaxed = true)
+        val coordinator = coordinator(watchdog = watchdog)
+
+        coordinator.reportEngineFailure(EngineId.BYEDPI, "candidate failed", notifyFailure = false)
+        coordinator.reportEngineFailure(EngineId.BYEDPI, "terminal failed", notifyFailure = true)
+
+        io.mockk.verify(exactly = 1) { watchdog.handleEngineFailure(EngineId.BYEDPI, "terminal failed") }
+    }
+
+    private fun coordinator(
+        vararg plugins: EnginePlugin,
+        watchdog: EngineWatchdogCoordinator = mockk(relaxed = true),
+    ): StartSequenceCoordinator {
         val pluginSet = plugins.toSet()
         return StartSequenceCoordinator(
             packageName = "ru.ozero.test",
@@ -123,7 +177,7 @@ class StartSequenceCoordinatorDecisionCoverageTest {
                 tunnelGateway = mockk(relaxed = true),
                 healthMonitor = mockk(relaxed = true),
                 tunBuilderHelper = mockk(relaxed = true),
-                engineWatchdog = mockk(relaxed = true),
+                engineWatchdog = watchdog,
                 statsLogger = mockk(relaxed = true),
                 splitTunnelRulesProvider = SplitTunnelRulesProvider.NoOp,
                 settingsRepository = StaticSettingsRepository(),
@@ -144,16 +198,29 @@ class StartSequenceCoordinatorDecisionCoverageTest {
 
     private fun StartSequenceCoordinator.resolveTarget(
         manualEngine: EngineId?,
-        settings: SettingsModel?,
+        settings: SettingsModel,
     ): EngineId? = callPrivate("resolveTargetForUi", manualEngine, settings)
 
     private fun StartSequenceCoordinator.engineAllowed(engineId: EngineId, trafficMode: TrafficMode): Boolean =
         callPrivate("engineAllowedForTrafficMode", engineId, trafficMode)
 
     private fun StartSequenceCoordinator.autoCandidates(
-        settings: SettingsModel?,
+        settings: SettingsModel,
         trafficMode: TrafficMode,
     ): List<Pair<EngineId, EngineConfig>> = callPrivate("autoCandidates", settings, trafficMode)
+
+    private fun StartSequenceCoordinator.buildConfig(
+        engineId: EngineId,
+        trafficMode: TrafficMode,
+    ): EngineConfig? = callPrivate("buildEngineConfig", engineId, SettingsModel(), trafficMode)
+
+    private fun StartSequenceCoordinator.reportEngineFailure(
+        engineId: EngineId,
+        reason: String,
+        notifyFailure: Boolean,
+    ) {
+        callPrivate<Unit>("reportEngineFailure", engineId, reason, notifyFailure)
+    }
 
     @Suppress("UNCHECKED_CAST")
     private fun <T> StartSequenceCoordinator.callPrivate(name: String, vararg args: Any?): T {
@@ -169,6 +236,8 @@ class StartSequenceCoordinatorDecisionCoverageTest {
         private val manualConfig: EngineConfig?,
         private val proxyConfig: EngineConfig? = manualConfig,
         override val capabilities: EngineCapabilities = proxyCapabilities(providesStandalone = false),
+        private val preflightResult: EnginePreflight.Result? = null,
+        private val preflightThrows: Boolean = false,
     ) : EnginePlugin {
         override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult =
             StartResult.Success(2080)
@@ -178,6 +247,31 @@ class StartSequenceCoordinatorDecisionCoverageTest {
         override fun stats(): Flow<EngineStats> = flowOf(EngineStats())
         override fun buildManualConfig(settings: SettingsModel?): EngineConfig? = manualConfig
         override fun buildProxyConfig(settings: SettingsModel?): EngineConfig? = proxyConfig
+        override fun preflight(): EnginePreflight? {
+            if (preflightResult == null && !preflightThrows) return null
+            return EnginePreflight { _ ->
+                if (preflightThrows) {
+                    error("preflight failed")
+                }
+                preflightResult ?: EnginePreflight.Result.Ok
+            }
+        }
+    }
+
+    private class DecisionTunPlugin(
+        override val id: EngineId,
+    ) : EnginePlugin, ru.ozero.enginescore.TunFdAcceptor {
+        override val capabilities: EngineCapabilities = proxyCapabilities(providesStandalone = false)
+        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult =
+            StartResult.Success(0)
+
+        override suspend fun stop() = Unit
+        override suspend fun probe(): ProbeResult = ProbeResult.Success(1L)
+        override fun stats(): Flow<EngineStats> = flowOf(EngineStats())
+        override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.WarpProxy(0)
+        override suspend fun tunSpec(): ru.ozero.enginescore.TunSpec? = null
+        override suspend fun attachTun(tunFd: Int): ru.ozero.enginescore.TunAttachResult =
+            ru.ozero.enginescore.TunAttachResult.Success
     }
 
     private class StaticSettingsRepository : SettingsRepository {

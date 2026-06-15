@@ -63,10 +63,8 @@ class VpnServiceLifecycleContractTest {
 
     @Test
     fun `logActiveExternalVpn пропускает собственный VPN через ownerUid guard — no self-false-positive`() {
-        val fnBody = source.substringAfter("private fun logActiveExternalVpn()")
-            .substringBefore("\n    }")
         assertTrue(
-            fnBody.contains("ownerUid"),
+            source.contains("isOwnVpnNetwork(caps, myUid)") && source.contains("caps.ownerUid"),
             "logActiveExternalVpn обязана пропускать собственный VPN через caps.ownerUid == myUid() " +
                 "(API 29+). Без этого Ozero детектит свой же VPN как 'external' при engine-switch " +
                 "→ лишние 750ms задержки при каждом перезапуске. Добавь: " +

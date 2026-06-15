@@ -33,7 +33,7 @@ class NativeHevTunnelGateway(
 
     override fun start(config: HevTunnelConfig): Int {
         val fd = config.tunPfd.fd
-        PersistentLoggers.instance?.info(
+        PersistentLoggers.info(
             TAG,
             "start entry thread=${Thread.currentThread().name} fd=$fd",
         )
@@ -41,32 +41,32 @@ class NativeHevTunnelGateway(
         val tLoad0 = System.nanoTime()
         loader.loadOnce()
         val tLoadMs = (System.nanoTime() - tLoad0) / 1_000_000
-        PersistentLoggers.instance?.info(
+        PersistentLoggers.info(
             TAG,
             "checkpoint loadOnce returned dt=${tLoadMs}ms libraryLoaded=${loader.libraryLoaded}",
         )
         if (!loader.libraryLoaded) {
-            PersistentLoggers.instance?.error(
+            PersistentLoggers.error(
                 TAG,
                 "libhev-ozero-socks5-tunnel не загружена: ${loader.loadError}",
             )
             return -1
         }
 
-        PersistentLoggers.instance?.info(TAG, "checkpoint pre-writeConfig")
+        PersistentLoggers.info(TAG, "checkpoint pre-writeConfig")
         val configFile = writeConfig(config)
-        PersistentLoggers.instance?.info(
+        PersistentLoggers.info(
             TAG,
             "checkpoint post-writeConfig path=${configFile.absolutePath} bytes=${configFile.length()}",
         )
 
-        PersistentLoggers.instance?.info(TAG, "checkpoint pre-nativeStart fd=$fd")
+        PersistentLoggers.info(TAG, "checkpoint pre-nativeStart fd=$fd")
         val tNative0 = System.nanoTime()
         val code = runCatching { nativeStart(configFile.absolutePath, fd) }
-            .onFailure { PersistentLoggers.instance?.error(TAG, "TProxyStartService threw", it) }
+            .onFailure { PersistentLoggers.error(TAG, "TProxyStartService threw", it) }
             .getOrElse { -1 }
         val tNativeMs = (System.nanoTime() - tNative0) / 1_000_000
-        PersistentLoggers.instance?.info(TAG, "checkpoint post-nativeStart code=$code dt=${tNativeMs}ms")
+        PersistentLoggers.info(TAG, "checkpoint post-nativeStart code=$code dt=${tNativeMs}ms")
         if (code == 0) {
             started.set(true)
             if (statsPollerEnabled) startStatsPoller()
@@ -79,7 +79,7 @@ class NativeHevTunnelGateway(
             var prev = longArrayOf(0L, 0L, 0L, 0L)
             var idleTicks = 0
             try {
-                while (!Thread.currentThread().isInterrupted && started.get()) {
+                while (started.get()) {
                     Thread.sleep(pollIntervalMs)
                     val s = nativeStats() ?: continue
                     if (s.size < 4) continue
@@ -94,7 +94,7 @@ class NativeHevTunnelGateway(
                     val movement = dTxB != 0L || dRxB != 0L
                     if (movement) {
                         idleTicks = 0
-                        PersistentLoggers.instance?.info(
+                        PersistentLoggers.info(
                             TAG,
                             "hev stats tx=${txBytes}B/${txPkts}p rx=${rxBytes}B/${rxPkts}p " +
                                 "Δtx=${dTxB}B/${dTxP}p Δrx=${dRxB}B/${dRxP}p",
@@ -102,7 +102,7 @@ class NativeHevTunnelGateway(
                     } else {
                         idleTicks++
                         if (idleTicks % STATS_IDLE_REPORT_EVERY == 0) {
-                            PersistentLoggers.instance?.warn(
+                            PersistentLoggers.warn(
                                 TAG,
                                 "hev stats IDLE ${idleTicks * pollIntervalMs / 1000}s " +
                                     "tx=${txBytes}B/${txPkts}p rx=${rxBytes}B/${rxPkts}p — " +
@@ -115,7 +115,7 @@ class NativeHevTunnelGateway(
             } catch (_: InterruptedException) {
                 /* stop signal */
             } catch (t: Throwable) {
-                PersistentLoggers.instance?.warn(TAG, "stats poller stopped: ${t.message}")
+                PersistentLoggers.warn(TAG, "stats poller stopped: ${t.message}")
             }
         }, "hev-stats-poller").apply { isDaemon = true }
         statsPoller.getAndSet(poller)?.interrupt()
@@ -128,12 +128,12 @@ class NativeHevTunnelGateway(
     // → performShutdown вызывал tunnelGateway.stop() → следующий BYEDPI start висел.
     override fun stop() {
         if (!started.compareAndSet(true, false)) {
-            PersistentLoggers.instance?.info(TAG, "stop skipped — gateway not started")
+            PersistentLoggers.info(TAG, "stop skipped — gateway not started")
             return
         }
         statsPoller.getAndSet(null)?.interrupt()
         runCatching { nativeStop() }
-            .onFailure { PersistentLoggers.instance?.warn(TAG, "TProxyStopService threw", it) }
+            .onFailure { PersistentLoggers.warn(TAG, "TProxyStopService threw", it) }
     }
 
     private fun writeConfig(config: HevTunnelConfig): File {

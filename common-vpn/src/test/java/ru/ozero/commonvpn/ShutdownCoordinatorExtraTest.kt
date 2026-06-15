@@ -160,6 +160,33 @@ class ShutdownCoordinatorExtraTest {
         assertFalse(fixture.state.stopSignal.get())
     }
 
+    @Test
+    fun `stopVpn tolerates lockdown close failure and null start job`() = runTest {
+        val lockdownFd = mockk<ParcelFileDescriptor>(relaxed = true)
+        every { lockdownFd.close() } throws RuntimeException("lockdown close failed")
+        val fixture = shutdownFixture(this, sessionId = -1L, lockdownFd = lockdownFd, startJob = null)
+
+        fixture.coordinator.stopVpn()
+        advanceUntilIdle()
+
+        verify(exactly = 1) { lockdownFd.close() }
+        verify(exactly = 1) { fixture.stopSelfRequest.invoke(42) }
+        assertFalse(fixture.state.stopping.get())
+        assertFalse(fixture.state.stopSignal.get())
+    }
+
+    @Test
+    fun `performShutdown with callStopSelf true uses latest start id`() = runTest {
+        val fixture = shutdownFixture(this, sessionId = -1L)
+
+        fixture.coordinator.performShutdown(callStopSelf = true)
+
+        verify(exactly = 1) { fixture.stopForegroundRequest.invoke() }
+        verify(exactly = 1) { fixture.stopSelfRequest.invoke(42) }
+        assertFalse(fixture.state.stopping.get())
+        assertFalse(fixture.state.stopSignal.get())
+    }
+
     private fun shutdownFixture(
         scope: kotlinx.coroutines.CoroutineScope,
         sessionId: Long = -1L,

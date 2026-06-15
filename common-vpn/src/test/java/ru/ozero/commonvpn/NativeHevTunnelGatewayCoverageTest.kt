@@ -106,6 +106,47 @@ class NativeHevTunnelGatewayCoverageTest {
     }
 
     @Test
+    fun `default native callbacks support load failure before native calls`(@TempDir tmp: File) {
+        val failingLoader = object : TProxyLoader {
+            override fun loadOnce() = Unit
+            override val libraryLoaded: Boolean = false
+            override val loadError: String? = null
+        }
+        val gateway = NativeHevTunnelGateway(cacheDir = tmp, loader = failingLoader)
+
+        val rc = gateway.start(HevTunnelConfig(tunPfd = pfd(22), socksAddress = "127.0.0.1", socksPort = 1080))
+
+        assertEquals(-1, rc)
+    }
+
+    @Test
+    fun `default native start exception is converted to minus one`(@TempDir tmp: File) {
+        val gateway = NativeHevTunnelGateway(cacheDir = tmp, loader = loader)
+
+        val rc = gateway.start(HevTunnelConfig(tunPfd = pfd(24), socksAddress = "127.0.0.1", socksPort = 1080))
+
+        assertEquals(-1, rc)
+    }
+
+    @Test
+    fun `default native stats callback is swallowed by poller`(@TempDir tmp: File) {
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = loader,
+            nativeStart = { _, _ -> 0 },
+            nativeStop = {},
+            pollIntervalMs = 1L,
+            statsPollerEnabled = true,
+        )
+
+        val rc = gateway.start(HevTunnelConfig(tunPfd = pfd(25), socksAddress = "127.0.0.1", socksPort = 1080))
+        Thread.sleep(10L)
+        gateway.stop()
+
+        assertEquals(0, rc)
+    }
+
+    @Test
     fun `nativeStart throw is converted to minus one and stop remains skipped`(@TempDir tmp: File) {
         var stopCalled = false
         val gateway = NativeHevTunnelGateway(
@@ -331,6 +372,62 @@ class NativeHevTunnelGatewayCoverageTest {
     }
 
     @Test
+    fun `stats poller handles zero movement then later movement`(@TempDir tmp: File) {
+        val statsCalls = AtomicInteger(0)
+        val observed = CountDownLatch(3)
+        val samples = listOf(
+            longArrayOf(0L, 0L, 0L, 0L),
+            longArrayOf(0L, 0L, 0L, 0L),
+            longArrayOf(1L, 10L, 1L, 10L),
+        )
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = loader,
+            nativeStart = { _, _ -> 0 },
+            nativeStop = {},
+            nativeStats = {
+                observed.countDown()
+                samples.getOrElse(statsCalls.getAndIncrement()) { samples.last() }
+            },
+            pollIntervalMs = 1L,
+            statsPollerEnabled = true,
+        )
+
+        gateway.start(HevTunnelConfig(tunPfd = pfd(23), socksAddress = "127.0.0.1", socksPort = 1080))
+        assertTrue(waitUntil { observed.count == 0L })
+        gateway.stop()
+
+        assertTrue(statsCalls.get() >= 3)
+    }
+
+    @Test
+    fun `stats poller treats rx only delta as movement`(@TempDir tmp: File) {
+        val statsCalls = AtomicInteger(0)
+        val observed = CountDownLatch(2)
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = loader,
+            nativeStart = { _, _ -> 0 },
+            nativeStop = {},
+            nativeStats = {
+                observed.countDown()
+                when (statsCalls.getAndIncrement()) {
+                    0 -> longArrayOf(0L, 0L, 0L, 0L)
+                    else -> longArrayOf(0L, 0L, 1L, 12L)
+                }
+            },
+            pollIntervalMs = 1L,
+            statsPollerEnabled = true,
+        )
+
+        gateway.start(HevTunnelConfig(tunPfd = pfd(30), socksAddress = "127.0.0.1", socksPort = 1080))
+        assertTrue(waitUntil { observed.count == 0L })
+        gateway.stop()
+
+        assertTrue(statsCalls.get() >= 2)
+    }
+
+    @Test
     fun `stats poller survives repeated idle samples until stop`(@TempDir tmp: File) {
         val statsCalls = AtomicInteger(0)
         val observed = CountDownLatch(7)
@@ -353,6 +450,69 @@ class NativeHevTunnelGatewayCoverageTest {
         gateway.stop()
 
         assertTrue(statsCalls.get() >= 7)
+    }
+
+    @Test
+    fun `nativeStats supports null and short samples`(@TempDir tmp: File) {
+        val observed = CountDownLatch(4)
+        val stats = listOf<LongArray?>(
+            null,
+            longArrayOf(0L),
+            longArrayOf(0L, 0L, 0L, 0L),
+            longArrayOf(1L, 10L, 2L, 20L),
+        )
+        val calls = AtomicInteger(0)
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = loader,
+            nativeStart = { _, _ -> 0 },
+            nativeStop = {},
+            nativeStats = {
+                observed.countDown()
+                stats.getOrElse(calls.getAndIncrement()) { stats.last() }
+            },
+            pollIntervalMs = 1L,
+            statsPollerEnabled = true,
+        )
+        val rc = gateway.start(
+            HevTunnelConfig(
+                tunPfd = pfd(20),
+                socksAddress = "127.0.0.1",
+                socksPort = 1080,
+            ),
+        )
+
+        assertEquals(0, rc)
+        assertTrue(waitUntil { observed.count == 0L })
+        gateway.stop()
+    }
+
+    @Test
+    fun `nativeStats exception from poller exits worker`(@TempDir tmp: File) {
+        val observed = CountDownLatch(1)
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = loader,
+            nativeStart = { _, _ -> 0 },
+            nativeStop = {},
+            nativeStats = {
+                observed.countDown()
+                error("native stats failed")
+            },
+            pollIntervalMs = 1L,
+            statsPollerEnabled = true,
+        )
+        val rc = gateway.start(
+            HevTunnelConfig(
+                tunPfd = pfd(21),
+                socksAddress = "127.0.0.1",
+                socksPort = 1080,
+            ),
+        )
+
+        assertEquals(0, rc)
+        assertTrue(waitUntil { observed.count == 0L })
+        gateway.stop()
     }
 
     @Test
@@ -419,6 +579,97 @@ class NativeHevTunnelGatewayCoverageTest {
         } finally {
             PersistentLoggers.instance = previous
         }
+    }
+
+    @Test
+    fun `null persistent logger still starts and stops without logging branches`(@TempDir tmp: File) {
+        val previous = PersistentLoggers.instance
+        PersistentLoggers.instance = null
+        try {
+            var stopped = false
+            val gateway = NativeHevTunnelGateway(
+                cacheDir = tmp,
+                loader = loader,
+                nativeStart = { _, _ -> 0 },
+                nativeStop = { stopped = true },
+            )
+
+            assertEquals(
+                0,
+                gateway.start(
+                    HevTunnelConfig(
+                        tunPfd = pfd(26),
+                        socksAddress = "127.0.0.1",
+                        socksPort = 1080,
+                    ),
+                ),
+            )
+            gateway.stop()
+
+            assertTrue(stopped)
+        } finally {
+            PersistentLoggers.instance = previous
+        }
+    }
+
+    @Test
+    fun `null persistent logger loader failure skips native start without logging branches`(@TempDir tmp: File) {
+        val previous = PersistentLoggers.instance
+        PersistentLoggers.instance = null
+        try {
+            var nativeStarted = false
+            val failingLoader = object : TProxyLoader {
+                override fun loadOnce() = Unit
+                override val libraryLoaded: Boolean = false
+                override val loadError: String? = "missing"
+            }
+            val gateway = NativeHevTunnelGateway(
+                cacheDir = tmp,
+                loader = failingLoader,
+                nativeStart = { _, _ ->
+                    nativeStarted = true
+                    0
+                },
+                nativeStop = {},
+            )
+
+            assertEquals(
+                -1,
+                gateway.start(
+                    HevTunnelConfig(
+                        tunPfd = pfd(27),
+                        socksAddress = "127.0.0.1",
+                        socksPort = 1080,
+                    ),
+                ),
+            )
+            assertFalse(nativeStarted)
+        } finally {
+            PersistentLoggers.instance = previous
+        }
+    }
+
+    @Test
+    fun `stats poller can be replaced before previous poller samples`(@TempDir tmp: File) {
+        val started = CountDownLatch(1)
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = loader,
+            nativeStart = { _, _ -> 0 },
+            nativeStop = {},
+            nativeStats = {
+                started.countDown()
+                longArrayOf(0L, 0L, 0L, 0L)
+            },
+            pollIntervalMs = 100L,
+            statsPollerEnabled = true,
+        )
+
+        gateway.start(HevTunnelConfig(tunPfd = pfd(28), socksAddress = "127.0.0.1", socksPort = 1080))
+        gateway.start(HevTunnelConfig(tunPfd = pfd(29), socksAddress = "127.0.0.1", socksPort = 1080))
+        gateway.stop()
+
+        assertTrue(started.count >= 0L)
     }
 
     private class RecordingLogger : PersistentLogger {

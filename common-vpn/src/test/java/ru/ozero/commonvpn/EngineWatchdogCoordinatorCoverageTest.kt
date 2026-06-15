@@ -241,6 +241,26 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
+    fun `startPeerWatchdog with missing plugin is no-op`() = runTest {
+        val plugin = FakeWatchdogPlugin(id = EngineId.WARP)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            plugins = setOf(plugin),
+            controller = connectedController(EngineId.BYEDPI),
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+        )
+
+        watchdog.startPeerWatchdog(EngineId.BYEDPI)
+        advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
+        runCurrent()
+        advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_TIMEOUT_MS)
+        runCurrent()
+
+        assertEquals(0, plugin.recoverCalls)
+    }
+
+    @Test
     fun `peer watchdog converts recover exception into failed retry`() = runTest {
         val plugin = FakeWatchdogPlugin(
             stats = listOf(EngineStats(activeConnections = 1), EngineStats(activeConnections = 0)),
@@ -396,6 +416,27 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
+    fun `startStagnationWatchdog with missing plugin is no-op`() = runTest {
+        val plugin = FakeWatchdogPlugin(id = EngineId.WARP)
+        val controller = stagnantController(EngineId.BYEDPI)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            plugins = setOf(plugin),
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+        )
+
+        watchdog.startStagnationWatchdog(EngineId.BYEDPI)
+        advanceTimeBy(EngineWatchdogCoordinator.STAGNATION_POLL_MS)
+        runCurrent()
+        advanceTimeBy(EngineWatchdogCoordinator.STAGNATION_RECOVER_THRESHOLD_MS)
+        runCurrent()
+
+        assertEquals(0, plugin.recoverCalls)
+    }
+
+    @Test
     fun `starting replacement watcher cancels previous health watcher`() = runTest {
         val health = degradingHealthMonitor()
         val controller = connectedController(EngineId.BYEDPI)
@@ -461,6 +502,31 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
+    fun `handleEngineFailure for failed state with same engine enters killswitch`() = runTest {
+        val controller = TunnelController().apply {
+            onProbing(EngineId.BYEDPI)
+            onConnecting(EngineId.BYEDPI)
+            onEngineStarted(EngineId.BYEDPI, socksPort = 1080)
+            onEngineDied(EngineId.BYEDPI, "already failed")
+        }
+        val stopCount = AtomicReference(0)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+            stopCount = stopCount,
+        )
+
+        val handled = watchdog.handleEngineFailure(EngineId.BYEDPI, "failed state retry")
+
+        assertTrue(handled)
+        assertEquals(0, stopCount.get())
+        assertTrue(controller.killswitchActive.value)
+        assertIs<TunnelState.Failed>(controller.state.value)
+    }
+
+    @Test
     fun `handleEngineFailure ignores inactive engine`() = runTest {
         val controller = connectedController(EngineId.BYEDPI)
         val stopCount = AtomicReference(0)
@@ -477,6 +543,38 @@ class EngineWatchdogCoordinatorCoverageTest {
         assertFalse(handled)
         assertEquals(0, stopCount.get())
         assertIs<TunnelState.Connected>(controller.state.value)
+    }
+
+    @Test
+    fun `handleEngineFailure active with killswitch cancels health peer and stagnation jobs`() = runTest {
+        val plugin = FakeWatchdogPlugin(
+            id = EngineId.BYEDPI,
+            stats = listOf(EngineStats(activeConnections = 0)),
+            recoverResults = listOf(EnginePlugin.RecoverResult.Success),
+        )
+        val health = degradingHealthMonitor()
+        val stopCount = AtomicReference(0)
+        val controller = connectedController(EngineId.BYEDPI)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            healthMonitor = health,
+            plugins = setOf(plugin),
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+            stopCount = stopCount,
+        )
+
+        watchdog.startHealthKillswitchWatcher(EngineId.BYEDPI)
+        watchdog.startPeerWatchdog(EngineId.BYEDPI)
+        watchdog.startStagnationWatchdog(EngineId.BYEDPI)
+        val handled = watchdog.handleEngineFailure(EngineId.BYEDPI, "killswitch cancels jobs")
+        runCurrent()
+        health.shutdown()
+
+        assertTrue(handled)
+        assertEquals(0, stopCount.get())
+        assertEquals(0, plugin.recoverCalls)
     }
 
     @Test
@@ -671,6 +769,47 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
+    fun `handleEngineFailure probing state for same engine is active`() = runTest {
+        val controller = TunnelController().apply { onProbing(EngineId.WARP) }
+        val stopCount = AtomicReference(0)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+            stopCount = stopCount,
+        )
+
+        val handled = watchdog.handleEngineFailure(EngineId.WARP, "probe failed")
+
+        assertTrue(handled)
+        assertEquals(0, stopCount.get())
+        assertTrue(controller.killswitchActive.value)
+    }
+
+    @Test
+    fun `handleEngineFailure connecting state for different engine is inactive`() = runTest {
+        val controller = TunnelController().apply {
+            onProbing(EngineId.BYEDPI)
+            onConnecting(EngineId.BYEDPI)
+        }
+        val stopCount = AtomicReference(0)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+            stopCount = stopCount,
+        )
+
+        val handled = watchdog.handleEngineFailure(EngineId.WARP, "stale connect failure")
+
+        assertFalse(handled)
+        assertEquals(0, stopCount.get())
+        assertEquals(TunnelState.Connecting(EngineId.BYEDPI), controller.state.value)
+    }
+
+    @Test
     fun `handleEngineFailure stops vpn when tun missing and killswitch enabled`() = runTest {
         val controller = connectedController(EngineId.BYEDPI)
         val statsJob = Job()
@@ -693,6 +832,110 @@ class EngineWatchdogCoordinatorCoverageTest {
         assertFalse(statsJob.isCancelled)
         assertEquals(1, stopCount.get())
         assertIs<TunnelState.Failed>(controller.state.value)
+    }
+
+    @Test
+    fun `handleEngineFailure connected with killswitch but no blocking tun stops vpn`() = runTest {
+        val controller = connectedController(EngineId.BYEDPI)
+        val stopCount = AtomicReference(0)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            controller = controller,
+            tunFd = null,
+            lockdownFd = null,
+            killswitch = true,
+            stopCount = stopCount,
+        )
+
+        val handled = watchdog.handleEngineFailure(EngineId.BYEDPI, "no fd")
+
+        assertFalse(handled)
+        assertEquals(1, stopCount.get())
+        assertFalse(controller.killswitchActive.value)
+        assertIs<TunnelState.Failed>(controller.state.value)
+    }
+
+    @Test
+    fun `handleEngineFailure failed state with different engine is ignored`() = runTest {
+        val controller = connectedController(EngineId.BYEDPI).apply {
+            onEngineDied(EngineId.BYEDPI, "first")
+        }
+        val stopCount = AtomicReference(0)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+            stopCount = stopCount,
+        )
+
+        val handled = watchdog.handleEngineFailure(EngineId.WARP, "other")
+
+        assertFalse(handled)
+        assertEquals(0, stopCount.get())
+        val state = controller.state.value
+        assertIs<TunnelState.Failed>(state)
+        assertEquals(EngineId.BYEDPI, state.engineId)
+    }
+
+    @Test
+    fun `health degraded with killswitch true but no fd logs without stop`() = runTest {
+        val health = degradingHealthMonitor()
+        val controller = connectedController(EngineId.BYEDPI)
+        val stopCount = AtomicReference(0)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            healthMonitor = health,
+            controller = controller,
+            tunFd = null,
+            lockdownFd = null,
+            killswitch = true,
+            stopCount = stopCount,
+        )
+
+        try {
+            watchdog.startHealthKillswitchWatcher(EngineId.BYEDPI)
+            health.start(1080)
+            advanceTimeBy(1)
+            runCurrent()
+
+            assertFalse(controller.killswitchActive.value)
+            assertEquals(0, stopCount.get())
+            assertIs<TunnelState.Connected>(controller.state.value)
+        } finally {
+            watchdog.cancelWatchers()
+            health.shutdown()
+        }
+    }
+
+    @Test
+    fun `health degraded while stopping does not enter killswitch`() = runTest {
+        val health = degradingHealthMonitor()
+        val controller = connectedController(EngineId.BYEDPI)
+        val stopCount = AtomicReference(0)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            healthMonitor = health,
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+            stopping = true,
+            stopCount = stopCount,
+        )
+
+        try {
+            watchdog.startHealthKillswitchWatcher(EngineId.BYEDPI)
+            health.start(1080)
+            advanceTimeBy(1)
+            runCurrent()
+
+            assertFalse(controller.killswitchActive.value)
+            assertEquals(0, stopCount.get())
+            assertIs<TunnelState.Connected>(controller.state.value)
+        } finally {
+            watchdog.cancelWatchers()
+            health.shutdown()
+        }
     }
 
     private fun TestScope.watchdog(

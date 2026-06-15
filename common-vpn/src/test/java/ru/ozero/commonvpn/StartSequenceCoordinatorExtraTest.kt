@@ -3,9 +3,11 @@ package ru.ozero.commonvpn
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -34,6 +36,7 @@ import ru.ozero.enginescore.settings.TrafficMode
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -401,6 +404,42 @@ class StartSequenceCoordinatorExtraTest {
         assertEquals(listOf(false), fixture.killswitchValues)
         assertEquals(1, engine.startedConfigs.size)
         assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+    }
+
+    @Test
+    fun `settings timeout with no plugins requests stop through null target path`() = runTest {
+        val fixture = startFixture(
+            settings = SettingsModel(),
+            settingsFlow = emptyFlow(),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(listOf(false), fixture.killswitchValues)
+        assertTrue(fixture.stopRequested.get())
+        verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(any(), any()) }
+        assertIs<TunnelState.Idle>(fixture.tunnelController.state.value)
+    }
+
+    @Test
+    fun `settings timeout still uses default priority first plugin when engine priority is absent`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2160,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(),
+            settingsFlow = emptyFlow(),
+        )
+        fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.startedConfigs.size)
+        assertEquals(EngineId.BYEDPI, (fixture.tunnelController.state.value as TunnelState.Connected).engineId)
     }
 
     @Test
@@ -968,6 +1007,62 @@ class StartSequenceCoordinatorExtraTest {
     }
 
     @Test
+    fun `custom tun attach throw tolerates tun close failure and reports original failure`() = runTest {
+        val engine = FakeTunEnginePlugin(
+            id = EngineId.WARP,
+            attachResult = TunAttachResult.Success,
+            attachThrows = true,
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.WARP,
+            ),
+        )
+        val tun = mockTunFd(rawFd = 75, dupFd = 175, closeThrows = true)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns mockTunBuilder(fd = tun)
+
+        fixture.coordinator.run()
+
+        assertEquals(listOf(175), engine.attachedFds)
+        assertEquals(1, engine.stopCalls)
+        verify(exactly = 1) { tun.close() }
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.WARP,
+                "attachTun threw: attach down",
+            )
+        }
+    }
+
+    @Test
+    fun `custom tun attach failure tolerates tun close failure and reports attach reason`() = runTest {
+        val engine = FakeTunEnginePlugin(
+            id = EngineId.WARP,
+            attachResult = TunAttachResult.Failure("attach denied"),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.WARP,
+            ),
+        )
+        val tun = mockTunFd(rawFd = 76, dupFd = 176, closeThrows = true)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns mockTunBuilder(fd = tun)
+
+        fixture.coordinator.run()
+
+        assertEquals(listOf(176), engine.attachedFds)
+        assertEquals(1, engine.stopCalls)
+        verify(exactly = 1) { tun.close() }
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(EngineId.WARP, "attachTun: attach denied")
+        }
+    }
+
+    @Test
     fun `custom tun success starts peer and stagnation watchdogs without native gateway`() = runTest {
         val engine = FakeTunEnginePlugin(
             id = EngineId.WARP,
@@ -1107,6 +1202,827 @@ class StartSequenceCoordinatorExtraTest {
         verify(exactly = 1) { fixture.engineWatchdog.startHealthKillswitchWatcher(EngineId.WARP) }
         verify(exactly = 0) { fixture.engineWatchdog.startStagnationWatchdog(any()) }
         verify(exactly = 1) { fixture.statsLogger.start() }
+    }
+
+    @Test
+    fun `manual tun health monitor cancellation is rethrown`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2150,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.BYEDPI,
+            ),
+        )
+        fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+        coEvery { fixture.healthMonitor.start(any()) } throws CancellationException("cancel tun health")
+
+        assertFailsWith<CancellationException> {
+            fixture.coordinator.run()
+        }
+
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+    }
+
+    @Test
+    fun `manual proxy health monitor cancellation is rethrown`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.WARP,
+            socksPort = 2151,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.PROXY,
+                manualEngine = EngineId.WARP,
+            ),
+        )
+        coEvery { fixture.healthMonitor.start(any()) } throws CancellationException("cancel proxy health")
+
+        assertFailsWith<CancellationException> {
+            fixture.coordinator.run()
+        }
+
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+    }
+
+    @Test
+    fun `killswitch lockdown builder exception still falls through to no engine stop`() = runTest {
+        val fixture = startFixture(
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = null,
+                engineAutoPriority = emptyList(),
+                killswitchEnabled = true,
+            ),
+        )
+        val lockdownBuilder = mockk<VpnService.Builder> {
+            every { establish() } throws IllegalStateException("lockdown throw")
+        }
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), false, emptyList(), false) } returns lockdownBuilder
+
+        fixture.coordinator.run()
+
+        assertEquals(listOf(true), fixture.killswitchValues)
+        assertTrue(fixture.stopRequested.get())
+        assertEquals(null, fixture.state.lockdownStartupFdRef.get())
+    }
+
+    @Test
+    fun `manual tun regular establish throw requests stop before chain start`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2152,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.BYEDPI,
+            ),
+        )
+        val builder = mockk<VpnService.Builder> {
+            every { establish() } throws IllegalStateException("vpn slot busy")
+        }
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), false, emptyList()) } returns builder
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.startedConfigs.size)
+        assertTrue(fixture.stopRequested.get())
+        assertEquals(null, fixture.state.tunFdRef.get())
+    }
+
+    @Test
+    fun `manual tun regular establish null requests stop and stops started chain`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2161,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.BYEDPI,
+            ),
+        )
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), false, emptyList()) } returns mockTunBuilder(null)
+
+        fixture.coordinator.run()
+
+        assertEquals(1, engine.startedConfigs.size)
+        assertEquals(1, engine.stopCalls)
+        assertTrue(fixture.stopRequested.get())
+        assertEquals(null, fixture.state.tunFdRef.get())
+    }
+
+    @Test
+    fun `custom tun establish null with unhandled watchdog requests stop`() = runTest {
+        val engine = FakeTunEnginePlugin(
+            id = EngineId.WARP,
+            attachResult = TunAttachResult.Success,
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.WARP,
+            ),
+            failureHandled = false,
+        )
+        val builder = mockTunBuilder(null)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns builder
+
+        fixture.coordinator.run()
+
+        assertEquals(0, engine.startedConfigs.size)
+        assertTrue(fixture.stopRequested.get())
+        verify(exactly = 1) { fixture.engineWatchdog.handleEngineFailure(EngineId.WARP, any()) }
+    }
+
+    @Test
+    fun `custom tun stopping after establish closes fd and skips chain start`() = runTest {
+        val engine = FakeTunEnginePlugin(
+            id = EngineId.WARP,
+            attachResult = TunAttachResult.Success,
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.WARP,
+            ),
+        )
+        val tunFd = mockTunFd(rawFd = 68, dupFd = 680)
+        val lockdownFd = mockk<ParcelFileDescriptor>(relaxed = true)
+        val builder = mockTunBuilder(tunFd)
+        fixture.state.lockdownStartupFdRef.set(lockdownFd)
+        every { builder.establish() } answers {
+            fixture.state.stopping.set(true)
+            tunFd
+        }
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns builder
+
+        fixture.coordinator.run()
+
+        assertEquals(0, engine.startedConfigs.size)
+        verify(exactly = 1) { lockdownFd.close() }
+        verify(exactly = 1) { tunFd.close() }
+        assertEquals(null, fixture.state.tunFdRef.get())
+    }
+
+    @Test
+    fun `manual tun success records session id and starts all non custom watchers`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2153,
+            capabilities = tunnelCapabilities(),
+        )
+        val recorder = RecordingSessionStatsRecorder()
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.BYEDPI,
+            ),
+            sessionStatsRecorder = recorder,
+        )
+        fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(listOf("BYEDPI"), recorder.startedEngines)
+        assertEquals(1L, fixture.state.sessionIdRef.get())
+        verify(exactly = 1) { fixture.engineWatchdog.startHealthKillswitchWatcher(EngineId.BYEDPI) }
+        verify(exactly = 0) { fixture.engineWatchdog.startPeerWatchdog(any()) }
+        verify(exactly = 1) { fixture.engineWatchdog.startStagnationWatchdog(EngineId.BYEDPI) }
+        verify(exactly = 1) { fixture.statsLogger.start() }
+    }
+
+    @Test
+    fun `manual proxy success records proxy session id and skips stagnation watchdog`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.WARP,
+            socksPort = 2154,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val recorder = RecordingSessionStatsRecorder()
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.PROXY,
+                manualEngine = EngineId.WARP,
+            ),
+            sessionStatsRecorder = recorder,
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(listOf("WARP:PROXY"), recorder.startedEngines)
+        assertEquals(1L, fixture.state.sessionIdRef.get())
+        verify(exactly = 1) { fixture.engineWatchdog.startHealthKillswitchWatcher(EngineId.WARP) }
+        verify(exactly = 0) { fixture.engineWatchdog.startPeerWatchdog(any()) }
+        verify(exactly = 0) { fixture.engineWatchdog.startStagnationWatchdog(any()) }
+        verify(exactly = 1) { fixture.statsLogger.start() }
+    }
+
+    @Test
+    fun `auto tun first candidate chain failure resets probing state before next candidate`() = runTest {
+        val first = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            startResult = StartResult.Failure("first down"),
+            capabilities = tunnelCapabilities(),
+        )
+        val second = FakeEnginePlugin(
+            id = EngineId.MASTERDNS,
+            socksPort = 2155,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            first,
+            second,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.BYEDPI, EngineId.MASTERDNS),
+            ),
+        )
+        fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(1, first.startedConfigs.size)
+        assertEquals(1, second.startedConfigs.size)
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+        assertFalse(fixture.stopRequested.get())
+    }
+
+    @Test
+    fun `auto tun first candidate establish null resets after probing failure`() = runTest {
+        val first = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2156,
+            capabilities = tunnelCapabilities(),
+        )
+        val second = FakeEnginePlugin(
+            id = EngineId.MASTERDNS,
+            socksPort = 2157,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            first,
+            second,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.BYEDPI, EngineId.MASTERDNS),
+            ),
+        )
+        val nullBuilder = mockTunBuilder(null)
+        val fd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 56
+        }
+        val successBuilder = mockTunBuilder(fd)
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), false, emptyList()) } returnsMany
+            listOf(nullBuilder, successBuilder)
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(1, first.startedConfigs.size)
+        assertEquals(1, second.startedConfigs.size)
+        assertEquals(fd, fixture.state.tunFdRef.get())
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+    }
+
+    @Test
+    fun `custom tun first candidate attach failure resets before next custom candidate`() = runTest {
+        val first = FakeTunEnginePlugin(
+            id = EngineId.WARP,
+            attachResult = TunAttachResult.Failure("attach refused"),
+        )
+        val second = FakeTunEnginePlugin(
+            id = EngineId.FPTN,
+            attachResult = TunAttachResult.Success,
+        )
+        val fixture = startFixture(
+            first,
+            second,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.WARP, EngineId.FPTN),
+            ),
+        )
+        val firstFd = mockTunFd(rawFd = 57, dupFd = 570)
+        val secondFd = mockTunFd(rawFd = 58, dupFd = 580)
+        val firstBuilder = mockTunBuilder(firstFd)
+        val secondBuilder = mockTunBuilder(secondFd)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returnsMany
+            listOf(firstBuilder, secondBuilder)
+
+        fixture.coordinator.run()
+
+        assertEquals(1, first.startedConfigs.size)
+        assertEquals(1, first.attachCalls)
+        assertEquals(1, second.startedConfigs.size)
+        assertEquals(1, second.attachCalls)
+        assertEquals(secondFd, fixture.state.tunFdRef.get())
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+    }
+
+    @Test
+    fun `custom tun success records session and starts peer watchdog only`() = runTest {
+        val engine = FakeTunEnginePlugin(
+            id = EngineId.WARP,
+            attachResult = TunAttachResult.Success,
+        )
+        val recorder = RecordingSessionStatsRecorder()
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.WARP,
+            ),
+            sessionStatsRecorder = recorder,
+        )
+        val tunFd = mockTunFd(rawFd = 59, dupFd = 590)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns mockTunBuilder(tunFd)
+
+        fixture.coordinator.run()
+
+        assertEquals(listOf("WARP"), recorder.startedEngines)
+        assertEquals(1L, fixture.state.sessionIdRef.get())
+        coVerify(exactly = 0) { fixture.healthMonitor.start(any()) }
+        verify(exactly = 0) { fixture.engineWatchdog.startHealthKillswitchWatcher(any()) }
+        verify(exactly = 1) { fixture.engineWatchdog.startPeerWatchdog(EngineId.WARP) }
+        verify(exactly = 1) { fixture.engineWatchdog.startStagnationWatchdog(EngineId.WARP) }
+        verify(exactly = 1) { fixture.statsLogger.start() }
+    }
+
+    @Test
+    fun `custom tun success tolerates session recorder failure`() = runTest {
+        val engine = FakeTunEnginePlugin(
+            id = EngineId.WARP,
+            attachResult = TunAttachResult.Success,
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.WARP,
+            ),
+            sessionStatsRecorder = FailingSessionStatsRecorder(),
+        )
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns
+            mockTunBuilder(mockTunFd(rawFd = 60, dupFd = 600))
+
+        fixture.coordinator.run()
+
+        assertEquals(-1L, fixture.state.sessionIdRef.get())
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+        verify(exactly = 1) { fixture.statsLogger.start() }
+    }
+
+    @Test
+    fun `custom tun applies ipv6 capable spec when settings enable ipv6`() = runTest {
+        val engine = FakeTunEnginePlugin(
+            id = EngineId.WARP,
+            attachResult = TunAttachResult.Success,
+            tunSpec = TunSpec(
+                sessionName = "warp-v6",
+                mtu = 1280,
+                blocking = true,
+                ipv4Address = "10.0.0.2",
+                ipv4PrefixLength = 32,
+                dnsServers = listOf("1.1.1.1"),
+                allowFamilyV6 = true,
+                ipv6Address = "fd00::2",
+                ipv6PrefixLength = 128,
+                routeAllV6 = true,
+                routeCidrsV6 = listOf("fd00::/8"),
+            ),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.WARP,
+                ipv6Enabled = true,
+            ),
+        )
+        val tunFd = mockTunFd(rawFd = 63, dupFd = 630)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), true) } returns mockTunBuilder(tunFd)
+
+        fixture.coordinator.run()
+
+        assertEquals(tunFd, fixture.state.tunFdRef.get())
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+        verify(exactly = 1) { fixture.tunBuilderHelper.applyEngineTunSpec(any(), true) }
+    }
+
+    @Test
+    fun `tun mode passes custom dns and ipv6 flags to regular tun builder`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2162,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.BYEDPI,
+                ipv6Enabled = true,
+                customDnsServers = listOf("9.9.9.9", "1.1.1.1"),
+            ),
+        )
+        val tunFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 64
+        }
+        val builder = mockTunBuilder(tunFd)
+        every {
+            fixture.tunBuilderHelper.buildTunBuilder(any(), true, listOf("9.9.9.9", "1.1.1.1"))
+        } returns builder
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(tunFd, fixture.state.tunFdRef.get())
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+    }
+
+    @Test
+    fun `killswitch startup uses empty custom dns when settings dns is null equivalent`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2163,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.BYEDPI,
+                killswitchEnabled = true,
+                customDnsServers = emptyList(),
+            ),
+        )
+        val lockdownFd = mockk<ParcelFileDescriptor>(relaxed = true)
+        val finalFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 65
+        }
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), false, emptyList(), false) } returns
+            mockTunBuilder(lockdownFd)
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), false, emptyList()) } returns
+            mockTunBuilder(finalFd)
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(listOf(true), fixture.killswitchValues)
+        assertEquals(finalFd, fixture.state.tunFdRef.get())
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+    }
+
+    @Test
+    fun `auto tun first candidate await ready timeout resets before next candidate`() = runTest {
+        val first = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2158,
+            capabilities = tunnelCapabilities(),
+            readyResult = EnginePlugin.ReadyResult.Timeout("slow tun"),
+        )
+        val second = FakeEnginePlugin(
+            id = EngineId.MASTERDNS,
+            socksPort = 2159,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            first,
+            second,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.BYEDPI, EngineId.MASTERDNS),
+            ),
+        )
+        val firstFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 61
+        }
+        val secondFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 62
+        }
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), false, emptyList()) } returnsMany
+            listOf(mockTunBuilder(firstFd), mockTunBuilder(secondFd))
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(1, first.startedConfigs.size)
+        assertEquals(1, first.stopCalls)
+        assertEquals(1, second.startedConfigs.size)
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+        verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(EngineId.BYEDPI, any()) }
+    }
+
+    @Test
+    fun `auto proxy first candidate failure after connecting resets connecting state`() = runTest {
+        val first = FakeEnginePlugin(
+            id = EngineId.WARP,
+            startResult = StartResult.Failure("proxy failed after probing"),
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val second = FakeEnginePlugin(
+            id = EngineId.MASTERDNS,
+            socksPort = 2164,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            first,
+            second,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.PROXY,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.WARP, EngineId.MASTERDNS),
+            ),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(1, first.startedConfigs.size)
+        assertEquals(1, second.startedConfigs.size)
+        val state = fixture.tunnelController.state.value
+        assertIs<TunnelState.Connected>(state)
+        assertEquals(EngineId.MASTERDNS, state.engineId)
+    }
+
+    @Test
+    fun `auto tun first candidate native exception resets state before second candidate`() = runTest {
+        val first = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2165,
+            capabilities = tunnelCapabilities(),
+        )
+        val second = FakeEnginePlugin(
+            id = EngineId.MASTERDNS,
+            socksPort = 2166,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            first,
+            second,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.BYEDPI, EngineId.MASTERDNS),
+            ),
+        )
+        val firstFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 66
+        }
+        val secondFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 67
+        }
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), false, emptyList()) } returnsMany
+            listOf(mockTunBuilder(firstFd), mockTunBuilder(secondFd))
+        var startCalls = 0
+        every { fixture.tunnelGateway.start(any()) } answers {
+            startCalls++
+            if (startCalls == 1) {
+                throw IllegalStateException("native down")
+            }
+            0
+        }
+
+        fixture.coordinator.run()
+
+        assertEquals(1, first.startedConfigs.size)
+        assertEquals(1, second.startedConfigs.size)
+        val state = fixture.tunnelController.state.value
+        assertIs<TunnelState.Connected>(state)
+        assertEquals(EngineId.MASTERDNS, state.engineId)
+        verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(EngineId.BYEDPI, any()) }
+    }
+
+    @Test
+    fun `manual proxy session recorder failure still connects and starts monitors`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.WARP,
+            socksPort = 2167,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.PROXY,
+                manualEngine = EngineId.WARP,
+            ),
+            sessionStatsRecorder = FailingSessionStatsRecorder(),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(-1L, fixture.state.sessionIdRef.get())
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+        coVerify(exactly = 1) { fixture.healthMonitor.start(2167) }
+        verify(exactly = 1) { fixture.engineWatchdog.startHealthKillswitchWatcher(EngineId.WARP) }
+        verify(exactly = 1) { fixture.statsLogger.start() }
+    }
+
+    @Test
+    fun `manual proxy health monitor throws but watcher and stats still start`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.MASTERDNS,
+            socksPort = 2168,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.PROXY,
+                manualEngine = EngineId.MASTERDNS,
+            ),
+        )
+        coEvery { fixture.healthMonitor.start(any()) } throws IllegalStateException("health down")
+
+        fixture.coordinator.run()
+
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+        verify(exactly = 1) { fixture.engineWatchdog.startHealthKillswitchWatcher(EngineId.MASTERDNS) }
+        verify(exactly = 1) { fixture.statsLogger.start() }
+    }
+
+    @Test
+    fun `manual tun health monitor throws but non custom watchers and stats still start`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2169,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.BYEDPI,
+            ),
+        )
+        fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+        coEvery { fixture.healthMonitor.start(any()) } throws IllegalStateException("health down")
+
+        fixture.coordinator.run()
+
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+        verify(exactly = 1) { fixture.engineWatchdog.startHealthKillswitchWatcher(EngineId.BYEDPI) }
+        verify(exactly = 0) { fixture.engineWatchdog.startPeerWatchdog(EngineId.BYEDPI) }
+        verify(exactly = 1) { fixture.engineWatchdog.startStagnationWatchdog(EngineId.BYEDPI) }
+        verify(exactly = 1) { fixture.statsLogger.start() }
+    }
+
+    @Test
+    fun `auto proxy first candidate zero socks resets and final failure notifies last candidate`() = runTest {
+        val first = FakeEnginePlugin(
+            id = EngineId.WARP,
+            socksPort = 0,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val second = FakeEnginePlugin(
+            id = EngineId.MASTERDNS,
+            startResult = StartResult.Failure("final failed"),
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            first,
+            second,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.PROXY,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.WARP, EngineId.MASTERDNS),
+            ),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(1, first.stopCalls)
+        assertEquals(1, second.startedConfigs.size)
+        assertTrue(fixture.stopRequested.get())
+        verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(EngineId.WARP, any()) }
+        verify(exactly = 1) { fixture.engineWatchdog.handleEngineFailure(EngineId.MASTERDNS, "final failed") }
+    }
+
+    @Test
+    fun `auto tun first candidate native code failure resets and final tunnel code failure notifies`() = runTest {
+        val first = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2170,
+            capabilities = tunnelCapabilities(),
+        )
+        val second = FakeEnginePlugin(
+            id = EngineId.MASTERDNS,
+            socksPort = 2171,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            first,
+            second,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.BYEDPI, EngineId.MASTERDNS),
+            ),
+        )
+        val firstFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 70
+        }
+        val secondFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 71
+        }
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), false, emptyList()) } returnsMany
+            listOf(mockTunBuilder(firstFd), mockTunBuilder(secondFd))
+        var starts = 0
+        every { fixture.tunnelGateway.start(any()) } answers {
+            starts++
+            if (starts == 1) 9 else 8
+        }
+
+        fixture.coordinator.run()
+
+        assertEquals(1, first.stopCalls)
+        assertEquals(1, second.stopCalls)
+        assertTrue(fixture.stopRequested.get())
+        verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(EngineId.BYEDPI, any()) }
+        verify(exactly = 1) { fixture.engineWatchdog.handleEngineFailure(EngineId.MASTERDNS, "tunnel code=8") }
+    }
+
+    @Test
+    fun `auto custom tun attach failure resets before non custom candidate starts`() = runTest {
+        val first = FakeTunEnginePlugin(
+            id = EngineId.WARP,
+            attachResult = TunAttachResult.Failure("bad fd"),
+        )
+        val second = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2172,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            first,
+            second,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.WARP, EngineId.BYEDPI),
+            ),
+        )
+        val customFd = mockTunFd(rawFd = 72, dupFd = 172)
+        val regularFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 73
+        }
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), false) } returns mockTunBuilder(customFd)
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), false, emptyList()) } returns mockTunBuilder(regularFd)
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(1, first.attachCalls)
+        assertEquals(1, second.startedConfigs.size)
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+        verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(EngineId.WARP, any()) }
+    }
+
+    @Test
+    fun `custom tun start chain failure after tun skips attach and reports final failure`() = runTest {
+        val engine = FakeTunEnginePlugin(
+            id = EngineId.WARP,
+            attachResult = TunAttachResult.Success,
+            startResult = StartResult.Failure("custom start failed"),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.WARP,
+            ),
+        )
+        val tunFd = mockTunFd(rawFd = 74, dupFd = 174)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), false) } returns mockTunBuilder(tunFd)
+
+        fixture.coordinator.run()
+
+        assertEquals(0, engine.attachCalls)
+        assertTrue(fixture.stopRequested.get())
+        verify(exactly = 1) { fixture.engineWatchdog.handleEngineFailure(EngineId.WARP, "custom start failed") }
     }
 
     private fun startFixture(
@@ -1362,13 +2278,16 @@ class StartSequenceCoordinatorExtraTest {
         }
     }
 
-    private fun mockTunFd(rawFd: Int, dupFd: Int): ParcelFileDescriptor {
+    private fun mockTunFd(rawFd: Int, dupFd: Int, closeThrows: Boolean = false): ParcelFileDescriptor {
         val duplicate = mockk<ParcelFileDescriptor>(relaxed = true) {
             every { detachFd() } returns dupFd
         }
         return mockk(relaxed = true) {
             every { fd } returns rawFd
             every { dup() } returns duplicate
+            if (closeThrows) {
+                every { close() } throws IllegalStateException("close failed")
+            }
         }
     }
 

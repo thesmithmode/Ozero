@@ -53,7 +53,7 @@ class NativeHevTunnelGatewayLogTest {
     @Test
     fun `pre-nativeStart попадает в boot log через PersistentLoggers`() {
         assertTrue(
-            startBody.contains("PersistentLoggers.instance?.info(TAG, \"checkpoint pre-nativeStart"),
+            startBody.contains("PersistentLoggers.info(TAG, \"checkpoint pre-nativeStart"),
             "pre-nativeStart обязан попадать в boot.log через PersistentLoggers.info — это последняя " +
                 "строка перед blocking JNI TProxyStartService. Если нативка зависает, эта запись " +
                 "укажет точный момент входа в JNI.",

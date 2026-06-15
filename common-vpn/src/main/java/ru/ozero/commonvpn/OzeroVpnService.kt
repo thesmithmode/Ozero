@@ -232,8 +232,11 @@ class OzeroVpnService : android.net.VpnService() {
     @SuppressLint("WakelockTimeout")
     private fun acquireLocks() {
         val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
-        wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ozero::vpn-service")
-            ?.apply { acquire() }
+        wakeLock = if (pm != null) {
+            pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ozero::vpn-service").also { it.acquire() }
+        } else {
+            null
+        }
         val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
         val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             WifiManager.WIFI_MODE_FULL_LOW_LATENCY
@@ -241,9 +244,12 @@ class OzeroVpnService : android.net.VpnService() {
             @Suppress("DEPRECATION")
             WifiManager.WIFI_MODE_FULL_HIGH_PERF
         }
-        wifiLock = wm?.createWifiLock(mode, "ozero::vpn-service")
-            ?.apply { acquire() }
-        PersistentLoggers.debug(TAG, "locks acquired wake=${wakeLock != null} wifi=${wifiLock != null}")
+        wifiLock = if (wm != null) {
+            wm.createWifiLock(mode, "ozero::vpn-service").also { it.acquire() }
+        } else {
+            null
+        }
+        PersistentLoggers.debug(TAG, "locks acquired")
     }
 
     private fun releaseLocks() {
@@ -353,7 +359,7 @@ class OzeroVpnService : android.net.VpnService() {
             for (n in networks) {
                 val caps = cm.getNetworkCapabilities(n) ?: continue
                 if (!caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) continue
-                if (android.os.Build.VERSION.SDK_INT >= 29 && caps.ownerUid == myUid) continue
+                if (isOwnVpnNetwork(caps, myUid)) continue
                 detected = true
                 PersistentLoggers.warn(
                     TAG,
@@ -410,4 +416,17 @@ class OzeroVpnService : android.net.VpnService() {
         runCatching { tunFdRef.getAndSet(null)?.close() }
         super.onDestroy()
     }
+}
+
+internal fun isOwnVpnNetwork(
+    caps: android.net.NetworkCapabilities,
+    myUid: Int,
+): Boolean {
+    if (android.os.Build.VERSION.SDK_INT < 29) return false
+    val ownerUid = try {
+        caps.ownerUid
+    } catch (_: NoSuchMethodError) {
+        return false
+    }
+    return ownerUid == myUid
 }

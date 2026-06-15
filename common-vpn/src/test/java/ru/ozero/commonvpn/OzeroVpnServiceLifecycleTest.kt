@@ -389,7 +389,7 @@ class OzeroVpnServiceLifecycleTest {
     @Test
     fun `autoCandidatesWithPreflight вызывает plugin preflight с no-op protector`() {
         assertTrue(
-            startSequenceSource.contains("plugin?.preflight()"),
+            startSequenceSource.contains("plugin.preflight()"),
             "autoCandidatesWithPreflight обязан брать EnginePreflight через plugin.preflight()",
         )
         val preflightFn = startSequenceSource.substringAfter("private suspend fun autoCandidatesWithPreflight")
@@ -450,7 +450,7 @@ class OzeroVpnServiceLifecycleTest {
             "manual-mode идёт прямым путём через buildEngineConfig — без preflight",
         )
         assertTrue(
-            body.contains("autoCandidatesWithPreflight(settings, trafficMode)"),
+            body.contains("autoCandidatesWithPreflight(effectiveSettings, trafficMode)"),
             "auto-mode (manualEngine == null) идёт через autoCandidatesWithPreflight",
         )
     }
@@ -464,7 +464,7 @@ class OzeroVpnServiceLifecycleTest {
             "autoCandidates обязан читать settings.engineAutoPriority для авто-режима",
         )
         assertTrue(
-            body.contains("DEFAULT_ENGINE_AUTO_PRIORITY"),
+            startSequenceSource.contains("val effectiveSettings = settings ?: SettingsModel()"),
             "fallback на DEFAULT_ENGINE_AUTO_PRIORITY когда settings null обязателен",
         )
         assertTrue(
