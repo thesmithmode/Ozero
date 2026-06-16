@@ -7,14 +7,15 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import ru.ozero.app.data.RoomSessionStatsRecorder
-import ru.ozero.app.data.RoomSplitTunnelRulesProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import ru.ozero.app.data.RoomSessionStatsRecorder
+import ru.ozero.app.data.RoomSplitTunnelRulesProvider
 import ru.ozero.commonvpn.HealthMonitor
 import ru.ozero.commonvpn.HevTunnelGateway
 import ru.ozero.commonvpn.NativeHevTunnelGateway
+import ru.ozero.commonvpn.RuntimeFailureRouter
 import ru.ozero.commonvpn.SessionStatsRecorder
 import ru.ozero.commonvpn.SplitTunnelRulesProvider
 import ru.ozero.commonvpn.TunnelController
@@ -47,6 +48,10 @@ object VpnModule {
     @Provides
     @Singleton
     fun provideHealthMonitor(): HealthMonitor = HealthMonitor()
+
+    @Provides
+    @Singleton
+    fun provideRuntimeFailureRouter(): RuntimeFailureRouter = RuntimeFailureRouter()
 }
 
 @Module

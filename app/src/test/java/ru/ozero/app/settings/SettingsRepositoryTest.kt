@@ -17,6 +17,8 @@ import org.junit.jupiter.api.io.TempDir
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.AutoStartGateway
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
+import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsKeys
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -315,6 +317,66 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `setCustomDnsServers filters invalid addresses and accepts ipv6`() = runTest {
+        repository.setCustomDnsServers(listOf("256.1.1.1", "2001:4860:4860::8888", "bad,entry"))
+
+        assertEquals(listOf("2001:4860:4860::8888"), repository.settings.first().customDnsServers)
+    }
+
+    @Test
+    fun `setCustomDnsServers removes key when all entries invalid`() = runTest {
+        repository.setCustomDnsServers(listOf("8.8.8.8"))
+        repository.setCustomDnsServers(listOf("256.256.256.256", "bad,entry"))
+
+        assertTrue(repository.settings.first().customDnsServers.isEmpty())
+    }
+
+    @Test
+    fun `hosts mode and hosts round trip with validation`() = runTest {
+        repository.setHostsMode(HostsMode.BLACKLIST)
+        repository.setHosts(listOf(" example.com ", "bad host", "127.0.0.1:5353", ""))
+
+        val current = repository.settings.first()
+        assertEquals(HostsMode.BLACKLIST, current.hostsMode)
+        assertEquals(listOf("example.com", "127.0.0.1:5353"), current.hosts)
+    }
+
+    @Test
+    fun `unknown hosts mode falls back to default and invalid hosts clear list`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.HOSTS_MODE] = "UNKNOWN"
+            prefs[SettingsKeys.HOSTS_LIST] = "one.test, two.test"
+        }
+        assertEquals(HostsMode.DISABLED, repository.settings.first().hostsMode)
+
+        repository.setHosts(listOf("bad host", "also bad"))
+        assertTrue(repository.settings.first().hosts.isEmpty())
+    }
+
+    @Test
+    fun `urnetwork country code normalizes valid values and clears invalid values`() = runTest {
+        repository.setUrnetworkCountryCode(" us ")
+        assertEquals("US", repository.settings.first().urnetworkCountryCode)
+
+        repository.setUrnetworkCountryCode("usa")
+        assertNull(repository.settings.first().urnetworkCountryCode)
+
+        repository.setUrnetworkCountryCode("de")
+        repository.setUrnetworkCountryCode(null)
+        assertNull(repository.settings.first().urnetworkCountryCode)
+    }
+
+    @Test
+    fun `byedpi ui mode and settings round trip`() = runTest {
+        repository.setByedpiUseUiMode(true)
+        repository.setByedpiUiSettings(ByeDpiUiSettings.DEFAULT.copy(fakeSni = "front.example.com"))
+
+        val current = repository.settings.first()
+        assertTrue(current.byedpiUseUiMode)
+        assertEquals("front.example.com", current.byedpiUiSettings.fakeSni)
+    }
+
+    @Test
     fun `uiLocaleTag default null`() = runTest {
         assertNull(repository.settings.first().uiLocaleTag)
     }
@@ -383,6 +445,15 @@ class SettingsRepositoryTest {
             prefs[SettingsKeys.ALWAYS_ON_BANNER_DISMISSED] = true
         }
         assertTrue(repository.settings.first().alwaysOnBannerDismissed)
+    }
+
+    @Test
+    fun `setKillswitchEnabled persists toggle`() = runTest {
+        repository.setKillswitchEnabled(true)
+        assertTrue(repository.settings.first().killswitchEnabled)
+
+        repository.setKillswitchEnabled(false)
+        assertFalse(repository.settings.first().killswitchEnabled)
     }
 
     private class FakeAutoStartGateway : AutoStartGateway {

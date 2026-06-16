@@ -160,4 +160,42 @@ class GroupSeederTest {
 
         assertEquals("https://url.example.com/path", fakeDao.groups.first().subscriptionUrl)
     }
+
+    @Test
+    fun `should keep first preset name when duplicate urls appear in the same seed call`() = runBlocking {
+        val presets = listOf(
+            GroupSeeder.PresetGroup("First Name", "https://dup.example.com"),
+            GroupSeeder.PresetGroup("Second Name", "https://dup.example.com"),
+        )
+
+        seeder.seedPresets(presets)
+
+        assertEquals(1, fakeDao.groups.size)
+        assertEquals("First Name", fakeDao.groups.first().name)
+    }
+
+    @Test
+    fun `should keep user order of first unseen preset after skipping existing and duplicate urls`() = runBlocking {
+        fakeDao.groups.add(
+            SubscriptionGroup(
+                id = 3L,
+                name = "Existing",
+                subscriptionUrl = "https://existing.example.com",
+                isBuiltin = true,
+            ),
+        )
+
+        val presets = listOf(
+            GroupSeeder.PresetGroup("Existing Duplicate", "https://existing.example.com"),
+            GroupSeeder.PresetGroup("New First", "https://new-first.example.com"),
+            GroupSeeder.PresetGroup("New Duplicate", "https://new-first.example.com"),
+            GroupSeeder.PresetGroup("New Second", "https://new-second.example.com"),
+        )
+
+        seeder.seedPresets(presets)
+
+        assertEquals(3, fakeDao.groups.size)
+        assertEquals(1, fakeDao.groups.first { it.subscriptionUrl == "https://new-first.example.com" }.userOrder)
+        assertEquals(3, fakeDao.groups.first { it.subscriptionUrl == "https://new-second.example.com" }.userOrder)
+    }
 }

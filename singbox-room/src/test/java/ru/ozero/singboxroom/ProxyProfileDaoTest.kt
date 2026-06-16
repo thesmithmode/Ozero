@@ -15,6 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import ru.ozero.singboxroom.entity.ProxyProfile
+import ru.ozero.singboxroom.entity.ProxyChainStep
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 
 @RunWith(RobolectricTestRunner::class)
@@ -165,6 +166,32 @@ class ProxyProfileDaoTest {
     }
 
     @Test
+    fun `insertAll should ignore stable id conflicts without cascading chain steps`() = runBlocking {
+        val groupId = insertGroup()
+        val profileDao = db.proxyProfileDao()
+        val chainDao = db.proxyChainDao()
+        val id = profileDao.insert(
+            ProxyProfile(groupId = groupId, name = "Stable", beanBlob = byteArrayOf(0), protocolType = 1),
+        )
+        chainDao.replace(listOf(id))
+
+        profileDao.insertAll(
+            listOf(
+                ProxyProfile(
+                    id = id,
+                    groupId = groupId,
+                    name = "Conflicting refresh row",
+                    beanBlob = byteArrayOf(1),
+                    protocolType = 1,
+                ),
+            ),
+        )
+
+        assertEquals(listOf(id), chainDao.getAll().map { it.profileId })
+        assertEquals("Stable", profileDao.getById(id)!!.name)
+    }
+
+    @Test
     fun `should not return profiles from other groups`() = runBlocking {
         val group1 = insertGroup("Group 1")
         val group2 = insertGroup("Group 2")
@@ -192,5 +219,124 @@ class ProxyProfileDaoTest {
         val result = dao.getByGroupId(groupId)
         assertEquals(1, result.size)
         assertEquals("New 1", result[0].name)
+    }
+
+    @Test
+    fun `replaceForGroup should preserve chain steps for stable profile ids`() = runBlocking {
+        val groupId = insertGroup()
+        val blob = byteArrayOf(0)
+        val profileDao = db.proxyProfileDao()
+        val chainDao = db.proxyChainDao()
+        val firstId = profileDao.insert(
+            ProxyProfile(groupId = groupId, name = "Old 1", beanBlob = blob, protocolType = 1, userOrder = 0),
+        )
+        val secondId = profileDao.insert(
+            ProxyProfile(groupId = groupId, name = "Old 2", beanBlob = blob, protocolType = 1, userOrder = 1),
+        )
+        chainDao.replace(listOf(firstId, secondId))
+
+        profileDao.replaceForGroup(
+            groupId,
+            listOf(
+                ProxyProfile(
+                    id = firstId,
+                    groupId = groupId,
+                    name = "New 1",
+                    beanBlob = byteArrayOf(1),
+                    protocolType = 1,
+                    userOrder = 0,
+                ),
+                ProxyProfile(
+                    id = secondId,
+                    groupId = groupId,
+                    name = "New 2",
+                    beanBlob = byteArrayOf(2),
+                    protocolType = 1,
+                    userOrder = 1,
+                ),
+            ),
+        )
+
+        val steps = chainDao.getAll()
+        assertEquals(listOf(firstId, secondId), steps.map { it.profileId })
+        assertEquals(listOf(0, 1), steps.map { it.userOrder })
+        assertEquals(listOf("New 1", "New 2"), profileDao.getByGroupId(groupId).map { it.name })
+    }
+
+    @Test
+    fun `replaceForGroup should cascade only removed profile chain steps`() = runBlocking {
+        val groupId = insertGroup()
+        val blob = byteArrayOf(0)
+        val profileDao = db.proxyProfileDao()
+        val chainDao = db.proxyChainDao()
+        val keptId = profileDao.insert(
+            ProxyProfile(groupId = groupId, name = "Keep", beanBlob = blob, protocolType = 1, userOrder = 0),
+        )
+        val removedId = profileDao.insert(
+            ProxyProfile(groupId = groupId, name = "Remove", beanBlob = blob, protocolType = 1, userOrder = 1),
+        )
+        chainDao.replace(listOf(keptId, removedId))
+
+        profileDao.replaceForGroup(
+            groupId,
+            listOf(
+                ProxyProfile(
+                    id = keptId,
+                    groupId = groupId,
+                    name = "Keep refreshed",
+                    beanBlob = byteArrayOf(1),
+                    protocolType = 1,
+                    userOrder = 0,
+                ),
+            ),
+        )
+
+        assertEquals(listOf(keptId), chainDao.getAll().map { it.profileId })
+        assertNull(profileDao.getById(removedId))
+    }
+
+    @Test
+    fun `replaceForGroup should handle large stable id subscriptions without dropping chains`() = runBlocking {
+        val groupId = insertGroup()
+        val profileDao = db.proxyProfileDao()
+        val chainDao = db.proxyChainDao()
+        val ids = (1..1007).map { index ->
+            profileDao.insert(
+                ProxyProfile(
+                    groupId = groupId,
+                    name = "Old $index",
+                    beanBlob = byteArrayOf(index.toByte()),
+                    protocolType = 1,
+                    userOrder = index,
+                ),
+            )
+        }
+        val keptIds = ids.take(1005)
+        chainDao.insertAll(
+            listOf(
+                ProxyChainStep(profileId = keptIds.first(), userOrder = 0),
+                ProxyChainStep(profileId = keptIds[999], userOrder = 1),
+                ProxyChainStep(profileId = keptIds.last(), userOrder = 2),
+            ),
+        )
+
+        profileDao.replaceForGroup(
+            groupId,
+            keptIds.mapIndexed { index, id ->
+                ProxyProfile(
+                    id = id,
+                    groupId = groupId,
+                    name = "New ${index + 1}",
+                    beanBlob = byteArrayOf((index + 1).toByte()),
+                    protocolType = 1,
+                    userOrder = index,
+                )
+            },
+        )
+
+        assertEquals(1005, profileDao.countByGroupId(groupId))
+        assertNull(profileDao.getById(ids[1005]))
+        assertNull(profileDao.getById(ids[1006]))
+        assertEquals(listOf(keptIds.first(), keptIds[999], keptIds.last()), chainDao.getAll().map { it.profileId })
     }
 }

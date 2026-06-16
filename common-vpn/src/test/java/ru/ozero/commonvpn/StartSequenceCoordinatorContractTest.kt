@@ -190,6 +190,20 @@ class StartSequenceCoordinatorContractTest {
     }
 
     @Test
+    fun `establishTunForEngine routes failure через watchdog and only stops on non-killswitch path`() {
+        val body = source.substringAfter("private suspend fun establishTunForEngine(")
+            .substringBefore("private fun captureTunIfaceName(")
+        assertTrue(
+            body.contains("handleEngineFailure(engineId, \"VPN slot"),
+            "establishTunForEngine must still report engine failure through watchdog.",
+        )
+        assertTrue(
+            body.contains("if (!deps.engineWatchdog.handleEngineFailure"),
+            "establishTunForEngine must stop the VPN only when watchdog has not entered killswitch mode.",
+        )
+    }
+
+    @Test
     fun `routeTrafficForEngine — TunFdAcceptor ветка через attachTun, иначе native tunnel`() {
         val body = source.substringAfter("private suspend fun routeTrafficForEngine(")
             .substringBefore("private suspend fun startNativeTunnel(")
@@ -199,20 +213,20 @@ class StartSequenceCoordinatorContractTest {
     }
 
     @Test
-    fun `run — onProbing вызывается ДО onEngineDied при no engine reachable — UI не застревает в Idle`() {
+    fun `run — onProbing вызывается ДО watchdog failure при no engine reachable — UI не застревает в Idle`() {
         val body = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
-        val failBlock = body.substringAfter("if (picks.isEmpty()) {").substringBefore("stopVpnRequest()")
+        val failBlock = body.substringAfter("if (picks.isEmpty()) {").substringBefore("return")
         val probingIdx = failBlock.indexOf("tunnelController.onProbing(")
-        val diedIdx = failBlock.indexOf("tunnelController.onEngineDied(")
+        val diedIdx = failBlock.indexOf("engineWatchdog.handleEngineFailure(")
         assertTrue(
             probingIdx >= 0,
             "run: при pick==null и targetForUi!=null обязан вызвать onProbing(targetForUi) " +
-                "ДО onEngineDied — иначе TunnelController в Idle игнорирует Failed transition, " +
+                "ДО handleEngineFailure — иначе TunnelController в Idle игнорирует Failed transition, " +
                 "UI не показывает ошибку (invalid transition Idle→Failed).",
         )
         assertTrue(
             probingIdx < diedIdx,
-            "onProbing обязан быть ДО onEngineDied. probingIdx=$probingIdx diedIdx=$diedIdx",
+            "onProbing обязан быть ДО handleEngineFailure. probingIdx=$probingIdx diedIdx=$diedIdx",
         )
     }
 

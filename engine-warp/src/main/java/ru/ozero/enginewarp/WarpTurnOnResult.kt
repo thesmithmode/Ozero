@@ -26,8 +26,16 @@ data class WarpTurnOnResult(
         val CREATOR: Parcelable.Creator<WarpTurnOnResult> = object : Parcelable.Creator<WarpTurnOnResult> {
             override fun createFromParcel(parcel: Parcel): WarpTurnOnResult {
                 val handle = parcel.readInt()
-                val v4 = if (parcel.readInt() == 1) ParcelFileDescriptor.CREATOR.createFromParcel(parcel) else null
-                val v6 = if (parcel.readInt() == 1) ParcelFileDescriptor.CREATOR.createFromParcel(parcel) else null
+                val v4 = if (parcel.readInt() != 0) {
+                    ParcelFileDescriptor.CREATOR.createFromParcel(parcel)
+                } else {
+                    null
+                }
+                val v6 = if (parcel.readInt() != 0) {
+                    ParcelFileDescriptor.CREATOR.createFromParcel(parcel)
+                } else {
+                    null
+                }
                 return WarpTurnOnResult(handle, v4, v6)
             }
 

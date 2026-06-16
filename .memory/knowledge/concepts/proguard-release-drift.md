@@ -5,7 +5,7 @@ tags: [android, r8, proguard, dependency, release, security]
 sources:
   - "daily/2026-05-23.md"
 created: 2026-05-23
-updated: 2026-05-23
+updated: 2026-06-12
 ---
 
 # Proguard/R8 Release Drift: JDK-Only Dependencies on Android

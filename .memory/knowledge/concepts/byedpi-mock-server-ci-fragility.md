@@ -7,7 +7,7 @@ sources:
   - "daily/2026-05-10.md"
   - "daily/2026-05-14.md"
 created: 2026-05-09
-updated: 2026-05-14
+updated: 2026-06-09
 ---
 
 # Mock SOCKS5 Server CI Fragility: repeat=N Exhaustion + Real-Time Clock Mismatch
@@ -67,6 +67,8 @@ This flaky test was hidden by CI job dependency masking ([[concepts/ci-job-depen
 - [[concepts/test-io-thread-zombie-trap]] - Related test infrastructure issue: `Thread.sleep` in mocks causes zombie threads; both are about mock lifecycle management in tests
 - [[concepts/ci-job-dependency-masking]] - ktlint failure masked this flaky test; same `needs:` pattern as detekt masking compile errors
 - [[concepts/junit-platform-silent-skip]] - Another test infrastructure trap producing misleading CI results
+- [[concepts/byedpi-connection-probe-injection-contract]] - Follow-up contract: the SOCKS readiness probe should be injectable so unit tests do not depend on real socket IO
+- [[connections/native-io-test-isolation-feedback-loop]] - Connects this ByeDPI IO flake to URnetwork native-wrapper test failures
 
 ## Root Cause 2: System.currentTimeMillis() Outer Loop vs Virtual Clock in runTest
 

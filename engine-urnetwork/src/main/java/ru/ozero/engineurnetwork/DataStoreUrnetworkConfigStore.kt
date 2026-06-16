@@ -8,19 +8,16 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import org.json.JSONArray
-import org.json.JSONObject
 
 class DataStoreUrnetworkConfigStore(
     private val dataStore: DataStore<Preferences>,
 ) : UrnetworkConfigStore {
-
-    override fun config(): Flow<UrnetworkConfig> = dataStore.data.map { prefs -> readConfig(prefs) }
+    override fun config(): Flow<UrnetworkConfig> =
+        dataStore.data.map { readConfig(it).withNormalizedCachedLocations() }
 
     override suspend fun update(transform: (UrnetworkConfig) -> UrnetworkConfig) {
         dataStore.edit { prefs ->
-            val current = readConfig(prefs)
-            val next = transform(current)
+            val next = transform(readConfig(prefs))
             writeConfig(prefs, next)
         }
     }
@@ -71,46 +68,62 @@ class DataStoreUrnetworkConfigStore(
 
     private fun readLocationCache(raw: String?): List<UrnetworkCachedLocation> {
         if (raw.isNullOrBlank()) return emptyList()
-        return runCatching {
-            val arr = JSONArray(raw)
-            buildList {
-                for (i in 0 until arr.length()) {
-                    val obj = arr.optJSONObject(i) ?: continue
-                    val name = obj.optString("name").takeIf { it.isNotBlank() } ?: continue
-                    val code = obj.optString("code").takeIf { it.length == 2 } ?: continue
-                    add(
-                        UrnetworkCachedLocation(
-                            name = name,
-                            countryCode = code.uppercase(),
-                            region = obj.optString("region").takeIf { it.isNotBlank() },
-                            city = obj.optString("city").takeIf { it.isNotBlank() },
-                            providerCount = obj.optInt("providers", 0),
-                            isStable = obj.optBoolean("stable", true),
-                            isStrongPrivacy = obj.optBoolean("privacy", false),
-                        ),
-                    )
-                }
-            }
-        }.getOrDefault(emptyList())
+        readLocationCacheLines(raw)?.let { return it }
+        return readLegacyJsonLocationCache(raw)
     }
 
     private fun writeLocationCache(items: List<UrnetworkCachedLocation>): String? {
         if (items.isEmpty()) return null
-        val arr = JSONArray()
-        items.take(MAX_CACHED_LOCATIONS).forEach { loc ->
-            arr.put(
-                JSONObject()
-                    .put("name", loc.name)
-                    .put("code", loc.countryCode)
-                    .put("region", loc.region)
-                    .put("city", loc.city)
-                    .put("providers", loc.providerCount)
-                    .put("stable", loc.isStable)
-                    .put("privacy", loc.isStrongPrivacy),
-            )
+        return items.take(MAX_CACHED_LOCATIONS).joinToString("\n") { loc ->
+            listOf(
+                loc.name,
+                loc.countryCode.orEmpty(),
+                loc.region.orEmpty(),
+                loc.city.orEmpty(),
+                loc.providerCount.toString(),
+                loc.isStable.toString(),
+                loc.isStrongPrivacy.toString(),
+            ).joinToString("\t") { it.escapeCacheField() }
         }
-        return arr.toString()
     }
+
+    private fun readLocationCacheLines(raw: String): List<UrnetworkCachedLocation>? {
+        if (raw.trimStart().startsWith("[")) return null
+        return raw.lineSequence()
+            .filter { it.isNotBlank() }
+            .mapNotNull { line ->
+                val fields = line.split('\t').map { it.unescapeCacheField() }
+                val name = fields.getOrNull(0)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val code = fields.getOrNull(1)?.takeIf { it.length == 2 } ?: return@mapNotNull null
+                UrnetworkCachedLocation(
+                    name = name,
+                    countryCode = code.uppercase(),
+                    region = fields.getOrNull(2)?.takeIf { it.isNotBlank() },
+                    city = fields.getOrNull(3)?.takeIf { it.isNotBlank() },
+                    providerCount = fields.getOrNull(4)?.toIntOrNull() ?: 0,
+                    isStable = fields.getOrNull(5)?.toBooleanStrictOrNull() ?: true,
+                    isStrongPrivacy = fields.getOrNull(6)?.toBooleanStrictOrNull() ?: false,
+                )
+            }
+            .take(MAX_CACHED_LOCATIONS)
+            .toList()
+    }
+
+    private fun UrnetworkConfig.withNormalizedCachedLocations(): UrnetworkConfig =
+        copy(
+            cachedCountries = cachedCountries.map {
+                it.copy(countryCode = it.countryCode?.uppercase())
+            }.take(MAX_CACHED_LOCATIONS),
+            cachedRegions = cachedRegions.map {
+                it.copy(countryCode = it.countryCode?.uppercase())
+            }.take(MAX_CACHED_LOCATIONS),
+            cachedCities = cachedCities.map {
+                it.copy(countryCode = it.countryCode?.uppercase())
+            }.take(MAX_CACHED_LOCATIONS),
+            cachedBestMatches = cachedBestMatches.map {
+                it.copy(countryCode = it.countryCode?.uppercase())
+            }.take(MAX_CACHED_LOCATIONS),
+        )
 
     private companion object {
         val KEY_WALLET_OVERRIDE = stringPreferencesKey("urnetwork_wallet_override")
@@ -137,4 +150,67 @@ class DataStoreUrnetworkConfigStore(
 
 private fun MutablePreferences.writeOrRemove(key: Preferences.Key<String>, value: String?) {
     value?.takeIf { it.isNotBlank() }?.let { this[key] = it } ?: remove(key)
+}
+
+private fun readLegacyJsonLocationCache(raw: String): List<UrnetworkCachedLocation> {
+    if (!raw.trimStart().startsWith("[")) return emptyList()
+    return Regex("""\{[^{}]*}""")
+        .findAll(raw)
+        .mapNotNull { match ->
+            val obj = match.value
+            val name = obj.jsonString("name")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val code = obj.jsonString("code")?.takeIf { it.length == 2 } ?: return@mapNotNull null
+            UrnetworkCachedLocation(
+                name = name,
+                countryCode = code.uppercase(),
+                region = obj.jsonString("region")?.takeIf { it.isNotBlank() },
+                city = obj.jsonString("city")?.takeIf { it.isNotBlank() },
+                providerCount = obj.jsonInt("providers") ?: 0,
+                isStable = obj.jsonBoolean("stable") ?: true,
+                isStrongPrivacy = obj.jsonBoolean("privacy") ?: false,
+            )
+        }
+        .take(500)
+        .toList()
+}
+
+private fun String.jsonString(key: String): String? {
+    val match = Regex(""""$key"\s*:\s*(null|"([^"\\]|\\.)*")""").find(this) ?: return null
+    val raw = match.groupValues[1]
+    if (raw == "null") return null
+    return raw.removeSurrounding("\"")
+        .replace("\\\"", "\"")
+        .replace("\\\\", "\\")
+}
+
+private fun String.jsonInt(key: String): Int? =
+    Regex(""""$key"\s*:\s*(-?\d+)""").find(this)?.groupValues?.get(1)?.toIntOrNull()
+
+private fun String.jsonBoolean(key: String): Boolean? =
+    Regex(""""$key"\s*:\s*(true|false)""").find(this)?.groupValues?.get(1)?.toBooleanStrictOrNull()
+
+private fun String.escapeCacheField(): String =
+    replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n")
+
+private fun String.unescapeCacheField(): String {
+    val out = StringBuilder(length)
+    var escaped = false
+    for (ch in this) {
+        if (escaped) {
+            out.append(
+                when (ch) {
+                    't' -> '\t'
+                    'n' -> '\n'
+                    else -> ch
+                },
+            )
+            escaped = false
+        } else if (ch == '\\') {
+            escaped = true
+        } else {
+            out.append(ch)
+        }
+    }
+    if (escaped) out.append('\\')
+    return out.toString()
 }

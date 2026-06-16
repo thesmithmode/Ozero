@@ -5,7 +5,7 @@ tags: [singbox, android, kotlin, deserialization, ping]
 sources:
   - "daily/2026-05-26.md"
 created: 2026-05-26
-updated: 2026-05-26
+updated: 2026-06-13
 ---
 
 # Singbox Ping: AbstractBean Deserialization for probeLatencyMs
@@ -51,6 +51,7 @@ This bug caused the server list ping UI to display `-1` ms for all non-VLESS ser
 - [[concepts/singbox-engine-design]] - Sealed server hierarchy and preset groups context
 - [[concepts/pingJob-viewmodel-cancellation]] - Companion concept: once deserialization is fixed, correct ViewModel cancellation is also needed
 - [[concepts/singbox-subscription-architecture]] - Subscription fetch populates the server list that ping operates on
+- [[connections/singbox-ui-ci-diagnostic-feedback-loop]] - Connects ping UI correctness with crash diagnostics and CI grounding
 
 ## Sources
 

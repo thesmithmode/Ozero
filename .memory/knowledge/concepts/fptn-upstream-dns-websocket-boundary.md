@@ -3,7 +3,7 @@ title: FPTN upstream DNS and WebSocket boundary
 sources:
   - [[daily/2026-05-29]]
 created: 2026-05-29
-updated: 2026-05-29
+updated: 2026-06-13
 ---
 # FPTN upstream DNS and WebSocket boundary
 
@@ -22,14 +22,18 @@ The confirmed boundary problem is after successful login: Ozero passed the token
 
 The same session separated lifecycle protection from protocol alignment. `CancellationException` during fallback must stop the auth cycle instead of being treated as another failed server, otherwise old FPTN starts can continue after stop/switch and poison later engine transitions.
 
+After the cancellation fix, the remaining FPTN boundary was explicitly scoped to DNS and WebSocket startup. The fix direction was to resolve the selected token host to IPv4 after login and carry that resolved address into native WebSocket setup, while preserving `port`, SNI, fallback policy, and native ABI.
+
 ## Related Concepts
 - [[concepts/fptn-dead-server-fallback]]
 - [[concepts/fptn-http-608-regression-baseline]]
 - [[concepts/engine-switch-failure-containment]]
 - [[concepts/release-last-good-baseline-audit]]
+- [[connections/multi-engine-lifecycle-exitnode-regression-loop]]
 
 ## Sources
 - [[daily/2026-05-29]]: upstream snapshot was saved from `fptn-project/fptn` commit `32085947ff3c3626f7ec64eb183cbc6b8dcfea3e`.
 - [[daily/2026-05-29]]: `vpn_port` was explicitly rejected because current upstream schema uses `port`.
 - [[daily/2026-05-29]]: Ozero passed `server.host` into native WebSocket as `serverIp`, while upstream resolves the host before constructing the WebSocket client.
 - [[daily/2026-05-29]]: FPTN auth fallback continuing after stop/switch was identified as a cancellation lifecycle bug.
+- [[daily/2026-05-29]]: commit `bd284d81` was recorded as the FPTN DNS-boundary fix pushed to `dev`.

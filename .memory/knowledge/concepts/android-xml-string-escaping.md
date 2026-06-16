@@ -5,7 +5,7 @@ tags: [android, localization, xml, gotcha, release]
 sources:
   - "daily/2026-05-06.md"
 created: 2026-05-06
-updated: 2026-05-06
+updated: 2026-06-12
 ---
 
 # Android XML String Escaping Traps
@@ -63,6 +63,7 @@ For any localization addition:
 - [[connections/release-checks-beyond-ci]] - Android XML escaping errors are another example of release.yml catching defects invisible to CI
 - [[concepts/ci-workflow-discipline]] - CI's debug-only build is insufficient for release validation
 - [[concepts/release-process]] - Release tagging flow that triggers release.yml
+- [[concepts/todo-before-autonomous-work-contract]] - Release tasks need explicit scope because CI-green and release-red states can coexist
 
 ## Sources
 

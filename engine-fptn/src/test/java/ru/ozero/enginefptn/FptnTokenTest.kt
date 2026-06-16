@@ -3,11 +3,14 @@ package ru.ozero.enginefptn
 import android.util.Base64
 import io.mockk.every
 import io.mockk.mockkStatic
+import io.mockk.mockkConstructor
+import io.mockk.unmockkConstructor
 import io.mockk.unmockkStatic
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayInputStream
+import kotlin.math.min
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -65,6 +68,54 @@ class FptnTokenTest {
         val json = """{"version":1,"username":"u",
             "servers":[{"name":"S","host":"1.2.3.4","port":443}]}"""
         assertNull(FptnToken.parse("fptn:${encode(json)}"))
+    }
+
+    @Test
+    fun `should return null when port is wrong type`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"S","host":"1.2.3.4","port":{"value":443}}]}"""
+        assertNull(FptnToken.parse("fptn:${encode(json)}"))
+    }
+
+    @Test
+    fun `should return null when port is boolean`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"S","host":"1.2.3.4","port":true}]}"""
+        assertNull(FptnToken.parse("fptn:${encode(json)}"))
+    }
+
+    @Test
+    fun `should parse valid fptnb payload`() {
+        mockkConstructor(org.brotli.dec.BrotliInputStream::class)
+        val tokenPayload =
+            """{"version":1,"username":"u","password":"p","servers":[{"name":"S","host":"h","port":443}]}"""
+        val bytes = tokenPayload.toByteArray()
+        var reads = 0
+        every {
+            anyConstructed<org.brotli.dec.BrotliInputStream>().read(any(), any(), any())
+        } answers {
+            if (reads++ == 0) {
+                val buffer = arg<ByteArray>(0)
+                val read = min(bytes.size, arg<Int>(2))
+                bytes.copyInto(buffer, destinationOffset = arg<Int>(1), startIndex = 0, endIndex = read)
+                read
+            } else {
+                -1
+            }
+        }
+
+        try {
+            val token = "fptnb:${encode("ignored")}"
+            val result = FptnToken.parse(token)
+
+            val parsed = assertNotNull(result)
+            assertEquals(1, parsed.servers.size)
+            assertEquals("u", parsed.username)
+            assertEquals("p", parsed.password)
+            assertEquals("S", parsed.servers.single().name)
+        } finally {
+            unmockkConstructor(org.brotli.dec.BrotliInputStream::class)
+        }
     }
 
     @Test
@@ -152,6 +203,78 @@ class FptnTokenTest {
     }
 
     @Test
+    fun `should ignore blank and null country metadata`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[
+                {"name":"blank","host":"h1","port":1,"country_code":"   "},
+                {"name":"null","host":"h2","port":2,"countryCode":null}
+            ]}"""
+        val result = FptnToken.parse("fptn:${encode(json)}")
+        assertNotNull(result)
+        assertNull(result.servers[0].countryCode)
+        assertNull(result.servers[1].countryCode)
+    }
+
+    @Test
+    fun `should reject long and partially numeric country codes`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[
+                {"name":"long","host":"h1","port":1,"country_code":"rus"},
+                {"name":"numeric","host":"h2","port":2,"country_code":"r1"}
+            ]}"""
+        val result = FptnToken.parse("fptn:${encode(json)}")
+        assertNotNull(result)
+        assertNull(result.servers[0].countryCode)
+        assertNull(result.servers[1].countryCode)
+    }
+
+    @Test
+    fun `country_code takes precedence over camel case countryCode`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"S","host":"h","port":1,"country_code":"de","countryCode":"br"}]}"""
+
+        val result = FptnToken.parse("fptn:${encode(json)}")
+
+        assertNotNull(result)
+        assertEquals("DE", result.servers.single().countryCode)
+    }
+
+    @Test
+    fun `blank country_code falls back to camel case countryCode`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"S","host":"h","port":1,"country_code":" ","countryCode":"br"}]}"""
+
+        val result = FptnToken.parse("fptn:${encode(json)}")
+
+        assertNotNull(result)
+        assertEquals("BR", result.servers.single().countryCode)
+    }
+
+    @Test
+    fun `should return null when server item is missing required host`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"S","port":1,"country_code":"de"}]}"""
+
+        assertNull(FptnToken.parse("fptn:${encode(json)}"))
+    }
+
+    @Test
+    fun `should return null when server item is not object`() {
+        val json = """{"username":"u","password":"p","servers":["bad"]}"""
+        assertNull(FptnToken.parse("fptn:${encode(json)}"))
+    }
+
+    @Test
+    fun `empty optional fields are preserved and parsed`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"S","host":"1.2.3.4","port":443,"md5_fingerprint":"","country_code":""}]}"""
+        val result = FptnToken.parse("fptn:${encode(json)}")
+        assertNotNull(result)
+        assertEquals("", result.servers.single().md5Fingerprint)
+        assertNull(result.servers.single().countryCode)
+    }
+
+    @Test
     fun `toString should not expose username or password`() {
         val json = """{"username":"sensitive_user","password":"secret_pass",
             "servers":[{"name":"S","host":"h","port":1}]}"""
@@ -178,6 +301,15 @@ class FptnTokenTest {
     fun `readBounded returns content when within limit`() {
         val data = ByteArray(100) { it.toByte() }
         val result = FptnToken.readBounded(ByteArrayInputStream(data), 1024)
+        assertContentEquals(data, result)
+    }
+
+    @Test
+    fun `readBounded allows payload exactly at limit`() {
+        val data = ByteArray(128) { it.toByte() }
+
+        val result = FptnToken.readBounded(ByteArrayInputStream(data), 128)
+
         assertContentEquals(data, result)
     }
 

@@ -5,7 +5,7 @@ tags: [architecture, health-monitoring, urnetwork, engine, gotcha]
 sources:
   - "daily/2026-05-08.md"
 created: 2026-05-08
-updated: 2026-05-08
+updated: 2026-06-12
 ---
 
 # HealthMonitor False Positive for P2P Engines
@@ -20,6 +20,7 @@ Ozero's `HealthMonitor` uses a probe-based approach to assess tunnel health: it 
 - Generic "Соединение нестабильна" message is not actionable for URnetwork users who see active peers in the UI
 - Separate issue found simultaneously: `EngineUrnetwork.start()` resolves "Connected" while SOCKS5 port 10810 doesn't accept connections for 4+ minutes — false success from premature resolution
 - Fix direction: engine-reported health override OR engine-specific thresholds; suppressing banner when engine has active peers is the quickest mitigation
+- Startup peer errors need a grace period; showing "no peers" at second zero is a UX and logic error for URnetwork discovery
 
 ## Details
 
@@ -62,12 +63,17 @@ Three approaches, in order of architectural quality:
 
 3. **Suppress banner for P2P in UI layer** (quickest mitigation): UI checks engine type before showing the banner. For URnetwork, substitute a peer-count display. Does not fix the monitoring logic but unblocks UX.
 
+The same user-facing bug family includes premature peer-error display during startup. URnetwork can need a short discovery window before peers become visible, so the UI should suppress "no peers" for roughly the first 10 seconds after module start. Without that grace period, a normal startup path looks like an immediate failure.
+
 ## Related Concepts
 
 - [[concepts/urnetwork-sdk-integration]] - URnetwork engine details; peer grace period and false-start stability issues documented
 - [[concepts/vpn-engine-pipeline]] - Engine pipeline; HealthMonitor must align with engine-specific health semantics
 - [[concepts/android-vpn-self-traffic-bypass]] - Related false diagnostic: in-app checkers can also show wrong data depending on routing context
+- [[concepts/urnetwork-startup-readiness-vs-runtime-peer-grace]] - Startup and runtime peer-grace boundaries for URnetwork
 
 ## Sources
+
+- [[daily/2026-05-08.md]] - Session 18:27: user reported immediate "no peers" error from zero seconds; decision was to add about 10 seconds of startup grace before showing the peer-error state.
 
 - [[daily/2026-05-08.md]] - Session 14:00: ozero.log analysis revealed HealthMonitor DEGRADED 3+ min with 7 URnetwork peers active; EngineUrnetwork.start() false-connected pattern; Session 18:27: user confirmed "7 пиров видно, всё работает" + DEGRADED banner — metric mismatch confirmed

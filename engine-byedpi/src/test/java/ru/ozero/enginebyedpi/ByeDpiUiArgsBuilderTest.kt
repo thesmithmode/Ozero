@@ -88,6 +88,17 @@ class ByeDpiUiArgsBuilderTest {
     }
 
     @Test
+    fun `tlsRecordSplit without SNI marker emits plain position`() {
+        val s = ByeDpiUiSettings.DEFAULT.copy(
+            tlsRecordSplit = true,
+            tlsRecordSplitPosition = 3,
+            tlsRecordSplitAtSni = false,
+        )
+        val args = ByeDpiUiArgsBuilder.build(s, 1080).toList()
+        assertTrue("-r3" in args)
+    }
+
+    @Test
     fun `tlsRecordSplit без position не добавляет -r`() {
         val s = ByeDpiUiSettings.DEFAULT.copy(tlsRecordSplit = true, tlsRecordSplitPosition = 0)
         val args = ByeDpiUiArgsBuilder.build(s, 1080).toList()
@@ -103,6 +114,23 @@ class ByeDpiUiArgsBuilderTest {
         )
         val args = ByeDpiUiArgsBuilder.build(s, 1080).toList()
         assertTrue("-Mh,d,r" in args)
+    }
+
+    @Test
+    fun `mod flags can be emitted independently`() {
+        val domainOnly = ByeDpiUiSettings.DEFAULT.copy(
+            hostMixedCase = false,
+            domainMixedCase = true,
+            hostRemoveSpaces = false,
+        )
+        val removeOnly = ByeDpiUiSettings.DEFAULT.copy(
+            hostMixedCase = false,
+            domainMixedCase = false,
+            hostRemoveSpaces = true,
+        )
+
+        assertTrue("-Md" in ByeDpiUiArgsBuilder.build(domainOnly, 1080).toList())
+        assertTrue("-Mr" in ByeDpiUiArgsBuilder.build(removeOnly, 1080).toList())
     }
 
     @Test

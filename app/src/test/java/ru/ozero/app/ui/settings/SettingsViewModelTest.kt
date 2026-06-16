@@ -50,7 +50,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `emits Content with default settings when repository emits default`() = runTest(dispatcher) {
-        val collector = launch { viewModel.uiState.collect {} }
+        val collector = backgroundScope.launch { viewModel.uiState.collect {} }
         repository.emit(SettingsModel.DEFAULT)
         advanceUntilIdle()
 
@@ -62,7 +62,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `emits Content with new model when repository emits update`() = runTest(dispatcher) {
-        val collector = launch { viewModel.uiState.collect {} }
+        val collector = backgroundScope.launch { viewModel.uiState.collect {} }
         repository.emit(SettingsModel.DEFAULT)
         advanceUntilIdle()
 

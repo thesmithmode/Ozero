@@ -283,7 +283,7 @@ class EngineWarp(
                     "dirListing=${WarpSocketDiagnostics.listSocketCandidates(uapiPath)}"
             }
             val reason = "WARP: WireGuard handshake timeout ${warpReadyTimeoutMs}ms ($diag)"
-            PersistentLoggers.warn(TAG, "awaitReady timeout - $reason - proceeding")
+            PersistentLoggers.warn(TAG, "awaitReady timeout - $reason - startup not ready")
             EnginePlugin.ReadyResult.Timeout(reason)
         }
     }
@@ -308,6 +308,12 @@ class EngineWarp(
 
     override fun preflight(): ru.ozero.enginescore.EnginePreflight =
         WarpPreflight(peerEndpointProvider = { resolvedConfig?.peerEndpoint })
+
+    override fun peerWatchdogPolicy(): EnginePlugin.PeerWatchdogPolicy =
+        EnginePlugin.PeerWatchdogPolicy(
+            timeoutMs = WARP_PEER_WATCHDOG_TIMEOUT_MS,
+            recoverBeforeFirstPeer = false,
+        )
 
     override suspend fun tunSpec(): TunSpec? {
         val cfg = resolvedConfig
@@ -504,7 +510,11 @@ class EngineWarp(
         }
         val iniConfig = if (!rawIni.isNullOrBlank()) {
             WarpConfParser.parse(baseIni).getOrNull()?.let { parsed ->
-                resolvedConfig.copy(allowedIps = parsed.allowedIps)
+                parsed.copy(
+                    publicKey = resolvedConfig.publicKey,
+                    accountLicense = resolvedConfig.accountLicense,
+                    doHProvider = resolvedConfig.doHProvider,
+                )
             } ?: resolvedConfig
         } else {
             resolvedConfig
@@ -646,7 +656,8 @@ class EngineWarp(
         const val BOOTSTRAP_DOH_URL = "https://1.1.1.1/dns-query"
         const val WARP_IPV6_BLACKHOLE_ADDRESS = "fd00::1"
         const val WARP_IPV6_BLACKHOLE_PREFIX = 128
-        const val WARP_READY_TIMEOUT_MS = 10_000L
+        const val WARP_READY_TIMEOUT_MS = 30_000L
+        const val WARP_PEER_WATCHDOG_TIMEOUT_MS = 30_000L
         const val WARP_READY_POLL_MS = 100L
         const val SOCKS_PROBE_TIMEOUT_MS = 300
         const val STATS_POLL_INTERVAL_MS = 5_000L

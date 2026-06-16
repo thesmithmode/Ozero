@@ -4,6 +4,8 @@ import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.error.YAMLException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Instant
+import java.util.Date
 
 object LockFileParser {
     private val SHA256_REGEX = Regex("[0-9a-f]{64}")
@@ -15,24 +17,37 @@ object LockFileParser {
         }
         val raw: Map<String, Any?> =
             try {
-                @Suppress("UNCHECKED_CAST")
-                Yaml().load<Any?>(content) as? Map<String, Any?>
+                val root = Yaml().load<Any?>(content)
+                val map = root as? Map<*, *>
                     ?: throw LockFileException("Lock file root must be a YAML map: $path")
+                map.entries.associate { (key, value) -> key.toString() to value }
             } catch (e: YAMLException) {
                 throw LockFileException("Malformed YAML in $path: ${e.message}", e)
-            } catch (e: ClassCastException) {
-                throw LockFileException("Lock file root must be a YAML map: $path", e)
             }
 
-        val tag = raw["tag"]?.toString()
-            ?: throw LockFileException("Missing required field 'tag' in $path")
-        val generatedAt = raw["generated_at"]?.toString()
-            ?: throw LockFileException("Missing required field 'generated_at' in $path")
+        val tagValue = raw["tag"] ?: throw LockFileException("Missing required field 'tag' in $path")
+        val tag = tagValue.toString()
+        val generatedAt = when (val value = raw["generated_at"]) {
+            null -> throw LockFileException("Missing required field 'generated_at' in $path")
+            is String -> value
+            is Date -> Instant.ofEpochMilli(value.time).toString()
+            else -> value.toString()
+        }
 
-        @Suppress("UNCHECKED_CAST")
-        val rawArtifacts = (raw["artifacts"] as? List<Map<String, Any?>>).orEmpty()
-
-        val artifacts = rawArtifacts.mapIndexed { i, m -> parseArtifact(m, i, path) }
+        val rawArtifacts = raw["artifacts"]
+        val artifacts = when (rawArtifacts) {
+            null -> emptyList()
+            is List<*> -> rawArtifacts.mapIndexed { i, item ->
+                val map = item as? Map<*, *>
+                    ?: throw LockFileException("Artifact #$i must be a YAML map in $path")
+                parseArtifact(
+                    map.entries.associate { (key, value) -> key.toString() to value },
+                    i,
+                    path,
+                )
+            }
+            else -> emptyList()
+        }
 
         val dupName = artifacts.groupBy { it.name }.entries.firstOrNull { it.value.size > 1 }?.key
         if (dupName != null) {
@@ -66,7 +81,7 @@ object LockFileParser {
                     "Artifact '$name' has unknown destination '$destinationStr' (expected libs|jniLibs) in $path",
                 )
             }
-        val abi = m["abi"] as? String
+        val abi = m.strictStringOrNull("abi")
         if (destination == Destination.JNI_LIBS && abi.isNullOrBlank()) {
             throw LockFileException("Artifact '$name' has destination=jniLibs but no abi in $path")
         }
@@ -89,7 +104,7 @@ object LockFileParser {
         val sourceRepo = req("source_repo")
         val sourceCommit = req("source_commit")
 
-        val targetFilename = (m["target_filename"] as? String)?.takeIf { it.isNotBlank() }
+        val targetFilename = m.strictStringOrNull("target_filename")?.takeIf { it.isNotBlank() }
 
         return Artifact(
             name = name,
@@ -103,5 +118,10 @@ object LockFileParser {
             sourceCommit = sourceCommit,
             targetFilename = targetFilename,
         )
+    }
+
+    private fun Map<String, Any?>.strictStringOrNull(key: String): String? {
+        val value = this[key] ?: return null
+        return value as? String
     }
 }

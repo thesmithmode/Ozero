@@ -5,7 +5,7 @@ tags: [android, jni, native, posix, gotcha]
 sources:
   - "daily/2026-05-02.md"
 created: 2026-05-02
-updated: 2026-05-02
+updated: 2026-06-12
 ---
 
 # Android POSIX close() via ParcelFileDescriptor

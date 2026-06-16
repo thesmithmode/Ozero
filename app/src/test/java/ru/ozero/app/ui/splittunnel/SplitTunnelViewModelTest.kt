@@ -1,5 +1,7 @@
 ﻿package ru.ozero.app.ui.splittunnel
 
+import androidx.compose.ui.graphics.ImageBitmap
+import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -363,6 +365,19 @@ class SplitTunnelViewModelTest {
     }
 
     @Test
+    fun `onToggleApp deletes nothing when tunnel not Idle`() = runTest {
+        tunnelController.onProbing(EngineId.BYEDPI)
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, socksPort = 1080)
+        advanceUntilIdle()
+
+        viewModel.onToggleApp("com.user.foo", checked = false)
+        advanceUntilIdle()
+
+        assertEquals(emptyList<String>(), dao.deletes)
+    }
+
+    @Test
     fun `onQuery filters apps case-insensitive`() = runTest {
         advanceUntilIdle()
 
@@ -372,6 +387,18 @@ class SplitTunnelViewModelTest {
         val state = viewModel.uiState.value as SplitTunnelUiState.Content
         assertEquals("foo", state.query)
         assertEquals(listOf("com.user.foo"), state.apps.map { it.packageName })
+    }
+
+    @Test
+    fun `onQuery blank keeps all apps`() = runTest {
+        advanceUntilIdle()
+
+        viewModel.onQuery("")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value as SplitTunnelUiState.Content
+        assertEquals("", state.query)
+        assertEquals(3, state.apps.size)
     }
 
     @Test
@@ -403,6 +430,52 @@ class SplitTunnelViewModelTest {
         assertEquals("foo", refreshed.query)
         assertEquals(1, refreshed.selectedCount)
         assertTrue(refreshed.apps.single { it.packageName == "com.user.foo" }.included)
+    }
+
+    @Test
+    fun `onResume triggers refreshApps`() = runTest {
+        val refreshProvider = RefreshCountingAppListProvider(sample)
+        val vm = SplitTunnelViewModel(refreshProvider, dao, settings, tunnelController)
+        advanceUntilIdle()
+
+        vm.onResume()
+        advanceUntilIdle()
+
+        assertEquals(1, refreshProvider.refreshCalls)
+    }
+
+    @Test
+    fun `loadIcon delegates to provider`() = runTest {
+        val icon = mockk<ImageBitmap>()
+        val provider = IconProvidingAppListProvider(sample, icon)
+        val vm = SplitTunnelViewModel(provider, dao, settings, tunnelController)
+        advanceUntilIdle()
+
+        assertEquals(icon, vm.loadIcon("com.user.foo"))
+    }
+
+    @Test
+    fun `loadIcon returns null when provider has no icon`() = runTest {
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.loadIcon("com.user.bar"))
+    }
+
+    @Test
+    fun `onQuery matches label and package name`() = runTest {
+        advanceUntilIdle()
+
+        viewModel.onQuery("sys")
+        advanceUntilIdle()
+
+        val byLabel = viewModel.uiState.value as SplitTunnelUiState.Content
+        assertEquals(listOf("com.android.system"), byLabel.apps.map { it.packageName })
+
+        viewModel.onQuery("bar")
+        advanceUntilIdle()
+
+        val byPackage = viewModel.uiState.value as SplitTunnelUiState.Content
+        assertEquals(listOf("com.user.bar"), byPackage.apps.map { it.packageName })
     }
 
     @Test
@@ -456,6 +529,32 @@ class SplitTunnelViewModelTest {
         fun complete(apps: List<InstalledApp>) {
             signal.complete(apps)
         }
+    }
+
+    private class RefreshCountingAppListProvider(apps: List<InstalledApp>) : AppListProvider {
+        private val events = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
+        private var currentApps = apps
+        var refreshCalls = 0
+        override val packageChanges: Flow<Unit> = events.asSharedFlow()
+        override suspend fun loadApps(): List<InstalledApp> = currentApps
+        override suspend fun refreshApps(): List<InstalledApp> {
+            refreshCalls += 1
+            return currentApps
+        }
+        override suspend fun loadIcon(packageName: String): androidx.compose.ui.graphics.ImageBitmap? = null
+    }
+
+    private class IconProvidingAppListProvider(
+        apps: List<InstalledApp>,
+        private val icon: ImageBitmap,
+    ) : AppListProvider {
+        private val events = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
+        private val currentApps = apps
+        override val packageChanges: Flow<Unit> = events.asSharedFlow()
+        override suspend fun loadApps(): List<InstalledApp> = currentApps
+        override suspend fun refreshApps(): List<InstalledApp> = currentApps
+        override suspend fun loadIcon(packageName: String): androidx.compose.ui.graphics.ImageBitmap? =
+            if (packageName == "com.user.foo") icon else null
     }
 
     private class RefreshGatedAppListProvider(initialApps: List<InstalledApp>) : AppListProvider {

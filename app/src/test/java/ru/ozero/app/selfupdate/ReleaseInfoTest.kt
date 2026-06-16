@@ -41,6 +41,18 @@ class ReleaseInfoTest {
     fun samePatch() = assertFalse(rel("v1.0.0").isNewerThan("v1.0.0"))
 
     @Test
+    fun olderMinor() = assertFalse(rel("v1.1.99").isNewerThan("v1.2.0"))
+
+    @Test
+    fun olderPatch() = assertFalse(rel("v1.0.0").isNewerThan("v1.0.1"))
+
+    @Test
+    fun invalidCurrentVersionRejectsUpdate() = assertFalse(rel("v2.0.0").isNewerThan("dev-build"))
+
+    @Test
+    fun invalidReleaseVersionRejectsUpdate() = assertFalse(rel("broken").isNewerThan("v1.0.0"))
+
+    @Test
     fun rcDoesNotInfluenceSemver() = assertFalse(rel("v1.0.0-rc1").isNewerThan("v1.0.0"))
 
     @Test

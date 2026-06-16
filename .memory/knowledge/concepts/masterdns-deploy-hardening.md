@@ -5,7 +5,7 @@ tags: [masterdns, ssh, deploy, docker, security, hardening]
 sources:
   - "daily/2026-05-23.md"
 created: 2026-05-23
-updated: 2026-05-23
+updated: 2026-06-12
 ---
 
 # MasterDNS SSH Deploy Hardening: Phase A-F Patterns

@@ -44,7 +44,15 @@ class BytesFormatterTest {
 
     @Test
     fun negativeBytes() {
+        assertEquals("-1 B", BytesFormatter.humanReadable(-1))
+        assertEquals("-1023 B", BytesFormatter.humanReadable(-1023))
         assertEquals("-1.0 KB", BytesFormatter.humanReadable(-1024))
+        assertEquals("-1.5 MB", BytesFormatter.humanReadable(-(1.5 * 1024 * 1024).toLong()))
+    }
+
+    @Test
+    fun petabyteScaleStaysAtLargestKnownUnit() {
+        assertEquals("1024.0 TB", BytesFormatter.humanReadable(1024L * 1024 * 1024 * 1024 * 1024))
     }
 
     @Test
@@ -56,8 +64,11 @@ class BytesFormatterTest {
     @Test
     fun perSecBytes() {
         assertEquals("100 B/s", BytesFormatter.humanReadablePerSec(100.0))
+        assertEquals("1023 B/s", BytesFormatter.humanReadablePerSec(1023.49))
         assertEquals("1.0 KB/s", BytesFormatter.humanReadablePerSec(1024.0))
         assertEquals("1.5 MB/s", BytesFormatter.humanReadablePerSec(1.5 * 1024 * 1024))
+        assertEquals("1.0 GB/s", BytesFormatter.humanReadablePerSec(1024.0 * 1024 * 1024))
+        assertEquals("1024.0 TB/s", BytesFormatter.humanReadablePerSec(1024.0 * 1024 * 1024 * 1024 * 1024))
     }
 
     @Test
@@ -77,5 +88,6 @@ class BytesFormatterTest {
     fun durationHms_hours() {
         assertEquals("1:00:00", BytesFormatter.durationHms(3_600_000))
         assertEquals("2:30:45", BytesFormatter.durationHms((2 * 3600 + 30 * 60 + 45) * 1000L))
+        assertEquals("24:00:00", BytesFormatter.durationHms(24 * 3_600_000L))
     }
 }

@@ -3,7 +3,7 @@ title: "URnetwork startup readiness vs runtime peer grace"
 sources:
   - "daily/2026-05-29.md"
 created: 2026-05-29
-updated: 2026-05-29
+updated: 2026-06-13
 ---
 # URnetwork startup readiness vs runtime peer grace
 ## Key Points
@@ -17,12 +17,16 @@ The regression pattern was `status=CONNECTING peers=0 deadline=300000ms`. The pr
 The stable contract is to separate startup from runtime. Startup should prove that attach/connect flow has actually been initiated and that the SDK reports a meaningful readiness signal. `peers=0` by itself is not a startup failure. After startup succeeds, a runtime grace window can allow peer discovery to continue without falsely killing the engine.
 
 `providerStateAdded` from `windowStatus` is an important signal because the reference URnetwork app uses it as part of runtime state. This concept is separate from relay/provide behavior in [[concepts/urnetwork-relay-provideenabled-sol-contract]] and should not be mixed with URnetwork relay diagnostics.
+
+The implemented fix kept the 5-minute peer grace but moved it to runtime health after `onEngineStarted()`. The startup gate became short and evidence-based, using attach/connect signals and `providerStateAdded`, so `CONNECTING peers=0` no longer blocked the lifecycle from reaching watchdog/recovery.
 ## Related Concepts
 - [[concepts/urnetwork-readiness-connectionstatus]] - Earlier readiness rule for accepting SDK `CONNECTED`.
 - [[concepts/urnetwork-provide-tun-investigation]] - Explains dummy IoLoop and provide-side behavior, separate from client readiness.
 - [[connections/startup-readiness-runtime-recovery-boundary]] - General startup/runtime boundary shared by multiple engines.
 - [[concepts/engine-poisoned-state-recovery-proof]] - Requires proving recovery without app restart.
+- [[connections/multi-engine-lifecycle-exitnode-regression-loop]] - Connects this fix with the broader 2026-05-29 runtime regression cycle.
 ## Sources
 - [[daily/2026-05-29]]: records the observed `CONNECTING peers=0 deadline=300000ms` pattern after `attachTun`.
 - [[daily/2026-05-29]]: records the agreed design of short startup readiness plus a 5-minute runtime peer grace.
 - [[daily/2026-05-29]]: records commit `310e86c4` implementing URnetwork readiness changes and pushing them to `dev`.
+- [[daily/2026-05-29]]: records that relay/provide behavior was intentionally excluded from the readiness patch.

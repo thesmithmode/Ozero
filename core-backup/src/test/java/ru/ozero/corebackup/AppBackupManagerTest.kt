@@ -30,6 +30,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@Suppress("LargeClass")
 class AppBackupManagerTest {
 
     private val ozeroDs = FakePreferencesDataStore()
@@ -184,6 +185,54 @@ class AppBackupManagerTest {
     }
 
     @Test
+    fun `export categories preserve dns byedpi and general settings independently`() = runTest {
+        ozeroDs.edit { prefs ->
+            prefs[SettingsKeys.SPLIT_MODE] = "per_app"
+            prefs[SettingsKeys.IPV6_ENABLED] = false
+            prefs[SettingsKeys.AUTO_START] = true
+            prefs[SettingsKeys.MANUAL_ENGINE] = "warp"
+            prefs[SettingsKeys.APP_MODE] = "VPN"
+            prefs[SettingsKeys.BYDPI_WINNING_ARGS] = "--split"
+            prefs[SettingsKeys.BYDPI_USE_UI_MODE] = false
+            prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON] = "{}"
+            prefs[SettingsKeys.BYDPI_DEFAULT_ACCEPTED] = true
+            prefs[SettingsKeys.CUSTOM_DNS_SERVERS] = "9.9.9.9"
+            prefs[SettingsKeys.HOSTS_MODE] = "CUSTOM"
+            prefs[SettingsKeys.HOSTS_LIST] = "127.0.0.1 example.test"
+            prefs[SettingsKeys.URNETWORK_ENABLED] = true
+            prefs[SettingsKeys.URNETWORK_JWT] = "legacy-jwt"
+            prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] = "PL"
+        }
+        fptnStore.inject { it.copy(token = " ") }
+
+        val data = manager.export(
+            setOf(
+                BackupCategory.GENERAL_SETTINGS,
+                BackupCategory.DNS_HOSTS,
+                BackupCategory.BYEDPI,
+            ),
+        )
+
+        assertEquals("per_app", data.settings.splitMode)
+        assertEquals(false, data.settings.ipv6Enabled)
+        assertEquals(true, data.settings.autoStart)
+        assertEquals("warp", data.settings.manualEngine)
+        assertEquals("VPN", data.settings.appMode)
+        assertEquals("--split", data.settings.bydpiWinningArgs)
+        assertEquals(false, data.settings.bydpiUseUiMode)
+        assertEquals("{}", data.settings.bydpiUiSettingsJson)
+        assertEquals(true, data.settings.bydpiDefaultAccepted)
+        assertEquals("9.9.9.9", data.settings.customDnsServers)
+        assertEquals("CUSTOM", data.settings.hostsMode)
+        assertEquals("127.0.0.1 example.test", data.settings.hostsList)
+        assertNull(data.settings.urnetworkEnabled)
+        assertNull(data.settings.urnetworkJwt)
+        assertNull(data.settings.urnetworkCountryCode)
+        assertNull(data.settings.fptnToken)
+        assertEquals(BackupUrnetwork(), data.urnetwork)
+    }
+
+    @Test
     fun `import — настройки записываются в DataStore`() = runTest {
         val data = makeMinimalBackup().copy(
             settings = BackupSettings(
@@ -280,10 +329,287 @@ class AppBackupManagerTest {
     }
 
     @Test
+    fun `import categories restore only dns and byedpi preferences when requested`() = runTest {
+        ozeroDs.edit { prefs ->
+            prefs[SettingsKeys.SPLIT_MODE] = "existing"
+            prefs[SettingsKeys.CUSTOM_DNS_SERVERS] = "1.1.1.1"
+            prefs[SettingsKeys.BYDPI_WINNING_ARGS] = "--old"
+        }
+        val data = makeMinimalBackup().copy(
+            settings = BackupSettings(
+                splitMode = "new-general",
+                ipv6Enabled = true,
+                autoStart = true,
+                manualEngine = "warp",
+                bydpiWinningArgs = "--new",
+                urnetworkEnabled = true,
+                urnetworkJwt = "urn",
+                customDnsServers = "9.9.9.9",
+                hostsMode = "CUSTOM",
+                hostsList = "127.0.0.1 example.test",
+                uiLocaleTag = "en",
+                appMode = "VPN",
+                bydpiUseUiMode = false,
+                bydpiUiSettingsJson = "{}",
+                bydpiDefaultAccepted = true,
+                urnetworkCountryCode = "DE",
+            ),
+        )
+
+        manager.import(data, setOf(BackupCategory.DNS_HOSTS, BackupCategory.BYEDPI))
+        val prefs = ozeroDs.data.first()
+
+        assertEquals("existing", prefs[SettingsKeys.SPLIT_MODE])
+        assertEquals("9.9.9.9", prefs[SettingsKeys.CUSTOM_DNS_SERVERS])
+        assertEquals("CUSTOM", prefs[SettingsKeys.HOSTS_MODE])
+        assertEquals("127.0.0.1 example.test", prefs[SettingsKeys.HOSTS_LIST])
+        assertEquals("--new", prefs[SettingsKeys.BYDPI_WINNING_ARGS])
+        assertEquals(false, prefs[SettingsKeys.BYDPI_USE_UI_MODE])
+        assertEquals("{}", prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON])
+        assertEquals(true, prefs[SettingsKeys.BYDPI_DEFAULT_ACCEPTED])
+        assertNull(prefs[SettingsKeys.URNETWORK_ENABLED])
+    }
+
+    @Test
+    fun `import general settings restores fptn token only when category is selected`() = runTest {
+        val data = makeMinimalBackup().copy(
+            settings = BackupSettings(
+                splitMode = "global",
+                ipv6Enabled = false,
+                autoStart = true,
+                manualEngine = "fptn",
+                bydpiWinningArgs = "--ignored",
+                urnetworkEnabled = true,
+                urnetworkJwt = "ignored",
+                customDnsServers = "ignored",
+                hostsMode = "ignored",
+                hostsList = "ignored",
+                uiLocaleTag = "en",
+                appMode = "VPN",
+                fptnToken = "persisted-token",
+            ),
+        )
+
+        manager.import(data, setOf(BackupCategory.DNS_HOSTS))
+        assertEquals("", fptnStore.currentConfig().token)
+
+        manager.import(data, setOf(BackupCategory.GENERAL_SETTINGS))
+
+        val prefs = ozeroDs.data.first()
+        assertEquals("global", prefs[SettingsKeys.SPLIT_MODE])
+        assertEquals("fptn", prefs[SettingsKeys.MANUAL_ENGINE])
+        assertEquals("persisted-token", fptnStore.currentConfig().token)
+        assertEquals("ignored", prefs[SettingsKeys.CUSTOM_DNS_SERVERS])
+        assertNull(prefs[SettingsKeys.URNETWORK_ENABLED])
+    }
+
+    @Test
+    fun `import general settings ignores blank fptn token`() = runTest {
+        fptnStore.inject { it.copy(token = "existing-token") }
+        manager.import(
+            makeMinimalBackup().copy(
+                settings = BackupSettings(
+                    splitMode = null,
+                    ipv6Enabled = null,
+                    autoStart = null,
+                    manualEngine = null,
+                    bydpiWinningArgs = null,
+                    urnetworkEnabled = null,
+                    urnetworkJwt = null,
+                    customDnsServers = null,
+                    hostsMode = null,
+                    hostsList = null,
+                    uiLocaleTag = null,
+                    appMode = null,
+                    fptnToken = " ",
+                ),
+            ),
+        )
+
+        assertEquals("existing-token", fptnStore.currentConfig().token)
+    }
+
+    @Test
+    fun `import urnetwork ignores invalid seed and preserves current nullable fields`() = runTest {
+        urnStore.inject {
+            it.copy(
+                byJwt = "old-jwt",
+                windowType = UrnetworkWindowType.QUALITY,
+                fixedIpSize = true,
+                allowDirect = false,
+                provideEnabled = false,
+                provideControlMode = UrnetworkProvideControlMode.ALWAYS,
+                provideNetworkMode = UrnetworkProvideNetworkMode.WIFI,
+                selectedLocation = UrnetworkLocationSelection("US", "CA", "LA"),
+            )
+        }
+        val beforeSeed = urnIdentity.pubkeyBase58()
+
+        manager.import(
+            makeMinimalBackup().copy(
+                urnetwork = BackupUrnetwork(
+                    deviceSeed = "bad",
+                    selectedLocation = BackupUrnetworkLocation(null, "Region", "City"),
+                ),
+            ),
+            setOf(BackupCategory.URNETWORK),
+        )
+
+        val cfg = urnStore.config().first()
+        assertEquals("old-jwt", cfg.byJwt)
+        assertEquals(UrnetworkWindowType.QUALITY, cfg.windowType)
+        assertEquals(true, cfg.fixedIpSize)
+        assertEquals(false, cfg.allowDirect)
+        assertEquals(false, cfg.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, cfg.provideControlMode)
+        assertEquals(UrnetworkProvideNetworkMode.WIFI, cfg.provideNetworkMode)
+        assertEquals(null, cfg.selectedLocation.countryCode)
+        assertEquals("Region", cfg.selectedLocation.region)
+        assertEquals("City", cfg.selectedLocation.city)
+        assertEquals(beforeSeed, urnIdentity.pubkeyBase58())
+    }
+
+    @Test
+    fun `import urnetwork applies raw enum values and decoded seed`() = runTest {
+        val importedIdentity = InMemoryUrnetworkDeviceIdentity(ByteArray(32) { 0 })
+        val importingManager = AppBackupManager(
+            ozeroDs,
+            warpStore,
+            urnStore,
+            splitDao,
+            fptnStore,
+            urnetworkDeviceIdentity = importedIdentity,
+        )
+
+        importingManager.import(
+            makeMinimalBackup().copy(
+                urnetwork = BackupUrnetwork(
+                    deviceSeed = manager.export().urnetwork.deviceSeed,
+                    windowType = "speed",
+                    fixedIpSize = false,
+                    allowDirect = true,
+                    provideEnabled = true,
+                    provideControlMode = "always",
+                    provideNetworkMode = "public",
+                ),
+            ),
+            setOf(BackupCategory.URNETWORK),
+        )
+
+        val cfg = urnStore.config().first()
+        assertEquals(UrnetworkWindowType.SPEED, cfg.windowType)
+        assertEquals(false, cfg.fixedIpSize)
+        assertEquals(true, cfg.allowDirect)
+        assertEquals(true, cfg.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, cfg.provideControlMode)
+        assertEquals(UrnetworkProvideNetworkMode.WIFI, cfg.provideNetworkMode)
+        assertEquals(urnIdentity.pubkeyBase58(), importedIdentity.pubkeyBase58())
+    }
+
+    @Test
     fun `import — WARP пустой — replaceAll не вызывается`() = runTest {
         warpStore.slots.value = listOf(sampleWarpSlot)
         manager.import(makeMinimalBackup())
         assertEquals(listOf(sampleWarpSlot), warpStore.slots.value)
+    }
+
+    @Test
+    fun `import warp restores optional amnezia values when present`() = runTest {
+        val slot = BackupWarpSlot(
+            id = "slot-id",
+            name = "Renamed",
+            isActive = false,
+            privateKey = "priv",
+            publicKey = "pub",
+            peerPublicKey = "peer",
+            peerEndpoint = "1.2.3.4:2408",
+            interfaceAddressV4 = "172.16.0.2/32",
+            interfaceAddressV6 = "2606:4700:110::2/128",
+            accountLicense = "license",
+            mtu = 1400,
+            dnsServers = listOf("9.9.9.9"),
+            keepaliveSeconds = 30,
+            awgJc = 1,
+            awgJmin = 2,
+            awgJmax = 3,
+            awgS1 = 4,
+            awgS2 = 5,
+            awgH1 = 6L,
+            awgH2 = 7L,
+            awgH3 = 8L,
+            awgH4 = 9L,
+            awgS3 = 10,
+            awgS4 = 11,
+            awgI1 = 12,
+            awgI2 = 13,
+            awgI3 = 14,
+            awgI4 = 15,
+            awgI5 = 16,
+            awgI1Hex = "0c",
+            awgI2Hex = "0d",
+            awgI3Hex = "0e",
+            awgI4Hex = "0f",
+            awgI5Hex = "10",
+        )
+
+        manager.import(makeMinimalBackup().copy(warpSlots = listOf(slot)), setOf(BackupCategory.WARP))
+
+        val restored = warpStore.slots.value.single()
+        assertEquals("slot-id", restored.id)
+        assertEquals("Renamed", restored.name)
+        assertEquals(false, restored.isActive)
+        assertEquals(1400, restored.config.mtu)
+        assertEquals(listOf("9.9.9.9"), restored.config.dnsServers)
+        assertEquals(10, restored.config.awgParams.underloadPacketJunkSize)
+        assertEquals(16, restored.config.awgParams.payloadPacketSizeCount3)
+        assertEquals("0c", restored.config.awgParams.payloadHexI1)
+        assertEquals("10", restored.config.awgParams.payloadHexI5)
+    }
+
+    @Test
+    fun `import warp uses awg defaults when optional amnezia values are absent`() = runTest {
+        manager.import(
+            makeMinimalBackup().copy(
+                warpSlots = listOf(
+                    BackupWarpSlot(
+                        id = "slot-id",
+                        name = "Defaulted",
+                        isActive = true,
+                        privateKey = "priv",
+                        publicKey = "pub",
+                        peerPublicKey = "peer",
+                        peerEndpoint = "1.2.3.4:2408",
+                        interfaceAddressV4 = "172.16.0.2/32",
+                        interfaceAddressV6 = "2606:4700:110::2/128",
+                        accountLicense = "",
+                        mtu = 1280,
+                        dnsServers = emptyList(),
+                        keepaliveSeconds = 25,
+                        awgJc = 1,
+                        awgJmin = 2,
+                        awgJmax = 3,
+                        awgS1 = 4,
+                        awgS2 = 5,
+                        awgH1 = 6L,
+                        awgH2 = 7L,
+                        awgH3 = 8L,
+                        awgH4 = 9L,
+                    ),
+                ),
+            ),
+            setOf(BackupCategory.WARP),
+        )
+
+        val awg = warpStore.slots.value.single().config.awgParams
+        assertEquals(AwgParams.DEFAULT_S3, awg.underloadPacketJunkSize)
+        assertEquals(AwgParams.DEFAULT_S4, awg.payloadPacketJunkSize)
+        assertEquals(AwgParams.DEFAULT_I1, awg.payloadPacketSizeCount1)
+        assertEquals(AwgParams.DEFAULT_I2, awg.payloadPacketSizeCount2)
+        assertEquals(AwgParams.DEFAULT_I3, awg.specialJunk3)
+        assertEquals(AwgParams.DEFAULT_I4, awg.specialJunk4)
+        assertEquals(AwgParams.DEFAULT_I5, awg.payloadPacketSizeCount3)
+        assertNull(awg.payloadHexI1)
+        assertNull(awg.payloadHexI5)
     }
 
     @Test

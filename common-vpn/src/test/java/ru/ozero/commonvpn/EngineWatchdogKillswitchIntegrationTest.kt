@@ -5,7 +5,6 @@ import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -26,6 +25,8 @@ class EngineWatchdogKillswitchIntegrationTest {
         scope: CoroutineScope,
         killswitch: Boolean,
         tunFd: ParcelFileDescriptor?,
+        lockdownStartupFd: ParcelFileDescriptor? = null,
+        stopping: Boolean = false,
         stopVpnInvocations: AtomicReference<Int>,
     ): EngineWatchdogCoordinator {
         val healthMonitor = HealthMonitor()
@@ -33,7 +34,7 @@ class EngineWatchdogKillswitchIntegrationTest {
         val notificationFactory = mockk<OzeroNotificationFactory>(relaxed = true)
         val tunFdRef = AtomicReference<ParcelFileDescriptor?>(tunFd)
         val statsJobRef = AtomicReference<Job?>(null)
-        val stopping = AtomicBoolean(false)
+        val stopping = AtomicBoolean(stopping)
         val starting = AtomicBoolean(false)
         return EngineWatchdogCoordinator(
             scope = scope,
@@ -43,6 +44,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             chainOrchestrator = chainOrchestrator,
             notificationFactory = notificationFactory,
             tunFdRef = tunFdRef,
+            lockdownStartupFdRef = AtomicReference(lockdownStartupFd),
             statsJobRef = statsJobRef,
             stopping = stopping,
             starting = starting,
@@ -54,7 +56,61 @@ class EngineWatchdogKillswitchIntegrationTest {
     }
 
     @Test
-    fun `handleEngineFailure killswitch=true + fdAlive — observer видит killswitchActive=true и Failed state`() =
+    fun `startup lockdown keeps killswitch active without stopVpn`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = TunnelController()
+            controller.onProbing(EngineId.WARP)
+            controller.onConnecting(EngineId.WARP)
+
+            val stopVpnCount = AtomicReference(0)
+            val lockdownFd = mockk<ParcelFileDescriptor>(relaxed = true)
+            val watchdog = buildWatchdog(
+                controller = controller,
+                scope = backgroundScope,
+                killswitch = true,
+                tunFd = null,
+                lockdownStartupFd = lockdownFd,
+                stopVpnInvocations = stopVpnCount,
+            )
+
+            watchdog.handleEngineFailure(EngineId.WARP, "startup failed")
+
+            assertTrue(
+                controller.killswitchActive.value,
+                "startup lockdown fd РґРѕР»Р¶РµРЅ СЃС‡РёС‚Р°С‚СЊСЃСЏ blocking TUN, РёРЅР°С‡Рµ fail-closed С‚РµСЂСЏРµС‚СЃСЏ РґРѕ РѕСЃРЅРѕРІРЅРѕРіРѕ tunFd.",
+            )
+            assertEquals(
+                0,
+                stopVpnCount.get(),
+                "РџСЂРё Р¶РёРІРѕРј startup lockdown fd РЅРµР»СЊР·СЏ РІС‹Р·С‹РІР°С‚СЊ stopVpnRequest: СЌС‚Рѕ СЃРЅРёРјР°РµС‚ Р±Р»РѕРєРёСЂРѕРІРєСѓ С‚СЂР°С„РёРєР°.",
+            )
+        }
+
+    @Test
+    fun `runtime restart without blocking fd falls back to stopVpn`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = TunnelController()
+            controller.onProbing(EngineId.WARP)
+            controller.onConnecting(EngineId.WARP)
+
+            val stopVpnCount = AtomicReference(0)
+            val watchdog = buildWatchdog(
+                controller = controller,
+                scope = backgroundScope,
+                killswitch = true,
+                tunFd = null,
+                stopVpnInvocations = stopVpnCount,
+            )
+
+            watchdog.handleEngineFailure(EngineId.WARP, "runtime restart gap")
+
+            assertFalse(controller.killswitchActive.value)
+            assertEquals(1, stopVpnCount.get())
+            assertIs<TunnelState.Failed>(controller.state.value)
+        }
+
+    @Test
+    fun `fd alive keeps killswitch active and failed state`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
             controller.onProbing(EngineId.WARP)
@@ -67,7 +123,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             val fakeFd = mockk<ParcelFileDescriptor>(relaxed = true)
             val watchdog = buildWatchdog(
                 controller = controller,
-                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                scope = backgroundScope,
                 killswitch = true,
                 tunFd = fakeFd,
                 stopVpnInvocations = stopVpnCount,
@@ -77,91 +133,61 @@ class EngineWatchdogKillswitchIntegrationTest {
 
             assertTrue(
                 controller.killswitchActive.value,
-                "killswitchActive обязан стать true после enterKillswitchMode — иначе UI не знает " +
-                    "что трафик заблокирован.",
+                "killswitchActive must stay true after enterKillswitchMode.",
             )
             val state = controller.state.value
-            assertIs<TunnelState.Failed>(state, "Tunnel state обязан перейти в Failed.")
+            assertIs<TunnelState.Failed>(state, "Tunnel state РѕР±СЏР·Р°РЅ РїРµСЂРµР№С‚Рё РІ Failed.")
             assertEquals(EngineId.WARP, state.engineId)
             assertTrue(
                 state.reason.contains("remote-binder-died"),
-                "Failed.reason обязан содержать переданный reason. Got: ${state.reason}",
+                "Failed.reason РѕР±СЏР·Р°РЅ СЃРѕРґРµСЂР¶Р°С‚СЊ РїРµСЂРµРґР°РЅРЅС‹Р№ reason. Got: ${state.reason}",
             )
             assertEquals(
                 0,
                 stopVpnCount.get(),
-                "stopVpnRequest НЕ должен вызываться при killswitch=true — chain должен остаться " +
-                    "остановленным но VPN service сохраняется для UI lockdown notification.",
+                "stopVpnRequest must stay silent while killswitch=true.",
             )
         }
 
     @Test
-    fun `handleEngineFailure killswitch=false — observer видит Failed но НЕ killswitchActive`() =
+    fun `stopping state prevents re-entering shutdown`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
-            controller.onProbing(EngineId.BYEDPI)
-            controller.onConnecting(EngineId.BYEDPI)
-            controller.onEngineStarted(EngineId.BYEDPI, socksPort = 1080)
+            controller.onProbing(EngineId.WARP)
+            controller.onConnecting(EngineId.WARP)
+            controller.onEngineStarted(EngineId.WARP, socksPort = 0)
+            controller.onDisconnecting()
 
             val stopVpnCount = AtomicReference(0)
             val fakeFd = mockk<ParcelFileDescriptor>(relaxed = true)
             val watchdog = buildWatchdog(
                 controller = controller,
-                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
-                killswitch = false,
-                tunFd = fakeFd,
-                stopVpnInvocations = stopVpnCount,
-            )
-
-            watchdog.handleEngineFailure(EngineId.BYEDPI, "engine died")
-
-            assertFalse(
-                controller.killswitchActive.value,
-                "killswitchActive обязан остаться false при killswitch=off — graceful shutdown branch.",
-            )
-            assertIs<TunnelState.Failed>(
-                controller.state.value,
-                "Failed state обязан выставиться через onEngineDied.",
-            )
-            assertEquals(
-                1,
-                stopVpnCount.get(),
-                "stopVpnRequest обязан вызваться ровно один раз — graceful VPN shutdown.",
-            )
-        }
-
-    @Test
-    fun `handleEngineFailure killswitch=true + fdAlive=null — fallback на stopVpnRequest, не lockdown`() =
-        runTest(UnconfinedTestDispatcher()) {
-            val controller = TunnelController()
-            controller.onProbing(EngineId.URNETWORK)
-            controller.onConnecting(EngineId.URNETWORK)
-            controller.onEngineStarted(EngineId.URNETWORK, socksPort = 0)
-
-            val stopVpnCount = AtomicReference(0)
-            val watchdog = buildWatchdog(
-                controller = controller,
-                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                scope = backgroundScope,
                 killswitch = true,
-                tunFd = null,
+                tunFd = fakeFd,
+                stopping = true,
                 stopVpnInvocations = stopVpnCount,
             )
 
-            watchdog.handleEngineFailure(EngineId.URNETWORK, "io-loop-ended")
+            watchdog.handleEngineFailure(EngineId.WARP, "remote-binder-died")
 
             assertFalse(
                 controller.killswitchActive.value,
-                "killswitchActive обязан остаться false когда fdAlive=null — нет TUN для lockdown.",
+                "killswitchActive РѕР±СЏР·Р°РЅ РѕСЃС‚Р°С‚СЊСЃСЏ false РїСЂРё С€С‚Р°С‚РЅРѕР№ РѕСЃС‚Р°РЅРѕРІРєРµ, РґР°Р¶Рµ РµСЃР»Рё fd РµС‰С‘ Р¶РёРІРѕР№.",
+            )
+            assertIs<TunnelState.Disconnecting>(
+                controller.state.value,
+                "Engine failure РІРѕ РІСЂРµРјСЏ stopping РЅРµ РґРѕР»Р¶РµРЅ РїСЂРµРІСЂР°С‰Р°С‚СЊ Disconnecting РІ Failed.",
             )
             assertEquals(
-                1,
+                0,
                 stopVpnCount.get(),
-                "stopVpnRequest обязан вызваться когда нет fdAlive — VPN service нужно остановить.",
+                "Р’Рѕ РІСЂРµРјСЏ stopping watchdog РЅРµ РґРѕР»Р¶РµРЅ РїРѕРІС‚РѕСЂРЅРѕ РІС…РѕРґРёС‚СЊ РІ stopVpnRequest.",
             )
         }
 
     @Test
-    fun `onKillswitchReleased сбрасывает killswitchActive — UI может вернуться в Idle`() =
+    fun `handleEngineFailure ignores inactive sidecar engine without killswitch or stop`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = TunnelController()
             controller.onProbing(EngineId.WARP)
@@ -172,7 +198,149 @@ class EngineWatchdogKillswitchIntegrationTest {
             val fakeFd = mockk<ParcelFileDescriptor>(relaxed = true)
             val watchdog = buildWatchdog(
                 controller = controller,
-                scope = CoroutineScope(UnconfinedTestDispatcher() + SupervisorJob()),
+                scope = backgroundScope,
+                killswitch = true,
+                tunFd = fakeFd,
+                stopVpnInvocations = stopVpnCount,
+            )
+
+            watchdog.handleEngineFailure(EngineId.URNETWORK, "relay io-loop-ended")
+
+            assertFalse(controller.killswitchActive.value)
+            assertEquals(0, stopVpnCount.get())
+            val state = controller.state.value
+            assertIs<TunnelState.Connected>(state)
+            assertEquals(EngineId.WARP, state.engineId)
+        }
+
+    @Test
+    fun `handleEngineFailure treats probing without engine id as active startup failure`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = TunnelController()
+            controller.onProbing()
+
+            val stopVpnCount = AtomicReference(0)
+            val watchdog = buildWatchdog(
+                controller = controller,
+                scope = backgroundScope,
+                killswitch = false,
+                tunFd = null,
+                stopVpnInvocations = stopVpnCount,
+            )
+
+            val handled = watchdog.handleEngineFailure(EngineId.WARP, "startup probe failed")
+
+            assertFalse(handled)
+            assertEquals(1, stopVpnCount.get())
+            val state = controller.state.value
+            assertIs<TunnelState.Failed>(state)
+            assertEquals(EngineId.WARP, state.engineId)
+        }
+
+    @Test
+    fun `handleEngineFailure ignores failure for different engine after failed state`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = TunnelController()
+            controller.onProbing(EngineId.WARP)
+            controller.onConnecting(EngineId.WARP)
+            controller.onEngineDied(EngineId.WARP, "first failure")
+
+            val stopVpnCount = AtomicReference(0)
+            val watchdog = buildWatchdog(
+                controller = controller,
+                scope = backgroundScope,
+                killswitch = false,
+                tunFd = null,
+                stopVpnInvocations = stopVpnCount,
+            )
+
+            val handled = watchdog.handleEngineFailure(EngineId.BYEDPI, "sidecar failure")
+
+            assertFalse(handled)
+            assertEquals(0, stopVpnCount.get())
+            val state = controller.state.value
+            assertIs<TunnelState.Failed>(state)
+            assertEquals(EngineId.WARP, state.engineId)
+        }
+
+    @Test
+    fun `handleEngineFailure killswitch=false вЂ” observer РІРёРґРёС‚ Failed РЅРѕ РќР• killswitchActive`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = TunnelController()
+            controller.onProbing(EngineId.BYEDPI)
+            controller.onConnecting(EngineId.BYEDPI)
+            controller.onEngineStarted(EngineId.BYEDPI, socksPort = 1080)
+
+            val stopVpnCount = AtomicReference(0)
+            val fakeFd = mockk<ParcelFileDescriptor>(relaxed = true)
+            val watchdog = buildWatchdog(
+                controller = controller,
+                scope = backgroundScope,
+                killswitch = false,
+                tunFd = fakeFd,
+                stopVpnInvocations = stopVpnCount,
+            )
+
+            watchdog.handleEngineFailure(EngineId.BYEDPI, "engine died")
+
+            assertFalse(
+                controller.killswitchActive.value,
+                "killswitchActive РѕР±СЏР·Р°РЅ РѕСЃС‚Р°С‚СЊСЃСЏ false РїСЂРё killswitch=off вЂ” graceful shutdown branch.",
+            )
+            assertIs<TunnelState.Failed>(
+                controller.state.value,
+                "Failed state РѕР±СЏР·Р°РЅ РІС‹СЃС‚Р°РІРёС‚СЊСЃСЏ С‡РµСЂРµР· onEngineDied.",
+            )
+            assertEquals(
+                1,
+                stopVpnCount.get(),
+                "stopVpnRequest РѕР±СЏР·Р°РЅ РІС‹Р·РІР°С‚СЊСЃСЏ СЂРѕРІРЅРѕ РѕРґРёРЅ СЂР°Р· вЂ” graceful VPN shutdown.",
+            )
+        }
+
+    @Test
+    fun `handleEngineFailure killswitch=true + fdAlive=null вЂ” fallback РЅР° stopVpnRequest, РЅРµ lockdown`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = TunnelController()
+            controller.onProbing(EngineId.URNETWORK)
+            controller.onConnecting(EngineId.URNETWORK)
+            controller.onEngineStarted(EngineId.URNETWORK, socksPort = 0)
+
+            val stopVpnCount = AtomicReference(0)
+            val watchdog = buildWatchdog(
+                controller = controller,
+                scope = backgroundScope,
+                killswitch = true,
+                tunFd = null,
+                stopVpnInvocations = stopVpnCount,
+            )
+
+            watchdog.handleEngineFailure(EngineId.URNETWORK, "io-loop-ended")
+
+            assertFalse(
+                controller.killswitchActive.value,
+                "killswitchActive РѕР±СЏР·Р°РЅ РѕСЃС‚Р°С‚СЊСЃСЏ false РєРѕРіРґР° fdAlive=null вЂ” РЅРµС‚ TUN РґР»СЏ lockdown.",
+            )
+            assertEquals(
+                1,
+                stopVpnCount.get(),
+                "stopVpnRequest РѕР±СЏР·Р°РЅ РІС‹Р·РІР°С‚СЊСЃСЏ РєРѕРіРґР° РЅРµС‚ fdAlive вЂ” VPN service РЅСѓР¶РЅРѕ РѕСЃС‚Р°РЅРѕРІРёС‚СЊ.",
+            )
+        }
+
+    @Test
+    fun `onKillswitchReleased СЃР±СЂР°СЃС‹РІР°РµС‚ killswitchActive вЂ” UI РјРѕР¶РµС‚ РІРµСЂРЅСѓС‚СЊСЃСЏ РІ Idle`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = TunnelController()
+            controller.onProbing(EngineId.WARP)
+            controller.onConnecting(EngineId.WARP)
+            controller.onEngineStarted(EngineId.WARP, socksPort = 0)
+
+            val stopVpnCount = AtomicReference(0)
+            val fakeFd = mockk<ParcelFileDescriptor>(relaxed = true)
+            val watchdog = buildWatchdog(
+                controller = controller,
+                scope = backgroundScope,
                 killswitch = true,
                 tunFd = fakeFd,
                 stopVpnInvocations = stopVpnCount,
@@ -185,7 +353,7 @@ class EngineWatchdogKillswitchIntegrationTest {
 
             assertFalse(
                 controller.killswitchActive.value,
-                "onKillswitchReleased обязан сбросить killswitchActive — иначе UI блокируется навсегда.",
+                "onKillswitchReleased РѕР±СЏР·Р°РЅ СЃР±СЂРѕСЃРёС‚СЊ killswitchActive вЂ” РёРЅР°С‡Рµ UI Р±Р»РѕРєРёСЂСѓРµС‚СЃСЏ РЅР°РІСЃРµРіРґР°.",
             )
         }
 }

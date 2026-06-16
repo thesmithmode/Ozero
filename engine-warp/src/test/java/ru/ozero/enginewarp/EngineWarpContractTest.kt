@@ -71,9 +71,54 @@ class EngineWarpContractTest {
     }
 
     @Test
+    fun `preflight before start uses fallback target`() = runTest {
+        val (e, _, _) = engine()
+        val (host, port) = (e.preflight() as WarpPreflight).resolveTarget()
+        assertEquals("1.1.1.1", host)
+        assertEquals(443, port)
+    }
+
+    @Test
     fun `EngineWarp implements TunFdAcceptor`() {
         val (e, _, _) = engine()
         assertTrue(e is TunFdAcceptor)
+    }
+
+    @Test
+    fun `tunSpec rawIni keeps DNS Address MTU and AllowedIPs from one conf`() = runTest {
+        val raw = """
+            [Interface]
+            PrivateKey = raw-private
+            Address = 172.16.9.2/32, 2606:4700:110::9/128
+            DNS = 176.99.11.77, 80.78.247.254, 2a00:f940:2:4:2::5d1b
+            MTU = 1280
+
+            [Peer]
+            PublicKey = raw-peer
+            AllowedIPs = 203.0.113.0/24, 2001:db8:feed::/48
+            Endpoint = 162.159.192.1:4500
+            PersistentKeepalive = 25
+        """.trimIndent()
+        val staleSlotConfig = sampleConfig.copy(
+            interfaceAddressV4 = "10.10.10.10/32",
+            interfaceAddressV6 = "2001:db8::1/128",
+            dnsServers = listOf("1.1.1.1"),
+            allowedIps = listOf("0.0.0.0/0", "::/0"),
+        )
+        val (e, _, _) = engine(activeConfig = staleSlotConfig, activeRawIni = raw, ipv6Enabled = true)
+
+        val spec = e.tunSpec()!!
+
+        assertEquals("172.16.9.2", spec.ipv4Address)
+        assertEquals("2606:4700:110::9", spec.ipv6Address)
+        assertEquals(
+            listOf("176.99.11.77", "80.78.247.254", "2a00:f940:2:4:2::5d1b"),
+            spec.dnsServers,
+        )
+        assertEquals(false, spec.routeAllV4)
+        assertEquals(listOf("203.0.113.0/24"), spec.routeCidrsV4)
+        assertEquals(false, spec.routeAllV6)
+        assertEquals(listOf("2001:db8:feed::/48"), spec.routeCidrsV6)
     }
 
     @Test
@@ -86,11 +131,37 @@ class EngineWarpContractTest {
     }
 
     @Test
+    fun `preflight after start resolves configured peer endpoint`() = runTest {
+        val (e, _, _) = engine(activeConfig = sampleConfig)
+        val startResult = e.start(EngineConfig.Warp, Upstream.None)
+        assertIs<StartResult.Success>(startResult)
+        val (host, port) = (e.preflight() as WarpPreflight).resolveTarget()
+        assertEquals("162.159.192.1", host)
+        assertEquals(443, port)
+    }
+
+    @Test
     fun `start с active config пропускает register`() = runTest {
         val (e, auto, _) = engine(activeConfig = sampleConfig)
         val r = e.start(EngineConfig.Warp, Upstream.None)
         assertIs<StartResult.Success>(r)
         assertEquals(0, auto.registerCalls)
+    }
+
+    @Test
+    fun `start without cached config resolves fresh and cached start skips auto register`() = runTest {
+        val (e, auto, store) = engine(
+            activeConfig = null,
+            autoConfigResult = Result.success(RegisteredWarpConfig(sampleConfig, "[Interface]\n[Peer]\n")),
+        )
+
+        val first = e.start(EngineConfig.Warp, Upstream.None)
+        store.clear()
+        val second = e.start(EngineConfig.Warp, Upstream.None)
+
+        assertIs<StartResult.Success>(first)
+        assertIs<StartResult.Success>(second)
+        assertEquals(1, auto.registerCalls)
     }
 
     @Test

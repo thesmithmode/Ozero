@@ -16,11 +16,12 @@ class SingboxHttp204RoutedProbe(
     private val probeUrl: URL = URL(PROBE_URL),
     private val socksHost: String = LOOPBACK,
     private val timeoutMs: Int = DEFAULT_TIMEOUT_MS,
+    private val nanoTime: () -> Long = System::nanoTime,
 ) : SingboxRoutedProbe {
 
     override suspend fun probeLatencyMs(socksPort: Int): Long = withContext(Dispatchers.IO) {
         if (socksPort <= 0) return@withContext LATENCY_FAILED
-        val start = System.nanoTime()
+        val start = nanoTime()
         runCatching {
             val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress(socksHost, socksPort))
             val connection = probeUrl.openConnection(proxy) as HttpURLConnection
@@ -32,7 +33,7 @@ class SingboxHttp204RoutedProbe(
                 connection.readTimeout = timeoutMs
                 val code = connection.responseCode
                 if (code == HttpURLConnection.HTTP_NO_CONTENT) {
-                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start).coerceAtLeast(1L)
+                    TimeUnit.NANOSECONDS.toMillis(nanoTime() - start).coerceAtLeast(1L)
                 } else {
                     LATENCY_FAILED
                 }

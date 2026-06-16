@@ -5,7 +5,7 @@ tags: [singbox, android, configuration, breaking-change]
 sources:
   - "daily/2026-05-26.md"
 created: 2026-05-26
-updated: 2026-05-26
+updated: 2026-06-13
 ---
 
 # Sing-box: dns Outbound Type Deprecated in 1.13.0
@@ -68,6 +68,7 @@ The Ozero v0.2.8/v0.2.9 device test log showed 3 consecutive SIGABRTs in `:engin
 - [[concepts/singbox-splithttp-unsupported]] - Companion deprecation issue found in the same log analysis
 - [[concepts/singbox-engine-design]] - Sing-box engine architecture and config generation
 - [[concepts/singbox-subscription-architecture]] - Subscription parser that needs to filter deprecated outbound types
+- [[connections/singbox-ui-ci-diagnostic-feedback-loop]] - Wider diagnostic loop for parser compatibility, crash evidence, and CI validation
 
 ## Sources
 

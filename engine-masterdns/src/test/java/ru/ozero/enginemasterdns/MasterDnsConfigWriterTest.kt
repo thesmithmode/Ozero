@@ -119,4 +119,21 @@ class MasterDnsConfigWriterTest {
         assertTrue(toml.contains("LISTEN_PORT = 18800"))
         assertFalse(toml.contains("Listen_Port = 7777"))
     }
+
+    @Test
+    fun `blank source lines trimmed before overrides appended`(@TempDir tmp: Path) {
+        val writer = MasterDnsConfigWriter(File(tmp.toFile(), "masterdns"))
+        val runtime = MasterDnsRuntimeConfig(
+            configToml = "DOMAINS = [\"v\"]\n\n",
+            resolvers = emptyList(),
+            socksPort = 18800,
+        )
+
+        val files = writer.write(runtime)
+
+        val toml = File(files.configPath).readText()
+        assertTrue(toml.contains("DOMAINS = [\"v\"]"))
+        assertTrue(toml.contains("LISTEN_PORT = 18800"))
+        assertTrue(toml.endsWith("LOCAL_DNS_ENABLED = false\n"))
+    }
 }

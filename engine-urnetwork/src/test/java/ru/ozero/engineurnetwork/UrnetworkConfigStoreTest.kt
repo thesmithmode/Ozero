@@ -3,13 +3,17 @@ package ru.ozero.engineurnetwork
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.mutablePreferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class UrnetworkConfigStoreTest {
 
@@ -259,9 +263,445 @@ class UrnetworkConfigStoreTest {
         assertEquals("Munich", snap.city)
     }
 
+    @Test
+    fun `config persists enum and boolean branches`() = runTest {
+        val (store, _) = newStore()
+
+        store.update {
+            it.copy(
+                windowType = UrnetworkWindowType.SPEED,
+                fixedIpSize = true,
+                allowDirect = false,
+                provideEnabled = false,
+                provideControlMode = UrnetworkProvideControlMode.AUTO,
+                provideNetworkMode = UrnetworkProvideNetworkMode.ALL,
+            )
+        }
+
+        val snap = store.config().first()
+        assertEquals(UrnetworkWindowType.SPEED, snap.windowType)
+        assertEquals(true, snap.fixedIpSize)
+        assertEquals(false, snap.allowDirect)
+        assertEquals(false, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(UrnetworkProvideNetworkMode.ALL, snap.provideNetworkMode)
+    }
+
+    @Test
+    fun `cached locations roundtrip all buckets and optional fields`() = runTest {
+        val (store, _) = newStore()
+        val country = UrnetworkCachedLocation(
+            name = "Germany",
+            countryCode = "de",
+            providerCount = 12,
+            isStable = false,
+            isStrongPrivacy = true,
+        )
+        val region = UrnetworkCachedLocation(
+            name = "Bavaria",
+            countryCode = "DE",
+            region = "Bavaria",
+            providerCount = 3,
+        )
+        val city = UrnetworkCachedLocation(
+            name = "Munich",
+            countryCode = "DE",
+            region = "Bavaria",
+            city = "Munich",
+            providerCount = 2,
+        )
+        val best = UrnetworkCachedLocation(
+            name = "Best",
+            countryCode = "US",
+            city = "New York",
+            isStrongPrivacy = true,
+        )
+
+        store.setCachedLocations(
+            countries = listOf(country),
+            regions = listOf(region),
+            cities = listOf(city),
+            bestMatches = listOf(best),
+        )
+
+        val snap = store.config().first()
+        assertEquals("DE", snap.cachedCountries.single().countryCode)
+        assertEquals(false, snap.cachedCountries.single().isStable)
+        assertEquals(true, snap.cachedCountries.single().isStrongPrivacy)
+        assertEquals("Bavaria", snap.cachedRegions.single().region)
+        assertEquals("Munich", snap.cachedCities.single().city)
+        assertEquals("New York", snap.cachedBestMatches.single().city)
+    }
+
+    @Test
+    fun `empty cached locations remove persisted json`() = runTest {
+        val (store, _) = newStore()
+        store.setCachedLocations(
+            countries = listOf(UrnetworkCachedLocation("Germany", "DE")),
+            regions = emptyList(),
+            cities = emptyList(),
+            bestMatches = emptyList(),
+        )
+
+        store.setCachedLocations(emptyList(), emptyList(), emptyList(), emptyList())
+
+        val snap = store.config().first()
+        assertTrue(snap.cachedCountries.isEmpty())
+        assertTrue(snap.cachedRegions.isEmpty())
+        assertTrue(snap.cachedCities.isEmpty())
+        assertTrue(snap.cachedBestMatches.isEmpty())
+    }
+
+    @Test
+    fun `cached locations are capped to max size`() = runTest {
+        val (store, _) = newStore()
+        val locations = (1..510).map { index ->
+            UrnetworkCachedLocation(name = "L$index", countryCode = "US")
+        }
+
+        store.setCachedLocations(locations, emptyList(), emptyList(), emptyList())
+
+        val cached = store.config().first().cachedCountries
+        assertEquals(500, cached.size)
+        assertEquals("L1", cached.first().name)
+        assertEquals("L500", cached.last().name)
+    }
+
+    @Test
+    fun `location selection normalization rejects invalid country only values`() {
+        assertNull(UrnetworkLocationSelection("U1", null, null).normalized())
+        assertNull(UrnetworkLocationSelection("USA", null, null).normalized())
+        assertEquals(
+            UrnetworkLocationSelection("DE", "Bavaria", "Munich"),
+            UrnetworkLocationSelection(" de ", " Bavaria ", " Munich ").normalized(),
+        )
+        assertEquals("DE/Bavaria/Munich", UrnetworkLocationSelection("DE", "Bavaria", "Munich").summary())
+        assertEquals("??", UrnetworkLocationSelection.EMPTY.summary())
+    }
+
+    @Test
+    fun `location selection normalized handles country with digits, blanks and city-only selections`() {
+        assertEquals(
+            UrnetworkLocationSelection(null, "Berlin", "Munich"),
+            UrnetworkLocationSelection("U1", "Berlin", "Munich").normalized(),
+        )
+        assertEquals(
+            UrnetworkLocationSelection("DE", null, null),
+            UrnetworkLocationSelection(" de ", "   ", "   ").normalized(),
+        )
+        assertEquals(
+            UrnetworkLocationSelection(null, null, "Berlin"),
+            UrnetworkLocationSelection(null, "   ", "\tBerlin  ").normalized(),
+        )
+        assertEquals(
+            UrnetworkLocationSelection("DE", null, "Munich"),
+            UrnetworkLocationSelection(" de ", "   ", " Munich ").normalized(),
+        )
+    }
+
+    @Test
+    fun `location selection normalized and summary covers mixed variants`() {
+        val onlyCountry = UrnetworkLocationSelection(" us ", null, null).normalized()
+        val onlyCity = UrnetworkLocationSelection(null, null, " Munich ").normalized()
+        val countryAndCity = UrnetworkLocationSelection("de", null, "  Berlin ").normalized()
+
+        assertEquals(UrnetworkLocationSelection("US", null, null), onlyCountry)
+        assertEquals(UrnetworkLocationSelection(null, null, "Munich"), onlyCity)
+        assertEquals(UrnetworkLocationSelection("DE", null, "Berlin"), countryAndCity)
+        assertNotNull(countryAndCity)
+        assertNotNull(onlyCity)
+        assertEquals("DE/Berlin", countryAndCity.summary())
+        assertEquals("??/Munich", onlyCity.summary())
+        assertEquals(
+            UrnetworkLocationSelection.EMPTY.summary(),
+            UrnetworkLocationSelection(null, null, null).summary(),
+        )
+    }
+
+    @Test
+    fun `persisted enum and boolean values reload through readConfig`() = runTest {
+        val (store, ds) = newStore()
+        store.setWindowType(UrnetworkWindowType.QUALITY)
+        store.setFixedIpSize(true)
+        store.setAllowDirect(false)
+        store.setProvideEnabled(false)
+        store.setProvideControlMode(UrnetworkProvideControlMode.AUTO)
+        store.setProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
+
+        val reloaded = DataStoreUrnetworkConfigStore(ds)
+        reloaded.update { it }
+        val snap = reloaded.config().first()
+
+        assertEquals(UrnetworkWindowType.QUALITY, snap.windowType)
+        assertEquals(true, snap.fixedIpSize)
+        assertEquals(false, snap.allowDirect)
+        assertEquals(false, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(UrnetworkProvideNetworkMode.ALL, snap.provideNetworkMode)
+    }
+
+    @Test
+    fun `persisted credentials and selected location reload through readConfig`() = runTest {
+        val (store, ds) = newStore()
+        store.setWalletOverride("wallet-override")
+        store.setByJwt("by.jwt")
+        store.setByClientJwt("client.jwt")
+        store.setDevicePubkey("device-pubkey")
+        store.setDeviceNetworkName("device-network")
+        store.setSelectedLocation(UrnetworkLocationSelection(" de ", " Bavaria ", " Munich "))
+
+        val reloaded = DataStoreUrnetworkConfigStore(ds)
+        reloaded.update { it }
+        val snap = reloaded.config().first()
+
+        assertEquals("wallet-override", snap.walletOverride)
+        assertEquals("by.jwt", snap.byJwt)
+        assertEquals("client.jwt", snap.byClientJwt)
+        assertEquals("device-pubkey", snap.devicePubkey)
+        assertEquals("device-network", snap.deviceNetworkName)
+        assertEquals(UrnetworkLocationSelection("DE", "Bavaria", "Munich"), snap.selectedLocation)
+    }
+
+    @Test
+    fun `config first after process recreation emits persisted values without update`() = runTest {
+        val (store, ds) = newStore()
+        store.update {
+            it.copy(
+                walletOverride = "wallet-override",
+                byJwt = "by.jwt",
+                byClientJwt = "client.jwt",
+                devicePubkey = "device-pubkey",
+                deviceNetworkName = "device-network",
+                windowType = UrnetworkWindowType.SPEED,
+                fixedIpSize = true,
+                allowDirect = false,
+                provideEnabled = false,
+                provideControlMode = UrnetworkProvideControlMode.AUTO,
+                provideNetworkMode = UrnetworkProvideNetworkMode.ALL,
+                selectedLocation = UrnetworkLocationSelection("DE", "Bavaria", "Munich"),
+            )
+        }
+
+        val snap = DataStoreUrnetworkConfigStore(ds).config().first()
+
+        assertEquals("wallet-override", snap.walletOverride)
+        assertEquals("by.jwt", snap.byJwt)
+        assertEquals("client.jwt", snap.byClientJwt)
+        assertEquals("device-pubkey", snap.devicePubkey)
+        assertEquals("device-network", snap.deviceNetworkName)
+        assertEquals(UrnetworkWindowType.SPEED, snap.windowType)
+        assertEquals(true, snap.fixedIpSize)
+        assertEquals(false, snap.allowDirect)
+        assertEquals(false, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(UrnetworkProvideNetworkMode.ALL, snap.provideNetworkMode)
+        assertEquals(UrnetworkLocationSelection("DE", "Bavaria", "Munich"), snap.selectedLocation)
+    }
+
+    @Test
+    fun `blank persisted optional values are treated as absent after reload`() = runTest {
+        val (_, ds) = newStore()
+        ds.editRaw(
+            "urnetwork_wallet_override" to " ",
+            "urnetwork_by_jwt" to "",
+            "urnetwork_by_client_jwt" to "   ",
+            "urnetwork_device_pubkey" to "",
+            "urnetwork_device_network_name" to " ",
+            "urnetwork_selected_country_code" to "",
+            "urnetwork_selected_region" to " ",
+            "urnetwork_selected_city" to "",
+        )
+
+        val reloaded = DataStoreUrnetworkConfigStore(ds)
+        reloaded.update { it }
+        val snap = reloaded.config().first()
+
+        assertNull(snap.walletOverride)
+        assertNull(snap.byJwt)
+        assertNull(snap.byClientJwt)
+        assertNull(snap.devicePubkey)
+        assertNull(snap.deviceNetworkName)
+        assertEquals(UrnetworkLocationSelection.EMPTY, snap.selectedLocation)
+    }
+
+    @Test
+    fun `malformed persisted cached locations reload as empty lists`() = runTest {
+        val (_, ds) = newStore()
+        ds.editRaw(
+            "urnetwork_cached_countries" to "{",
+            "urnetwork_cached_regions" to "not-json",
+            "urnetwork_cached_cities" to "",
+            "urnetwork_cached_best_matches" to "[]",
+        )
+
+        val reloaded = DataStoreUrnetworkConfigStore(ds)
+        reloaded.update { snap ->
+            assertTrue(snap.cachedCountries.isEmpty())
+            assertTrue(snap.cachedRegions.isEmpty())
+            assertTrue(snap.cachedCities.isEmpty())
+            assertTrue(snap.cachedBestMatches.isEmpty())
+            snap
+        }
+    }
+
+    @Test
+    fun `line cache defaults malformed ints and booleans and drops invalid rows`() = runTest {
+        val (_, ds) = newStore()
+        ds.editRaw(
+            "urnetwork_cached_countries" to listOf(
+                "Country\tde\t\tBerlin\tbad-int\tbad-bool\tbad-bool",
+                "Valid\tus\tRegion\tCity\t12\tnot-bool\tmaybe",
+                "\tde",
+                "BadCode\tusa\tRegion\tCity\t1\ttrue\tfalse",
+            ).joinToString("\n"),
+        )
+
+        val cached = DataStoreUrnetworkConfigStore(ds).config().first().cachedCountries
+
+        assertEquals(2, cached.size)
+        assertEquals("Country", cached[0].name)
+        assertEquals("DE", cached[0].countryCode)
+        assertEquals(0, cached[0].providerCount)
+        assertEquals(true, cached[0].isStable)
+        assertEquals(false, cached[0].isStrongPrivacy)
+        assertEquals("Valid", cached[1].name)
+        assertEquals("US", cached[1].countryCode)
+        assertEquals(12, cached[1].providerCount)
+        assertEquals(true, cached[1].isStable)
+        assertEquals(false, cached[1].isStrongPrivacy)
+    }
+
+    @Test
+    fun `line cache reload preserves escaped fields`() = runTest {
+        val (_, ds) = newStore()
+        val rawLine = "Esc\\taped\tde\tReg\\nion\tCity\\\\Name\t1\tfalse\ttrue"
+        ds.editRaw("urnetwork_cached_regions" to rawLine)
+
+        val cached = DataStoreUrnetworkConfigStore(ds).config().first().cachedRegions.single()
+
+        assertEquals("Esc\taped", cached.name)
+        assertEquals("DE", cached.countryCode)
+        assertEquals("Reg\nion", cached.region)
+        assertEquals("City\\Name", cached.city)
+        assertEquals(1, cached.providerCount)
+        assertEquals(false, cached.isStable)
+        assertEquals(true, cached.isStrongPrivacy)
+    }
+
+    @Test
+    fun `line cache truncates on raw 500 row payload`() = runTest {
+        val (_, ds) = newStore()
+        val raw = (1..502).joinToString("\n") { index -> "N$index\tde" }
+        ds.editRaw("urnetwork_cached_best_matches" to raw)
+
+        val cached = DataStoreUrnetworkConfigStore(ds).config().first().cachedBestMatches
+
+        assertEquals(500, cached.size)
+        assertEquals("N1", cached.first().name)
+        assertEquals("N500", cached.last().name)
+    }
+
+    @Test
+    fun `line cached locations preserve escaped tabs newlines and backslashes`() = runTest {
+        val (store, ds) = newStore()
+        val original = UrnetworkCachedLocation(
+            name = "Name\twith\nslashes\\",
+            countryCode = "de",
+            region = "Region\tA",
+            city = "City\nB",
+            providerCount = 7,
+            isStable = false,
+            isStrongPrivacy = true,
+        )
+
+        store.setCachedLocations(listOf(original), emptyList(), emptyList(), emptyList())
+        val reloaded = DataStoreUrnetworkConfigStore(ds).config().first().cachedCountries.single()
+
+        assertEquals("Name\twith\nslashes\\", reloaded.name)
+        assertEquals("DE", reloaded.countryCode)
+        assertEquals("Region\tA", reloaded.region)
+        assertEquals("City\nB", reloaded.city)
+        assertEquals(7, reloaded.providerCount)
+        assertEquals(false, reloaded.isStable)
+        assertEquals(true, reloaded.isStrongPrivacy)
+    }
+
+    @Test
+    fun `line cached locations skip invalid rows and keep valid rows`() = runTest {
+        val (_, ds) = newStore()
+        ds.editRaw(
+            "urnetwork_cached_countries" to listOf(
+                "",
+                "MissingCode",
+                "Short\tD",
+                "Good\tde\t\tBerlin\t9\tfalse\ttrue",
+                "BadProviders\tus\t\t\tNaN\tbad\tbad",
+            ).joinToString("\n"),
+        )
+
+        val cached = DataStoreUrnetworkConfigStore(ds).config().first().cachedCountries
+
+        assertEquals(2, cached.size)
+        assertEquals("Good", cached[0].name)
+        assertEquals("DE", cached[0].countryCode)
+        assertEquals(9, cached[0].providerCount)
+        assertEquals(false, cached[0].isStable)
+        assertEquals(true, cached[0].isStrongPrivacy)
+        assertEquals("BadProviders", cached[1].name)
+        assertEquals("US", cached[1].countryCode)
+        assertEquals(0, cached[1].providerCount)
+        assertEquals(true, cached[1].isStable)
+        assertEquals(false, cached[1].isStrongPrivacy)
+    }
+
+    @Test
+    fun `line cached locations are capped during raw reload`() = runTest {
+        val (_, ds) = newStore()
+        val raw = (1..510).joinToString("\n") { index -> "L$index\tus" }
+
+        ds.editRaw("urnetwork_cached_best_matches" to raw)
+
+        val cached = DataStoreUrnetworkConfigStore(ds).config().first().cachedBestMatches
+        assertEquals(500, cached.size)
+        assertEquals("L1", cached.first().name)
+        assertEquals("L500", cached.last().name)
+    }
+
+    @Test
+    fun `invalid persisted enum raw values fall back to defaults`() = runTest {
+        val (_, ds) = newStore()
+        ds.editRaw(
+            "urnetwork_window_type" to "bad-window",
+            "urnetwork_provide_control_mode" to "bad-control",
+            "urnetwork_provide_network_mode" to "bad-network",
+        )
+
+        val snap = DataStoreUrnetworkConfigStore(ds).config().first()
+
+        assertEquals(UrnetworkWindowType.AUTO, snap.windowType)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
+        assertEquals(UrnetworkProvideNetworkMode.WIFI, snap.provideNetworkMode)
+    }
+
     private class FakePreferencesDataStore : DataStore<Preferences> {
         private val state = MutableStateFlow<Preferences>(emptyPreferences())
         override val data: Flow<Preferences> get() = state
+
+        suspend fun editRaw(vararg values: Pair<String, String>) {
+            updateData { prefs ->
+                mutablePreferencesOf(
+                    *prefs.asMap()
+                        .mapNotNull { (key, value) -> (value as? String)?.let { key.name to it } }
+                        .plus(values)
+                        .map { (key, value) -> stringPreferencesKey(key) to value }
+                        .toTypedArray(),
+                ).apply {
+                    values.forEach { (key, value) ->
+                        this[stringPreferencesKey(key)] = value
+                    }
+                }
+            }
+        }
 
         override suspend fun updateData(
             transform: suspend (t: Preferences) -> Preferences,

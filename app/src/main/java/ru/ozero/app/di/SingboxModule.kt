@@ -15,12 +15,15 @@ import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.combine
 import okhttp3.OkHttpClient
-import ru.ozero.commonvpn.TunnelController
+import ru.ozero.app.vpn.singboxRuntimeFingerprint
+import ru.ozero.commonvpn.RuntimeFailureRouter
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.EngineRuntimeConfigProvider
 import ru.ozero.singboxroom.SingboxDatabase
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
@@ -99,12 +102,38 @@ object SingboxModule {
         @SingboxPrefs dataStore: DataStore<Preferences>,
         profileDao: ProxyProfileDao,
         proxyChainDao: ProxyChainDao,
-        tunnelController: TunnelController,
+        runtimeFailureRouter: RuntimeFailureRouter,
     ): EnginePlugin = SingboxEngine(
         context = context,
         dataStore = dataStore,
         profileDao = profileDao,
         proxyChainDao = proxyChainDao,
-        onProcessDied = { tunnelController.onEngineDied(EngineId.SINGBOX, "binder-died") },
+        onProcessDied = { runtimeFailureRouter.handleEngineFailure(EngineId.SINGBOX, "binder-died") },
     )
+
+    @Provides
+    @Singleton
+    @IntoSet
+    fun provideSingboxRuntimeConfigProvider(
+        @SingboxPrefs dataStore: DataStore<Preferences>,
+        profileDao: ProxyProfileDao,
+        proxyChainDao: ProxyChainDao,
+    ): EngineRuntimeConfigProvider = object : EngineRuntimeConfigProvider {
+        override val engineId: EngineId = EngineId.SINGBOX
+        override val changes = combine(
+            dataStore.data,
+            profileDao.getAllFlow(),
+            proxyChainDao.getAllFlow(),
+        ) { prefs, profiles, chainSteps ->
+            singboxRuntimeFingerprint(
+                prefs = prefs,
+                profiles = profiles,
+                chainSteps = chainSteps,
+                resolveProfileById = profileDao::getById,
+            )
+        }
+        override val includeStarting: Boolean = false
+        override val replayAfterStarting: Boolean = true
+        override val restartReason: String = "singbox profile changed while connected -> restart"
+    }
 }

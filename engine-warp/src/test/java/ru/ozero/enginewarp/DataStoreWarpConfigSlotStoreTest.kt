@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
@@ -433,6 +435,41 @@ class DataStoreWarpConfigSlotStoreTest {
     }
 
     @Test
+    fun `слот без doHProvider — fallback Cloudflare DoH как новый WARP default`() = runTest {
+        val ds = FakePreferencesDataStore()
+        val goodSlot = buildValidSlotJson("id-no-doh", "NoDoH")
+        ds.edit { it[stringPreferencesKey("warp_slots_json")] = """[$goodSlot]""" }
+        val store = DataStoreWarpConfigSlotStore(ds, DataStoreWarpConfigStore(FakePreferencesDataStore()))
+
+        val slot = store.slots().first().single()
+
+        assertEquals(WarpConfig.DEFAULT_DOH_PROVIDER, slot.config.doHProvider)
+    }
+
+    @Test
+    fun `legacy current without doHProvider falls back to Cloudflare DoH`() = runTest {
+        val legacy = FakePreferencesDataStore()
+        runBlocking { DataStoreWarpConfigStore(legacy).save(sample) }
+
+        val current = DataStoreWarpConfigStore(legacy).current().first()
+
+        assertNotNull(current)
+        assertEquals(WarpConfig.DEFAULT_DOH_PROVIDER, current.doHProvider)
+    }
+
+    @Test
+    fun `legacy slot with explicit SYSTEM doHProvider preserves SYSTEM`() = runTest {
+        val ds = FakePreferencesDataStore()
+        val slot = buildValidSlotJson("id-system", "SystemDoH", doHProvider = DoHProvider.SYSTEM.name)
+        ds.edit { it[stringPreferencesKey("warp_slots_json")] = """[$slot]""" }
+        val store = DataStoreWarpConfigSlotStore(ds, DataStoreWarpConfigStore(FakePreferencesDataStore()))
+
+        val saved = store.slots().first().single()
+
+        assertEquals(DoHProvider.SYSTEM, saved.config.doHProvider)
+    }
+
+    @Test
     fun `updateSlot с endpointList — обновляет список`() = runTest {
         val store = newStore()
         val id = store.addSlot("S", sample)
@@ -455,15 +492,44 @@ class DataStoreWarpConfigSlotStoreTest {
         assertEquals(5, saved.config.awgParams.payloadPacketJunkSize)
     }
 
-    private fun buildValidSlotJson(id: String, name: String): String {
+    private fun buildValidSlotJson(
+        id: String,
+        name: String,
+        doHProvider: String? = null,
+    ): String {
         val c = sample
-        val cfg = """{"priv":"${c.privateKey}","pub":"${c.publicKey}","peerPub":"${c.peerPublicKey}",""" +
-            """"peerEndpoint":"${c.peerEndpoint}","ifaceV4":"${c.interfaceAddressV4}",""" +
-            """"ifaceV6":"${c.interfaceAddressV6}","license":"${c.accountLicense}","mtu":${c.mtu},""" +
-            """"dnsServers":["1.1.1.1"],"allowedIps":["0.0.0.0/0","::/0"],""" +
-            """"keepalive":${c.keepaliveSeconds},""" +
-            """"awgParams":{"jc":0,"jmin":0,"jmax":0,"s1":0,"s2":0,"h1":1,"h2":2,"h3":3,"h4":4}}"""
-        return """{"id":"$id","name":"$name","isActive":false,"config":$cfg}"""
+        val config = JSONObject()
+            .put("priv", c.privateKey)
+            .put("pub", c.publicKey)
+            .put("peerPub", c.peerPublicKey)
+            .put("peerEndpoint", c.peerEndpoint)
+            .put("ifaceV4", c.interfaceAddressV4)
+            .put("ifaceV6", c.interfaceAddressV6)
+            .put("license", c.accountLicense)
+            .put("mtu", c.mtu)
+            .put("dnsServers", JSONArray().put("1.1.1.1"))
+            .put("allowedIps", JSONArray().put("0.0.0.0/0").put("::/0"))
+            .put("keepalive", c.keepaliveSeconds)
+            .put(
+                "awgParams",
+                JSONObject()
+                    .put("jc", 0)
+                    .put("jmin", 0)
+                    .put("jmax", 0)
+                    .put("s1", 0)
+                    .put("s2", 0)
+                    .put("h1", 1)
+                    .put("h2", 2)
+                    .put("h3", 3)
+                    .put("h4", 4),
+            )
+        doHProvider?.let { config.put("doHProvider", it) }
+        return JSONObject()
+            .put("id", id)
+            .put("name", name)
+            .put("isActive", false)
+            .put("config", config)
+            .toString()
     }
 
     private class FakePreferencesDataStore : DataStore<Preferences> {

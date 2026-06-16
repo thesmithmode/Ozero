@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayInputStream
 import java.io.IOException
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.Proxy
 import java.net.URL
@@ -32,10 +33,12 @@ class SocksProbeClientTest {
     private fun client(
         opener: (URL, Proxy) -> HttpURLConnection,
         clock: () -> Long = { 0L },
+        maxBytesToRead: Long = HttpSocksProbeClient.DEFAULT_MAX_BYTES,
     ) = HttpSocksProbeClient(
         proxyHost = "127.0.0.1",
         proxyPort = 1080,
         timeoutMs = 5000,
+        maxBytesToRead = maxBytesToRead,
         urlOpener = opener,
         nowMs = clock,
     )
@@ -134,6 +137,83 @@ class SocksProbeClientTest {
         ).probe("example.com")
         assertEquals(Proxy.Type.SOCKS, capturedProxy?.type())
         assertNotNull(capturedProxy)
+    }
+
+    @Test
+    fun `formatUrl preserves https scheme`() = runTest {
+        var capturedUrl: URL? = null
+        val opener: (URL, Proxy) -> HttpURLConnection = { url, _ ->
+            capturedUrl = url
+            fakeConnection(200, 0L, ByteArray(0))
+        }
+        client(opener).probe("https://example.com")
+        assertEquals("https://example.com", capturedUrl?.toString())
+    }
+
+    @Test
+    fun `non 2xx response reads error stream`() = runTest {
+        val conn = mockk<HttpURLConnection>(relaxed = true)
+        every { conn.responseCode } returns 403
+        every { conn.contentLengthLong } returns 4L
+        every { conn.errorStream } returns ByteArrayInputStream(byteArrayOf(1, 2, 3, 4))
+        every { conn.inputStream } throws AssertionError("input stream must not be used")
+
+        val result = client(opener = { _, _ -> conn }).probe("blocked.com")
+
+        assertTrue(result.success)
+        assertEquals(403, result.responseCode)
+        assertEquals(4L, result.actualLength)
+    }
+
+    @Test
+    fun `null error stream returns zero length and failure for declared body`() = runTest {
+        val conn = mockk<HttpURLConnection>(relaxed = true)
+        every { conn.responseCode } returns 503
+        every { conn.contentLengthLong } returns 10L
+        every { conn.errorStream } returns null
+
+        val result = client(opener = { _, _ -> conn }).probe("blocked.com")
+
+        assertFalse(result.success)
+        assertEquals(0L, result.actualLength)
+        assertEquals(10L, result.declaredLength)
+    }
+
+    @Test
+    fun `unknown declared length stops at configured max bytes`() = runTest {
+        val body = ByteArray(10) { it.toByte() }
+        val opener = { _: URL, _: Proxy -> fakeConnection(200, -1L, body) }
+
+        val result = client(opener, maxBytesToRead = 4L).probe("example.com")
+
+        assertTrue(result.success)
+        assertEquals(4L, result.actualLength)
+    }
+
+    @Test
+    fun `read IOException returns bytes read before failure`() = runTest {
+        val stream = object : InputStream() {
+            var calls = 0
+
+            override fun read(): Int = error("single byte read is not used")
+
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                calls++
+                if (calls > 1) throw IOException("truncated")
+                buffer[offset] = 1
+                buffer[offset + 1] = 2
+                return 2
+            }
+        }
+        val conn = mockk<HttpURLConnection>(relaxed = true)
+        every { conn.responseCode } returns 200
+        every { conn.contentLengthLong } returns 4L
+        every { conn.inputStream } returns stream
+
+        val result = client(opener = { _, _ -> conn }).probe("example.com")
+
+        assertFalse(result.success)
+        assertEquals(2L, result.actualLength)
     }
 
     @Test

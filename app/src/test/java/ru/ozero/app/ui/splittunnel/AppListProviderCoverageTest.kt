@@ -1,0 +1,111 @@
+package ru.ozero.app.ui.splittunnel
+
+import android.content.Context
+import android.content.pm.PackageManager
+import android.graphics.Canvas
+import android.graphics.ColorFilter
+import android.graphics.PixelFormat
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
+import io.mockk.every
+import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+class AppListProviderCoverageTest {
+
+    private val dispatcher = StandardTestDispatcher()
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(dispatcher)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `drawableToImageBitmap returns null for BitmapDrawable without bitmap`() {
+        val drawable = mockk<BitmapDrawable>()
+        every { drawable.bitmap } returns null
+
+        assertNull(invokeDrawableToImageBitmap(drawable))
+    }
+
+    @Test
+    fun `drawableToImageBitmap returns image bitmap for BitmapDrawable with bitmap`() {
+        val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        val drawable = mockk<BitmapDrawable>()
+        every { drawable.bitmap } returns bitmap
+
+        assertNotNull(invokeDrawableToImageBitmap(drawable))
+    }
+
+    @Test
+    fun `drawableToImageBitmap converts generic drawable`() {
+        val drawable = object : Drawable() {
+            override fun draw(canvas: Canvas) = Unit
+            override fun setAlpha(alpha: Int) = Unit
+            override fun setColorFilter(colorFilter: ColorFilter?) = Unit
+            override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+            override fun getIntrinsicWidth(): Int = 0
+            override fun getIntrinsicHeight(): Int = 0
+        }
+
+        assertNotNull(invokeDrawableToImageBitmap(drawable))
+    }
+
+    @Test
+    fun `loadIcon caches missing icons after package manager miss`() = runTest(dispatcher) {
+        val pm = mockk<PackageManager>()
+        every { pm.getApplicationIcon("missing.pkg") } throws PackageManager.NameNotFoundException()
+        val context = mockk<Context> {
+            every { packageManager } returns pm
+            every { applicationContext } returns this
+        }
+        val provider = DefaultAppListProvider(context)
+
+        assertNull(provider.loadIcon("missing.pkg"))
+        assertNull(provider.loadIcon("missing.pkg"))
+    }
+
+    @Test
+    fun `loadIcon caches successful bitmap drawable result`() = runTest(dispatcher) {
+        val pm = mockk<PackageManager>()
+        val drawable = mockk<BitmapDrawable>()
+        val bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        every { drawable.bitmap } returns bitmap
+        every { pm.getApplicationIcon("ok.pkg") } returns drawable
+        val context = mockk<Context> {
+            every { packageManager } returns pm
+            every { applicationContext } returns this
+        }
+        val provider = DefaultAppListProvider(context)
+
+        assertNotNull(provider.loadIcon("ok.pkg"))
+        assertNotNull(provider.loadIcon("ok.pkg"))
+    }
+
+    private fun invokeDrawableToImageBitmap(drawable: Drawable): Any? {
+        val method = Class.forName("ru.ozero.app.ui.splittunnel.AppListProviderKt")
+            .getDeclaredMethod("drawableToImageBitmap", Drawable::class.java)
+        method.isAccessible = true
+        return method.invoke(null, drawable)
+    }
+}

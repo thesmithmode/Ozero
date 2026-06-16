@@ -64,8 +64,8 @@ class MainActivitySwitchingSentinelTest {
 
     @Test
     fun `coalesced restart settle wait ignores stale Idle after start`() {
-        val block = source.substringAfter("if (restartPending) {")
-            .substringBefore("} while (restartPending)")
+        val block = source.substringAfter("withTimeoutOrNull(RESTART_SETTLE_TIMEOUT_MS)")
+            .substringBefore("} while")
         assertTrue(
             block.contains("TunnelState.Connected") &&
                 block.contains("TunnelState.Failed") &&
@@ -76,23 +76,19 @@ class MainActivitySwitchingSentinelTest {
     }
 
     @Test
-    fun `singbox profile changes restart only stable connected singbox`() {
-        val observerBlock = source.substringAfter("private fun observeSingboxProfileChanges")
-            .substringBefore("private suspend fun restartSingboxIfStableConnected")
+    fun `runtime config observer owns engine-specific restart rules`() {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val app = File(moduleRoot, "src/main/java/ru/ozero/app/OzeroApp.kt").readText()
+        val coordinator = File(
+            moduleRoot,
+            "src/main/java/ru/ozero/app/vpn/RuntimeConfigRestartCoordinator.kt",
+        ).readText()
         assertTrue(
-            observerBlock.contains("restartSingboxIfStableConnected") &&
-                !observerBlock.contains("restartVpnIfConnected("),
-            "singbox profile observer must not call generic restart directly because Connecting/Probing profile writes can self-restart",
-        )
-
-        val helperBlock = source.substringAfter("private suspend fun restartSingboxIfStableConnected")
-            .substringBefore("private companion object")
-        assertTrue(
-            helperBlock.contains("TunnelState.Connected") &&
-                helperBlock.contains("EngineId.SINGBOX") &&
-                !helperBlock.contains("TunnelState.Connecting") &&
-                !helperBlock.contains("TunnelState.Probing"),
-            "singbox profile restart must be allowed only after stable Connected(SINGBOX), not during Connecting/Probing",
+            source.contains("EngineRuntimeConfigRestartObserver").not() &&
+                app.contains("runtimeConfigRestartCoordinator.start(appScope)") &&
+                coordinator.contains("observer.start") &&
+                coordinator.contains("tunnelController.state"),
+            "Runtime config restarts must be process-wide, not gated by MainActivity STARTED lifecycle.",
         )
     }
 }

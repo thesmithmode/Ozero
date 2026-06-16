@@ -279,7 +279,7 @@ private fun trojanOutbound(bean: TrojanBean, tag: String, detour: String? = null
     if (tls != null) sb.append(""""tls":$tls,""")
 
     if (detour != null) sb.append(""""detour":${jsonString(detour)},""")
-    if (sb.isNotEmpty() && sb[sb.length - 1] == ',') sb.deleteCharAt(sb.length - 1)
+    if (sb[sb.length - 1] == ',') sb.deleteCharAt(sb.length - 1)
     sb.append('}')
     return sb.toString()
 }
@@ -324,11 +324,6 @@ private fun buildTransport(bean: StandardV2RayBean): String? = when (bean.type) 
     )
     "httpupgrade" -> buildMap(
         "type" to "httpupgrade",
-        "path" to (bean.path.ifEmpty { "/" }),
-        "host" to bean.host,
-    )
-    "splithttp" -> buildMap(
-        "type" to "splithttp",
         "path" to (bean.path.ifEmpty { "/" }),
         "host" to bean.host,
     )

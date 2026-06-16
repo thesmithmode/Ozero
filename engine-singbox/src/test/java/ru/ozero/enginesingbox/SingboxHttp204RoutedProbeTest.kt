@@ -16,8 +16,64 @@ import kotlin.test.assertTrue
 class SingboxHttp204RoutedProbeTest {
 
     @Test
+    fun `routed probe rejects non positive socks ports without opening connection`() = runTest {
+        val probe = SingboxHttp204RoutedProbe(
+            probeUrl = URL("http://127.0.0.1/generate_204"),
+            timeoutMs = 100,
+        )
+
+        assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, probe.probeLatencyMs(0))
+        assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, probe.probeLatencyMs(-1))
+    }
+
+    @Test
+    fun `routed probe default configuration rejects invalid port`() = runTest {
+        val probe = SingboxHttp204RoutedProbe()
+
+        assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, probe.probeLatencyMs(0))
+    }
+
+    @Test
     fun `routed probe succeeds after HTTP 204 through SOCKS`() = runTest {
-        Socks204Server().use { socks ->
+        val ticks = 1_000L
+        SocksHttpServer(statusCode = 204, reason = "No Content").use { socks ->
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("http://127.0.0.1/generate_204"),
+                timeoutMs = 1_000,
+                nanoTime = { ticks },
+            )
+
+            val latency = probe.probeLatencyMs(socks.port)
+
+            assertEquals(1L, latency)
+            assertTrue(socks.requestText.startsWith("GET /generate_204 "))
+        }
+    }
+
+    @Test
+    fun `routed probe keeps measured latency above minimum`() = runTest {
+        var ticks = 1_000L
+        SocksHttpServer(statusCode = 204, reason = "No Content").use { socks ->
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("http://127.0.0.1/generate_204"),
+                timeoutMs = 1_000,
+                nanoTime = {
+                    val current = ticks
+                    ticks += 3_000_000L
+                    current
+                },
+            )
+
+            val latency = probe.probeLatencyMs(socks.port)
+
+            assertEquals(3L, latency)
+            assertTrue(socks.requestText.startsWith("GET /generate_204 "))
+        }
+    }
+
+    @Test
+    fun `routed probe rejects non 204 response through SOCKS`() = runTest {
+        SocksHttpServer(statusCode = 200, reason = "OK").use { socks ->
             val probe = SingboxHttp204RoutedProbe(
                 probeUrl = URL("http://127.0.0.1/generate_204"),
                 timeoutMs = 1_000,
@@ -25,7 +81,7 @@ class SingboxHttp204RoutedProbeTest {
 
             val latency = probe.probeLatencyMs(socks.port)
 
-            assertTrue(latency >= 0)
+            assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
             assertTrue(socks.requestText.startsWith("GET /generate_204 "))
         }
     }
@@ -47,7 +103,35 @@ class SingboxHttp204RoutedProbeTest {
         }
     }
 
-    private class Socks204Server : AutoCloseable {
+    @Test
+    fun `routed probe returns failed when socks port is closed`() = runTest {
+        val closedPort = ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { it.localPort }
+        val probe = SingboxHttp204RoutedProbe(
+            probeUrl = URL("http://127.0.0.1/generate_204"),
+            timeoutMs = 100,
+        )
+
+        val latency = probe.probeLatencyMs(closedPort)
+
+        assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
+    }
+
+    @Test
+    fun `routed probe maps non http connection failures to failed latency`() = runTest {
+        val probe = SingboxHttp204RoutedProbe(
+            probeUrl = URL("file:probe-resource"),
+            timeoutMs = 100,
+        )
+
+        val latency = probe.probeLatencyMs(1)
+
+        assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
+    }
+
+    private class SocksHttpServer(
+        private val statusCode: Int,
+        private val reason: String,
+    ) : AutoCloseable {
         private val server = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
         private val worker = thread(start = true, isDaemon = true) {
             runCatching {
@@ -86,7 +170,7 @@ class SingboxHttp204RoutedProbeTest {
 
             requestText = input.readHttpHeaders()
             output.write(
-                "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                "HTTP/1.1 $statusCode $reason\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
                     .toByteArray(StandardCharsets.US_ASCII),
             )
             output.flush()

@@ -233,6 +233,78 @@ class ByeDpiEngineSettingsViewModelTest {
         assertEquals("8.8.8.8", state.dnsText)
     }
 
+    @Test
+    fun `useUiMode reflects model and dirty tracks local toggle`() = runTest(dispatcher) {
+        repo.emit(SettingsModel.DEFAULT.copy(byedpiUseUiMode = true))
+        advanceUntilIdle()
+        val initial = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertTrue(initial.useUiMode)
+        assertFalse(initial.dirty)
+
+        vm.onToggleUiMode(false)
+
+        val changed = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertFalse(changed.useUiMode)
+        assertTrue(changed.dirty)
+    }
+
+    @Test
+    fun `model update does not overwrite unsaved useUiMode change`() = runTest(dispatcher) {
+        advanceUntilIdle()
+        vm.onToggleUiMode(false)
+        repo.emit(SettingsModel.DEFAULT.copy(byedpiUseUiMode = true))
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertFalse(state.useUiMode)
+        assertTrue(state.savedUseUiMode)
+    }
+
+    @Test
+    fun `uiSettings reflects model and dirty tracks local settings change`() = runTest(dispatcher) {
+        val saved = ByeDpiUiSettings.DEFAULT.copy(splitPosition = 7)
+        repo.emit(SettingsModel.DEFAULT.copy(byedpiUiSettings = saved))
+        advanceUntilIdle()
+        val initial = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertEquals(saved, initial.uiSettings)
+        assertFalse(initial.dirty)
+
+        val edited = saved.copy(splitPosition = 9)
+        vm.onUiSettingsChange(edited)
+
+        val changed = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertEquals(edited, changed.uiSettings)
+        assertTrue(changed.dirty)
+    }
+
+    @Test
+    fun `onSave persists useUiMode and uiSettings`() = runTest(dispatcher) {
+        val edited = ByeDpiUiSettings.DEFAULT.copy(splitPosition = 11)
+        advanceUntilIdle()
+        vm.onToggleUiMode(true)
+        vm.onUiSettingsChange(edited)
+
+        vm.onSave()
+        advanceUntilIdle()
+
+        assertEquals(listOf(true), repo.useUiModeUpdates)
+        assertEquals(listOf(edited), repo.uiSettingsUpdates)
+    }
+
+    @Test
+    fun `onResetToDefault resets uiSettings in state and repository`() = runTest(dispatcher) {
+        val edited = ByeDpiUiSettings.DEFAULT.copy(splitPosition = 11)
+        repo.emit(SettingsModel.DEFAULT.copy(byedpiUiSettings = edited))
+        advanceUntilIdle()
+
+        vm.onResetToDefault()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertEquals(ByeDpiUiSettings.DEFAULT, state.uiSettings)
+        assertEquals(listOf(ByeDpiUiSettings.DEFAULT), repo.uiSettingsUpdates)
+    }
+
     private class FakeSettingsRepository : SettingsRepository {
         private val state = MutableStateFlow(SettingsModel.DEFAULT)
         override val settings: Flow<SettingsModel> = state.asStateFlow()
@@ -240,6 +312,8 @@ class ByeDpiEngineSettingsViewModelTest {
         val byedpiUpdates = mutableListOf<String?>()
         val defaultAcceptedUpdates = mutableListOf<Boolean>()
         val dnsUpdates = mutableListOf<List<String>>()
+        val useUiModeUpdates = mutableListOf<Boolean>()
+        val uiSettingsUpdates = mutableListOf<ByeDpiUiSettings>()
 
         fun emit(model: SettingsModel) {
             state.value = model
@@ -274,10 +348,12 @@ class ByeDpiEngineSettingsViewModelTest {
         }
 
         override suspend fun setByedpiUseUiMode(enabled: Boolean) {
+            useUiModeUpdates += enabled
             state.value = state.value.copy(byedpiUseUiMode = enabled)
         }
 
         override suspend fun setByedpiUiSettings(settings: ByeDpiUiSettings) {
+            uiSettingsUpdates += settings
             state.value = state.value.copy(byedpiUiSettings = settings)
         }
     }

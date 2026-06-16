@@ -67,18 +67,18 @@ class OzeroVpnServiceLockdownKillswitchTest {
         require("if (usesCustomTun) {" in establishTunAndChainBody) {
             "anchor 'if (usesCustomTun)' исчез в establishTunAndChain — обнови sentinel"
         }
-        require("return tun to chain\n        }\n" in establishTunAndChainBody) {
+        require("return tun to chain" in establishTunAndChainBody) {
             "anchor закрытия customTun branch исчез — обнови sentinel"
         }
         establishTunAndChainBody.substringAfter("if (usesCustomTun) {")
-            .substringBefore("return tun to chain\n        }\n")
+            .substringBefore("return tun to chain")
     }
 
     private val regularTunBranchBody by lazy {
-        require("return tun to chain\n        }\n" in establishTunAndChainBody) {
+        require("return tun to chain" in establishTunAndChainBody) {
             "anchor закрытия customTun branch исчез — обнови sentinel"
         }
-        establishTunAndChainBody.substringAfter("return tun to chain\n        }\n")
+        establishTunAndChainBody.substringAfter("return tun to chain")
     }
 
     @Test

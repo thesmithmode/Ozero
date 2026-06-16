@@ -17,18 +17,27 @@ object ClashYamlParser {
 
     fun parse(text: String): List<AbstractBean> {
         if (!proxiesKeyPattern.containsMatchIn(text)) return emptyList()
-        val root = loadRoot(text) ?: return emptyList()
-        val proxies = root["proxies"] as? List<*> ?: emptyList<Any?>()
-        return proxies.mapNotNull { (it as? Map<*, *>)?.toStringKeyMap()?.let(::parseProxy) }
-    }
-
-    private fun loadRoot(text: String): Map<String, Any?>? = try {
-        val loaderOptions = LoaderOptions().apply {
-            codePointLimit = MAX_YAML_CODE_POINTS
+        val root = try {
+            val loaderOptions = LoaderOptions().apply {
+                codePointLimit = MAX_YAML_CODE_POINTS
+            }
+            when (val loaded = Yaml(SafeConstructor(loaderOptions)).load<Any?>(text)) {
+                is Map<*, *> -> loaded.toStringKeyMap()
+                else -> null
+            }
+        } catch (_: YAMLException) {
+            null
+        } ?: return emptyList()
+        val proxies = when (val value = root["proxies"]) {
+            is List<*> -> value
+            else -> return emptyList()
         }
-        (Yaml(SafeConstructor(loaderOptions)).load<Any?>(text) as? Map<*, *>)?.toStringKeyMap()
-    } catch (_: YAMLException) {
-        null
+        return proxies.mapNotNull { item ->
+            when (item) {
+                is Map<*, *> -> parseProxy(item.toStringKeyMap())
+                else -> null
+            }
+        }
     }
 
     private fun parseProxy(fields: Map<String, Any?>): AbstractBean? = when (fields.string("type").lowercase()) {
@@ -53,10 +62,10 @@ object ClashYamlParser {
         }
         "ss", "shadowsocks" -> ShadowsocksBean().apply {
             applyCommon(fields)
-            method = fields.string("cipher", "method").ifBlank { method }
+            method = fields.shadowsocksMethod().ifBlank { method }
             password = fields.string("password")
             plugin = fields.string("plugin")
-            pluginOpts = fields.string("plugin-opts", "plugin_opts")
+            pluginOpts = fields.string("plugin-opts", "plugin_opts", entrySeparator = ";")
         }
         else -> null
     }?.takeIf { it.serverAddress.isNotBlank() && it.serverPort > 0 }
@@ -94,6 +103,15 @@ object ClashYamlParser {
         val grpc = fields.mapValue("grpc-opts", "grpc_opts")
         val http = fields.mapValue("h2-opts", "h2_opts", "http-opts", "http_opts")
         val httpUpgrade = fields.mapValue("httpupgrade-opts", "httpupgrade_opts")
+        type = fields.string("network", "net").ifBlank {
+            when {
+                ws.isNotEmpty() -> "ws"
+                grpc.isNotEmpty() -> "grpc"
+                http.isNotEmpty() -> "http"
+                httpUpgrade.isNotEmpty() -> "httpupgrade"
+                else -> type
+            }
+        }.let(::normalizeNetwork)
         path = fields.string("path").ifBlank {
             ws.string("path").ifBlank { http.string("path").ifBlank { httpUpgrade.string("path") } }
         }
@@ -126,11 +144,14 @@ object ClashYamlParser {
         key.toString() to value
     }
 
-    private fun Map<String, Any?>.string(vararg keys: String): String = keys.firstNotNullOfOrNull { key ->
+    private fun Map<String, Any?>.string(
+        vararg keys: String,
+        entrySeparator: String = ",",
+    ): String = keys.firstNotNullOfOrNull { key ->
         when (val value = this[key]) {
             null -> null
-            is Map<*, *> -> value.entries.joinToString(";") { (k, v) -> "$k=$v" }
-            is Iterable<*> -> value.joinToString(",") { it.toString() }
+            is Map<*, *> -> value.entries.joinToString(entrySeparator) { (k, v) -> "$k=$v" }
+            is Iterable<*> -> value.joinToString(entrySeparator) { it.toString() }
             else -> value.toString()
         }?.takeIf { it.isNotBlank() }
     }.orEmpty()
@@ -149,11 +170,26 @@ object ClashYamlParser {
     }
 
     private fun Map<String, Any?>.mapValue(vararg keys: String): Map<String, Any?> = keys.firstNotNullOfOrNull { key ->
-        (this[key] as? Map<*, *>)?.toStringKeyMap()
+        when (val value = this[key]) {
+            is Map<*, *> -> value.toStringKeyMap()
+            else -> null
+        }
     }.orEmpty()
 
     private fun Map<String, Any?>.listString(key: String): String = when (val value = this[key]) {
         is Iterable<*> -> value.joinToString(",") { it.toString() }
         else -> string(key)
     }
+
+    private fun Map<String, Any?>.shadowsocksMethod(): String = when (val cipher = this["cipher"]) {
+        is String -> cipher
+        is Number,
+        is Boolean -> cipher.toString()
+        is Map<*, *> -> {
+            val parsed = cipher.toStringKeyMap()
+            val method = parsed["method"]?.toString()?.trim()
+            method?.takeIf { it.isNotBlank() } ?: parsed.entries.joinToString(",") { (key, value) -> "$key=$value" }
+        }
+        else -> string("method")
+    }.ifBlank { string("method") }
 }

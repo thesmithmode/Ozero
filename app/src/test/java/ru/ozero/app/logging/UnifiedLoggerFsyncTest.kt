@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -48,11 +49,12 @@ class UnifiedLoggerFsyncTest {
     @Test
     fun `rotate работает при превышении MAX_BYTES`() {
         UnifiedLogger.init(mockContext())
-        val chunk = "x".repeat(50_000)
-        repeat(120) { UnifiedLogger.info("Bulk", chunk) }
+        val target = assertNotNull(UnifiedLogger.file())
+        val filler = "prefill "
+        target.writeText(filler.repeat((LogFileStore.MAX_BYTES / filler.length).toInt()))
+        UnifiedLogger.info("Bulk", "rotation marker ".repeat(64))
         val prev = File(File(tmp, "logs"), "ozero.log.prev")
         assertTrue(prev.exists(), "ожидали ротацию в ozero.log.prev")
-        val target = assertNotNull(UnifiedLogger.file())
         assertTrue(target.exists())
     }
 
@@ -72,5 +74,54 @@ class UnifiedLoggerFsyncTest {
         BootFileLogger.info("Facade", "facade-payload")
         val target = assertNotNull(UnifiedLogger.file())
         assertTrue(target.readText().contains("facade-payload"))
+    }
+
+    @Test
+    fun `persistent log redacts proxy uris userinfo and long tokens`() {
+        UnifiedLogger.init(mockContext())
+        UnifiedLogger.error(
+            "Secret",
+            "trojan://user:pass@example.com:443/path token=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef123456",
+        )
+
+        val content = UnifiedLogger.read()
+
+        assertTrue(content.contains("<redacted-uri>") || content.contains("://<redacted>@"))
+        assertTrue(content.contains("<redacted-token>"))
+        assertFalse(content.contains("user:pass"))
+        assertFalse(content.contains("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef123456"))
+    }
+
+    @Test
+    fun `logger source uses sanitized logcat payload`() {
+        val src = readSourceFile("app/src/main/java/ru/ozero/app/logging/UnifiedLogger.kt")
+        assertTrue(src.contains("safeLogcatMsg"))
+        assertTrue(src.contains("Log.e(tag, safeLogcatMsg)"))
+        assertTrue(src.contains("Log.w(tag, safeLogcatMsg)"))
+        assertFalse(src.contains("Log.e(tag, msg, t)"))
+        assertFalse(src.contains("Log.w(tag, msg, t)"))
+    }
+
+    private fun readSourceFile(relativePath: String): String {
+        val candidates = buildList {
+            val cwd = File(System.getProperty("user.dir") ?: ".")
+            var current = cwd
+            repeat(6) {
+                add(current.resolve(relativePath))
+                if (current.name.equals("app", ignoreCase = false)) {
+                    add(current.resolve("..").resolve(relativePath))
+                } else {
+                    add(current.resolve("app").resolve(relativePath.removePrefix("app/")))
+                }
+                current.parentFile ?: return@repeat
+                current = current.parentFile
+            }
+        }.distinct()
+        for (candidate in candidates) {
+            if (candidate.exists()) {
+                return candidate.readText()
+            }
+        }
+        return File(relativePath).readText()
     }
 }

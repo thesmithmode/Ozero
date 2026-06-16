@@ -6,10 +6,13 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import javax.net.ssl.SSLHandshakeException
+import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
+import ru.ozero.singboxfmt.StandardV2RayBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
@@ -49,8 +52,33 @@ class RawUpdater(
                         userOrder = idx,
                     )
                 }
+                val existingProfiles = profileDao.getByGroupId(group.id)
+                val incomingBaseKeyCounts = profiles
+                    .groupingBy { it.stableBaseIdentityKey() }
+                    .eachCount()
+                val existingByBaseIdentity = existingProfiles
+                    .groupBy { it.stableBaseIdentityKey() }
+                    .mapValues { (_, matches) -> matches.toMutableList() }
+                val existingByFullIdentity = existingProfiles
+                    .groupBy { it.stableFullIdentityKey() }
+                    .mapValues { (_, matches) -> matches.toMutableList() }
+                val profilesWithStableIds = profiles.map { profile ->
+                    val baseKey = profile.stableBaseIdentityKey()
+                    val useFullKey = (incomingBaseKeyCounts[baseKey] ?: 0) > 1 ||
+                        ((existingByBaseIdentity[baseKey]?.size ?: 0) > 1)
+                    val matched = if (useFullKey) {
+                        existingByFullIdentity[profile.stableFullIdentityKey()]?.removeFirstOrNull()
+                    } else {
+                        existingByBaseIdentity[baseKey]?.removeFirstOrNull()
+                    }
+                    if (matched != null) {
+                        profile.copy(id = matched.id)
+                    } else {
+                        profile
+                    }
+                }
 
-                profileDao.replaceForGroup(group.id, profiles)
+                profileDao.replaceForGroup(group.id, profilesWithStableIds)
 
                 val usedBytes = subInfo?.let { it.uploadBytes + it.downloadBytes } ?: group.bytesUsed
                 val remainingBytes = subInfo?.let {
@@ -65,8 +93,8 @@ class RawUpdater(
                     ),
                 )
 
-                Log.i(TAG, "refresh ok groupId=${group.id} servers=${profiles.size}")
-                profiles.size
+                Log.i(TAG, "refresh ok groupId=${group.id} servers=${profilesWithStableIds.size}")
+                profilesWithStableIds.size
             }
         }.recoverCatching { e ->
             throw normalizeError(e)
@@ -99,3 +127,94 @@ class RawUpdater(
         }
     }
 }
+
+private fun ProxyProfile.stableBaseIdentityKey(): String =
+    listOf(
+        groupId.toString(),
+        protocolType.toString(),
+        runCatching { KryoSerializer.deserialize<AbstractBean>(beanBlob) }
+            .getOrNull()
+            ?.let { "${it.serverAddress}|${it.serverPort}|${it.stableCredentialKey()}" }
+            ?: beanBlob.contentHashCode().toString(),
+    ).joinToString("|")
+
+private fun ProxyProfile.stableFullIdentityKey(): String =
+    listOf(
+        stableBaseIdentityKey(),
+        runCatching { KryoSerializer.deserialize<AbstractBean>(beanBlob) }
+            .getOrNull()
+            ?.stableRuntimeKey()
+            ?: "",
+    ).joinToString("|")
+
+private fun AbstractBean.stableCredentialKey(): String = when (this) {
+    is VLESSBean -> "uuid=${uuid.trim()}"
+    is VMessBean -> "uuid=${uuid.trim()}"
+    is TrojanBean -> "password=${password.trim()}"
+    is ShadowsocksBean -> "method=${method.trim()}|password=${password.trim()}"
+    is StandardV2RayBean -> "uuid=${uuid.trim()}"
+    else -> "blob=${KryoSerializer.serialize(this).contentHashCode()}"
+}
+
+private fun AbstractBean.stableRuntimeKey(): String = when (this) {
+    is VLESSBean -> listOf(
+        standardV2RayRuntimeKey(),
+        "flow=${flow.trim()}",
+    ).joinToString("|")
+    is VMessBean -> listOf(
+        standardV2RayRuntimeKey(),
+        "alterId=$alterId",
+        "encryption=${encryption.trim()}",
+    ).joinToString("|")
+    is StandardV2RayBean -> standardV2RayRuntimeKey()
+    is ShadowsocksBean -> listOf(
+        "plugin=${plugin.trim()}",
+        "pluginOpts=${pluginOpts.trim()}",
+    ).joinToString("|")
+    else -> ""
+}
+
+internal fun stableIdentityKeysForTest(bean: AbstractBean, groupId: Long = 1L): Pair<String, String> {
+    val profile = ProxyProfile(
+        groupId = groupId,
+        name = bean.name,
+        beanBlob = KryoSerializer.serialize(bean),
+        protocolType = RawUpdater.protocolTypeOf(bean),
+    )
+    return profile.stableBaseIdentityKey() to profile.stableFullIdentityKey()
+}
+
+internal fun stableBeanKeysForTest(bean: AbstractBean): Pair<String, String> =
+    bean.stableCredentialKey() to bean.stableRuntimeKey()
+
+internal fun corruptedStableIdentityKeysForTest(blob: ByteArray, groupId: Long = 1L): Pair<String, String> {
+    val profile = ProxyProfile(
+        groupId = groupId,
+        name = "corrupted",
+        beanBlob = blob,
+        protocolType = RawUpdater.PROTOCOL_VLESS,
+    )
+    return profile.stableBaseIdentityKey() to profile.stableFullIdentityKey()
+}
+
+private fun StandardV2RayBean.standardV2RayRuntimeKey(): String =
+    listOf(
+        "type=${type.trim()}",
+        "security=${security.trim()}",
+        "sni=${sni.trim()}",
+        "host=${host.trim()}",
+        "path=${path.trim()}",
+        "grpcServiceName=${grpcServiceName.trim()}",
+        "maxEarlyData=$maxEarlyData",
+        "earlyDataHeaderName=${earlyDataHeaderName.trim()}",
+        "splithttpMode=${splithttpMode.trim()}",
+        "headerType=${headerType.trim()}",
+        "mKcpSeed=${mKcpSeed.trim()}",
+        "quicSecurity=${quicSecurity.trim()}",
+        "quicKey=${quicKey.trim()}",
+        "alpn=${alpn.trim()}",
+        "allowInsecure=$allowInsecure",
+        "utlsFingerprint=${utlsFingerprint.trim()}",
+        "realityPublicKey=${realityPublicKey.trim()}",
+        "realityShortId=${realityShortId.trim()}",
+    ).joinToString("|")

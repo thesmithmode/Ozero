@@ -1,10 +1,12 @@
 package ru.ozero.enginebyedpi.strategy
 
+import java.io.File
+import org.json.JSONObject
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import java.io.File
 import kotlin.random.Random
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class GeneMemoryTest {
@@ -125,6 +127,64 @@ class GeneMemoryTest {
     }
 
     @Test
+    fun `record with empty token list leaves memory empty`() {
+        val mem = memory()
+
+        mem.record(emptyList(), fitness = 1.0)
+
+        assertFalse(mem.hasData())
+        assertNull(mem.rawJson())
+    }
+
+    @Test
+    fun `rawJson returns null for empty memory and JSON after record`() {
+        val mem = memory()
+        assertNull(mem.rawJson())
+
+        mem.record(listOf("-x"), fitness = 0.25)
+        val raw = mem.rawJson()
+
+        assertTrue(raw.orEmpty().contains("-x"), "rawJson must include persisted token: $raw")
+        assertTrue(raw.orEmpty().contains("\"trials\""), "rawJson must include trial count: $raw")
+    }
+
+    @Test
+    fun `importRawJson ignores empty JSON and keeps existing scores`() {
+        val mem = memory()
+        mem.record(listOf("-keep"), fitness = 1.0)
+        val before = meanSamples(mem, "-keep", SEED_DEFAULT)
+
+        mem.importRawJson("{}")
+        val after = meanSamples(mem, "-keep", SEED_DEFAULT)
+
+        assertTrue(before > 0.5)
+        assertTrue(after > 0.5, "empty import must not clear in-memory scores")
+    }
+
+    @Test
+    fun `load decays stale evidence but keeps token available`() {
+        val file = File(tempDir, "decay.json")
+        val oldMs = System.currentTimeMillis() - 2 * 86_400_000L
+        file.writeText(
+            JSONObject()
+                .put(
+                    "-old",
+                    JSONObject()
+                        .put("wins", 10.0)
+                        .put("trials", 10.0)
+                        .put("lastMs", oldMs),
+                )
+                .toString(),
+        )
+        val mem = GeneMemory(file)
+
+        mem.load()
+
+        assertTrue(mem.hasData())
+        assertTrue(meanSamples(mem, "-old", SEED_DEFAULT) > 0.5)
+    }
+
+    @Test
     fun `under-tried tokens have higher sampling variance than popular tokens`() {
         val mem = memory()
         repeat(REPEAT_TIMES_HIGH) { mem.record(listOf("-popular"), fitness = 0.5) }
@@ -175,6 +235,57 @@ class GeneMemoryTest {
         val mem2 = GeneMemory(File(tempDir, "test_memory.json"))
         mem2.load()
         assertTrue(mem2.hasData(), "valid prior state must survive failed import")
+    }
+
+    @Test
+    fun `importRawJson ignores empty array JSON`() {
+        val mem = memory()
+        mem.record(listOf("-keep"), fitness = 1.0)
+
+        mem.importRawJson("[]")
+
+        assertTrue(mem.hasData())
+    }
+
+    @Test
+    fun `importRawJson replaces scores from valid JSON file`() {
+        val mem = memory()
+        mem.record(listOf("-old"), fitness = 1.0)
+        val json = JSONObject()
+            .put(
+                "-new",
+                JSONObject()
+                    .put("wins", 8.0)
+                    .put("trials", 10.0)
+                    .put("lastMs", System.currentTimeMillis()),
+            )
+            .toString()
+
+        mem.importRawJson(json)
+
+        assertTrue(meanSamples(mem, "-new", SEED_DEFAULT) > 0.6)
+        assertTrue(meanSamples(mem, "-old", SEED_DEFAULT) < 0.7)
+    }
+
+    @Test
+    fun `load ignores malformed persisted JSON`() {
+        val file = File(tempDir, "persist.json")
+        file.writeText("{broken")
+        val mem = GeneMemory(file)
+
+        mem.load()
+
+        assertFalse(mem.hasData())
+    }
+
+    @Test
+    fun `sampleScore supports fractional fitness posterior`() {
+        val mem = memory()
+        repeat(REPEAT_TIMES_HIGH) { mem.record(listOf("-half"), fitness = 0.5) }
+
+        val mean = meanSamples(mem, "-half", SEED_DEFAULT)
+
+        assertTrue(mean in 0.35..0.65, "fractional fitness should stay near 0.5, got $mean")
     }
 
     @Test

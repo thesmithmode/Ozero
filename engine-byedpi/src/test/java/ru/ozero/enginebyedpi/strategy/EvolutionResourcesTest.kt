@@ -59,6 +59,13 @@ class EvolutionResourcesTest {
     }
 
     @Test
+    fun `safe separators are preserved in network id`() {
+        val provider = DefaultEvolutionResourcesProvider(tempDir)
+        val res = provider.forNetwork("wifi_5g-home")
+        assertEquals("wifi_5g-home", res.networkId)
+    }
+
+    @Test
     fun `network id length capped`() {
         val provider = DefaultEvolutionResourcesProvider(tempDir)
         val res = provider.forNetwork("a".repeat(500))

@@ -1,8 +1,6 @@
 package ru.ozero.commonvpn
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
@@ -15,14 +13,16 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class TunnelControllerTest {
-    private lateinit var controller: TunnelController
+abstract class TunnelControllerTestBase {
+    protected lateinit var controller: TunnelController
 
     @BeforeEach
     fun setUp() {
         controller = TunnelController()
     }
+}
 
+class TunnelControllerStateTest : TunnelControllerTestBase() {
     @Test
     fun initialStateIsIdle() {
         assertIs<TunnelState.Idle>(controller.state.value)
@@ -222,6 +222,37 @@ class TunnelControllerTest {
     }
 
     @Test
+    fun invalidConnectingToProbingIgnored() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onProbing(EngineId.WARP)
+
+        assertEquals(TunnelState.Connecting(EngineId.BYEDPI), controller.state.value)
+    }
+
+    @Test
+    fun invalidDisconnectingToConnectedIgnored() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onDisconnecting()
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+
+        assertIs<TunnelState.Disconnecting>(controller.state.value)
+    }
+
+    @Test
+    fun failedToDisconnectingIsAllowed() {
+        controller.onProbing()
+        controller.onEngineDied(EngineId.BYEDPI, "crash")
+        controller.onDisconnecting()
+
+        assertIs<TunnelState.Disconnecting>(controller.state.value)
+    }
+}
+
+class TunnelControllerStatsTest : TunnelControllerTestBase() {
+    @Test
     fun statsInitiallyNull() {
         assertNull(controller.stats.value)
     }
@@ -338,7 +369,9 @@ class TunnelControllerTest {
         ctl.reset()
         assertEquals(false, ctl.stagnant.value)
     }
+}
 
+class TunnelControllerKillswitchTest : TunnelControllerTestBase() {
     @Test
     fun killswitchActiveInitiallyFalse() {
         assertEquals(false, controller.killswitchActive.value)
@@ -397,7 +430,9 @@ class TunnelControllerTest {
         assertIs<TunnelState.Failed>(s)
         assertEquals(EngineId.WARP, s.engineId)
     }
+}
 
+class TunnelControllerStatsSmoothingTest : TunnelControllerTestBase() {
     @Test
     fun updateStats_firstSampleBpsIsZero() {
         controller.updateStats(
@@ -461,7 +496,9 @@ class TunnelControllerTest {
         )
         assertEquals(0.0, snap.bpsIn, "rx не менялся → bpsIn=0")
     }
+}
 
+class TunnelControllerSwitchingTest : TunnelControllerTestBase() {
     @Test
     fun switchingStartedSetsTransitionAndPersistsThroughIdle() {
         controller.onProbing()
@@ -531,10 +568,9 @@ class TunnelControllerTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun switchingWatchdogAutoClearsOnTimeout() = runTest {
-        val testScope = TestScope(StandardTestDispatcher(testScheduler))
         val timeoutMs = 12_000L
         val ctl = TunnelController(
-            watchdogScope = testScope,
+            watchdogScope = backgroundScope,
             switchingTimeoutMs = timeoutMs,
         )
         ctl.onProbing()
@@ -542,19 +578,18 @@ class TunnelControllerTest {
         ctl.onEngineStarted(EngineId.BYEDPI, 1080)
         ctl.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.URNETWORK)
         assertNotNull(ctl.switching.value, "switching должен быть установлен сразу")
-        testScope.testScheduler.advanceTimeBy(timeoutMs - 1)
+        testScheduler.advanceTimeBy(timeoutMs - 1)
         assertNotNull(ctl.switching.value, "watchdog не должен срабатывать до таймаута")
-        testScope.testScheduler.advanceTimeBy(2)
+        testScheduler.advanceTimeBy(2)
         assertNull(ctl.switching.value, "watchdog обязан auto-clear switching после ${timeoutMs}ms")
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun switchingWatchdogCancelledOnTerminalTransition() = runTest {
-        val testScope = TestScope(StandardTestDispatcher(testScheduler))
         val timeoutMs = 12_000L
         val ctl = TunnelController(
-            watchdogScope = testScope,
+            watchdogScope = backgroundScope,
             switchingTimeoutMs = timeoutMs,
         )
         ctl.onProbing()
@@ -567,44 +602,42 @@ class TunnelControllerTest {
         ctl.onConnecting(EngineId.URNETWORK)
         ctl.onEngineStarted(EngineId.URNETWORK, 1080)
         assertNull(ctl.switching.value, "terminal transition обязан очистить switching")
-        testScope.testScheduler.advanceTimeBy(timeoutMs + 1)
+        testScheduler.advanceTimeBy(timeoutMs + 1)
         assertNull(ctl.switching.value, "повторный watchdog после terminal не должен реактивировать switching")
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun switchingWatchdogCancelledOnExplicitFinish() = runTest {
-        val testScope = TestScope(StandardTestDispatcher(testScheduler))
         val timeoutMs = 12_000L
         val ctl = TunnelController(
-            watchdogScope = testScope,
+            watchdogScope = backgroundScope,
             switchingTimeoutMs = timeoutMs,
         )
         ctl.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.WARP)
         ctl.onSwitchingFinished("explicit")
         assertNull(ctl.switching.value)
-        testScope.testScheduler.advanceTimeBy(timeoutMs + 1)
+        testScheduler.advanceTimeBy(timeoutMs + 1)
         assertNull(ctl.switching.value, "после explicit finish watchdog не должен реактивироваться")
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun switchingWatchdogRestartsOnNewSwitching() = runTest {
-        val testScope = TestScope(StandardTestDispatcher(testScheduler))
         val timeoutMs = 12_000L
         val ctl = TunnelController(
-            watchdogScope = testScope,
+            watchdogScope = backgroundScope,
             switchingTimeoutMs = timeoutMs,
         )
         ctl.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.URNETWORK)
-        testScope.testScheduler.advanceTimeBy(6_000L)
+        testScheduler.advanceTimeBy(6_000L)
         ctl.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.WARP)
-        testScope.testScheduler.advanceTimeBy(7_000L)
+        testScheduler.advanceTimeBy(7_000L)
         assertNotNull(
             ctl.switching.value,
             "новый onSwitchingStarted перезапускает watchdog — старый timer должен быть отменён",
         )
-        testScope.testScheduler.advanceTimeBy(timeoutMs)
+        testScheduler.advanceTimeBy(timeoutMs)
         assertNull(ctl.switching.value, "новый watchdog должен сработать на новом таймауте")
     }
 
@@ -675,5 +708,198 @@ class TunnelControllerTest {
             controller.state.value,
             "успешный старт старого движка не должен подменять UI state текущего движка",
         )
+    }
+
+    @Test
+    fun targetedProbingAcceptsMatchingEngineOnly() {
+        controller.onProbing(EngineId.WARP)
+        controller.onConnecting(EngineId.WARP)
+
+        assertEquals(TunnelState.Connecting(EngineId.WARP), controller.state.value)
+    }
+
+    @Test
+    fun targetedProbingRejectsStaleEngineStartAndFailure() {
+        controller.onProbing(EngineId.URNETWORK)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onEngineDied(EngineId.BYEDPI, "old failure")
+
+        assertEquals(TunnelState.Probing(EngineId.URNETWORK), controller.state.value)
+    }
+
+    @Test
+    fun failedCanMoveToDisconnectingAndThenIdle() {
+        controller.onProbing()
+        controller.onEngineDied(EngineId.BYEDPI, "crash")
+        controller.onDisconnecting()
+
+        assertIs<TunnelState.Disconnecting>(controller.state.value)
+
+        controller.reset()
+
+        assertIs<TunnelState.Idle>(controller.state.value)
+    }
+
+    @Test
+    fun disconnectingCanMoveToFailedForOwnShutdownError() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.onDisconnecting()
+        controller.onKillswitchEngaged(EngineId.BYEDPI, "shutdown failed")
+
+        val state = controller.state.value
+        assertIs<TunnelState.Failed>(state)
+        assertEquals("shutdown failed", state.reason)
+    }
+
+    @Test
+    fun switchingWithNullTargetClearsOnAnyConnectedEngine() {
+        controller.onSwitchingStarted(from = EngineId.BYEDPI, to = null)
+        assertNotNull(controller.switching.value)
+
+        controller.onProbing()
+        controller.onConnecting(EngineId.WARP)
+        controller.onEngineStarted(EngineId.WARP, 1080)
+
+        assertNull(controller.switching.value)
+    }
+
+    @Test
+    fun duplicateSwitchingFinishedOnNullMarkerIsNoOp() {
+        controller.onSwitchingFinished("already empty")
+        controller.onSwitchingFinished("still empty")
+
+        assertNull(controller.switching.value)
+    }
+
+    @Test
+    fun switchingFinishedClearsOnlyCurrentMarkerOnce() {
+        controller.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.WARP)
+        controller.onSwitchingFinished("first")
+        controller.onSwitchingFinished("second")
+
+        assertNull(controller.switching.value)
+    }
+
+    @Test
+    fun engineStartedResetsPreviousStatsAndStagnation() {
+        var clock = 1_000L
+        val mon = StatsStagnationMonitor(thresholdMs = 10L, nowMs = { clock })
+        val ctl = TunnelController(stagnationMonitor = mon)
+        ctl.onProbing()
+        ctl.onConnecting(EngineId.BYEDPI)
+        ctl.onEngineStarted(EngineId.BYEDPI, 1080)
+        ctl.updateStats(TunnelStats(0, 100, 0, 200, clock))
+        clock += 11L
+        ctl.updateStats(TunnelStats(0, 100, 0, 200, clock))
+        assertEquals(true, ctl.stagnant.value)
+
+        ctl.onDisconnecting()
+        ctl.reset()
+        ctl.onProbing()
+        ctl.onConnecting(EngineId.WARP)
+        ctl.onEngineStarted(EngineId.WARP, 1081)
+        ctl.updateStats(TunnelStats(0, 100, 0, 200, clock + 1))
+
+        assertEquals(false, ctl.stagnant.value)
+        assertEquals(0.0, ctl.stats.value?.bpsIn)
+        assertEquals(0.0, ctl.stats.value?.bpsOut)
+    }
+
+    @Test
+    fun invalidFailedToConnectedIsIgnored() {
+        controller.onProbing()
+        controller.onEngineDied(EngineId.BYEDPI, "crash")
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+
+        assertIs<TunnelState.Failed>(controller.state.value)
+    }
+
+    @Test
+    fun connectedStaleEngineStartedAndFailureAreIgnored() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+
+        controller.onEngineStarted(EngineId.WARP, 2080)
+        controller.onEngineDied(EngineId.WARP, "stale")
+
+        val state = controller.state.value
+        assertIs<TunnelState.Connected>(state)
+        assertEquals(EngineId.BYEDPI, state.engineId)
+        assertEquals(1080, state.socksPort)
+    }
+
+    @Test
+    fun updateStatsUsesOneMillisecondFloorForSameTimestamp() {
+        controller.updateStats(TunnelStats(0, 0, 0, 0, timestampMs = 1000))
+        controller.updateStats(TunnelStats(0, 10, 0, 10, timestampMs = 1000))
+
+        val snapshot = controller.stats.value
+        assertNotNull(snapshot)
+        assertTrue(snapshot.bpsIn > 0.0)
+        assertTrue(snapshot.bpsOut > 0.0)
+    }
+
+    @Test
+    fun switchingToNullClearsOnFailedState() {
+        controller.onSwitchingStarted(from = EngineId.BYEDPI, to = null)
+        controller.onProbing()
+        controller.onEngineDied(EngineId.WARP, "startup failed")
+
+        assertNull(controller.switching.value)
+        assertIs<TunnelState.Failed>(controller.state.value)
+    }
+
+    @Test
+    fun switchingDoesNotClearOnNonTerminalProbingOrConnecting() {
+        controller.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.WARP)
+        controller.onProbing()
+        controller.onConnecting(EngineId.WARP)
+
+        assertNotNull(controller.switching.value)
+        assertIs<TunnelState.Connecting>(controller.state.value)
+    }
+
+    @Test
+    fun onKillswitchEngagedFromDisconnectingMarksFailedAndActive() {
+        controller.onProbing()
+        controller.onDisconnecting()
+        controller.onKillswitchEngaged(EngineId.BYEDPI, "shutdown failure")
+
+        val state = controller.state.value
+        assertIs<TunnelState.Failed>(state)
+        assertEquals(EngineId.BYEDPI, state.engineId)
+        assertTrue(controller.killswitchActive.value)
+    }
+
+    @Test
+    fun switchingFinishedWithoutMarkerKeepsWatchdogStateEmpty() {
+        controller.onSwitchingFinished("none")
+
+        assertNull(controller.switching.value)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun restartingSwitchingCancelsPreviousWatchdogBeforeTimeout() = runTest {
+        val ctl = TunnelController(
+            watchdogScope = backgroundScope,
+            switchingTimeoutMs = 100L,
+        )
+        ctl.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.WARP)
+        testScheduler.advanceTimeBy(50L)
+        ctl.onSwitchingStarted(from = EngineId.WARP, to = EngineId.URNETWORK)
+        testScheduler.advanceTimeBy(60L)
+
+        assertEquals(
+            SwitchingTransition(EngineId.WARP, EngineId.URNETWORK),
+            ctl.switching.value,
+        )
+
+        testScheduler.advanceTimeBy(41L)
+
+        assertNull(ctl.switching.value)
     }
 }

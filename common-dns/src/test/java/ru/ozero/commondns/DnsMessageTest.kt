@@ -51,6 +51,16 @@ class DnsMessageTest {
     }
 
     @Test
+    fun parseAAnswersReturnsEmptyWhenAnswerCountIsZero() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 0, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 1, 0, 1,
+        )
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
     fun parseAAnswersIgnoresAAAARecords() {
         val body = byteArrayOf(
             0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
@@ -60,6 +70,152 @@ class DnsMessageTest {
             0x20, 0x01, 0x0d, 0xb8.toByte(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
         )
         assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun parseAAnswersIgnoresARecordWithUnexpectedRdataLength() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 1, 0, 1,
+            0xC0.toByte(), 0x0C, 0, 1, 0, 1, 0, 0, 0, 60, 0, 3,
+            1, 2, 3,
+        )
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun parseAAnswersExtractsIpv4FromCompressedAnswerName() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 1, 0, 1,
+            0xC0.toByte(), 0x0C, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4,
+            1, 2, 3, 4,
+        )
+        assertEquals(listOf("1.2.3.4"), DnsMessage.parseAAnswers(body))
+    }
+
+    @Test
+    fun parseAAnswersExtractsIpv4FromUncompressedAnswerName() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 1, 0, 1,
+            1, 'a'.code.toByte(), 0, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4,
+            5, 6, 7, 8,
+        )
+        assertEquals(listOf("5.6.7.8"), DnsMessage.parseAAnswers(body))
+    }
+
+    @Test
+    fun parseAAnswersStopsWhenQuestionNameOverrunsBody() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            10, 'a'.code.toByte(),
+        )
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun buildAQueryIgnoresEmptyLabelsAroundHostname() {
+        val normal = DnsMessage.buildAQuery("example.com")
+        val dotted = DnsMessage.buildAQuery(".example..com.")
+
+        assertEquals(normal.drop(2), dotted.drop(2))
+    }
+
+    @Test
+    fun parseAAnswersStopsOnTruncatedCompressedAnswerName() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 1, 0, 1,
+            0xC0.toByte(),
+        )
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun parseAAnswersStopsOnTruncatedResourceRecordHeader() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 1, 0, 1,
+            0,
+        )
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun parseAAnswersStopsOnTruncatedRdata() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 1, 0, 1,
+            0xC0.toByte(), 0x0C, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4,
+            1, 2,
+        )
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun parseAAnswersStopsOnPointerLoopGuard() {
+        val body = ByteArray(12 + 2 + 4).also {
+            it[2] = 0x81.toByte()
+            it[3] = 0x80.toByte()
+            it[5] = 1.toByte()
+            it[7] = 1.toByte()
+            it[12] = 0xC0.toByte()
+            it[13] = 12.toByte()
+        }
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun parseAAnswersStopsWhenQuestionNameExceedsLoopGuard() {
+        val body = ByteArray(12 + 129 * 2 + 4).also { body ->
+            body[2] = 0x81.toByte()
+            body[3] = 0x80.toByte()
+            body[5] = 1.toByte()
+            body[7] = 1.toByte()
+            var offset = 12
+            repeat(129) {
+                body[offset] = 1.toByte()
+                body[offset + 1] = 'a'.code.toByte()
+                offset += 2
+            }
+        }
+        assertTrue(DnsMessage.parseAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun parseAAAAAnswersStopsOnTruncatedAnswerHeader() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 28, 0, 1,
+            0xC0.toByte(),
+        )
+        assertTrue(DnsMessage.parseAAAAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun parseAAAAAnswersStopsOnTruncatedRdata() {
+        val body = byteArrayOf(
+            0, 0, 0x81.toByte(), 0x80.toByte(), 0, 1, 0, 1, 0, 0, 0, 0,
+            1, 'a'.code.toByte(), 0,
+            0, 28, 0, 1,
+            0xC0.toByte(), 0x0C, 0, 28, 0, 1, 0, 0, 0, 60, 0, 16,
+            0x20, 0x01, 0x0d, 0xb8.toByte(),
+        )
+        assertTrue(DnsMessage.parseAAAAAnswers(body).isEmpty())
+    }
+
+    @Test
+    fun buildAQueryKeepsTwoLabelHostnameBoundary() {
+        val q = DnsMessage.buildAQuery("a.b")
+        assertEquals(21, q.size)
     }
 
     @Test

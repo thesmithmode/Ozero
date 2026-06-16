@@ -21,10 +21,12 @@ import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginewarp.AwgParams
 import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpAutoConfig
+import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigDuplicateException
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import ru.ozero.enginewarp.WarpEditDraft
 import ru.ozero.enginewarp.WarpFileImporter
+import ru.ozero.enginewarp.WarpIniBuilder
 import ru.ozero.enginewarp.WarpSettingsUiState
 import ru.ozero.enginewarp.buildNextWarpSlotName
 import ru.ozero.enginewarp.draftFromSlot
@@ -70,11 +72,11 @@ class WarpEngineSettingsViewModel @Inject constructor(
     }
 
     val selectedDoHProvider: StateFlow<DoHProvider> = uiState.map {
-        it.editDraft?.doHProvider ?: DoHProvider.SYSTEM
+        it.editDraft?.doHProvider ?: WarpConfig.DEFAULT_DOH_PROVIDER
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
-        initialValue = DoHProvider.SYSTEM,
+        initialValue = WarpConfig.DEFAULT_DOH_PROVIDER,
     )
 
     fun onSetDoHProvider(provider: DoHProvider) {
@@ -227,12 +229,24 @@ class WarpEngineSettingsViewModel @Inject constructor(
             return
         }
         val existingSlot = _uiState.value.slots.firstOrNull { it.id == draft.slotId }
-        val basAwg = existingSlot?.config?.awgParams ?: AwgParams()
-        val config = draft.toWarpConfig(basAwg)
+        val existingConfig = existingSlot?.config
+        val basAwg = existingConfig?.awgParams ?: AwgParams()
+        val config = draft.toWarpConfig(basAwg).copy(
+            accountLicense = existingConfig?.accountLicense ?: "",
+            allowedIps = existingConfig?.allowedIps ?: WarpConfig.DEFAULT_ALLOWED_IPS,
+        )
         val slotId = draft.slotId
         val name = draft.name.trim().ifBlank { "WARP" }
+        val rawIni = existingSlot?.rawIniOverride?.let {
+            runCatching { WarpIniBuilder.build(config, it) }.getOrElse { WarpIniBuilder.build(config) }
+        }
+        val endpointList = if (existingConfig?.peerEndpoint?.trim() == config.peerEndpoint.trim()) {
+            existingSlot?.endpointList ?: emptyList()
+        } else {
+            listOf(config.peerEndpoint)
+        }
         viewModelScope.launch {
-            runCatching { store.updateSlot(slotId, name, config, existingSlot?.rawIniOverride) }
+            runCatching { store.updateSlot(slotId, name, config, rawIni, endpointList) }
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
                         editDraft = null,

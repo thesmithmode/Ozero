@@ -67,6 +67,15 @@ class GenePoolTest {
     }
 
     @Test
+    fun `blank only seed list uses K fallback vocabulary and block`() {
+        val pool = GenePool(listOf(" ", "\t"))
+
+        assertEquals(listOf("-K"), pool.allGenes().map { it.token })
+        assertEquals(listOf("-K"), pool.randomBlock(Random(0)).map { it.token })
+        assertEquals(listOf("-K"), pool.randomChromosome(1..1, Random(0)).map { it.token })
+    }
+
+    @Test
     fun `parseChromosome ignores extra spaces`() {
         val chromosome = parseChromosome("  -Ku  -An  ")
         assertEquals(2, chromosome.size)
@@ -82,6 +91,45 @@ class GenePoolTest {
             val gene = pool.weightedRandomGene(memory, kotlin.random.Random(it.toLong()))
             assertTrue(vocab.contains(gene.token), "weighted gene '${gene.token}' not in vocab")
         }
+    }
+
+    @Test
+    fun `weighted random block returns fallback block for blank only seeds`() {
+        val pool = GenePool(listOf(""))
+        val memory = GeneMemory(java.io.File.createTempFile("mem-block", ".json").also { it.deleteOnExit() })
+
+        val block = pool.weightedRandomBlock(memory, Random(0))
+
+        assertEquals(listOf("-K"), block.map { it.token })
+    }
+
+    @Test
+    fun `weighted random gene returns fallback gene for blank only seeds`() {
+        val pool = GenePool(listOf(" "))
+        val memory = GeneMemory(java.io.File.createTempFile("mem-gene", ".json").also { it.deleteOnExit() })
+
+        val gene = pool.weightedRandomGene(memory, Random(0))
+
+        assertEquals("-K", gene.token)
+    }
+
+    @Test
+    fun `randomChromosome falls back to one block when requested range is smaller than source blocks`() {
+        val pool = GenePool(listOf("-n example.com --fake -1"))
+
+        val chromosome = pool.randomChromosome(1..1, Random(0))
+
+        assertTrue(chromosome.isNotEmpty())
+    }
+
+    @Test
+    fun `weightedRandomChromosome falls back to weighted block when range is smaller than source blocks`() {
+        val pool = GenePool(listOf("-n example.com --fake -1"))
+        val memory = GeneMemory(java.io.File.createTempFile("mem-weighted-small", ".json").also { it.deleteOnExit() })
+
+        val chromosome = pool.weightedRandomChromosome(memory, 1..1, Random(0))
+
+        assertTrue(chromosome.isNotEmpty())
     }
 
     @Test
@@ -155,6 +203,24 @@ class GenePoolTest {
         val shortSource = "-only"
         val chromosome = pool.randomSubsequence(listOf(shortSource), minLen = 3, maxLen = 5, random = Random(0))
         assertTrue(chromosome.isNotEmpty(), "short source should return non-empty chromosome")
+    }
+
+    @Test
+    fun `randomSubsequence with blank source falls back to generated chromosome`() {
+        val pool = GenePool(seeds)
+
+        val chromosome = pool.randomSubsequence(listOf("   "), minLen = 2, maxLen = 4, random = Random(0))
+
+        assertTrue(chromosome.size in 2..4)
+    }
+
+    @Test
+    fun `randomSubsequence returns first viable block when selected list would be empty`() {
+        val pool = GenePool(seeds)
+
+        val chromosome = pool.randomSubsequence(listOf("-n example.com"), minLen = 2, maxLen = 1, random = Random(0))
+
+        assertEquals(listOf("-n", "example.com"), chromosome.map { it.token })
     }
 
     @Test

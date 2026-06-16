@@ -5,7 +5,7 @@ tags: [testing, mockk, android, native, gotcha, jni]
 sources:
   - "daily/2026-05-10.md"
 created: 2026-05-10
-updated: 2026-05-10
+updated: 2026-06-09
 ---
 
 # mockk AAR Native Static Initializer Trap
@@ -86,6 +86,8 @@ This trap caused a multi-day CI failure in Ozero's `engine-urnetwork` module. Te
 - [[concepts/amneziawg-jni-classpath-completeness]] — Related pattern: native SO requires specific Java classes at load time; this article covers the inverse (Java tests cannot reference native-backed classes)
 - [[concepts/hilt-di-native-library-failure]] — Hilt DI also breaks when native library load fails; similar root cause, different context
 - [[concepts/urnetwork-sdk-integration]] — URnetwork SDK where `ConnectLocation` caused this trap
+- [[concepts/urnetwork-location-empty-string-fallback]] — `LocationInfo` wrappers also need app-level blank-string normalization
+- [[connections/native-io-test-isolation-feedback-loop]] — Shared boundary with ByeDPI: tests should not cross native or real-IO seams
 
 ## Sources
 

@@ -16,7 +16,7 @@ class BinaryDownloader(
     private val retryDelaysMs: List<Long> = listOf(3000L, 9000L, 27000L),
     private val httpClient: HttpClient =
         HttpClient.newBuilder()
-                                                .followRedirects(HttpClient.Redirect.NORMAL)
+            .followRedirects(HttpClient.Redirect.NORMAL)
             .connectTimeout(Duration.ofSeconds(30))
             .build(),
 ) {

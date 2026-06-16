@@ -5,7 +5,7 @@ tags: [android, kotlin, compose, viewmodel, coroutines, ping]
 sources:
   - "daily/2026-05-26.md"
 created: 2026-05-26
-updated: 2026-05-26
+updated: 2026-06-13
 ---
 
 # PingJob ViewModel Cancellation Pattern
@@ -85,6 +85,7 @@ if (isPinging) {
 - [[concepts/viewmodel-stateflow-test-race]] - Related: StateFlow race conditions in ViewModel testing
 - [[concepts/compose-launchedeffect-crash-invisibility]] - LaunchedEffect crash patterns in Compose
 - [[concepts/viewmodel-polling-runtest-trap]] - Testing ViewModel coroutine loops
+- [[connections/singbox-ui-ci-diagnostic-feedback-loop]] - Explains why coroutine review findings must be verified in the broader singbox diagnostic loop
 
 ## Sources
 

@@ -5,7 +5,7 @@ tags: [gradle, agp, configuration-cache, build, ci]
 sources:
   - "daily/2026-05-23.md"
 created: 2026-05-23
-updated: 2026-05-23
+updated: 2026-06-12
 ---
 
 # Gradle Configuration Cache + AGP 8.7.x: MapSourceSetPathsTask Non-Serializable Bug

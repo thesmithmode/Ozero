@@ -5,7 +5,7 @@ tags: [warp, android, ui, sentinel, bug, stats]
 sources:
   - "daily/2026-05-26.md"
 created: 2026-05-26
-updated: 2026-05-26
+updated: 2026-06-13
 ---
 
 # WARP Amber Flash: activeConnections=0 at Ready

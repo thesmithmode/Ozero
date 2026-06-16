@@ -20,6 +20,15 @@ class FakeProxyProfileDao : ProxyProfileDao {
         profiles.forEach { insert(it) }
     }
 
+    override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
+        profiles.map { profile ->
+            if (profile.id != 0L && this.profiles.any { it.id == profile.id }) {
+                -1L
+            } else {
+                insert(profile)
+            }
+        }
+
     override suspend fun getById(id: Long): ProxyProfile? =
         profiles.firstOrNull { it.id == id }
 
@@ -34,6 +43,14 @@ class FakeProxyProfileDao : ProxyProfileDao {
 
     override suspend fun deleteByGroupId(groupId: Long) {
         profiles.removeAll { it.groupId == groupId }
+    }
+
+    override suspend fun getIdsByGroupId(groupId: Long): List<Long> =
+        profiles.filter { it.groupId == groupId }.map { it.id }
+
+    override suspend fun deleteByIds(ids: List<Long>) {
+        val idSet = ids.toSet()
+        profiles.removeAll { it.id in idSet }
     }
 
     override suspend fun updateLatency(id: Long, latency: Int) {

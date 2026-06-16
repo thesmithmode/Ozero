@@ -89,4 +89,70 @@ class WarpPreflightTest {
         val (host, _) = preflight.resolveTarget()
         assertEquals("1.1.1.1", host)
     }
+
+    @Test
+    fun `resolveTarget uses fallback for bracketed non IPv6 host`() {
+        val preflight = WarpPreflight(peerEndpointProvider = { "[engage.cloudflareclient.com]:4500" })
+
+        val (host, port) = preflight.resolveTarget()
+
+        assertEquals("1.1.1.1", host)
+        assertEquals(443, port)
+    }
+
+    @Test
+    fun `resolveTarget uses fallback for bracketed endpoint without closing bracket`() {
+        val preflight = WarpPreflight(peerEndpointProvider = { "[2606:4700:d0::a29f:c001:4500" })
+
+        val (host, _) = preflight.resolveTarget()
+
+        assertEquals("1.1.1.1", host)
+    }
+
+    @Test
+    fun `resolveTarget uses fallback for IPv4 endpoint with empty host`() {
+        val preflight = WarpPreflight(peerEndpointProvider = { ":4500" })
+
+        val (host, _) = preflight.resolveTarget()
+
+        assertEquals("1.1.1.1", host)
+    }
+
+    @Test
+    fun `resolveTarget uses fallback for IPv4 host with invalid character`() {
+        val preflight = WarpPreflight(peerEndpointProvider = { "203.0.113.a:4500" })
+
+        val (host, _) = preflight.resolveTarget()
+
+        assertEquals("1.1.1.1", host)
+    }
+
+    @Test
+    fun `resolveTarget uses fallback for bracketed IPv6 with invalid character`() {
+        val preflight = WarpPreflight(peerEndpointProvider = { "[2606:4700::zzzz]:4500" })
+
+        val (host, _) = preflight.resolveTarget()
+
+        assertEquals("1.1.1.1", host)
+    }
+
+    @Test
+    fun `resolveTarget accepts uppercase IPv6 hex characters`() {
+        val preflight = WarpPreflight(peerEndpointProvider = { "[2606:4700:D0::A29F:C001]:4500" })
+
+        val (host, port) = preflight.resolveTarget()
+
+        assertEquals("2606:4700:D0::A29F:C001", host)
+        assertEquals(443, port)
+    }
+
+    @Test
+    fun `resolveTarget trims provider endpoint before parsing`() {
+        val preflight = WarpPreflight(peerEndpointProvider = { "  203.0.113.9:4500  " })
+
+        val (host, port) = preflight.resolveTarget()
+
+        assertEquals("203.0.113.9", host)
+        assertEquals(443, port)
+    }
 }

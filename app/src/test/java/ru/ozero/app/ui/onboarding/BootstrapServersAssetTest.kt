@@ -3,6 +3,7 @@ package ru.ozero.app.ui.onboarding
 import org.json.JSONObject
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -21,7 +22,7 @@ class BootstrapServersAssetTest {
         val json = JSONObject(asset.readText())
         val servers = json.optJSONArray("servers")
         assertNotNull(servers, "servers array обязателен")
-        assertTrue(servers!!.length() >= 30, "ожидаем ≥30 серверов, got ${servers.length()}")
+        assertEquals(0, servers!!.length(), "bundled asset не должен содержать live proxy credentials")
     }
 
     @Test
@@ -44,6 +45,17 @@ class BootstrapServersAssetTest {
             val uri = servers.optString(i)
             val scheme = uri.substringBefore("://").lowercase()
             assertTrue(scheme in supported, "URI #$i scheme '$scheme' не поддерживается: $uri")
+        }
+    }
+
+    @Test
+    fun `asset does not ship live proxy credentials or insecure proxy flags`() {
+        val text = asset.readText()
+        listOf("vless://", "vmess://", "trojan://", "ss://", "hysteria2://", "hy2://").forEach { scheme ->
+            assertFalse(text.contains(scheme), "bundled bootstrap не должен содержать live proxy URI: $scheme")
+        }
+        listOf("allowInsecure=1", "security=none", "insecure=1", "encryption=none").forEach { marker ->
+            assertFalse(text.contains(marker), "bundled bootstrap не должен содержать insecure marker: $marker")
         }
     }
 

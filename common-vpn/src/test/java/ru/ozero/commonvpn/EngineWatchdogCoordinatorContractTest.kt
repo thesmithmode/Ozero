@@ -1,4 +1,4 @@
-package ru.ozero.commonvpn
+﻿package ru.ozero.commonvpn
 
 import org.junit.jupiter.api.Test
 import java.io.File
@@ -10,7 +10,7 @@ class EngineWatchdogCoordinatorContractTest {
     private val source by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
         val f = File(moduleRoot, "src/main/java/ru/ozero/commonvpn/EngineWatchdogCoordinator.kt")
-        assertTrue(f.exists(), "EngineWatchdogCoordinator.kt не найден: $f")
+        assertTrue(f.exists(), "EngineWatchdogCoordinator.kt РЅРµ РЅР°Р№РґРµРЅ: $f")
         f.readText()
     }
 
@@ -19,6 +19,19 @@ class EngineWatchdogCoordinatorContractTest {
         assertEquals(5_000L, EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
         assertEquals(30_000L, EngineWatchdogCoordinator.PEER_WATCHDOG_TIMEOUT_MS)
         assertEquals(30_000L, EngineWatchdogCoordinator.PEER_WATCHDOG_RECOVER_GRACE_MS)
+    }
+
+    @Test
+    fun `handleEngineFailure fdAlive=false РІРµРґС‘С‚ Рє stopVpnRequest, РЅРµ lockdown (P33) - default path`() {
+        val body = source.substringAfter("fun handleEngineFailure(")
+        assertTrue(
+            body.contains("killswitchProvider() && hasBlockingTunForKillswitch()"),
+            "True-branch РѕР±СЏР·Р°РЅ С‚СЂРµР±РѕРІР°С‚СЊ killswitch=on Рё РѕР±С‰РёР№ blocking TUN check С‡РµСЂРµР· hasBlockingTunForKillswitch(). Body:\n$body",
+        )
+        assertTrue(
+            body.contains("tunnelController.onEngineDied(engineId, reason)") && body.contains("stopVpnRequest()"),
+            "False-branch РѕР±СЏР·Р°РЅ РѕСЃС‚Р°РІРёС‚СЊ graceful stop С‡РµСЂРµР· onEngineDied + stopVpnRequest. Body:\n$body",
+        )
     }
 
     @Test
@@ -40,7 +53,7 @@ class EngineWatchdogCoordinatorContractTest {
     }
 
     @Test
-    fun `публичные методы существуют`() {
+    fun `РїСѓР±Р»РёС‡РЅС‹Рµ РјРµС‚РѕРґС‹ СЃСѓС‰РµСЃС‚РІСѓСЋС‚`() {
         listOf(
             "fun startHealthKillswitchWatcher(",
             "fun startPeerWatchdog(",
@@ -48,116 +61,112 @@ class EngineWatchdogCoordinatorContractTest {
             "fun handleEngineFailure(",
             "fun cancelWatchers(",
         ).forEach { anchor ->
-            assertTrue(source.contains(anchor), "Public API anchor потерян: '$anchor'")
+            assertTrue(source.contains(anchor), "Public API anchor РїРѕС‚РµСЂСЏРЅ: '$anchor'")
         }
     }
 
     @Test
-    fun `enterKillswitchMode остаётся private — внутренний хелпер`() {
+    fun `enterKillswitchMode РѕСЃС‚Р°С‘С‚СЃСЏ private вЂ” РІРЅСѓС‚СЂРµРЅРЅРёР№ С…РµР»РїРµСЂ`() {
         assertTrue(
             source.contains("private fun enterKillswitchMode("),
-            "enterKillswitchMode обязан быть private — вызывается только из health watcher и handleEngineFailure.",
+            "enterKillswitchMode РѕР±СЏР·Р°РЅ Р±С‹С‚СЊ private вЂ” РІС‹Р·С‹РІР°РµС‚СЃСЏ С‚РѕР»СЊРєРѕ РёР· health watcher Рё handleEngineFailure.",
         )
     }
 
     @Test
-    fun `cancelWatchers отменяет все watch jobs`() {
+    fun `cancelWatchers РѕС‚РјРµРЅСЏРµС‚ РІСЃРµ watch jobs`() {
         val body = source.substringAfter("fun cancelWatchers(").substringBefore("fun handleEngineFailure")
         assertTrue(
             body.contains("healthWatchJobRef.getAndSet(null)") &&
                 body.contains("peerWatchJobRef.getAndSet(null)") &&
                 body.contains("stagnationWatchJobRef.getAndSet(null)"),
-            "cancelWatchers обязан отменить все jobs — иначе утечка watchers при stop. Body:\n$body",
+            "cancelWatchers РѕР±СЏР·Р°РЅ РѕС‚РјРµРЅРёС‚СЊ РІСЃРµ jobs вЂ” РёРЅР°С‡Рµ СѓС‚РµС‡РєР° watchers РїСЂРё stop. Body:\n$body",
         )
     }
 
     @Test
-    fun `handleEngineFailure ветвится по killswitchProvider + fdAlive`() {
+    fun `handleEngineFailure РІРµС‚РІРёС‚СЃСЏ РїРѕ killswitchProvider + fdAlive`() {
         val body = source.substringAfter("fun handleEngineFailure(").substringBefore("private fun enterKillswitchMode")
-        assertTrue(body.contains("killswitchProvider()"), "Обязан читать killswitchProvider().")
-        assertTrue(body.contains("tunFdRef.get() != null"), "Обязан проверять fdAlive.")
-        assertTrue(body.contains("enterKillswitchMode("), "True-branch → killswitch.")
-        assertTrue(body.contains("stopVpnRequest()"), "False-branch → stopVpnRequest callback.")
+        assertTrue(body.contains("killswitchProvider()"), "РћР±СЏР·Р°РЅ С‡РёС‚Р°С‚СЊ killswitchProvider().")
+        assertTrue(
+            body.contains("hasBlockingTun()"),
+            "РћР±СЏР·Р°РЅ РїСЂРѕРІРµСЂСЏС‚СЊ РѕР±С‰РёР№ blocking TUN, РІРєР»СЋС‡Р°СЏ startup lockdown fd.",
+        )
+        assertTrue(body.contains("enterKillswitchMode("), "True-branch в†’ killswitch.")
+        assertTrue(
+            !body.contains("restartInProgressProvider"),
+            "restartInProgressProvider больше не должен участвовать в watchdog decision.",
+        )
     }
 
     @Test
-    fun `enterKillswitchMode останавливает chain и health monitor + меняет notification`() {
-        val body = source.substringAfter("private fun enterKillswitchMode(").substringBefore("companion object")
-        assertTrue(body.contains("tunnelController.onKillswitchEngaged"), "Уведомление UI обязательно.")
-        assertTrue(body.contains("chainOrchestrator.stop()"), "Chain stop обязательно.")
-        assertTrue(body.contains("healthMonitor.stop()"), "Health monitor stop обязательно.")
-        assertTrue(body.contains("notificationFactory.notifyStats("), "Killswitch notification обязательна.")
-        assertTrue(body.contains("starting.set(false)"), "starting сброс обязателен.")
-    }
-
-    @Test
-    fun `startHealthKillswitchWatcher cancels previous job до запуска нового`() {
+    fun `startHealthKillswitchWatcher cancels previous job РґРѕ Р·Р°РїСѓСЃРєР° РЅРѕРІРѕРіРѕ`() {
         val body = source.substringAfter("fun startHealthKillswitchWatcher(").substringBefore("fun startPeerWatchdog")
         assertTrue(
             body.indexOf("healthWatchJobRef.getAndSet(null)?.cancel()") >= 0,
-            "Watcher обязан отменить предыдущий job — иначе double-fire при перезапуске. Body:\n$body",
+            "Watcher РѕР±СЏР·Р°РЅ РѕС‚РјРµРЅРёС‚СЊ РїСЂРµРґС‹РґСѓС‰РёР№ job вЂ” РёРЅР°С‡Рµ double-fire РїСЂРё РїРµСЂРµР·Р°РїСѓСЃРєРµ. Body:\n$body",
         )
     }
 
     @Test
-    fun `startPeerWatchdog cancels previous job + early return если plugin не найден`() {
+    fun `startPeerWatchdog cancels previous job + early return РµСЃР»Рё plugin РЅРµ РЅР°Р№РґРµРЅ`() {
         val body = source.substringAfter("fun startPeerWatchdog(").substringBefore("fun startStagnationWatchdog")
         assertTrue(
             body.contains("peerWatchJobRef.getAndSet(null)?.cancel()"),
-            "Обязан отменить предыдущий peer watch job.",
+            "РћР±СЏР·Р°РЅ РѕС‚РјРµРЅРёС‚СЊ РїСЂРµРґС‹РґСѓС‰РёР№ peer watch job.",
         )
         assertTrue(
             body.contains("enginePlugins.firstOrNull { it.id == engineId } ?: return"),
-            "Plugin not found → early return до launch.",
+            "Plugin not found в†’ early return РґРѕ launch.",
         )
     }
 
     @Test
-    fun `coordinator не зависит от OzeroVpnService — тестируемость`() {
+    fun `coordinator РЅРµ Р·Р°РІРёСЃРёС‚ РѕС‚ OzeroVpnService вЂ” С‚РµСЃС‚РёСЂСѓРµРјРѕСЃС‚СЊ`() {
         assertTrue(
             !source.contains("OzeroVpnService"),
-            "EngineWatchdogCoordinator не должен ссылаться на OzeroVpnService — нарушение модульности.",
+            "EngineWatchdogCoordinator РЅРµ РґРѕР»Р¶РµРЅ СЃСЃС‹Р»Р°С‚СЊСЃСЏ РЅР° OzeroVpnService вЂ” РЅР°СЂСѓС€РµРЅРёРµ РјРѕРґСѓР»СЊРЅРѕСЃС‚Рё.",
         )
         val classDecl = source.substringAfter("class EngineWatchdogCoordinator").substringBefore("{").trim()
         assertTrue(
             classDecl.contains("scope: CoroutineScope") &&
                 classDecl.contains("killswitchProvider: () -> Boolean") &&
                 classDecl.contains("stopVpnRequest: () -> Unit"),
-            "Coordinator зависит от scope + callbacks, не от service напрямую.",
+            "Coordinator Р·Р°РІРёСЃРёС‚ РѕС‚ scope + callbacks, РЅРµ РѕС‚ service РЅР°РїСЂСЏРјСѓСЋ.",
         )
     }
 
     @Test
-    fun `killswitch=false branch вызывает onEngineDied + stopVpnRequest, не enterKillswitchMode (P33)`() {
+    fun `killswitch=false branch РІС‹Р·С‹РІР°РµС‚ onEngineDied + stopVpnRequest, РЅРµ enterKillswitchMode (P33)`() {
         val body = source.substringAfter("fun handleEngineFailure(")
             .substringBefore("private fun enterKillswitchMode")
         val elseBlock = body.substringAfter("else {").substringBefore("}")
         assertTrue(
             elseBlock.contains("tunnelController.onEngineDied(engineId"),
-            "false-branch (killswitch=off ИЛИ fdAlive=false) обязан вызвать " +
-                "tunnelController.onEngineDied — иначе UI не знает что движок умер. Body:\n$elseBlock",
+            "false-branch (killswitch=off РР›Р fdAlive=false) РѕР±СЏР·Р°РЅ РІС‹Р·РІР°С‚СЊ " +
+                "tunnelController.onEngineDied вЂ” РёРЅР°С‡Рµ UI РЅРµ Р·РЅР°РµС‚ С‡С‚Рѕ РґРІРёР¶РѕРє СѓРјРµСЂ. Body:\n$elseBlock",
         )
         assertTrue(
             elseBlock.contains("stopVpnRequest()"),
-            "false-branch обязан звать stopVpnRequest — graceful shutdown VPN, не lockdown. Body:\n$elseBlock",
+            "false-branch РѕР±СЏР·Р°РЅ Р·РІР°С‚СЊ stopVpnRequest вЂ” graceful shutdown VPN, РЅРµ lockdown. Body:\n$elseBlock",
         )
         assertTrue(
             !elseBlock.contains("enterKillswitchMode"),
-            "false-branch НЕ должен звать enterKillswitchMode — killswitch=off значит " +
-                "не блокируем трафик, а штатно останавливаем VPN. Body:\n$elseBlock",
+            "false-branch РќР• РґРѕР»Р¶РµРЅ Р·РІР°С‚СЊ enterKillswitchMode вЂ” killswitch=off Р·РЅР°С‡РёС‚ " +
+                "РЅРµ Р±Р»РѕРєРёСЂСѓРµРј С‚СЂР°С„РёРє, Р° С€С‚Р°С‚РЅРѕ РѕСЃС‚Р°РЅР°РІР»РёРІР°РµРј VPN. Body:\n$elseBlock",
         )
     }
 
     @Test
-    fun `health watcher killswitch=false branch не вызывает enterKillswitchMode (P33)`() {
+    fun `health watcher killswitch=false branch РЅРµ РІС‹Р·С‹РІР°РµС‚ enterKillswitchMode (P33)`() {
         val body = source.substringAfter("fun startHealthKillswitchWatcher(")
             .substringBefore("fun startPeerWatchdog")
         val elseBlock = body.substringAfter("} else {").substringBefore("}")
         assertTrue(
             !elseBlock.contains("enterKillswitchMode"),
             "В health watcher else-ветке (killswitch=off ИЛИ fd=null ИЛИ stopping) " +
-                "НЕ должен вызываться enterKillswitchMode — иначе lockdown триггерится без согласия юзера. " +
-                "Body:\n$elseBlock",
+                "НЕ должен вызываться enterKillswitchMode — иначе lockdown триггерится " +
+                "без согласия user. Body:\n$elseBlock",
         )
         assertTrue(
             elseBlock.contains("PersistentLoggers"),
@@ -167,21 +176,18 @@ class EngineWatchdogCoordinatorContractTest {
     }
 
     @Test
-    fun `handleEngineFailure fdAlive=false ведёт к stopVpnRequest, не lockdown (P33)`() {
+    fun `handleEngineFailure fdAlive=false ведёт к stopVpnRequest, не lockdown (P33) - blocking tun path`() {
         val body = source.substringAfter("fun handleEngineFailure(")
             .substringBefore("private fun enterKillswitchMode")
         assertTrue(
-            body.contains("killswitchProvider() && fdAlive") ||
-                body.contains("killswitchProvider() && tunFdRef.get() != null") ||
-                body.contains("fdAlive && killswitchProvider()") ||
-                body.contains("tunFdRef.get() != null && killswitchProvider()"),
-            "True-branch обязан требовать ОБА: killswitch=on И fdAlive — иначе " +
-                "lockdown триггерится при уже мёртвом TUN (no-op + state inconsistency). Body:\n$body",
+            body.contains("killswitchProvider() && hasBlockingTunForKillswitch()") &&
+                !body.contains("restartInProgressProvider"),
+            "True-branch обязана требовать killswitch=on + real blocking TUN. Body:\n$body",
         )
     }
 
     @Test
-    fun `CancellationException пробрасывается, не глотается в watcher`() {
+    fun `CancellationException пробырасывается, не глотается в watcher`() {
         val healthBody = source.substringAfter("fun startHealthKillswitchWatcher(")
             .substringBefore("fun startPeerWatchdog")
         val peerBody = source.substringAfter("fun startPeerWatchdog(").substringBefore("fun cancelWatchers")

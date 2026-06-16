@@ -78,7 +78,12 @@ object RawShareLinksParser {
                 pluginOpts = outbound.optString("plugin_opts")
             }
             else -> null
-        }?.takeIf { it.serverAddress.isNotBlank() && it.serverPort > 0 }
+        }?.takeIf {
+            outbound.has("server") &&
+                outbound.has("server_port") &&
+                it.serverAddress.isNotBlank() &&
+                it.serverPort > 0
+        }
 
     private fun AbstractBean.applyCommon(outbound: JSONObject) {
         name = outbound.optString("tag")

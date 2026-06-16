@@ -5,7 +5,7 @@ tags: [fptn, engine, tls, sni, reality, configuration]
 sources:
   - "daily/2026-05-23.md"
 created: 2026-05-23
-updated: 2026-05-23
+updated: 2026-06-12
 ---
 
 # FPTN SNI Bypass Method: Enum, sniDomain Field, Reality Protocol Requirement
@@ -66,6 +66,8 @@ Three radio buttons in `FptnBypassCard` (Compose):
 - `SNI + Reality` — requires valid SNI domain in field below
 
 SNI domain field is shown only when `SNI` or `SNI_AND_REALITY` is selected. Reset button restores `sniDomain` to `"ads.x5.ru"`. `FptnBypassCard` was decomposed into 3 private functions to satisfy detekt `LongMethod` rule (195 → <120 lines per function).
+
+After v0.2.0 release testing, user logs showed `SNI-REALITY-FIREFOX-149` timing out with HTTP 608, then a manual switch to plain `SNI` succeeding quickly. This confirmed the practical default for Ozero should remain `SNI`, while Reality remains an explicit advanced path that depends on a server-compatible domain and fingerprint.
 
 ## Related Concepts
 

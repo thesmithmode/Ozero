@@ -11,7 +11,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxfmt.ShadowsocksBean
+import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyChainStep
@@ -36,6 +39,33 @@ class SingboxEngineAutoSelectTest {
         }
         return KryoSerializer.serialize(bean)
     }
+
+    private fun makeVmessBlob(): ByteArray = KryoSerializer.serialize(
+        VMessBean().apply {
+            uuid = "vmess-id"
+            serverAddress = "vmess.example.com"
+            serverPort = 443
+            type = "tcp"
+        },
+    )
+
+    private fun makeTrojanBlob(): ByteArray = KryoSerializer.serialize(
+        TrojanBean().apply {
+            password = "secret"
+            serverAddress = "trojan.example.com"
+            serverPort = 443
+            type = "tcp"
+        },
+    )
+
+    private fun makeShadowsocksBlob(): ByteArray = KryoSerializer.serialize(
+        ShadowsocksBean().apply {
+            method = "aes-128-gcm"
+            password = "secret"
+            serverAddress = "ss.example.com"
+            serverPort = 8388
+        },
+    )
 
     private fun makeProfile(id: Long, groupId: Long, host: String, port: Int): ProxyProfile =
         ProxyProfile(
@@ -69,7 +99,12 @@ class SingboxEngineAutoSelectTest {
             override suspend fun getById(id: Long): ProxyProfile? = allProfiles.find { it.id == id }
             override suspend fun insert(profile: ProxyProfile): Long = profile.id
             override suspend fun insertAll(profiles: List<ProxyProfile>) {}
+            override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
+                profiles.map { it.id.takeIf { id -> id != 0L } ?: 1L }
             override suspend fun deleteByGroupId(groupId: Long) {}
+            override suspend fun getIdsByGroupId(groupId: Long): List<Long> =
+                profilesByGroup[groupId]?.map { it.id } ?: emptyList()
+            override suspend fun deleteByIds(ids: List<Long>) {}
             override suspend fun updateLatency(id: Long, latency: Int) {}
             override suspend fun countByGroupId(groupId: Long): Int =
                 profilesByGroup[groupId]?.size ?: 0
@@ -180,6 +215,25 @@ class SingboxEngineAutoSelectTest {
     }
 
     @Test
+    fun `manual profile config prefers selected row blob over stale datastore blob`() {
+        val selected = makeProfile(42L, 1L, "eu.example.com", 443)
+        val stale = makeVlessBlob("stale.example.com", 8443)
+        val prefs = mutablePreferencesOf(beanKey to stale, selectedProfileKey to selected.id)
+        val engine = buildEngine(
+            prefs = prefs,
+            profilesByGroup = mapOf(1L to listOf(selected)),
+        )
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNotNull(result)
+        assertTrue(result is EngineConfig.Singbox)
+        assertTrue(result.beanBlob.contentEquals(selected.beanBlob))
+        assertTrue(!result.beanBlob.contentEquals(stale))
+    }
+
+    @Test
     fun `should return null when no blob and no auto mode`() {
         val engine = buildEngine()
         awaitInit()
@@ -208,5 +262,63 @@ class SingboxEngineAutoSelectTest {
         assertNotNull(result)
         assertTrue(result is EngineConfig.Singbox)
         assertEquals(3, result.autoSelectBeanBlobs.size)
+    }
+
+    @Test
+    fun `buildManualConfig maps protocol type from selected bean class`() {
+        val cases = listOf(
+            makeVlessBlob() to SingboxEngine.PROTOCOL_VLESS,
+            makeVmessBlob() to SingboxEngine.PROTOCOL_VMESS,
+            makeTrojanBlob() to SingboxEngine.PROTOCOL_TROJAN,
+            makeShadowsocksBlob() to SingboxEngine.PROTOCOL_SHADOWSOCKS,
+        )
+
+        cases.forEachIndexed { index, (blob, expectedType) ->
+            val prefs = mutablePreferencesOf(beanKey to blob, selectedProfileKey to (index + 10L))
+            val profile = ProxyProfile(
+                id = index + 10L,
+                groupId = 1L,
+                name = "case-$index",
+                beanBlob = blob,
+                protocolType = expectedType,
+            )
+            val engine = buildEngine(prefs = prefs, profilesByGroup = mapOf(1L to listOf(profile)))
+            awaitInit()
+
+            val result = engine.buildManualConfig(null)
+
+            assertNotNull(result)
+            assertTrue(result is EngineConfig.Singbox)
+            assertEquals(expectedType, result.protocolType)
+        }
+    }
+
+    @Test
+    fun `buildManualConfig falls back to VLESS protocol for invalid blob`() {
+        val invalid = byteArrayOf(1, 2, 3)
+        val prefs = mutablePreferencesOf(beanKey to invalid)
+        val engine = buildEngine(prefs = prefs)
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNotNull(result)
+        assertTrue(result is EngineConfig.Singbox)
+        assertEquals(SingboxEngine.PROTOCOL_VLESS, result.protocolType)
+    }
+
+    @Test
+    fun `buildProxyConfig mirrors manual config with proxy mode enabled`() {
+        val blob = makeVlessBlob()
+        val prefs = mutablePreferencesOf(beanKey to blob)
+        val engine = buildEngine(prefs = prefs)
+        awaitInit()
+
+        val result = engine.buildProxyConfig(null)
+
+        assertNotNull(result)
+        val singbox = result as EngineConfig.Singbox
+        assertTrue(singbox.proxyMode)
+        assertTrue(singbox.beanBlob.contentEquals(blob))
     }
 }

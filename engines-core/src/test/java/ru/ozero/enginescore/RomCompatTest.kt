@@ -16,13 +16,22 @@ class RomCompatTest {
     fun zte_manufacturer_returns_true() = assertTrue(check("ZTE", "ZTE A52 Lite"))
 
     @Test
+    fun zte_manufacturer_without_model_hint_returns_true() = assertTrue(check("zte corporation", "blade"))
+
+    @Test
     fun redmagic_model_returns_true() = assertTrue(check("nubia", "RedMagic 9 Pro"))
+
+    @Test
+    fun redmagic_model_without_nubia_manufacturer_returns_true() = assertTrue(check("unknown", "RedMagic 9 Pro"))
 
     @Test
     fun nx7_model_returns_true() = assertTrue(check("Nubia", "NX729J"))
 
     @Test
     fun nx7_model_prefix_returns_true() = assertTrue(check("unknown", "NX7Pro"))
+
+    @Test
+    fun nx7_model_without_redmagic_hint_returns_true() = assertTrue(check("unknown", "phone nx7 variant"))
 
     @Test
     fun samsung_device_returns_false() = assertFalse(check("samsung", "SM-G991B"))
@@ -35,4 +44,9 @@ class RomCompatTest {
 
     @Test
     fun empty_strings_return_false() = assertFalse(check("", ""))
+
+    @Test
+    fun default_android_build_values_are_safe_to_check() {
+        RomCompat.isNubiaRedMagic()
+    }
 }

@@ -7,6 +7,7 @@ import com.bringyour.sdk.ConnectViewController
 import com.bringyour.sdk.DeviceLocal
 import com.bringyour.sdk.FilteredLocations
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ru.ozero.enginescore.PersistentLoggers
@@ -25,38 +26,45 @@ internal class UrnetworkPreferredLocationConnector(
         if (!resolving.compareAndSet(false, true)) return
         val locVc = runCatching { device.openLocationsViewController() }.getOrNull()
         if (locVc == null) {
-            PersistentLoggers.warn(TAG, "openLocationsViewController null — fallback connectBestAvailable")
-            runCatching { cv.connectBestAvailable() }
+            PersistentLoggers.warn(TAG, "openLocationsViewController null fallback connectBestAvailable")
+            bridgeScope.launch(Dispatchers.Main.immediate) {
+                runCatching { cv.connectBestAvailable() }
+            }
             resolving.set(false)
             return
         }
         val attached = AtomicBoolean(false)
-        val timeoutJob = bridgeScope.launch {
+        fun finish() {
+            resolving.set(false)
+        }
+        val timeoutJob = bridgeScope.launch(Dispatchers.Main.immediate) {
             delay(PREFERRED_COUNTRY_TIMEOUT_MS)
             if (attached.compareAndSet(false, true)) {
                 runCatching { cv.connectBestAvailable() }
                 runCatching { locVc.stop() }
                 runCatching { locVc.close() }
-                resolving.set(false)
+                finish()
                 PersistentLoggers.warn(
                     TAG,
-                    "preferred ${selection.summary()} timeout (${PREFERRED_COUNTRY_TIMEOUT_MS}ms) → fallback connectBestAvailable",
+                    "preferred ${selection.summary()} timeout (${PREFERRED_COUNTRY_TIMEOUT_MS}ms) fallback connectBestAvailable",
                 )
             }
         }
         runCatching {
             locVc.addFilteredLocationsListener { filtered, _ ->
-                if (filtered == null) return@addFilteredLocationsListener
-                val match = findBestMatch(filtered, selection) ?: return@addFilteredLocationsListener
-                if (attached.compareAndSet(false, true)) {
-                    timeoutJob.cancel()
-                    persistLocation(device, match)
-                    runCatching { cv.connect(match) }
-                        .onFailure { PersistentLoggers.warn(TAG, "connect(match) threw: ${it.message}") }
-                    Log.i(TAG, "preferred ${selection.summary()} matched → connected")
-                    runCatching { locVc.stop() }
-                    runCatching { locVc.close() }
-                    resolving.set(false)
+                bridgeScope.launch(Dispatchers.Main.immediate) {
+                    if (filtered == null) return@launch
+                    val match = findBestMatch(filtered, selection) ?: return@launch
+                    if (attached.compareAndSet(false, true)) {
+                        timeoutJob.cancel()
+                        runCatching { cv.connect(match) }
+                            .onSuccess { }
+                            .onFailure { PersistentLoggers.warn(TAG, "connect(match) threw: ${it.message}") }
+                        Log.i(TAG, "preferred ${selection.summary()} matched connected")
+                        runCatching { locVc.stop() }
+                        runCatching { locVc.close() }
+                        finish()
+                    }
                 }
             }
             locVc.start()
@@ -64,11 +72,13 @@ internal class UrnetworkPreferredLocationConnector(
         }.onFailure { t ->
             if (attached.compareAndSet(false, true)) {
                 timeoutJob.cancel()
-                PersistentLoggers.warn(TAG, "locVc setup failed: ${t.message} → fallback connectBestAvailable")
-                runCatching { cv.connectBestAvailable() }
-                runCatching { locVc.stop() }
-                runCatching { locVc.close() }
-                resolving.set(false)
+                bridgeScope.launch(Dispatchers.Main.immediate) {
+                    PersistentLoggers.warn(TAG, "locVc setup failed: ${t.message} fallback connectBestAvailable")
+                    runCatching { cv.connectBestAvailable() }
+                    runCatching { locVc.stop() }
+                    runCatching { locVc.close() }
+                    finish()
+                }
             }
         }
     }
@@ -81,8 +91,7 @@ internal class UrnetworkPreferredLocationConnector(
         if (cc == null) {
             PersistentLoggers.warn(
                 TAG,
-                "findBestMatch: city/region match без countryCode запрещён — " +
-                    "иначе wrong-country connect (одинаковые имена городов в разных странах)",
+                "findBestMatch: city/region match without countryCode is forbidden - wrong-country connect",
             )
             return null
         }
@@ -116,14 +125,6 @@ internal class UrnetworkPreferredLocationConnector(
             if (predicate(loc)) return loc
         }
         return null
-    }
-
-    private fun persistLocation(device: DeviceLocal, location: ConnectLocation) {
-        val localState = runCatching { device.networkSpace?.asyncLocalState?.localState }.getOrNull()
-        runCatching { localState?.connectLocation = location }
-        runCatching { localState?.defaultLocation = location }
-        runCatching { device.connectLocation = location }
-        runCatching { device.defaultLocation = location }
     }
 
     private companion object {

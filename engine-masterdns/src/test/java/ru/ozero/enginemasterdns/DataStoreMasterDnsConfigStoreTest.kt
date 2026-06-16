@@ -36,6 +36,15 @@ class DataStoreMasterDnsConfigStoreTest {
     }
 
     @Test
+    fun `setResolvers preserves order while dropping blank and whitespace only entries`(@TempDir tmp: Path) = runTest {
+        val store = makeStore(tmp)
+
+        store.setResolvers(listOf("", "  ", "9.9.9.9", "\t", "1.0.0.1", " 8.8.4.4 "))
+
+        assertEquals(listOf("9.9.9.9", "1.0.0.1", "8.8.4.4"), store.config().first().resolvers)
+    }
+
+    @Test
     fun `setResolvers with empty list clears`(@TempDir tmp: Path) = runTest {
         val store = makeStore(tmp)
         store.setResolvers(listOf("8.8.8.8"))
@@ -74,11 +83,39 @@ class DataStoreMasterDnsConfigStoreTest {
     }
 
     @Test
+    fun `setServerPort persists zero and high custom ports without normalization`(@TempDir tmp: Path) = runTest {
+        val store = makeStore(tmp)
+
+        store.setServerPort(0)
+        assertEquals(0, store.config().first().serverPort)
+
+        store.setServerPort(65535)
+        assertEquals(65535, store.config().first().serverPort)
+    }
+
+    @Test
     fun `setServerIp with empty string clears`(@TempDir tmp: Path) = runTest {
         val store = makeStore(tmp)
         store.setServerIp("10.0.0.1")
         store.setServerIp("")
         assertEquals("", store.config().first().serverIp)
+    }
+
+    @Test
+    fun `setConfigToml and server settings survive independent writes`(@TempDir tmp: Path) = runTest {
+        val store = makeStore(tmp)
+        val toml = "SERVER = \"203.0.113.10\"\nENCRYPTION_KEY = \"k\"\n"
+
+        store.setConfigToml(toml)
+        store.setServerIp("203.0.113.10")
+        store.setServerPort(2222)
+        store.setResolvers(listOf("8.8.8.8"))
+
+        val cfg = store.config().first()
+        assertEquals(toml, cfg.configToml)
+        assertEquals("203.0.113.10", cfg.serverIp)
+        assertEquals(2222, cfg.serverPort)
+        assertEquals(listOf("8.8.8.8"), cfg.resolvers)
     }
 
     private fun makeStore(tmp: Path): DataStoreMasterDnsConfigStore {

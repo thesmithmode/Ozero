@@ -53,10 +53,26 @@ class ApkUpdateVerifierTest {
     }
 
     @Test
+    fun rejectsMissingSignatureWhenApkExists(@TempDir tmp: Path) {
+        val (_, pub) = generateKeyPair()
+        val apk = (tmp / "ozero.apk").toFile().apply { writeBytes(byteArrayOf(0x01)) }
+        val sig = File(tmp.toFile(), "missing.sig")
+        assertFalse(ApkUpdateVerifier(pub).verify(apk, sig))
+    }
+
+    @Test
     fun rejectsTooShortSignature(@TempDir tmp: Path) {
         val (_, pub) = generateKeyPair()
         val apk = (tmp / "ozero.apk").toFile().apply { writeBytes(byteArrayOf(0x01)) }
         val sig = (tmp / "ozero.apk.sig").toFile().apply { writeBytes(ByteArray(63)) }
+        assertFalse(ApkUpdateVerifier(pub).verify(apk, sig))
+    }
+
+    @Test
+    fun rejectsTooLongSignature(@TempDir tmp: Path) {
+        val (_, pub) = generateKeyPair()
+        val apk = (tmp / "ozero.apk").toFile().apply { writeBytes(byteArrayOf(0x01)) }
+        val sig = (tmp / "ozero.apk.sig").toFile().apply { writeBytes(ByteArray(65)) }
         assertFalse(ApkUpdateVerifier(pub).verify(apk, sig))
     }
 

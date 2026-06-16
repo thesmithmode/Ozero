@@ -19,6 +19,8 @@ import java.security.MessageDigest
 class DownloadBinaryTaskTest {
     private lateinit var server: MockWebServer
 
+    private class NamedBlankMessageException : RuntimeException("   ")
+
     @TempDir
     lateinit var tmp: Path
 
@@ -57,6 +59,32 @@ class DownloadBinaryTaskTest {
             """.trimIndent(),
         )
         return lock
+    }
+
+    private fun writeLock(content: String): Path {
+        val lock = tmp.resolve("binaries-${System.nanoTime()}.lock.yaml")
+        Files.writeString(lock, content.trimIndent())
+        return lock
+    }
+
+    private fun newTask(
+        lockPath: Path,
+        testModuleDir: Path = tmp.resolve("module-${System.nanoTime()}"),
+        requested: List<String>,
+    ): DownloadBinaryTask {
+        Files.createDirectories(testModuleDir)
+        val project = ProjectBuilder.builder().withProjectDir(tmp.toFile()).build()
+        return project.tasks.register(
+            "downloadBinaries${System.nanoTime()}",
+            DownloadBinaryTask::class.java,
+            Action<DownloadBinaryTask> {
+                lockFile.set(lockPath.toFile())
+                cacheDir.set(tmp.resolve("cache").toFile())
+                moduleDir.set(testModuleDir.toFile())
+                requestedArtifacts.set(requested)
+                retryDelaysMs.set(listOf(0L, 0L, 0L))
+            },
+        ).get()
     }
 
     @Test
@@ -141,5 +169,203 @@ class DownloadBinaryTaskTest {
         val expected = testModuleDir.resolve("src/main/jniLibs/arm64-v8a/libbyedpi-arm64-v8a.so")
         assertThat(Files.exists(expected)).isTrue()
         assertThat(server.requestCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `task returns without downloads when requested artifacts are empty`() {
+        val data = "fake-so".toByteArray()
+        val lockPath = writeLock(data, "/lib.so")
+        val task = newTask(lockPath = lockPath, requested = emptyList())
+
+        task.run()
+
+        assertThat(server.requestCount).isEqualTo(0)
+    }
+
+    @Test
+    fun `task handles multiple requested artifacts and creates both destination kinds`() {
+        val soBytes = "fake-so".toByteArray()
+        val aarBytes = "fake-aar".toByteArray()
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(soBytes)))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(aarBytes)))
+        val lockPath = writeLock(
+            """
+            tag: binaries-test
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libengine-arm64-v8a.so
+                engine: engine
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: ${server.url("/engine.so")}
+                sha256: ${sha256(soBytes)}
+                size_bytes: ${soBytes.size}
+                source_repo: https://example.com/engine
+                source_commit: ${"a".repeat(40)}
+              - name: engine.aar
+                engine: engine
+                destination: libs
+                download_url: ${server.url("/engine.aar")}
+                sha256: ${sha256(aarBytes)}
+                size_bytes: ${aarBytes.size}
+                source_repo: https://example.com/engine
+                source_commit: ${"b".repeat(40)}
+            """,
+        )
+        val moduleDir = tmp.resolve("module-both")
+        val task = newTask(
+            lockPath = lockPath,
+            testModuleDir = moduleDir,
+            requested = listOf("libengine-arm64-v8a.so", "engine.aar"),
+        )
+
+        task.run()
+
+        assertThat(Files.readAllBytes(moduleDir.resolve("src/main/jniLibs/arm64-v8a/libengine-arm64-v8a.so")))
+            .isEqualTo(soBytes)
+        assertThat(Files.readAllBytes(moduleDir.resolve("libs/engine.aar"))).isEqualTo(aarBytes)
+        assertThat(server.requestCount).isEqualTo(2)
+    }
+
+    @Test
+    fun `task downloads libs artifact using target filename`() {
+        val data = "fake-aar".toByteArray()
+        val sha = sha256(data)
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(data)))
+        val lockPath = writeLock(
+            """
+            tag: binaries-test
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: original.aar
+                target_filename: renamed.aar
+                engine: xray
+                destination: libs
+                download_url: ${server.url("/x.aar")}
+                sha256: $sha
+                size_bytes: ${data.size}
+                source_repo: https://github.com/XTLS/Xray-core
+                source_commit: ${"a".repeat(40)}
+            """,
+        )
+        val testModuleDir = tmp.resolve("module-libs")
+        val task = newTask(lockPath = lockPath, testModuleDir = testModuleDir, requested = listOf("original.aar"))
+
+        task.run()
+
+        assertThat(Files.readAllBytes(testModuleDir.resolve("libs/renamed.aar"))).isEqualTo(data)
+    }
+
+    @Test
+    fun `task downloads libs artifact using original name when target filename is absent`() {
+        val data = "fake-aar".toByteArray()
+        val sha = sha256(data)
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(data)))
+        val lockPath = writeLock(
+            """
+            tag: binaries-test
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: original.aar
+                engine: xray
+                destination: libs
+                download_url: ${server.url("/x.aar")}
+                sha256: $sha
+                size_bytes: ${data.size}
+                source_repo: https://github.com/XTLS/Xray-core
+                source_commit: ${"a".repeat(40)}
+            """,
+        )
+        val testModuleDir = tmp.resolve("module-libs-original")
+        val task = newTask(lockPath = lockPath, testModuleDir = testModuleDir, requested = listOf("original.aar"))
+
+        task.run()
+
+        assertThat(Files.readAllBytes(testModuleDir.resolve("libs/original.aar"))).isEqualTo(data)
+    }
+
+    @Test
+    fun `task wraps malformed lock file as gradle exception`() {
+        val lockPath = writeLock("tag: [unclosed")
+        val task = newTask(lockPath = lockPath, requested = listOf("libbyedpi-arm64-v8a.so"))
+
+        assertThatThrownBy { task.run() }
+            .isInstanceOf(GradleException::class.java)
+            .hasMessageContaining("Malformed YAML")
+            .hasCauseInstanceOf(LockFileException::class.java)
+    }
+
+    @Test
+    fun `task wraps download failure as gradle exception`() {
+        server.enqueue(MockResponse().setResponseCode(404))
+        val data = "fake-so".toByteArray()
+        val lockPath = writeLock(data, "/missing.so")
+        val task = newTask(lockPath = lockPath, requested = listOf("libbyedpi-arm64-v8a.so"))
+
+        assertThatThrownBy { task.run() }
+            .isInstanceOf(GradleException::class.java)
+            .hasMessageContaining("404")
+            .hasCauseInstanceOf(BinaryDownloadException::class.java)
+    }
+
+    @Test
+    fun `task retries transient server error and wraps final failure`() {
+        repeat(3) {
+            server.enqueue(MockResponse().setResponseCode(500))
+        }
+        val data = "fake-so".toByteArray()
+        val lockPath = writeLock(data, "/transient.so")
+        val task = newTask(lockPath = lockPath, requested = listOf("libbyedpi-arm64-v8a.so"))
+
+        assertThatThrownBy { task.run() }
+            .isInstanceOf(GradleException::class.java)
+            .hasMessageContaining("Failed to download")
+            .hasMessageContaining("HTTP 500")
+            .hasCauseInstanceOf(BinaryDownloadException::class.java)
+        assertThat(server.requestCount).isEqualTo(3)
+    }
+
+    @Test
+    fun `task wraps integrity failure as gradle exception`() {
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write("wrong".toByteArray())))
+        val lockPath = writeLock("expected".toByteArray(), "/lib.so")
+        val task = newTask(lockPath = lockPath, requested = listOf("libbyedpi-arm64-v8a.so"))
+
+        assertThatThrownBy { task.run() }
+            .isInstanceOf(GradleException::class.java)
+            .hasMessageContaining("SHA256")
+            .hasCauseInstanceOf(IntegrityException::class.java)
+    }
+
+    @Test
+    fun `gradleMessage keeps non blank exception message`() {
+        val exception = RuntimeException("clear failure")
+
+        assertThat(exception.gradleMessage()).isEqualTo("clear failure")
+    }
+
+    @Test
+    fun `gradleMessage falls back to exception type when message is null`() {
+        val exception = object : RuntimeException() {
+            override val message: String? = null
+        }
+
+        assertThat(exception.gradleMessage()).isEqualTo("RuntimeException")
+    }
+
+    @Test
+    fun `gradleMessage falls back when message is blank`() {
+        val exception = NamedBlankMessageException()
+
+        assertThat(exception.gradleMessage()).isEqualTo("NamedBlankMessageException")
+    }
+
+    @Test
+    fun `gradleMessage falls back to superclass name for anonymous throwable`() {
+        val exception = object : Throwable() {
+            override val message: String? = ""
+        }
+
+        assertThat(exception.gradleMessage()).isEqualTo("Throwable")
     }
 }

@@ -1,3 +1,5 @@
+@file:Suppress("LargeClass")
+
 package ru.ozero.enginemasterdns.deploy
 
 import kotlinx.coroutines.flow.toList
@@ -10,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class MasterDnsDeployerTest {
+    private val readEncryptKeyCommand = "docker exec masterdns-ozero cat /etc/masterdnsvpn/encrypt_key.txt"
 
     private lateinit var transport: FakeSshTransport
     private lateinit var deployer: FakeSshMasterDnsDeployer
@@ -27,7 +30,10 @@ class MasterDnsDeployerTest {
         transport.setResponse("apt-get", MasterDnsDockerScripts.MARKER_DOCKER_OK)
         transport.setResponse("Dockerfile", MasterDnsDockerScripts.MARKER_BUILD_OK)
         transport.setResponse("docker run -d", MasterDnsDockerScripts.MARKER_RUN_OK)
-        transport.setResponse("encrypt_key", "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899")
+        transport.setResponse(
+            readEncryptKeyCommand,
+            "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+        )
     }
 
     private fun credentials(password: String = "secret") = MasterDnsDeployCredentials(
@@ -170,6 +176,49 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `malformed structured port busy falls back to generic port error`() = runTest {
+        transport.setResponse("bind_probe", "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("port_53_busy|proto=udp|addr=0.0.0.0:53|owner=", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("apt-get") })
+    }
+
+    @Test
+    fun `structured port busy with missing proto or address falls back to raw generic error`() = runTest {
+        transport.setResponse("bind_probe", "PORT_BUSY|proto=|addr=|owner=dnsmasq")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("port_53_busy|proto=|addr=|owner=dnsmasq", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("apt-get") })
+    }
+
+    @Test
+    fun `legacy port busy marker maps to generic port error without details`() = runTest {
+        transport.setResponse("bind_probe", MasterDnsDockerScripts.MARKER_PORT_BUSY)
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("port_53_busy", error.message)
+    }
+
+    @Test
+    fun `amnezia dns conflict defaults missing marker fields`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_CONFLICT)
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val conflict = states.last() as MasterDnsDeployState.AmneziaDnsConflict
+        assertEquals("unknown", conflict.protocol)
+        assertEquals("0.0.0.0", conflict.address)
+    }
+
+    @Test
     fun `should recheck port after docker install before docker build and run`() = runTest {
         transport.setResponses(
             "bind_probe",
@@ -185,6 +234,21 @@ class MasterDnsDeployerTest {
         assertEquals("docker:adguardhome", portBusy.owner)
         assertFalse(transport.executedCommands.any { it.contains("Dockerfile") })
         assertFalse(transport.executedCommands.any { it.contains("docker run -d") })
+    }
+
+    @Test
+    fun `post docker amnezia dns conflict stops before build`() = runTest {
+        transport.setResponses(
+            "docker inspect amnezia-dns",
+            listOf("", "AMNEZIA_DNS_CONFLICT|proto=udp|addr=0.0.0.0:53"),
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val conflict = states.last() as MasterDnsDeployState.AmneziaDnsConflict
+        assertEquals("udp", conflict.protocol)
+        assertEquals("0.0.0.0:53", conflict.address)
+        assertFalse(transport.executedCommands.any { it.contains("Dockerfile") })
     }
 
     @Test
@@ -308,6 +372,43 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `bin missing build error redacts password and token diagnostics`() = runTest {
+        transport.setResponse(
+            "Dockerfile",
+            "ERR_BUILD|reason=bin_missing|password=secret-value|token=token-value|candidate=/tmp/bin",
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertTrue(error.message.startsWith("build_failed/bin_missing|ERR_BUILD|reason=bin_missing"))
+        assertTrue(error.message.contains("password=<redacted>"))
+        assertTrue(error.message.contains("token=<redacted>"))
+        assertFalse(error.message.contains("secret-value"))
+        assertFalse(error.message.contains("token-value"))
+    }
+
+    @Test
+    fun `bin missing build marker without diagnostics uses compact error`() = runTest {
+        transport.setResponse("Dockerfile", MasterDnsDockerScripts.MARKER_ERR_BUILD_BIN_MISSING)
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("build_failed/bin_missing|${MasterDnsDockerScripts.MARKER_ERR_BUILD_BIN_MISSING}", error.message)
+    }
+
+    @Test
+    fun `bin missing reason without marker line uses compact bin missing error`() = runTest {
+        transport.setResponse("Dockerfile", "some log\nreason=bin_missing\nmore log")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("build_failed/bin_missing", error.message)
+    }
+
+    @Test
     fun `should return Error when container run fails`() = runTest {
         transport.setResponse("docker run -d", MasterDnsDockerScripts.MARKER_ERR_RUN)
 
@@ -334,8 +435,39 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `run error marker with blank details maps to compact run failed`() = runTest {
+        transport.setResponse("docker run -d", "${MasterDnsDockerScripts.MARKER_ERR_RUN}|")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("run_failed", error.message)
+    }
+
+    @Test
+    fun `run failure without marker maps to compact run failed`() = runTest {
+        transport.setResponse("docker run -d", "container exited before marker")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("run_failed", error.message)
+    }
+
+    @Test
+    fun `firewall command failure is reported as unexpected error`() = runTest {
+        transport.failOn("ufw")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("unexpected_error", error.message)
+        assertTrue(transport.closeCalled)
+    }
+
+    @Test
     fun `should return Error when key extraction returns empty`() = runTest {
-        transport.setResponse("encrypt_key", "")
+        transport.setResponse(readEncryptKeyCommand, "")
 
         val states = deployer.deploy(credentials()).toList()
 
@@ -366,6 +498,17 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `deploy returns unexpected error when command execution throws`() = runTest {
+        transport.failOn("free -m")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("unexpected_error", error.message)
+        assertTrue(transport.closeCalled)
+    }
+
+    @Test
     fun `should return Error when SSH auth fails`() = runTest {
         transport.authShouldFail = true
 
@@ -373,6 +516,174 @@ class MasterDnsDeployerTest {
 
         val error = states.last() as MasterDnsDeployState.Error
         assertEquals("auth_failed", error.message)
+    }
+
+    @Test
+    fun `undeploy returns unexpected error when remove command throws`() = runTest {
+        transport.failOn("docker rm -f")
+
+        val states = deployer.undeploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("unexpected_error", error.message)
+        assertTrue(states.any { it is MasterDnsDeployState.Removing })
+        assertTrue(transport.closeCalled)
+    }
+
+    @Test
+    fun `remove and continue treats not found marker as successful removal`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_NOT_FOUND)
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        assertTrue(states.any { it is MasterDnsDeployState.Removing })
+        assertInstanceOf(MasterDnsDeployState.Done::class.java, states.last())
+    }
+
+    @Test
+    fun `remove and continue returns unexpected error when remove command throws`() = runTest {
+        transport.failOn("docker inspect amnezia-dns")
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("unexpected_error", error.message)
+        assertTrue(transport.closeCalled)
+    }
+
+    @Test
+    fun `remove and continue clears credentials when connect fails`() = runTest {
+        transport.connectShouldFail = true
+        val creds = credentials("super_secret_p@ssw0rd")
+
+        val states = deployer.removeAmneziaDnsAndContinue(creds).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("connection_failed", error.message)
+        assertTrue(creds.password.all { it == '\u0000' })
+        assertTrue(transport.closeCalled)
+    }
+
+    @Test
+    fun `remove and continue stops when preflight fails after successful removal`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED)
+        transport.setResponse("sudo -K", MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_ALLOWED)
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("sudo_not_allowed", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("apt-get") })
+    }
+
+    @Test
+    fun `remove and continue stops when docker install fails after successful removal`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED)
+        transport.setResponse("apt-get", MasterDnsDockerScripts.MARKER_ERR_DOCKER)
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("docker_install_failed", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("Dockerfile") })
+    }
+
+    @Test
+    fun `remove and continue stops when post docker port check fails`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED)
+        transport.setResponses(
+            "bind_probe",
+            listOf(
+                MasterDnsDockerScripts.MARKER_PORT_FREE,
+                "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=docker:adguardhome",
+            ),
+        )
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        val portBusy = states.last() as MasterDnsDeployState.PortBusy
+        assertEquals("docker:adguardhome", portBusy.owner)
+        assertFalse(transport.executedCommands.any { it.contains("Dockerfile") })
+    }
+
+    @Test
+    fun `remove and continue stops when build fails after successful removal`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED)
+        transport.setResponse("Dockerfile", MasterDnsDockerScripts.MARKER_ERR_BUILD)
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("build_failed", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("docker exec masterdns-ozero cat") })
+    }
+
+    @Test
+    fun `remove and continue stops when key extraction fails after successful removal`() = runTest {
+        transport.setResponse("docker inspect amnezia-dns", MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED)
+        transport.setResponse(readEncryptKeyCommand, "")
+
+        val states = deployer.removeAmneziaDnsAndContinue(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("key_extraction_failed", error.message)
+    }
+
+    @Test
+    fun `malformed resources output maps missing numbers to insufficient resources`() = runTest {
+        transport.setResponse("free -m", "n/a")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("insufficient_resources", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("apt-get") })
+    }
+
+    @Test
+    fun `both resources below threshold stop before docker install`() = runTest {
+        transport.setResponse("free -m", "1 1")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("insufficient_resources", error.message)
+        assertFalse(transport.executedCommands.any { it.contains("apt-get") })
+    }
+
+    @Test
+    fun `firewall ok marker completes without warning path`() = runTest {
+        transport.setResponse("ufw", "FW_OK")
+
+        val states = deployer.deploy(credentials()).toList()
+
+        assertInstanceOf(MasterDnsDeployState.Done::class.java, states.last())
+    }
+
+    @Test
+    fun `firewall none marker is non fatal`() = runTest {
+        transport.setResponse("ufw", MasterDnsDockerScripts.MARKER_FW_NONE_OK)
+
+        val states = deployer.deploy(credentials()).toList()
+
+        assertInstanceOf(MasterDnsDeployState.Done::class.java, states.last())
+    }
+
+    @Test
+    fun `long bin missing diagnostics are truncated and sanitized`() = runTest {
+        val longSecret = "x".repeat(900)
+        transport.setResponse(
+            "Dockerfile",
+            "ERR_BUILD|reason=bin_missing|password=$longSecret|token=$longSecret|candidate=/tmp/bin",
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertTrue(error.message.length < 780)
+        assertTrue(error.message.contains("password=<redacted>"))
+        assertTrue(error.message.contains("token=<redacted>"))
+        assertFalse(error.message.contains(longSecret))
     }
 
     @Test
@@ -480,4 +791,48 @@ class MasterDnsDeployerTest {
         deployer.undeploy(creds).toList()
         assertTrue(creds.password.all { it == '\u0000' }, "password must be wiped after connect failure")
     }
+
+    @Test
+    fun `private deploy mappers cover malformed and fallback marker branches`() {
+        val parsePortBusy = deployerMethod("parsePortBusy", String::class.java)
+        val parseConflict = deployerMethod("parseAmneziaDnsConflict", String::class.java)
+        val markerValue = deployerMethod("markerValue", String::class.java, String::class.java)
+        val mapSudo = deployerMethod("mapSudoResult", String::class.java)
+        val mapBuild = deployerMethod("mapBuildError", String::class.java)
+        val mapRun = deployerMethod("mapRunError", String::class.java)
+        val mapPort = deployerMethod("mapPortResult", String::class.java)
+        val buildToml = deployerMethod("buildClientToml", String::class.java, String::class.java)
+
+        assertEquals(null, parsePortBusy.invoke(null, "ok"))
+        assertEquals(null, parsePortBusy.invoke(null, "PORT_BUSY|proto=udp|addr=0.0.0.0|owner="))
+        val busy = parsePortBusy.invoke(null, "noise\nPORT_BUSY|proto=UDP|addr=0.0.0.0:53|name=dnsmasq")
+            as MasterDnsDeployState.PortBusy
+        assertEquals("udp", busy.protocol)
+        assertEquals("dnsmasq", busy.owner)
+
+        assertEquals(null, parseConflict.invoke(null, "no conflict"))
+        val conflict = parseConflict.invoke(null, "AMNEZIA_DNS_CONFLICT|proto=tcp|addr=127.0.0.1:53")
+            as MasterDnsDeployState.AmneziaDnsConflict
+        assertEquals("tcp", conflict.protocol)
+        assertEquals("127.0.0.1:53", conflict.address)
+        assertEquals("value", markerValue.invoke(null, "a|key= value |b", "key"))
+        assertEquals("", markerValue.invoke(null, "a|other=value", "key"))
+
+        assertEquals(null, mapSudo.invoke(null, "SUDO_OK"))
+        assertEquals("build_failed", mapBuild.invoke(null, "ERR_BUILD"))
+        assertEquals("build_failed/bin_missing", mapBuild.invoke(null, "reason=bin_missing"))
+        assertEquals("run_failed", mapRun.invoke(null, "ERR_RUN"))
+        assertEquals("run_failed|exit=1", mapRun.invoke(null, "ERR_RUN|exit=1"))
+        assertEquals(null, mapPort.invoke(null, "PORT_FREE"))
+        assertEquals("port_53_busy", mapPort.invoke(null, "PORT_BUSY"))
+        assertEquals("port_53_busy|proto=udp", mapPort.invoke(null, "PORT_BUSY|proto=udp"))
+        val toml = buildToml.invoke(null, "203.0.113.10", "secret-key") as String
+        assertTrue(toml.contains("SERVER = \"203.0.113.10\""))
+        assertTrue(toml.contains("ENCRYPTION_KEY = \"secret-key\""))
+    }
+
+    private fun deployerMethod(name: String, vararg types: Class<*>) =
+        Class.forName("ru.ozero.enginemasterdns.deploy.MasterDnsDeployerImplKt")
+            .getDeclaredMethod(name, *types)
+            .apply { isAccessible = true }
 }

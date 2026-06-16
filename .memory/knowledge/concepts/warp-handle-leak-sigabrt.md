@@ -5,7 +5,7 @@ tags: [warp, amneziawg, native, crash, jni, debugging]
 sources:
   - "daily/2026-05-08.md"
 created: 2026-05-08
-updated: 2026-05-08
+updated: 2026-06-12
 ---
 
 # WARP Handle Leak: Unpaired awgTurnOn Causes Go GC SIGABRT
@@ -19,6 +19,7 @@ updated: 2026-05-08
 - Root cause in Ozero: `attachTun` overwrote `tunnelHandle = handle` without closing previous → engine restart cycles accumulated leaks
 - Fix: idempotency guard at bridge layer — if `tunnelHandle != INVALID_HANDLE` before new `awgTurnOn`, run `runCatching { awgTurnOff(tunnelHandle) }` first
 - Diagnosis method: count entry/exit JNI calls in persistent log — entry > exit count reveals unpaired handles; crash always follows the pattern, never on first start
+- Rejected hypotheses matter: raw INI passthrough, service shutdown order, and main-thread `loadOnce()` were checked and did not match the crash evidence
 
 ## Details
 
@@ -80,12 +81,17 @@ fun attachTun(fd: Int, config: String): Int {
 
 The guard operates independently of whatever caused the double call (engine switch race, reconnect logic, stop/start overlap). Sentinel tests cover: double attach without detach (turnOff count = 1), stale turnOff throws (new turnOn still succeeds), 10-cycle stress test (turnOff count = turnOn - 1).
 
+The same investigation explicitly rejected earlier root-cause theories. Raw INI parsing was not the active cause because the passthrough printed all expected keys including `I1`; service shutdown order was not the active cause because shutdown begin/end ordering was correct; `loadOnce()` thread affinity was not violated. This evidence narrowed the fix to bridge-layer idempotency instead of another higher-level lifecycle patch.
+
 ## Related Concepts
 
 - [[concepts/amneziawg-turnon-minus-one]] - Earlier awgTurnOn failure modes (-1 return); this article covers the case where awgTurnOn succeeds but accumulates state
 - [[concepts/amneziawg-so-binary-integrity]] - The SO migration that preceded this crash pattern being discovered
 - [[concepts/dual-go-runtime-eager-loading]] - Related Go runtime lifecycle management; eager loading prevents a different class of crash
+- [[connections/warp-portal-runtime-migration-proof-loop]] - Native runtime migration proof that preceded the handle-leak diagnosis
 
 ## Sources
+
+- [[daily/2026-05-08.md]] - Session 14:00: rejected raw INI loss, stopSelf race, and `loadOnce()` thread-affinity hypotheses before fixing bridge-layer stale-handle cleanup.
 
 - [[daily/2026-05-08.md]] - Session 14:00: 12732-line ozero.log analysis; 13 entry vs 11 exit awgTurnOn calls = 2 leaked handles; SIGABRT in gcWriteBarrier (PIDs 32444, 7659); fix = idempotency guard in attachTun committed f7cdcdc

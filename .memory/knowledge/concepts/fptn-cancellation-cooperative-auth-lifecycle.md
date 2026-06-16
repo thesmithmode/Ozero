@@ -3,7 +3,7 @@ title: FPTN cancellation-cooperative auth lifecycle
 sources:
   - daily/2026-05-29.md
 created: 2026-05-29
-updated: 2026-05-29
+updated: 2026-06-13
 ---
 # FPTN cancellation-cooperative auth lifecycle
 
@@ -22,12 +22,16 @@ The 2026-05-29 investigation compared current FPTN behavior against `v0.2.0`, lo
 
 The same investigation corrected a false lead: upstream does not require a `vpn_port` token field for the current schema. The confirmed next layer is lifecycle/readiness alignment: startup should follow upstream order through test/probe, login, DNS, WebSocket readiness, and assigned IP callback. Cancellation is a separate safety boundary so a stopped startup cannot keep authenticating candidates in the background.
 
+The later implementation direction narrowed the immediate fix to lifecycle cancellation and bounded fallback, while leaving full DNS/IP callback parity as the next protocol-alignment layer. This split avoided mixing token-schema changes, server-candidate policy, and native WebSocket readiness into one risky patch.
+
 ## Related Concepts
 - [[concepts/fptn-upstream-readiness-ip-callback-flow]]
 - [[concepts/fptn-upstream-websocket-dns-boundary]]
 - [[concepts/auto-candidate-terminal-status-invariant]]
 - [[connections/stale-engine-signals-cross-engine-failures]]
+- [[connections/multi-engine-lifecycle-exitnode-regression-loop]]
 
 ## Sources
 - [[daily/2026-05-29]]: upstream comparison showed `port` rather than `vpn_port`, and established the probe/login/DNS/WebSocket/IP callback order.
 - [[daily/2026-05-29]]: logs showed FPTN auth fallback continuing after stop/switch, making cancellation-cooperative auth a separate fix target.
+- [[daily/2026-05-29]]: commit `e53229e9` fixed FPTN launch cancellation without changing the upstream `port` schema.

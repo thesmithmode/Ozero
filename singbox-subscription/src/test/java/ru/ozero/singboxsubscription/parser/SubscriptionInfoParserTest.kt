@@ -92,4 +92,34 @@ class SubscriptionInfoParserTest {
         assertNotNull(info)
         assertEquals(total, info!!.totalBytes)
     }
+
+    @Test
+    fun `should use last occurrence when header repeats a field`() {
+        val info = SubscriptionInfoParser.parse("upload=1; upload=4096; download=2")
+
+        assertNotNull(info)
+        assertEquals(4096L, info!!.uploadBytes)
+        assertEquals(2L, info.downloadBytes)
+    }
+
+    @Test
+    fun `should ignore unknown and malformed fragments while parsing known fields`() {
+        val info = SubscriptionInfoParser.parse("plan=premium; upload=128MB; download=256; note=ok; expire=1700000000")
+
+        assertNotNull(info)
+        assertEquals(0L, info!!.uploadBytes)
+        assertEquals(256L, info.downloadBytes)
+        assertEquals(1700000000L, info.expiryTimestamp)
+    }
+
+    @Test
+    fun `should parse known fields embedded in noisy header text`() {
+        val info = SubscriptionInfoParser.parse("upload=12, download=34; total=56 bytes; expire=78; extra=ignored")
+
+        assertNotNull(info)
+        assertEquals(12L, info!!.uploadBytes)
+        assertEquals(34L, info.downloadBytes)
+        assertEquals(56L, info.totalBytes)
+        assertEquals(78L, info.expiryTimestamp)
+    }
 }

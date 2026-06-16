@@ -29,7 +29,7 @@ During the v0.3.0 release preparation, commit `6df7ca13` was found with `Author:
 ```bash
 git rebase -i <parent-sha>
 # Mark the commit as 'edit'
-git commit --amend --author="thesmithmode <117716736+thesmithmode@users.noreply.github.com>"
+git commit --amend --author="<project-author>"
 git rebase --continue
 git push --force-with-lease origin dev
 ```

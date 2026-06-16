@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.app.ui.IpInfoState
 import ru.ozero.app.ui.MainViewModel
+import ru.ozero.app.ui.components.PowerDiscState
 import ru.ozero.commonnet.IpInfo
 import ru.ozero.commonnet.IpInfoProvider
 import ru.ozero.commonvpn.HealthMonitor
@@ -42,12 +43,14 @@ import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
+import ru.ozero.enginescore.settings.TrafficMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
+@Suppress("LargeClass")
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
     private val dispatcher = StandardTestDispatcher()
@@ -106,6 +109,7 @@ class MainViewModelTest {
         override val id: EngineId,
         private val route: (Int) -> IpProbeRoute,
         private val strategy: ((Int) -> ExitNodeStrategy)? = null,
+        private val statsFlow: Flow<EngineStats> = emptyFlow(),
     ) : EnginePlugin {
         override val capabilities: EngineCapabilities = EngineCapabilities(
             supportsTcp = true,
@@ -119,7 +123,7 @@ class MainViewModelTest {
             StartResult.Failure("test fake")
         override suspend fun stop() = Unit
         override suspend fun probe(): ProbeResult = ProbeResult.Failure("test fake")
-        override fun stats(): Flow<EngineStats> = emptyFlow()
+        override fun stats(): Flow<EngineStats> = statsFlow
         override suspend fun ipProbeRoute(socksPort: Int): IpProbeRoute = route(socksPort)
         override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy =
             strategy?.invoke(socksPort) ?: when (val r = route(socksPort)) {
@@ -271,6 +275,16 @@ class MainViewModelTest {
     }
 
     @Test
+    fun stagnantInitiallyFalse() {
+        assertEquals(false, viewModel.stagnant.value)
+    }
+
+    @Test
+    fun killswitchInitiallyFalse() {
+        assertEquals(false, viewModel.killswitchActive.value)
+    }
+
+    @Test
     fun speedHistoryRetainedDuringSwitching() = runTest {
         val sample = TunnelStats(txPackets = 1, txBytes = 100, rxPackets = 2, rxBytes = 200, timestampMs = 1)
         tunnelController.onProbing()
@@ -344,6 +358,21 @@ class MainViewModelTest {
     }
 
     @Test
+    fun trafficModeMirrorsSettingsRepository() = runTest {
+        settingsRepository.emit(SettingsModel.DEFAULT.copy(trafficMode = TrafficMode.PROXY))
+        advanceUntilIdle()
+        assertEquals(TrafficMode.PROXY, viewModel.trafficMode.value)
+    }
+
+    @Test
+    fun engineAutoPriorityMirrorsSettingsRepository() = runTest {
+        val priority = listOf(EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI)
+        settingsRepository.emit(SettingsModel.DEFAULT.copy(engineAutoPriority = priority))
+        advanceUntilIdle()
+        assertEquals(priority, viewModel.engineAutoPriority.value)
+    }
+
+    @Test
     fun manualEngineDefaultIsNull() {
         assertNull(viewModel.manualEngine.value)
     }
@@ -404,6 +433,95 @@ class MainViewModelTest {
             tunnelController.switching.value,
             "Idle → switching marker не должен ставиться: нечего переключать",
         )
+    }
+
+    @Test
+    fun onManualEngineSelectSameEngineDoesNotStartSwitching() = runTest {
+        tunnelController.onProbing(EngineId.WARP)
+        tunnelController.onConnecting(EngineId.WARP)
+        advanceUntilIdle()
+
+        viewModel.onManualEngineSelect(EngineId.WARP)
+        advanceUntilIdle()
+
+        assertNull(tunnelController.switching.value)
+        assertEquals(listOf<EngineId?>(EngineId.WARP), settingsRepository.manualEngineUpdates)
+    }
+
+    @Test
+    fun killswitchActiveMirrorsTunnelController() = runTest {
+        tunnelController.onKillswitchEngaged(EngineId.BYEDPI, "test")
+        advanceUntilIdle()
+        assertEquals(true, viewModel.killswitchActive.value)
+    }
+
+    @Test
+    fun killswitchClearsAfterRelease() = runTest {
+        tunnelController.onKillswitchEngaged(EngineId.BYEDPI, "test")
+        advanceUntilIdle()
+        tunnelController.onKillswitchReleased()
+        advanceUntilIdle()
+        assertEquals(false, viewModel.killswitchActive.value)
+    }
+
+    @Test
+    fun currentEngineDegradedTrueForTrackedEngineWithZeroActiveConnections() = runTest {
+        val stats = MutableStateFlow(EngineStats(activeConnections = 0))
+        val warp = FakeEnginePlugin(
+            EngineId.WARP,
+            route = { IpProbeRoute.Default },
+            statsFlow = stats.asStateFlow(),
+        )
+        val vm = newViewModel(plugins = setOf(byedpiPlugin, warp, urnetworkPlugin))
+        backgroundScope.launch { vm.currentEngineDegraded.collect {} }
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.WARP)
+        tunnelController.onEngineStarted(EngineId.WARP, 0)
+        runCurrent()
+        assertEquals(true, vm.currentEngineDegraded.value)
+    }
+
+    @Test
+    fun currentEngineDegradedFalseWhenTrackedEngineHasActiveConnections() = runTest {
+        val stats = MutableStateFlow(EngineStats(activeConnections = 2))
+        val warp = FakeEnginePlugin(
+            EngineId.WARP,
+            route = { IpProbeRoute.Default },
+            statsFlow = stats.asStateFlow(),
+        )
+        val vm = newViewModel(plugins = setOf(byedpiPlugin, warp, urnetworkPlugin))
+        backgroundScope.launch { vm.currentEngineDegraded.collect {} }
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.WARP)
+        tunnelController.onEngineStarted(EngineId.WARP, 0)
+        runCurrent()
+        assertEquals(false, vm.currentEngineDegraded.value)
+    }
+
+    @Test
+    fun powerDiscStateReflectsSwitchingConnectedAndOff() = runTest {
+        backgroundScope.launch { viewModel.powerDiscState.collect {} }
+        tunnelController.onProbing()
+        runCurrent()
+        assertEquals(PowerDiscState.Connecting, viewModel.powerDiscState.value)
+
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        runCurrent()
+        assertEquals(PowerDiscState.Connected, viewModel.powerDiscState.value)
+
+        tunnelController.onSwitchingStarted(EngineId.BYEDPI, EngineId.WARP)
+        runCurrent()
+        assertEquals(PowerDiscState.Switching, viewModel.powerDiscState.value)
+
+        tunnelController.onDisconnecting()
+        tunnelController.reset()
+        runCurrent()
+        assertEquals(PowerDiscState.Switching, viewModel.powerDiscState.value)
+
+        tunnelController.onSwitchingFinished("test")
+        runCurrent()
+        assertEquals(PowerDiscState.Off, viewModel.powerDiscState.value)
     }
 
     @Test
@@ -470,6 +588,34 @@ class MainViewModelTest {
         advanceTimeBy(2_000)
         runCurrent()
         assertEquals(0, vm.urnetworkPeerSearchSeconds.value)
+    }
+
+    @Test
+    fun urnetworkPeerCountReflectsRunningBridge() = runTest {
+        val bridge = FakeUrnetworkBridge(peers = 7)
+        val vm = newViewModel(bridge = bridge)
+        backgroundScope.launch { vm.urnetworkPeerCount.collect {} }
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.URNETWORK)
+        tunnelController.onEngineStarted(EngineId.URNETWORK, 1080)
+        runCurrent()
+        advanceTimeBy(2_100)
+        runCurrent()
+        assertEquals(7, vm.urnetworkPeerCount.value)
+    }
+
+    @Test
+    fun urnetworkPeerCountZeroWhenBridgeNotRunning() = runTest {
+        val bridge = FakeUrnetworkBridge(peers = 7, running = false)
+        val vm = newViewModel(bridge = bridge)
+        backgroundScope.launch { vm.urnetworkPeerCount.collect {} }
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.URNETWORK)
+        tunnelController.onEngineStarted(EngineId.URNETWORK, 1080)
+        runCurrent()
+        advanceTimeBy(2_100)
+        runCurrent()
+        assertEquals(0, vm.urnetworkPeerCount.value)
     }
 
     @Test
@@ -704,6 +850,14 @@ class MainViewModelTest {
         tunnelController.reset()
         advanceUntilIdle()
         assertEquals(false, viewModel.isReconnecting.value)
+    }
+
+    @Test
+    fun onConnectClickAndVpnPermissionGrantedAreNoOps() = runTest {
+        viewModel.onConnectClick()
+        viewModel.onVpnPermissionGranted()
+        advanceUntilIdle()
+        assertIs<TunnelState.Idle>(tunnelController.state.value)
     }
 
     private class FakeSettingsRepository : SettingsRepository {

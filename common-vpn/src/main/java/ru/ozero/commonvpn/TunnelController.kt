@@ -94,11 +94,11 @@ class TunnelController(
     }
 
     fun onSwitchingFinished(reason: String) {
-        if (_switching.compareAndSet(_switching.value, null)) {
-            switchingWatchdogJob?.cancel()
-            switchingWatchdogJob = null
-            PersistentLoggers.info(TAG, "switching finished: $reason")
-        }
+        if (_switching.value == null) return
+        _switching.value = null
+        switchingWatchdogJob?.cancel()
+        switchingWatchdogJob = null
+        PersistentLoggers.info(TAG, "switching finished: $reason")
     }
 
     fun reset() {

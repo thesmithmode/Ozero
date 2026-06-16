@@ -17,13 +17,13 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.app.R
+import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.ImportedWarpConfig
 import ru.ozero.enginewarp.RegisteredWarpConfig
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigDuplicateException
 import ru.ozero.enginewarp.WarpConfigSlot
-import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import ru.ozero.enginewarp.WarpFileImporter
 import java.io.ByteArrayInputStream
@@ -438,14 +438,80 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onSaveEdit сохраняет rawIniOverride из слота — не обнуляет`() = runTest {
+    fun `onSaveEdit rebuilds rawIniOverride from updated config`() = runTest {
         val rawIni = "[Interface]\nPrivateKey = priv\n\n[Peer]\nPublicKey = peer\n"
+        val id = store.addSlot("S", SAMPLE, rawIni)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onEditDraftChange(
+            vm.uiState.value.editDraft!!.copy(
+                dns = "176.99.11.77, 80.78.247.254",
+                endpoint = "162.159.192.1:4500",
+            ),
+        )
+        vm.onSaveEdit()
+        advanceUntilIdle()
+        val updatedRaw = store.lastUpdateRawIni ?: error("rawIni missing")
+        assertTrue(updatedRaw.contains("DNS = 176.99.11.77, 80.78.247.254"))
+        assertTrue(updatedRaw.contains("Endpoint = 162.159.192.1:4500"))
+        assertTrue(updatedRaw.contains("PrivateKey = ${SAMPLE.privateKey}"))
+    }
+
+    @Test
+    fun `onSaveEdit preserves imported allowedIps in config and rawIniOverride`() = runTest {
+        val restrictedAllowedIps = listOf("192.0.2.0/24", "2001:db8::/32")
+        val rawIni = "[Interface]\nPrivateKey = priv\n\n[Peer]\n" +
+            "PublicKey = peer\nAllowedIPs = 192.0.2.0/24, 2001:db8::/32\n"
+        val id = store.addSlot("S", SAMPLE.copy(allowedIps = restrictedAllowedIps), rawIni)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onEditDraftChange(vm.uiState.value.editDraft!!.copy(name = "Renamed"))
+        vm.onSaveEdit()
+        advanceUntilIdle()
+
+        assertEquals(restrictedAllowedIps, store.lastUpdateCall?.third?.allowedIps)
+        assertTrue(store.lastUpdateRawIni?.contains("AllowedIPs = 192.0.2.0/24, 2001:db8::/32") == true)
+    }
+
+    @Test
+    fun `onSaveEdit preserves endpointList from existing slot`() = runTest {
+        val endpoints = listOf("162.159.193.10:2408", "162.159.195.10:2408")
+        val id = store.addSlot("S", SAMPLE, endpointList = endpoints)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onEditDraftChange(vm.uiState.value.editDraft!!.copy(name = "Renamed"))
+        vm.onSaveEdit()
+        advanceUntilIdle()
+
+        assertEquals(endpoints, store.lastUpdateEndpointList)
+    }
+
+    @Test
+    fun `onSaveEdit replaces endpointList when endpoint changes`() = runTest {
+        val endpoints = listOf("162.159.193.10:2408", "162.159.195.10:2408")
+        val id = store.addSlot("S", SAMPLE, endpointList = endpoints)
+        advanceUntilIdle()
+        vm.onStartEdit(id)
+        vm.onEditDraftChange(vm.uiState.value.editDraft!!.copy(endpoint = "9.9.9.9:2408"))
+        vm.onSaveEdit()
+        advanceUntilIdle()
+
+        assertEquals(listOf("9.9.9.9:2408"), store.lastUpdateEndpointList)
+    }
+
+    @Test
+    fun `onSaveEdit preserves unmodeled peer fields from rawIniOverride`() = runTest {
+        val rawIni = "[Interface]\nPrivateKey = priv\nAddress = 10.0.0.1/32\nDNS = 1.1.1.1\n" +
+            "[Peer]\nPublicKey = peer\nPresharedKey = very-secret\nEndpoint = engage.cloudflareclient.com:2408\n"
         val id = store.addSlot("S", SAMPLE, rawIni)
         advanceUntilIdle()
         vm.onStartEdit(id)
         vm.onSaveEdit()
         advanceUntilIdle()
-        assertEquals(rawIni, store.lastUpdateRawIni, "rawIniOverride должен сохраняться при редактировании")
+
+        val updatedRaw = store.lastUpdateRawIni ?: error("rawIni missing")
+        assertTrue(updatedRaw.contains("PresharedKey = very-secret"), "unmodeled peer field must be preserved")
+        assertTrue(updatedRaw.contains("PrivateKey = ${SAMPLE.privateKey}"))
     }
 
     @Test
@@ -523,11 +589,19 @@ class WarpEngineSettingsViewModelTest {
         assertEquals(DoHProvider.GOOGLE_8844, vm.selectedDoHProvider.value)
     }
 
+    @Test
+    fun `selectedDoHProvider без draft использует Cloudflare DoH default как PORTAL WG`() = runTest {
+        advanceUntilIdle()
+
+        assertEquals(WarpConfig.DEFAULT_DOH_PROVIDER, vm.selectedDoHProvider.value)
+    }
+
     private open class FakeWarpStore : WarpConfigSlotStore {
         private val slotsFlow = MutableStateFlow<List<WarpConfigSlot>>(emptyList())
         val setActiveCalls = mutableListOf<String>()
         var lastUpdateCall: Triple<String, String, WarpConfig>? = null
         var lastUpdateRawIni: String? = null
+        var lastUpdateEndpointList: List<String>? = null
         private var idCounter = 0
 
         fun slotCount() = slotsFlow.value.size
@@ -587,6 +661,7 @@ class WarpEngineSettingsViewModelTest {
         ) {
             lastUpdateCall = Triple(id, name, config)
             lastUpdateRawIni = rawIni
+            lastUpdateEndpointList = endpointList
             slotsFlow.value = slotsFlow.value.map {
                 if (it.id == id) {
                     it.copy(name = name, config = config, rawIniOverride = rawIni, endpointList = endpointList)

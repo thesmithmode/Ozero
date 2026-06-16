@@ -94,6 +94,20 @@ class BinaryDownloaderTest {
     }
 
     @Test
+    fun `unexpected non retryable status fails immediately`() {
+        server.enqueue(MockResponse().setResponseCode(403))
+        val cache = tmp.resolve("cache")
+        val dst = tmp.resolve("out/libbyedpi.so")
+        val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = listOf(0, 0, 0))
+        assertThatThrownBy {
+            downloader.download(server.url("/x.so").toString(), "0".repeat(64), dst)
+        }
+            .isInstanceOf(BinaryDownloadException::class.java)
+            .hasMessageContaining("Unexpected HTTP 403")
+        assertThat(server.requestCount).isEqualTo(1)
+    }
+
+    @Test
     fun `5xx persistent fails after exhausting retries`() {
         repeat(4) { server.enqueue(MockResponse().setResponseCode(500)) }
         val cache = tmp.resolve("cache")
@@ -105,6 +119,39 @@ class BinaryDownloaderTest {
             .isInstanceOf(BinaryDownloadException::class.java)
             .hasMessageContaining("500")
         assertThat(server.requestCount).isEqualTo(3)
+    }
+
+    @Test
+    fun `599 is treated as retryable server error`() {
+        repeat(2) { server.enqueue(MockResponse().setResponseCode(599)) }
+        val cache = tmp.resolve("cache")
+        val dst = tmp.resolve("out/libbyedpi.so")
+        val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = listOf(0, 0))
+
+        assertThatThrownBy {
+            downloader.download(server.url("/x.so").toString(), "0".repeat(64), dst)
+        }
+            .isInstanceOf(BinaryDownloadException::class.java)
+            .hasMessageContaining("599")
+
+        assertThat(server.requestCount).isEqualTo(2)
+    }
+
+    @Test
+    fun `single retry slot still reports final failure without sleeping`() {
+        server.enqueue(MockResponse().setResponseCode(500))
+        val cache = tmp.resolve("cache")
+        val dst = tmp.resolve("out/libbyedpi.so")
+        val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = listOf(0))
+
+        assertThatThrownBy {
+            downloader.download(server.url("/x.so").toString(), "0".repeat(64), dst)
+        }
+            .isInstanceOf(BinaryDownloadException::class.java)
+            .hasMessageContaining("after 1 attempts")
+            .hasMessageContaining("HTTP 500")
+
+        assertThat(server.requestCount).isEqualTo(1)
     }
 
     @Test
@@ -120,5 +167,53 @@ class BinaryDownloaderTest {
             .isInstanceOf(IntegrityException::class.java)
         assertThat(Files.exists(dst)).isFalse()
         assertThat(server.requestCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `io failures are retried and wrapped after exhaustion`() {
+        val url = server.url("/x.so").toString()
+        server.shutdown()
+        val cache = tmp.resolve("cache")
+        val dst = tmp.resolve("out/libbyedpi.so")
+        val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = listOf(0, 0, 0))
+
+        assertThatThrownBy {
+            downloader.download(url, "0".repeat(64), dst)
+        }
+            .isInstanceOf(BinaryDownloadException::class.java)
+            .hasMessageContaining("after 3 attempts")
+            .hasCauseInstanceOf(java.io.IOException::class.java)
+    }
+
+    @Test
+    fun `empty retry schedule fails without issuing HTTP request`() {
+        val cache = tmp.resolve("cache")
+        val dst = tmp.resolve("out/libbyedpi.so")
+        val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = emptyList())
+
+        assertThatThrownBy {
+            downloader.download(server.url("/x.so").toString(), "0".repeat(64), dst)
+        }
+            .isInstanceOf(BinaryDownloadException::class.java)
+            .hasMessageContaining("after 0 attempts")
+
+        assertThat(server.requestCount).isEqualTo(0)
+        assertThat(Files.exists(dst)).isFalse()
+    }
+
+    @Test
+    fun `io failure on final attempt reports wrapped message without retry sleep`() {
+        val url = server.url("/x.so").toString()
+        server.shutdown()
+        val cache = tmp.resolve("cache")
+        val dst = tmp.resolve("out/libbyedpi.so")
+        val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = listOf(0))
+
+        assertThatThrownBy {
+            downloader.download(url, "0".repeat(64), dst)
+        }
+            .isInstanceOf(BinaryDownloadException::class.java)
+            .hasMessageContaining("after 1 attempts")
+            .hasCauseInstanceOf(java.io.IOException::class.java)
     }
 }

@@ -70,6 +70,14 @@ internal class FakeUrnetworkBridge(
     override fun connectBestAvailable() {
         connectBestAvailableCallCount.incrementAndGet()
     }
+    var lastPreferredLocation: ru.ozero.engineurnetwork.UrnetworkLocationSelection? = null
+    val connectPreferredLocationCallCount = AtomicInteger(0)
+    override fun setPreferredLocation(selection: ru.ozero.engineurnetwork.UrnetworkLocationSelection?) {
+        lastPreferredLocation = selection
+    }
+    override fun connectPreferredLocation() {
+        connectPreferredLocationCallCount.incrementAndGet()
+    }
     override fun selectedLocation(): UrnetworkSdkBridge.LocationToken? = initialLocation
     override fun openLocationsViewController(): LocationsViewController? = null
     var lastAppliedWindowType: UrnetworkWindowType? = null

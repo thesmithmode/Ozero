@@ -5,7 +5,7 @@ tags: [kotlin, coroutines, gotcha, compile-error]
 sources:
   - "daily/2026-05-06.md"
 created: 2026-05-06
-updated: 2026-05-06
+updated: 2026-06-12
 ---
 
 # Kotlin 2.x suspendCancellableCoroutine Type Inference Trap
@@ -62,6 +62,7 @@ Any `suspendCancellableCoroutine` block with more than one `cont.resume(...)` ca
 
 - [[concepts/ci-workflow-discipline]] - The CI-only testing policy means this compile error was caught in CI, not locally
 - [[concepts/viewmodel-stateflow-test-race]] - Another Kotlin concurrency trap in test code; similar pattern of non-obvious runtime/compile behavior in coroutine contexts
+- [[concepts/compile-vs-coverage-priority-contract]] - Compile failures from type inference must be fixed before any coverage interpretation
 
 ## Sources
 

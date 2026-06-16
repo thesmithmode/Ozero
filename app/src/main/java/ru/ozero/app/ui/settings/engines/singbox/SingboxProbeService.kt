@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.byteArrayPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -45,6 +46,7 @@ class SingboxProbeService internal constructor(
     private val profileDao: ProxyProfileDao,
     @SingboxPrefs private val dataStore: DataStore<Preferences>,
     private val profileProbe: SingboxProfileProbe,
+    private val probeDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
     @Inject
@@ -71,12 +73,12 @@ class SingboxProbeService internal constructor(
                 profile to bean
             }
         }
-        val results = ConcurrentLinkedQueue<Pair<ProxyProfile, Int>>()
+        val results = ConcurrentLinkedQueue<ProbeResult>()
         val nextIndex = AtomicInteger(0)
         val workerCount = minOf(MAX_CONCURRENT_PROFILE_PROBES, probeCandidates.size)
         coroutineScope {
             List(workerCount) {
-                async(Dispatchers.IO) {
+                async(probeDispatcher) {
                     while (true) {
                         val index = nextIndex.getAndIncrement()
                         if (index >= probeCandidates.size) break
@@ -86,7 +88,7 @@ class SingboxProbeService internal constructor(
                             val latency = probeLatencyMs(bean)
                             if (latency == LATENCY_SKIPPED_ACTIVE_RUNTIME) continue
                             profileDao.updateLatency(profile.id, latency)
-                            results.add(profile to latency)
+                            results.add(ProbeResult(index, profile, latency))
                         } finally {
                             onProfileTestingChanged(profile.id, false)
                         }
@@ -94,7 +96,14 @@ class SingboxProbeService internal constructor(
                 }
             }.awaitAll()
         }
-        val best = results.filter { it.second >= 0 }.minByOrNull { it.second }?.first ?: return
+        val best = results
+            .filter { it.latency >= 0 }
+            .minWithOrNull(
+                compareBy<ProbeResult> { it.latency }
+                    .thenBy { it.index },
+            )
+            ?.profile
+            ?: return
         dataStore.edit { prefs ->
             if (prefs[SELECTED_PROFILE_KEY] == SingboxEngine.SELECTED_AUTO) return@edit
             prefs[SELECTED_PROFILE_KEY] = best.id
@@ -103,6 +112,12 @@ class SingboxProbeService internal constructor(
     }
 
     private suspend fun probeLatencyMs(bean: AbstractBean): Int = profileProbe.probeLatencyMs(bean)
+
+    private data class ProbeResult(
+        val index: Int,
+        val profile: ProxyProfile,
+        val latency: Int,
+    )
 
     companion object {
         val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")
@@ -182,7 +197,8 @@ private class SingboxServiceProfileProbe(
                 process = null
             }
         }
-        val intent = Intent().setComponent(ComponentName(context, "ru.ozero.singboxprocess.SingboxEngineService"))
+        val component = ComponentName(context, "ru.ozero.singboxprocess.SingboxEngineService")
+        val intent = Intent().apply { this.component = component }
         val bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
         if (!bound) {
             runCatching { context.unbindService(connection) }

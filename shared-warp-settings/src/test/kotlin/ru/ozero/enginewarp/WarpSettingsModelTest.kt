@@ -120,6 +120,8 @@ class WarpSettingsModelTest {
         assertEquals(emptyList<WarpConfigSlot>(), WarpSettingsUiState().slots)
         assertTrue(DoHProvider.SYSTEM.isSystem)
         assertFalse(DoHProvider.CLOUDFLARE_1111.isSystem)
+        assertEquals(DoHProvider.CLOUDFLARE_1111, WarpConfig.DEFAULT_DOH_PROVIDER)
+        assertEquals(WarpConfig.DEFAULT_DOH_PROVIDER, emptyWarpDraft().doHProvider)
         assertEquals("Cloudflare (1.1.1.1)", DoHProvider.CLOUDFLARE_1111.displayName)
         assertEquals("https://1.1.1.1/dns-query", DoHProvider.CLOUDFLARE_1111.url)
         assertTrue(DoHProvider.entries.contains(DoHProvider.GOOGLE_8888))
@@ -152,6 +154,83 @@ class WarpSettingsModelTest {
         assertFalse(hasRequiredFields(valid.copy(endpoint = "")))
         assertFalse(hasRequiredFields(valid.copy(addressV4 = "")))
     }
+
+    @Test
+    fun `buildNextWarpSlotName treats zero negative and padded names as used integers`() {
+        val slots = listOf(
+            slot(name = "Ozero-0"),
+            slot(name = "Ozero--1"),
+            slot(name = "Ozero-01"),
+            slot(name = "Ozero-2"),
+            slot(name = "Ozero- 3"),
+        )
+
+        assertEquals("Ozero-3", buildNextWarpSlotName(slots))
+    }
+
+    @Test
+    fun `parseDnsServers trims blanks and falls back to defaults`() {
+        assertEquals(listOf("1.1.1.1", "8.8.8.8"), parseDnsServers(" 1.1.1.1, ,8.8.8.8 "))
+        assertEquals(WarpConfig.DEFAULT_DNS, parseDnsServers(""))
+        assertEquals(WarpConfig.DEFAULT_DNS, parseDnsServers(" , , "))
+    }
+
+    @Test
+    fun `hasRequiredFields rejects whitespace-only required fields`() {
+        val valid = draftFromSlot(slot(config = sampleConfig()))
+
+        assertFalse(hasRequiredFields(valid.copy(privateKey = "   ")))
+        assertFalse(hasRequiredFields(valid.copy(peerPublicKey = "\t")))
+        assertFalse(hasRequiredFields(valid.copy(endpoint = "\n")))
+        assertFalse(hasRequiredFields(valid.copy(addressV4 = " ")))
+    }
+
+    @Test
+    fun `toWarpConfig maps all numeric draft fields`() {
+        val draft = draftFromSlot(slot(config = sampleConfig())).copy(
+            mtu = "1300",
+            keepalive = "25",
+            jc = "8",
+            jmin = "12",
+            jmax = "24",
+            s1 = "36",
+            s2 = "48",
+            h1 = "111",
+            h2 = "222",
+            h3 = "333",
+            h4 = "444",
+            doHProvider = DoHProvider.GOOGLE_8888,
+        )
+
+        val config = draft.toWarpConfig()
+
+        assertEquals(1300, config.mtu)
+        assertEquals(25, config.keepaliveSeconds)
+        assertEquals(8, config.awgParams.junkPacketCount)
+        assertEquals(12, config.awgParams.junkPacketMinSize)
+        assertEquals(24, config.awgParams.junkPacketMaxSize)
+        assertEquals(36, config.awgParams.initPacketJunkSize)
+        assertEquals(48, config.awgParams.responsePacketJunkSize)
+        assertEquals(111L, config.awgParams.initPacketMagicHeader)
+        assertEquals(222L, config.awgParams.responsePacketMagicHeader)
+        assertEquals(333L, config.awgParams.cookieReplyMagicHeader)
+        assertEquals(444L, config.awgParams.transportMagicHeader)
+        assertEquals(DoHProvider.GOOGLE_8888, config.doHProvider)
+    }
+
+    @Test
+    fun `draftFromConfig uses supplied slot id and name defaults`() {
+        val defaultDraft = draftFromConfig(sampleConfig())
+        val customDraft = draftFromConfig(sampleConfig(), slotId = "slot-9", name = "Custom")
+
+        assertEquals("", defaultDraft.slotId)
+        assertEquals("WARP", defaultDraft.name)
+        assertEquals("slot-9", customDraft.slotId)
+        assertEquals("Custom", customDraft.name)
+    }
+}
+
+class WarpConfParserTest {
 
     @Test
     fun `parser and builder round trip required fields`() {
@@ -266,6 +345,35 @@ class WarpSettingsModelTest {
     }
 
     @Test
+    fun `parser preserves only ipv4 or ipv6 address inputs`() {
+        val ipv4Only = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 10.0.0.2
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            """.trimIndent(),
+        ).getOrThrow()
+        val ipv6Only = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 2606:4700::2
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            """.trimIndent(),
+        ).getOrThrow()
+
+        assertEquals("10.0.0.2/32", ipv4Only.interfaceAddressV4)
+        assertEquals("", ipv4Only.interfaceAddressV6)
+        assertEquals("", ipv6Only.interfaceAddressV4)
+        assertEquals("2606:4700::2/128", ipv6Only.interfaceAddressV6)
+    }
+
+    @Test
     fun `parser preserves cidr addresses and integer awg payloads`() {
         val parsed = WarpConfParser.parse(
             """
@@ -323,6 +431,26 @@ class WarpSettingsModelTest {
     }
 
     @Test
+    fun `parser falls back when awg hex fields are absent entirely`() {
+        val parsed = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 10.0.0.2
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            """.trimIndent(),
+        ).getOrThrow()
+
+        assertEquals(null, parsed.awgParams.payloadHexI1)
+        assertEquals(null, parsed.awgParams.payloadHexI2)
+        assertEquals(null, parsed.awgParams.payloadHexI3)
+        assertEquals(null, parsed.awgParams.payloadHexI4)
+        assertEquals(null, parsed.awgParams.payloadHexI5)
+    }
+
+    @Test
     fun `parser falls back for invalid numeric awg fields`() {
         val parsed = WarpConfParser.parse(
             """
@@ -366,6 +494,49 @@ class WarpSettingsModelTest {
         assertEquals("0102", parsed.awgParams.payloadHexI2)
         assertEquals(AwgParams.DEFAULT_I3, parsed.awgParams.specialJunk3)
     }
+
+    @Test
+    fun `parser ignores unknown sections and malformed keys around valid sections`() {
+        val parsed = WarpConfParser.parse(
+            """
+            [Unknown]
+            PrivateKey = ignored
+            = ignored
+            [Interface]
+            PrivateKey = private-key
+            Address = 10.0.0.2/32
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            AllowedIPs =
+            """.trimIndent(),
+        ).getOrThrow()
+
+        assertEquals("private-key", parsed.privateKey)
+        assertEquals(WarpConfig.DEFAULT_ALLOWED_IPS, parsed.allowedIps)
+    }
+
+    @Test
+    fun `parser accepts uppercase wrapped hex and rejects short plain hex`() {
+        val parsed = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 10.0.0.2/32
+            I1 = <B 0X0A0B>
+            I2 = 0x0
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            """.trimIndent(),
+        ).getOrThrow()
+
+        assertEquals("0a0b", parsed.awgParams.payloadHexI1)
+        assertEquals(AwgParams.DEFAULT_I2, parsed.awgParams.payloadPacketSizeCount2)
+    }
+}
+
+class WarpIniBuilderTest {
 
     @Test
     fun `builder omits awg section for vanilla params and blank ipv6`() {
@@ -429,6 +600,227 @@ class WarpSettingsModelTest {
     }
 
     @Test
+    fun `builder preserves raw peer fields while rebuilding known sections`() {
+        val built = WarpIniBuilder.build(
+            sampleConfig().copy(
+                interfaceAddressV4 = "10.9.0.2/32",
+                peerEndpoint = "new.example.com:2408",
+            ),
+            """
+            [Interface]
+            PrivateKey = old-private
+            Address = 10.8.0.2/32
+            DNS = 9.9.9.9
+
+            [Peer]
+            PublicKey = old-peer
+            PresharedKey = shared-secret
+            Endpoint = old.example.com:1234
+            AllowedIPs = 0.0.0.0/0
+            """.trimIndent(),
+        )
+
+        assertTrue(built.contains("PrivateKey = private-key"))
+        assertTrue(built.contains("Address = 10.9.0.2/32, 2606:4700::2/128"))
+        assertTrue(built.contains("Endpoint = new.example.com:2408"))
+        assertTrue(built.contains("PresharedKey = shared-secret"))
+        assertTrue(built.contains("AllowedIPs = 0.0.0.0/0"))
+    }
+
+    @Test
+    fun `builder merges preserved raw ini with unknown sections and blank preserve shortcut`() {
+        val generated = WarpIniBuilder.build(sampleConfig())
+        val preserved = """
+            [Custom]
+            Comment line without equals
+
+            [interface]
+            PrivateKey = old-private
+            Address = 10.8.0.2/32
+            DNS = 9.9.9.9
+            MTU = 1400
+
+            [peer]
+            PublicKey = old-peer
+            Endpoint = old.example.com:1234
+            AllowedIPs = 0.0.0.0/0
+        """.trimIndent()
+
+        val merged = WarpIniBuilder.build(sampleConfig(), preserved)
+        val passthrough = WarpIniBuilder.build(sampleConfig(), "")
+
+        assertEquals(generated, passthrough)
+        assertTrue(merged.contains("[Custom]"))
+        assertTrue(merged.contains("Comment line without equals"))
+        assertTrue(merged.contains("PrivateKey = private-key"))
+        assertTrue(merged.contains("Endpoint = engage.cloudflareclient.com:2408"))
+        assertTrue(merged.contains("AllowedIPs = 0.0.0.0/0"))
+    }
+
+    @Test
+    fun `builder uses default headers when preserved ini omits known sections`() {
+        val merged = WarpIniBuilder.build(
+            sampleConfig(),
+            """
+            [Custom]
+            Keep = value
+            """.trimIndent(),
+        )
+
+        assertTrue(merged.contains("[Interface]"))
+        assertTrue(merged.contains("[Peer]"))
+        assertTrue(merged.contains("[Custom]"))
+        assertTrue(merged.contains("Keep = value"))
+    }
+
+    @Test
+    fun `builder keeps default headers when only one known section is preserved`() {
+        val merged = WarpIniBuilder.build(
+            sampleConfig(),
+            """
+            [Peer]
+            Endpoint = old.example.com:1234
+            AllowedIPs = 0.0.0.0/0
+            """.trimIndent(),
+        )
+
+        assertTrue(merged.contains("[Interface]"))
+        assertTrue(merged.contains("[Peer]"))
+        assertTrue(merged.contains("Endpoint = engage.cloudflareclient.com:2408"))
+    }
+
+    @Test
+    fun `builder keeps malformed and duplicate preserved lines`() {
+        val merged = WarpIniBuilder.build(
+            sampleConfig(),
+            """
+            [Interface]
+            PrivateKey = old-private
+            PrivateKey = duplicate-private
+            Note without equals
+
+            [Peer]
+            Endpoint = old.example.com:1234
+            Endpoint = duplicate.example.com:1234
+            """.trimIndent(),
+        )
+
+        assertTrue(merged.contains("Note without equals"))
+        assertTrue(merged.contains("PrivateKey = private-key"))
+        assertTrue(merged.contains("Endpoint = engage.cloudflareclient.com:2408"))
+        assertFalse(merged.contains("duplicate-private"))
+        assertFalse(merged.contains("duplicate.example.com:1234"))
+    }
+
+    @Test
+    fun `private warp ini helpers cover unknown labels and missing preferred sections`() {
+        val mergerClass = Class.forName("ru.ozero.enginewarp.RawWarpIniMerger")
+        val ctor = mergerClass.getDeclaredConstructor(String::class.java).apply { isAccessible = true }
+        val merger = ctor.newInstance("")
+        val canonicalLabel = mergerClass
+            .getDeclaredMethod("canonicalLabel", String::class.java)
+            .apply { isAccessible = true }
+        val appendPreferredSection = mergerClass.getDeclaredMethod(
+            "appendPreferredSection",
+            StringBuilder::class.java,
+            Map::class.java,
+            MutableSet::class.java,
+            String::class.java,
+        ).apply { isAccessible = true }
+
+        assertEquals("custom", canonicalLabel.invoke(merger, "custom"))
+        appendPreferredSection.invoke(
+            merger,
+            StringBuilder(),
+            emptyMap<String, Any>(),
+            mutableSetOf<String>(),
+            "missing",
+        )
+    }
+
+    @Test
+    fun `builder preserves unknown key labels and handles duplicate preferred sections`() {
+        val merged = WarpIniBuilder.build(
+            sampleConfig(),
+            """
+            [Interface]
+            CustomKey = old
+            PrivateKey = old-private
+
+            [Interface]
+            Other = ignored
+
+            [Peer]
+            Endpoint = old.example.com:1234
+            custompeer = keep
+            """.trimIndent(),
+        )
+
+        assertTrue(merged.contains("CustomKey = old"))
+        assertTrue(merged.contains("custompeer = keep"))
+        assertTrue(merged.contains("PrivateKey = private-key"))
+        assertTrue(merged.contains("Endpoint = engage.cloudflareclient.com:2408"))
+        assertTrue(merged.contains("Other = ignored"))
+    }
+
+    @Test
+    fun `builder uses default peer header when preserved peer is absent`() {
+        val merged = WarpIniBuilder.build(
+            sampleConfig(),
+            """
+            [Interface]
+            PrivateKey = old-private
+            DNS = old
+            """.trimIndent(),
+        )
+
+        assertTrue(merged.contains("[Interface]"))
+        assertTrue(merged.contains("[Peer]"))
+        assertTrue(merged.contains("DNS = 1.1.1.1, 8.8.8.8"))
+        assertTrue(merged.contains("PublicKey = peer-key"))
+    }
+
+    @Test
+    fun `builder appends generated keys missing from preserved section`() {
+        val merged = WarpIniBuilder.build(
+            sampleConfig(),
+            """
+            [Interface]
+            PrivateKey = old-private
+
+            [Peer]
+            PublicKey = old-peer
+            """.trimIndent(),
+        )
+
+        assertTrue(merged.contains("Address = 10.0.0.2/32, 2606:4700::2/128"))
+        assertTrue(merged.contains("DNS = 1.1.1.1, 8.8.8.8"))
+        assertTrue(merged.contains("Endpoint = engage.cloudflareclient.com:2408"))
+    }
+}
+
+class WarpConfigValidationTest {
+
+    @Test
+    fun `parser defaults allowed ips and dns for missing or blank peer values`() {
+        val parsed = WarpConfParser.parse(
+            """
+            [Interface]
+            PrivateKey = private-key
+            Address = 10.0.0.2/32
+            DNS =
+            [Peer]
+            PublicKey = peer-key
+            Endpoint = endpoint:2408
+            AllowedIPs = ,
+            """.trimIndent(),
+        ).getOrThrow()
+
+        assertEquals(WarpConfig.DEFAULT_DNS, parsed.dnsServers)
+        assertEquals(WarpConfig.DEFAULT_ALLOWED_IPS, parsed.allowedIps)
+    }
+
+    @Test
     fun `toWarpConfig falls back for invalid optional awg fields`() {
         val fallback = AwgParams(underloadPacketJunkSize = 9, payloadHexI1 = "0a0b")
         val config = draftFromSlot(slot(config = sampleConfig())).copy(
@@ -486,9 +878,25 @@ class WarpSettingsModelTest {
         assertThrows(IllegalArgumentException::class.java) {
             AwgParams(initPacketMagicHeader = 1, responsePacketMagicHeader = 1)
         }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(transportMagicHeader = 0)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(cookieReplyMagicHeader = 1, transportMagicHeader = 1)
+        }
         assertTrue(AwgParams.JC_RANGE.contains(AwgParams.DEFAULT_JC))
         assertTrue(AwgParams.SIZE_RANGE.contains(AwgParams.DEFAULT_JMIN))
         assertTrue(AwgParams.HEADER_RANGE.contains(AwgParams.DEFAULT_H1))
+    }
+
+    @Test
+    fun `AwgParams rejects low bounds for size fields`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(initPacketJunkSize = -1)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AwgParams(responsePacketJunkSize = -1)
+        }
     }
 
     @Test
@@ -501,21 +909,21 @@ class WarpSettingsModelTest {
         assertFalse(longPeer.contains("private-key"))
         assertFalse(longPeer.contains("2606:4700::2"))
     }
-
-    private fun slot(
-        name: String = "Ozero-1",
-        config: WarpConfig = sampleConfig(),
-    ): WarpConfigSlot = WarpConfigSlot(name = name, config = config)
-
-    private fun sampleConfig(): WarpConfig =
-        WarpConfig(
-            privateKey = "private-key",
-            publicKey = "public-key",
-            peerPublicKey = "peer-key",
-            peerEndpoint = "engage.cloudflareclient.com:2408",
-            interfaceAddressV4 = "10.0.0.2/32",
-            interfaceAddressV6 = "2606:4700::2/128",
-            dnsServers = listOf("1.1.1.1", "8.8.8.8"),
-            awgParams = AwgParams(junkPacketCount = 7),
-        )
 }
+
+private fun slot(
+    name: String = "Ozero-1",
+    config: WarpConfig = sampleConfig(),
+): WarpConfigSlot = WarpConfigSlot(name = name, config = config)
+
+private fun sampleConfig(): WarpConfig =
+    WarpConfig(
+        privateKey = "private-key",
+        publicKey = "public-key",
+        peerPublicKey = "peer-key",
+        peerEndpoint = "engage.cloudflareclient.com:2408",
+        interfaceAddressV4 = "10.0.0.2/32",
+        interfaceAddressV6 = "2606:4700::2/128",
+        dnsServers = listOf("1.1.1.1", "8.8.8.8"),
+        awgParams = AwgParams(junkPacketCount = 7),
+    )

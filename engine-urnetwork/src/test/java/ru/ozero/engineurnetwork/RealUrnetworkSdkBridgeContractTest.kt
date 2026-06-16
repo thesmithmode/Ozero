@@ -296,6 +296,38 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `connect methods persist selected location only after successful connect`() {
+        val connectToBlock = source.substringAfter("override fun connectTo(")
+            .substringBefore("override fun connectBestAvailable()")
+        assertTrue(
+            connectToBlock.contains("runCatching { cv.connect(sdkLoc) }"),
+            "connectTo must call connect before persisting location.",
+        )
+        assertTrue(
+            connectToBlock.contains(".onSuccess {"),
+            "connectTo must persist only on successful connect.",
+        )
+        assertTrue(
+            connectToBlock.indexOf("cv.connect(sdkLoc)") < connectToBlock.indexOf("persistConnectLocation(sdkLoc)"),
+            "connectTo must persist after connect succeeds.",
+        )
+
+        val bestBlock = source.substringAfter("override fun connectBestAvailable()")
+            .substringBefore("override fun selectedLocation()")
+        assertTrue(
+            bestBlock.contains("runCatching { cv.connectBestAvailable() }"),
+            "connectBestAvailable must call connect before persisting location.",
+        )
+        assertTrue(
+            bestBlock.contains(".onSuccess {"),
+            "connectBestAvailable must persist only on successful connect.",
+        )
+        val connectIndex = bestBlock.indexOf("cv.connectBestAvailable()")
+        val persistIndex = bestBlock.indexOf("persistConnectLocation(bestAvailableConnectLocation())")
+        assertTrue(connectIndex < persistIndex, "connectBestAvailable must persist after connect succeeds.")
+    }
+
+    @Test
     fun `stop() не закрывает device пока IoLoop активен — SIGABRT guard`() {
         val stopBlock = source.substringAfter("override suspend fun stop").substringBefore("override fun isRunning")
         assertTrue(
@@ -513,6 +545,12 @@ class RealUrnetworkSdkBridgeContractTest {
             startBlock.contains("attachConnectionStatusListener(cv)"),
             "runStartOnMain must subscribe to addConnectionStatusListener after openConnectViewController.",
         )
+        val listenerBlock = source.substringAfter("private fun attachConnectionStatusListener")
+            .substringBefore("private fun detachConnectionStatusListener")
+        assertTrue(
+            listenerBlock.contains("bridgeScope.launch(Dispatchers.Main.immediate)"),
+            "connectionStatus listener must marshal callback work onto the main thread.",
+        )
         val stopBlock = source.substringAfter("private suspend fun stopUnderLock")
             .substringBefore("private fun cleanupOnFailure")
         assertTrue(
@@ -535,6 +573,10 @@ class RealUrnetworkSdkBridgeContractTest {
         )
         val listenerBlock = source.substringAfter("private fun attachSelectedLocationListener")
             .substringBefore("private fun refreshConnectionStatus")
+        assertTrue(
+            listenerBlock.contains("bridgeScope.launch(Dispatchers.Main.immediate)"),
+            "selectedLocation listener must marshal SDK callback work onto the main thread.",
+        )
         assertTrue(
             listenerBlock.contains("addSelectedLocationListener") &&
                 listenerBlock.contains("persistConnectLocation(location)"),
@@ -599,6 +641,10 @@ class RealUrnetworkSdkBridgeContractTest {
         val listenerBody = startBlock.substringAfter("addProvideSecretKeysListener {")
             .substringBefore("d.initProvideSecretKeys()")
         assertTrue(
+            listenerBody.contains("Dispatchers.Main.immediate + NonCancellable"),
+            "provideSecretKeys persistence in runStartOnMain must survive normal stop/switch cancellation.",
+        )
+        assertTrue(
             listenerBody.contains("localState.provideSecretKeys = "),
             "Listener в runStartOnMain обязан сохранять ключи через localState.provideSecretKeys — " +
                 "без этого provider identity сбрасывается на каждом рестарте → 0 раздачи.",
@@ -620,6 +666,12 @@ class RealUrnetworkSdkBridgeContractTest {
             listenerIdx < initIdx,
             "addProvideSecretKeysListener обязан регистрироваться ДО device.initProvideSecretKeys().",
         )
+        val listenerBody = ensureBlock.substringAfter("addProvideSecretKeysListener {")
+            .substringBefore("device.initProvideSecretKeys()")
+        assertTrue(
+            listenerBody.contains("Dispatchers.Main.immediate + NonCancellable"),
+            "provideSecretKeys persistence in ensureDeviceOnMain must survive normal stop/switch cancellation.",
+        )
     }
 
     @Test
@@ -633,6 +685,10 @@ class RealUrnetworkSdkBridgeContractTest {
         )
         val listenerBody = startBlock.substringAfter("addJwtRefreshListener {")
             .substringBefore("applyDeviceFields")
+        assertTrue(
+            listenerBody.contains("bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable)"),
+            "addJwtRefreshListener callback must marshal LocalState mutation onto the main thread.",
+        )
         assertTrue(
             listenerBody.contains("localState.byClientJwt = "),
             "addJwtRefreshListener callback обязан сохранять newJwt в localState.byClientJwt — " +
@@ -651,6 +707,10 @@ class RealUrnetworkSdkBridgeContractTest {
         )
         val listenerBody = ensureBlock.substringAfter("addJwtRefreshListener {")
             .substringBefore("applyDeviceFields")
+        assertTrue(
+            listenerBody.contains("bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable)"),
+            "ensureDevice addJwtRefreshListener callback must marshal LocalState mutation onto the main thread.",
+        )
         assertTrue(
             listenerBody.contains("localState.byClientJwt = "),
             "ensureDevice addJwtRefreshListener callback обязан сохранять newJwt в localState.byClientJwt.",

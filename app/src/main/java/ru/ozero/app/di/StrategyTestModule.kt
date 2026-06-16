@@ -43,7 +43,7 @@ object StrategyTestModule {
     @Provides
     @Singleton
     @StrategyTestEngine
-    fun provideStrategyTestEnginePlugin(): EnginePlugin = ByeDpiEngine(ByeDpiProxy())
+    fun provideStrategyTestEnginePlugin(): EnginePlugin = ByeDpiEngine(proxy = ByeDpiProxy())
 
     @Provides
     @Singleton

@@ -24,6 +24,7 @@ class EngineWatchdogCoordinator(
     private val chainOrchestrator: ChainOrchestrator,
     private val notificationFactory: OzeroNotificationFactory,
     private val tunFdRef: AtomicReference<ParcelFileDescriptor?>,
+    private val lockdownStartupFdRef: AtomicReference<ParcelFileDescriptor?>,
     private val statsJobRef: AtomicReference<Job?>,
     private val stopping: AtomicBoolean,
     private val starting: AtomicBoolean,
@@ -42,7 +43,7 @@ class EngineWatchdogCoordinator(
                 healthMonitor.status
                     .filter { it == HealthMonitor.Status.DEGRADED }
                     .first()
-                if (killswitchProvider() && tunFdRef.get() != null && !stopping.get()) {
+                if (killswitchProvider() && hasBlockingTunForKillswitch() && !stopping.get()) {
                     PersistentLoggers.warn(
                         TAG,
                         "health degraded → killswitch fire engine=$engineId",
@@ -164,14 +165,33 @@ class EngineWatchdogCoordinator(
         stagnationWatchJobRef.getAndSet(null)?.cancel()
     }
 
-    fun handleEngineFailure(engineId: EngineId, reason: String) {
-        val fdAlive = tunFdRef.get() != null
-        if (killswitchProvider() && fdAlive) {
+    fun handleEngineFailure(engineId: EngineId, reason: String): Boolean {
+        if (stopping.get()) return false
+        if (!isActiveEngine(engineId)) {
+            PersistentLoggers.warn(TAG, "ignore inactive engine failure: engine=$engineId reason=$reason")
+            return false
+        }
+        if (killswitchProvider() && hasBlockingTunForKillswitch()) {
             enterKillswitchMode(engineId, reason)
+            return true
         } else {
             tunnelController.onEngineDied(engineId, reason)
             stopVpnRequest()
+            return false
         }
+    }
+
+    private fun hasBlockingTun(): Boolean =
+        tunFdRef.get() != null || lockdownStartupFdRef.get() != null
+
+    private fun hasBlockingTunForKillswitch(): Boolean = hasBlockingTun()
+
+    private fun isActiveEngine(engineId: EngineId): Boolean = when (val state = tunnelController.state.value) {
+        is TunnelState.Probing -> state.engineId == null || state.engineId == engineId
+        is TunnelState.Connecting -> state.engineId == engineId
+        is TunnelState.Connected -> state.engineId == engineId
+        is TunnelState.Failed -> state.engineId == engineId
+        else -> false
     }
 
     private fun enterKillswitchMode(engineId: EngineId, reason: String) {

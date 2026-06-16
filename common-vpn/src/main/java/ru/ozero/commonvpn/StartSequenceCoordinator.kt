@@ -62,18 +62,17 @@ class StartSequenceCoordinator(
         val settings = withTimeoutOrNull(SETTINGS_READ_TIMEOUT_MS) {
             runCatching { deps.settingsRepository.settings.first() }.getOrNull()
         }
-        val splitConfig = readSplitConfig(settings?.splitMode ?: SplitTunnelMode.ALL)
-        val trafficMode = settings?.trafficMode ?: TrafficMode.TUN
-        val killswitch = settings?.killswitchEnabled ?: false
+        val effectiveSettings = settings ?: SettingsModel()
+        val splitConfig = readSplitConfig(effectiveSettings.splitMode)
+        val trafficMode = effectiveSettings.trafficMode
+        val killswitch = effectiveSettings.killswitchEnabled
         killswitchSetter(trafficMode == TrafficMode.TUN && killswitch)
         if (trafficMode == TrafficMode.TUN && killswitch) {
-            val startupIpv6 = settings?.ipv6Enabled ?: false
-            val startupDns = settings?.customDnsServers.orEmpty()
             runCatching {
                 deps.tunBuilderHelper.buildTunBuilder(
                     splitConfig = splitConfig,
-                    ipv6Enabled = startupIpv6,
-                    customDnsServers = startupDns,
+                    ipv6Enabled = effectiveSettings.ipv6Enabled,
+                    customDnsServers = effectiveSettings.customDnsServers,
                     applyUnderlying = false,
                 ).establish()
             }
@@ -86,14 +85,14 @@ class StartSequenceCoordinator(
                 .onFailure { PersistentLoggers.error(TAG, "lockdown startup TUN failed: ${it.message}") }
         }
 
-        val manualEngine = settings?.manualEngine
+        val manualEngine = effectiveSettings.manualEngine
         val autoPicks = if (manualEngine == null) {
-            autoCandidatesWithPreflight(settings, trafficMode)
+            autoCandidatesWithPreflight(effectiveSettings, trafficMode)
         } else {
             emptyList()
         }
         val picks = if (manualEngine != null) {
-            val cfg = buildEngineConfig(manualEngine, settings, trafficMode)
+            val cfg = buildEngineConfig(manualEngine, effectiveSettings, trafficMode)
             if (cfg == null || !engineAllowedForTrafficMode(manualEngine, trafficMode)) {
                 emptyList()
             } else {
@@ -104,13 +103,14 @@ class StartSequenceCoordinator(
         }
         if (picks.isEmpty()) {
             val mode = if (manualEngine == null) "auto" else "manual"
-            val targetForUi = resolveTargetForUi(manualEngine, settings)
+            val targetForUi = resolveTargetForUi(manualEngine, effectiveSettings)
             if (targetForUi == null) {
                 PersistentLoggers.error(TAG, "no plugins registered — отказ старта")
             } else {
                 PersistentLoggers.error(TAG, "no engine reachable ($mode mode) — отказ старта")
                 deps.tunnelController.onProbing(targetForUi)
-                deps.tunnelController.onEngineDied(targetForUi, "no engine reachable ($mode mode)")
+                deps.engineWatchdog.handleEngineFailure(targetForUi, "no engine reachable ($mode mode)")
+                if (deps.tunnelController.killswitchActive.value) return
             }
             stopVpnRequest()
             return
@@ -120,7 +120,7 @@ class StartSequenceCoordinator(
             val success = startSingleEngineCandidate(
                 activeEngineId = pick.first,
                 activeConfig = pick.second,
-                settings = settings,
+                settings = effectiveSettings,
                 splitConfig = splitConfig,
                 trafficMode = trafficMode,
                 notifyFailure = manualEngine != null || isLast,
@@ -133,7 +133,7 @@ class StartSequenceCoordinator(
     private suspend fun startSingleEngineCandidate(
         activeEngineId: EngineId,
         activeConfig: EngineConfig,
-        settings: SettingsModel?,
+        settings: SettingsModel,
         splitConfig: SplitTunnelConfig,
         trafficMode: TrafficMode,
         notifyFailure: Boolean,
@@ -144,13 +144,13 @@ class StartSequenceCoordinator(
             return runSingleProxy(activeEngineId, activeConfig, notifyFailure)
         }
         val usesCustomTun = engineNeedsCustomTun(activeEngineId)
-        val ipv6Enabled = settings?.ipv6Enabled ?: false
+        val ipv6Enabled = settings.ipv6Enabled
         val established = establishTunAndChain(
             activeEngineId = activeEngineId,
             activeConfig = activeConfig,
             splitConfig = splitConfig,
             ipv6Enabled = ipv6Enabled,
-            customDns = settings?.customDnsServers.orEmpty(),
+            customDns = settings.customDnsServers,
             usesCustomTun = usesCustomTun,
             notifyFailure = notifyFailure,
         ) ?: return false
@@ -311,7 +311,7 @@ class StartSequenceCoordinator(
 
     private fun buildEngineConfig(
         engineId: EngineId,
-        settings: SettingsModel?,
+        settings: SettingsModel,
         trafficMode: TrafficMode = TrafficMode.TUN,
     ): EngineConfig? {
         val plugin = deps.enginePlugins.firstOrNull { it.id == engineId } ?: return null
@@ -322,13 +322,15 @@ class StartSequenceCoordinator(
         }
     }
 
-    private fun resolveTargetForUi(manualEngine: EngineId?, settings: SettingsModel?): EngineId? = manualEngine
-        ?: settings?.engineAutoPriority?.firstOrNull()
-        ?: deps.enginePlugins.firstOrNull()?.id
+    private fun resolveTargetForUi(manualEngine: EngineId?, settings: SettingsModel): EngineId? {
+        if (manualEngine != null) return manualEngine
+        val pluginIds = deps.enginePlugins.mapTo(mutableSetOf()) { it.id }
+        return settings.engineAutoPriority.firstOrNull { it in pluginIds }
+            ?: deps.enginePlugins.firstOrNull()?.id
+    }
 
-    private fun autoCandidates(settings: SettingsModel?, trafficMode: TrafficMode): List<Pair<EngineId, EngineConfig>> {
-        val priority = settings?.engineAutoPriority ?: SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
-        return priority.mapNotNull { id ->
+    private fun autoCandidates(settings: SettingsModel, trafficMode: TrafficMode): List<Pair<EngineId, EngineConfig>> {
+        return settings.engineAutoPriority.mapNotNull { id ->
             if (!engineAllowedForTrafficMode(id, trafficMode)) return@mapNotNull null
             val cfg = buildEngineConfig(id, settings, trafficMode) ?: return@mapNotNull null
             id to cfg
@@ -336,7 +338,7 @@ class StartSequenceCoordinator(
     }
 
     private suspend fun autoCandidatesWithPreflight(
-        settings: SettingsModel?,
+        settings: SettingsModel,
         trafficMode: TrafficMode,
         skipIds: Set<EngineId> = emptySet(),
     ): List<Pair<EngineId, EngineConfig>> {
@@ -345,8 +347,8 @@ class StartSequenceCoordinator(
         val accepted = mutableListOf<Pair<EngineId, EngineConfig>>()
         val protector = SocketProtector { _ -> true }
         for ((id, cfg) in candidates) {
-            val plugin = deps.enginePlugins.firstOrNull { it.id == id }
-            val preflight = plugin?.preflight()
+            val plugin = deps.enginePlugins.first { it.id == id }
+            val preflight = plugin.preflight()
             if (preflight == null) {
                 Log.i(TAG, "auto-mode preflight skip (null) engine=$id")
                 accepted += id to cfg
@@ -384,7 +386,7 @@ class StartSequenceCoordinator(
         splitConfig: SplitTunnelConfig,
         ipv6Enabled: Boolean,
     ): ParcelFileDescriptor? {
-        val plugin = deps.enginePlugins.firstOrNull { it.id == engineId } ?: return null
+        val plugin = deps.enginePlugins.first { it.id == engineId }
         val spec = plugin.tunSpec() ?: return null
         val builder = deps.tunBuilderHelper.applyEngineTunSpec(spec, ipv6Enabled)
         TunBuilderConfigurator(packageName).apply(builder, splitConfig, excludeSelf = true)
@@ -402,8 +404,9 @@ class StartSequenceCoordinator(
             builder.establish()
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "engine TUN establish threw: ${t.message}")
-            deps.tunnelController.onEngineDied(engineId, "VPN slot занят — выключите другой VPN")
-            stopVpnRequest()
+            if (!deps.engineWatchdog.handleEngineFailure(engineId, "VPN slot занят — выключите другой VPN")) {
+                stopVpnRequest()
+            }
             return null
         }
         if (pfd == null) {
@@ -411,8 +414,9 @@ class StartSequenceCoordinator(
                 TAG,
                 "engine TUN establish returned null — VPN slot занят другим приложением",
             )
-            deps.tunnelController.onEngineDied(engineId, "VPN slot занят — выключите другой VPN")
-            stopVpnRequest()
+            if (!deps.engineWatchdog.handleEngineFailure(engineId, "VPN slot занят — выключите другой VPN")) {
+                stopVpnRequest()
+            }
             return null
         }
         state.tunFdRef.set(pfd)

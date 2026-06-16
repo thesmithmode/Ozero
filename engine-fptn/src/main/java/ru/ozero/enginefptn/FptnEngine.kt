@@ -36,6 +36,8 @@ import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.settings.SettingsModel
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.util.Locale
@@ -43,10 +45,10 @@ import java.util.Locale
 class FptnEngine(
     private val configStore: FptnConfigStore,
     private val onEngineFailed: (String) -> Unit = {},
+    private val wsClient: FptnWebSocketClient = FptnNativeWebSocket(),
+    private val httpsClient: FptnHttpsClient = FptnNativeHttpsClient(),
+    private val tunIo: FptnTunIo = AndroidFptnTunIo,
 ) : EnginePlugin, TunFdAcceptor {
-
-    private val wsClient = FptnNativeWebSocket()
-    private val httpsClient = FptnNativeHttpsClient()
 
     private val _stats = MutableStateFlow(EngineStats())
     private var tunScope: CoroutineScope? = null
@@ -147,11 +149,11 @@ class FptnEngine(
                 "n=${tokenData.servers.size} candidates=${candidates.size}",
         )
 
-        FptnNativeWebSocket.loadOnce()
-        if (!FptnNativeWebSocket.libraryLoaded) {
-            PersistentLoggers.error(TAG, "native lib load failed: ${FptnNativeWebSocket.loadError}")
+        wsClient.loadOnce()
+        if (!wsClient.libraryLoaded) {
+            PersistentLoggers.error(TAG, "native lib load failed: ${wsClient.loadError}")
             return StartResult.Failure(
-                "fptn_native_lib not loaded: ${FptnNativeWebSocket.loadError}"
+                "fptn_native_lib not loaded: ${wsClient.loadError}"
             )
         }
 
@@ -189,10 +191,9 @@ class FptnEngine(
 
         Log.d(TAG, "attachTun: fd=$tunFd server=${server.name}")
 
-        val pfd = ParcelFileDescriptor.adoptFd(tunFd)
-        _pfd = pfd
-
-        val fos = FileOutputStream(pfd.fileDescriptor)
+        val tun = tunIo.open(tunFd)
+        _pfd = tun.pfd
+        val fos = tun.output
 
         wsClient.onOpen = {
             Log.d(TAG, "WS connected")
@@ -223,13 +224,13 @@ class FptnEngine(
                 censorshipStrategy = _bypassMethod,
             )
         }.getOrElse { e ->
-            fos.runCatching { close() }
+            tun.close()
             PersistentLoggers.error(TAG, "nativeCreate failed: ${e.message}")
             return TunAttachResult.Failure("nativeCreate failed: ${e.message}")
         }
         Log.d(TAG, "attachTun: handle=$handle, starting WS thread")
         runCatching { wsClient.nativeRun(handle) }.getOrElse { e ->
-            fos.runCatching { close() }
+            tun.close()
             runCatching { wsClient.nativeDestroy(handle) }
             PersistentLoggers.error(TAG, "nativeRun failed: ${e.message}")
             return TunAttachResult.Failure("nativeRun failed: ${e.message}")
@@ -241,7 +242,7 @@ class FptnEngine(
         tunScope = scope
 
         scope.launch {
-            FileInputStream(pfd.fileDescriptor).use { fis ->
+            tun.input.use { fis ->
                 val buf = ByteArray(65535)
                 try {
                     while (isActive) {
@@ -522,6 +523,33 @@ class FptnEngine(
         internal const val FPTN_API_ERROR = "FPTN API error"
         internal const val FPTN_ALL_CANDIDATES_FAILED = "FPTN all server candidates failed"
         internal const val FPTN_TOKEN_REJECTED = "FPTN token rejected"
+    }
+}
+
+interface FptnTunIo {
+    fun open(tunFd: Int): FptnTunStreams
+}
+
+data class FptnTunStreams(
+    val pfd: ParcelFileDescriptor?,
+    val input: InputStream,
+    val output: OutputStream,
+) {
+    fun close() {
+        output.runCatching { close() }
+        input.runCatching { close() }
+        pfd?.runCatching { close() }
+    }
+}
+
+private object AndroidFptnTunIo : FptnTunIo {
+    override fun open(tunFd: Int): FptnTunStreams {
+        val pfd = ParcelFileDescriptor.adoptFd(tunFd)
+        return FptnTunStreams(
+            pfd = pfd,
+            input = FileInputStream(pfd.fileDescriptor),
+            output = FileOutputStream(pfd.fileDescriptor),
+        )
     }
 }
 

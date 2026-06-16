@@ -7,31 +7,47 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.runBlocking
 
 class DataStoreFptnConfigStore(
     private val dataStore: DataStore<Preferences>,
-    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) : FptnConfigStore {
 
-    private val cache = dataStore.data
-        .map { readConfig(it) }
-        .stateIn(scope, SharingStarted.Eagerly, FptnConfig())
+    @Volatile
+    private var latest = FptnConfig()
 
-    override fun config(): Flow<FptnConfig> = cache
+    @Volatile
+    private var loaded = false
 
-    override fun currentConfig(): FptnConfig = cache.value
+    override fun config(): Flow<FptnConfig> = dataStore.data.map { prefs ->
+        readConfig(prefs).also {
+            latest = it
+            loaded = true
+        }
+    }
+
+    override fun currentConfig(): FptnConfig {
+        if (!loaded) {
+            synchronized(this) {
+                if (!loaded) {
+                    latest = runBlocking(Dispatchers.IO) { dataStore.data.first().let(::readConfig) }
+                    loaded = true
+                }
+            }
+        }
+        return latest
+    }
 
     override suspend fun update(transform: (FptnConfig) -> FptnConfig) {
         dataStore.edit { prefs ->
             val next = transform(readConfig(prefs))
             writeConfig(prefs, next)
+            latest = next
+            loaded = true
         }
     }
 

@@ -5,7 +5,7 @@ tags: [urnetwork, relay, provider, identity, sdk, architecture]
 sources:
   - "daily/2026-05-23.md"
 created: 2026-05-23
-updated: 2026-05-23
+updated: 2026-06-12
 ---
 
 # URnetwork Provider Identity: provideSecretKeys Persistence and JWT Refresh Listener
@@ -72,6 +72,8 @@ After the fix, the relay behavior for first-time users is:
 1. First `start()` call: `initProvideSecretKeys()` generates new keys → listener fires → keys saved to `localState.provideSecretKeys` (SDK-persisted)
 2. Subsequent `start()` calls: `initProvideSecretKeys()` loads existing keys from SDK space → listener fires with SAME keys → `localState.provideSecretKeys` unchanged
 3. Mesh identity = stable → traffic routed to this provider node
+
+Provider diagnostics must not use `peerCount()` as proof of consumer traffic. The daily investigation found that `peerCount()` maps to grid window neighbor count, not to the number of clients consuming the provider. A stronger runtime signal is a provider-state field such as `device.windowStatus.providerStateAdded > 0`, or a log line showing relay forwarding with accumulated bytes.
 
 ## Related Concepts
 

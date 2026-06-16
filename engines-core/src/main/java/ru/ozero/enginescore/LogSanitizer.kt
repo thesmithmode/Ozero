@@ -4,6 +4,17 @@ import java.net.URI
 
 object LogSanitizer {
 
+    fun sanitize(text: String): String {
+        var out = text
+        out = USERINFO_URI.replace(out) { m -> "${m.groupValues[1]}://<redacted>@${m.groupValues[3]}" }
+        out = PROXY_URI.replace(out, "<redacted-uri>")
+        out = KEYED_LONG_TOKEN.replace(out) { m -> "${m.groupValues[1]}=<redacted-token>" }
+        out = LONG_TOKEN.replace(out) { m ->
+            if (m.value.isBareTokenLike()) "<redacted-token>" else m.value
+        }
+        return out
+    }
+
     fun redactUrl(raw: String): String =
         runCatching {
             val uri = URI(raw)
@@ -12,4 +23,26 @@ object LogSanitizer {
             val port = if (uri.port > 0) ":${uri.port}" else ""
             "$scheme://$host$port/<redacted>"
         }.getOrElse { "<redacted-uri>" }
+
+    private val USERINFO_URI = Regex(
+        "(?i)(\\w+)://([^:/@\\s]+(?::[^@\\s]*)?)@([^\\s/]+)",
+    )
+
+    private val PROXY_URI = Regex(
+        "(?i)\\b(vless|vmess|trojan|ss|hysteria2?|tuic|naive\\+https?|wireguard|awg)://\\S+",
+    )
+
+    private val KEYED_LONG_TOKEN = Regex(
+        "(?i)\\b([a-z][a-z0-9_-]{0,31})=([A-Za-z0-9+/_-]{24,})",
+    )
+
+    private val LONG_TOKEN = Regex(
+        "[A-Za-z0-9+/_=-]{32,}",
+    )
+
+    private fun String.isBareTokenLike(): Boolean {
+        val hasDigit = any { it.isDigit() }
+        val hasTokenSeparator = any { it == '+' || it == '/' || it == '_' || it == '-' || it == '=' }
+        return hasTokenSeparator || hasDigit
+    }
 }

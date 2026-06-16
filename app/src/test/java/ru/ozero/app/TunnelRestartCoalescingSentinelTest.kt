@@ -11,18 +11,18 @@ class TunnelRestartCoalescingSentinelTest {
         val source = mainActivitySource()
         val block = source.substringAfter("private suspend fun restartVpnIfConnected")
             .substringBefore("private fun observeLiveEngineSettingsChanges")
-        val tryLockIdx = block.indexOf("restartMutex.tryLock()")
-        val switchingIdx = block.indexOf("onSwitchingStarted")
         assertTrue(
             source.contains("private val restartMutex = Mutex()") &&
-                source.contains("private var restartPending = false") &&
-                tryLockIdx >= 0 &&
-                tryLockIdx < switchingIdx &&
-                block.contains("restartPending = true") &&
-                block.contains("while (restartPending)") &&
-                block.contains("restartMutex.unlock()"),
-            "restartVpnIfConnected must take restartMutex.tryLock() before onSwitchingStarted, " +
-                "preserve a pending restart instead of dropping it, and unlock in finally. Block:\n$block",
+                source.contains("private val restartQueue = ArrayDeque<String>()") &&
+                source.contains("private var restartInProgress = false") &&
+                block.contains("restartMutex.withLock") &&
+                block.contains("restartQueue.addLast(reason)") &&
+                block.contains("restartQueue.removeFirstOrNull()") &&
+                block.contains("abortQueuedRestarts()") &&
+                block.contains("restartQueue.clear()") &&
+                block.contains("restartInProgress = false") &&
+                block.contains("restartQueue.isNotEmpty()"),
+            "restartVpnIfConnected must coalesce through a mutex-guarded queue so enqueue and exit checks stay consistent. Block:\n$block",
         )
     }
 

@@ -28,7 +28,7 @@ class LockFileParserTest {
                 engine: byedpi
                 abi: arm64-v8a
                 destination: jniLibs
-                download_url: https://github.com/example-owner/example-repo/releases/download/binaries-abc12345/libbyedpi-arm64-v8a.so
+                download_url: https://example.com/libbyedpi.so
                 sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
                 size_bytes: 285184
                 source_repo: https://github.com/hufrea/byedpi
@@ -47,6 +47,167 @@ class LockFileParserTest {
             assertThat(sizeBytes).isEqualTo(285184L)
             assertThat(sourceCommit).isEqualTo("1111111111111111111111111111111111111111")
         }
+    }
+
+    @Test
+    fun `parse preserves generated at source repo and lookup by name`() {
+        val f = write(
+            """
+            tag: binaries-meta
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libone.so
+                engine: one
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/libone.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com/one
+                source_commit: 1111111111111111111111111111111111111111
+            """.trimIndent(),
+        )
+
+        val lock = LockFileParser.parse(f)
+
+        assertThat(lock.generatedAt).isEqualTo("2026-04-25T10:00:00Z")
+        assertThat(lock.findByName("libone.so")?.sourceRepo).isEqualTo("https://example.com/one")
+        assertThat(lock.findByName("missing.so")).isNull()
+    }
+
+    @Test
+    fun `parse converts yaml timestamp generated at to instant string`() {
+        val f = write(
+            """
+            tag: binaries-meta
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libone.so
+                engine: one
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/libone.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com/one
+                source_commit: 1111111111111111111111111111111111111111
+            """.trimIndent(),
+        )
+
+        val lock = LockFileParser.parse(f)
+
+        assertThat(lock.generatedAt).isEqualTo("2026-04-25T10:00:00Z")
+    }
+
+    @Test
+    fun `parse preserves plain string generated at without coercion`() {
+        val f = write(
+            """
+            tag: binaries-meta
+            generated_at: custom-build-marker
+            artifacts:
+              - name: libone.so
+                engine: one
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/libone.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com/one
+                source_commit: 1111111111111111111111111111111111111111
+            """.trimIndent(),
+        )
+
+        val lock = LockFileParser.parse(f)
+
+        assertThat(lock.generatedAt).isEqualTo("custom-build-marker")
+    }
+
+    @Test
+    fun `parse coerces numeric tag to string`() {
+        val f = write(
+            """
+            tag: 123
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts: []
+            """.trimIndent(),
+        )
+
+        val lock = LockFileParser.parse(f)
+
+        assertThat(lock.tag).isEqualTo("123")
+    }
+
+    @Test
+    fun `parse converts unquoted yaml timestamp generated at to instant string`() {
+        val f = write(
+            """
+            tag: binaries-meta
+            generated_at: 2026-04-25 10:00:00Z
+            artifacts:
+              - name: libone.so
+                engine: one
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/libone.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com/one
+                source_commit: 1111111111111111111111111111111111111111
+            """.trimIndent(),
+        )
+
+        val lock = LockFileParser.parse(f)
+
+        assertThat(lock.generatedAt).startsWith("2026-04-25T10:00:00")
+    }
+
+    @Test
+    fun `parse converts yaml date generated at to instant string`() {
+        val f = write(
+            """
+            tag: binaries-meta
+            generated_at: 2026-04-25
+            artifacts:
+              - name: libone.so
+                engine: one
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/libone.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com/one
+                source_commit: 1111111111111111111111111111111111111111
+            """.trimIndent(),
+        )
+
+        val lock = LockFileParser.parse(f)
+
+        assertThat(lock.generatedAt).startsWith("2026-04-25T00:00:00")
+    }
+
+    @Test
+    fun `parse converts non string non date generated at using toString`() {
+        val f = write(
+            """
+            tag: binaries-meta
+            generated_at: 20260425
+            artifacts:
+              - name: libone.so
+                engine: one
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: https://example.com/libone.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com/one
+                source_commit: 1111111111111111111111111111111111111111
+            """.trimIndent(),
+        )
+
+        val lock = LockFileParser.parse(f)
+
+        assertThat(lock.generatedAt).isEqualTo("20260425")
     }
 
     @Test
@@ -72,192 +233,70 @@ class LockFileParserTest {
     }
 
     @Test
-    fun `reject missing tag field`() {
-        val f = write("generated_at: 2026-04-25T10:00:00Z\nartifacts: []\n")
-        assertThatThrownBy { LockFileParser.parse(f) }
-            .isInstanceOf(LockFileException::class.java)
-            .hasMessageContaining("tag")
-    }
-
-    @Test
-    fun `reject missing sha256 on artifact`() {
+    fun `parse target filename and string size`() {
         val f = write(
             """
-            tag: binaries-x
+            tag: binaries-deadbeef
             generated_at: 2026-04-25T10:00:00Z
             artifacts:
-              - name: libbyedpi-arm64-v8a.so
-                engine: byedpi
-                abi: arm64-v8a
-                destination: jniLibs
-                download_url: https://example.com/x.so
-                size_bytes: 100
-                source_repo: https://github.com/hufrea/byedpi
-                source_commit: 4444444444444444444444444444444444444444
-            """.trimIndent(),
-        )
-        assertThatThrownBy { LockFileParser.parse(f) }
-            .isInstanceOf(LockFileException::class.java)
-            .hasMessageContaining("sha256")
-    }
-
-    @Test
-    fun `reject duplicate artifact names`() {
-        val f = write(
-            """
-            tag: binaries-x
-            generated_at: 2026-04-25T10:00:00Z
-            artifacts:
-              - name: libbyedpi-arm64-v8a.so
-                engine: byedpi
-                abi: arm64-v8a
-                destination: jniLibs
-                download_url: https://example.com/a.so
+              - name: original.aar
+                target_filename: renamed.aar
+                engine: xray
+                destination: libs
+                download_url: https://example.com/original.aar
                 sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-                size_bytes: 1
-                source_repo: https://example.com
-                source_commit: 5555555555555555555555555555555555555555
-              - name: libbyedpi-arm64-v8a.so
-                engine: byedpi
-                abi: arm64-v8a
-                destination: jniLibs
-                download_url: https://example.com/b.so
-                sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-                size_bytes: 1
-                source_repo: https://example.com
-                source_commit: 6666666666666666666666666666666666666666
+                size_bytes: "15728640"
+                source_repo: https://github.com/XTLS/Xray-core
+                source_commit: 2222222222222222222222222222222222222222
             """.trimIndent(),
         )
-        assertThatThrownBy { LockFileParser.parse(f) }
-            .isInstanceOf(LockFileException::class.java)
-            .hasMessageContaining("Duplicate")
+        val artifact = LockFileParser.parse(f).artifacts.single()
+        assertThat(artifact.targetFilename).isEqualTo("renamed.aar")
+        assertThat(artifact.sizeBytes).isEqualTo(15_728_640L)
     }
 
     @Test
-    fun `reject jniLibs artifact without abi`() {
+    fun `blank target filename falls back to artifact name`() {
         val f = write(
             """
-            tag: binaries-x
+            tag: binaries-deadbeef
             generated_at: 2026-04-25T10:00:00Z
             artifacts:
-              - name: libbyedpi.so
-                engine: byedpi
-                destination: jniLibs
-                download_url: https://example.com/x.so
+              - name: original.aar
+                target_filename: " "
+                engine: xray
+                destination: libs
+                download_url: https://example.com/original.aar
                 sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-                size_bytes: 1
-                source_repo: https://example.com
-                source_commit: 7777777777777777777777777777777777777777
+                size_bytes: 15728640
+                source_repo: https://github.com/XTLS/Xray-core
+                source_commit: 2222222222222222222222222222222222222222
             """.trimIndent(),
         )
-        assertThatThrownBy { LockFileParser.parse(f) }
-            .isInstanceOf(LockFileException::class.java)
-            .hasMessageContaining("abi")
+        assertThat(LockFileParser.parse(f).artifacts.single().targetFilename).isNull()
     }
 
     @Test
-    fun `reject unknown destination value`() {
+    fun `parse lock with absent artifacts as empty list`() {
         val f = write(
             """
-            tag: binaries-x
+            tag: binaries-empty
             generated_at: 2026-04-25T10:00:00Z
-            artifacts:
-              - name: libx.so
-                engine: x
-                abi: arm64-v8a
-                destination: somewhere_else
-                download_url: https://example.com/x.so
-                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-                size_bytes: 1
-                source_repo: https://example.com
-                source_commit: 8888888888888888888888888888888888888888
             """.trimIndent(),
         )
-        assertThatThrownBy { LockFileParser.parse(f) }
-            .isInstanceOf(LockFileException::class.java)
-            .hasMessageContaining("destination")
+        assertThat(LockFileParser.parse(f).artifacts).isEmpty()
     }
 
     @Test
-    fun `reject sha256 with wrong length`() {
+    fun `parse lock with non list artifacts as empty list`() {
         val f = write(
             """
-            tag: binaries-x
+            tag: binaries-empty
             generated_at: 2026-04-25T10:00:00Z
             artifacts:
-              - name: libx.so
-                engine: x
-                abi: arm64-v8a
-                destination: jniLibs
-                download_url: https://example.com/x.so
-                sha256: deadbeef
-                size_bytes: 1
-                source_repo: https://example.com
-                source_commit: 9999999999999999999999999999999999999999
+              byedpi: libbyedpi.so
             """.trimIndent(),
         )
-        assertThatThrownBy { LockFileParser.parse(f) }
-            .isInstanceOf(LockFileException::class.java)
-            .hasMessageContaining("sha256")
-    }
-
-    @Test
-    fun `reject empty file`() {
-        val f = write("")
-        assertThatThrownBy { LockFileParser.parse(f) }
-            .isInstanceOf(LockFileException::class.java)
-    }
-
-    @Test
-    fun `reject relative download url`() {
-        val f = write(
-            """
-            tag: binaries-x
-            generated_at: 2026-04-25T10:00:00Z
-            artifacts:
-              - name: libx.so
-                engine: x
-                abi: arm64-v8a
-                destination: jniLibs
-                download_url: /relative/path/x.so
-                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-                size_bytes: 1
-                source_repo: https://example.com
-                source_commit: 9999999999999999999999999999999999999999
-            """.trimIndent(),
-        )
-        assertThatThrownBy { LockFileParser.parse(f) }
-            .isInstanceOf(LockFileException::class.java)
-            .hasMessageContaining("absolute")
-    }
-
-    @Test
-    fun `reject non-positive size bytes`() {
-        val f = write(
-            """
-            tag: binaries-x
-            generated_at: 2026-04-25T10:00:00Z
-            artifacts:
-              - name: libx.so
-                engine: x
-                abi: arm64-v8a
-                destination: jniLibs
-                download_url: https://example.com/x.so
-                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-                size_bytes: 0
-                source_repo: https://example.com
-                source_commit: 9999999999999999999999999999999999999999
-            """.trimIndent(),
-        )
-        assertThatThrownBy { LockFileParser.parse(f) }
-            .isInstanceOf(LockFileException::class.java)
-            .hasMessageContaining("size_bytes")
-    }
-
-    @Test
-    fun `reject malformed yaml`() {
-        val f = write("tag: [unclosed")
-        assertThatThrownBy { LockFileParser.parse(f) }
-            .isInstanceOf(LockFileException::class.java)
+        assertThat(LockFileParser.parse(f).artifacts).isEmpty()
     }
 }

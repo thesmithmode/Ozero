@@ -16,8 +16,8 @@ object ByeDpiArgvValidator {
             when {
                 token == "-n" -> expectedValueFor = token
                 token.startsWith("--") -> {
-                    if (!isLongOptionToken(token)) return false
-                    if (ByeDpiOptionBlocks.requiresDetachedValue(token)) {
+                    if (!isLongOptionValid(token)) return false
+                    if (expectsDetachedLongValue(token)) {
                         expectedValueFor = token
                     }
                 }
@@ -38,11 +38,21 @@ object ByeDpiArgvValidator {
             "-n" -> isDomainValue(token)
             "--fake" -> isSignedInt(token)
             "--ttl" -> isUnsignedInt(token)
-            "--split", "--disorder" -> isModifierValue(token)
+            "--split", "--disorder" -> isModifierValue(token) && !token.startsWith("-")
             "-a", "-d", "-e", "-f", "-m", "-o", "-p", "-q", "-r", "-s", "-t", "-O", "-R" ->
                 isModifierValue(token) && !token.startsWith("-")
             else -> token.isNotBlank()
         }
+
+    private fun isLongOptionValid(token: String): Boolean {
+        if (!isLongOptionToken(token)) return false
+        if (!token.contains("=")) return true
+        val rawName = token.substringBefore('=')
+        return isValueValid(rawName, token.substringAfter('='))
+    }
+
+    private fun expectsDetachedLongValue(token: String): Boolean =
+        !token.contains("=") && ByeDpiOptionBlocks.requiresDetachedValue(token.substringBefore('='))
 
     private fun isFlagToken(token: String): Boolean {
         if (token.length < 2) return false

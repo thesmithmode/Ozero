@@ -5,7 +5,7 @@ tags: [urnetwork, sdk, integration, gotcha]
 sources:
   - "daily/2026-05-02.md"
 created: 2026-05-02
-updated: 2026-05-02
+updated: 2026-06-12
 ---
 
 # URnetwork NetworkSpace Initialization Flow

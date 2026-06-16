@@ -47,6 +47,18 @@ class StrategyEvolverTest {
     }
 
     @Test
+    fun `crossoverSinglePoint with empty parent1 returns parent2`() {
+        val p2 = parseChromosome("-a -b")
+        assertEquals(p2, evolver.crossoverSinglePoint(emptyList(), p2, Random(0)))
+    }
+
+    @Test
+    fun `crossoverSinglePoint with empty parent2 returns parent1`() {
+        val p1 = parseChromosome("-a -b")
+        assertEquals(p1, evolver.crossoverSinglePoint(p1, emptyList(), Random(0)))
+    }
+
+    @Test
     fun `crossoverTwoPoint produces child with genes only from parents`() {
         val p1 = parseChromosome("-a -b -c -d")
         val p2 = parseChromosome("-w -x -y -z")
@@ -98,6 +110,18 @@ class StrategyEvolverTest {
     fun `crossoverTwoPoint with empty parent2 returns parent1`() {
         val p1 = parseChromosome("-a -b")
         assertEquals(p1, evolver.crossoverTwoPoint(p1, emptyList(), Random(0)))
+    }
+
+    @Test
+    fun `crossoverTwoPoint with one block parents falls back to single point`() {
+        val p1 = parseChromosome("-n example.com")
+        val p2 = parseChromosome("--fake -1")
+        val allTokens = (p1 + p2).map { it.token }.toSet()
+
+        val child = evolver.crossoverTwoPoint(p1, p2, Random(0))
+
+        assertTrue(child.isNotEmpty())
+        assertTrue(child.all { it.token in allTokens })
     }
 
     @Test
@@ -184,6 +208,11 @@ class StrategyEvolverTest {
     }
 
     @Test
+    fun `swap on empty chromosome returns unchanged`() {
+        assertEquals(emptyList(), evolver.swap(emptyList(), Random(0)))
+    }
+
+    @Test
     fun `swap exchanges two different gene positions over many runs`() {
         val chromosome = parseChromosome("-a -b -c -d -e")
         var swappedAtLeastOnce = false
@@ -267,6 +296,28 @@ class StrategyEvolverTest {
     }
 
     @Test
+    fun `mutate with empty memory falls back to random block`() {
+        val memory = GeneMemory(java.io.File.createTempFile("mem-empty", ".json").also { it.deleteOnExit() })
+        val chromosome = parseChromosome("-a -b -c")
+        val vocab = pool.allGenes().map { it.token }.toSet()
+
+        val mutated = evolver.mutate(chromosome, rate = 1f, random = Random(2), memory = memory)
+
+        assertTrue(mutated.isNotEmpty())
+        assertTrue(mutated.all { it.token in vocab })
+    }
+
+    @Test
+    fun `mutate can skip insert delete and swap gates`() {
+        val chromosome = parseChromosome("-a -b -c -d")
+
+        val results = (10..40).map { evolver.mutate(chromosome, rate = 0.4f, random = Random(it)) }
+
+        assertTrue(results.any { it.size == chromosome.size })
+        assertTrue(results.all { it.isNotEmpty() })
+    }
+
+    @Test
     fun `select returns top-k by fitness descending`() {
         val scored = listOf(
             parseChromosome("-a") to 0.5,
@@ -344,6 +395,19 @@ class StrategyEvolverTest {
     }
 
     @Test
+    fun `tournament size larger than population uses whole population`() {
+        val scored = listOf(
+            parseChromosome("-low") to 0.1,
+            parseChromosome("-high") to 0.9,
+        )
+
+        val picked = evolver.tournament(scored, k = 1, tournamentSize = 10, random = Random(0))
+
+        assertEquals(1, picked.size)
+        assertTrue(picked.first().isNotEmpty())
+    }
+
+    @Test
     fun `insert adds one gene to chromosome`() {
         val chromosome = parseChromosome("-a -b -c")
         val result = evolver.insert(chromosome, Random(0))
@@ -371,9 +435,44 @@ class StrategyEvolverTest {
     }
 
     @Test
+    fun `delete on empty chromosome returns unchanged`() {
+        assertEquals(emptyList(), evolver.delete(emptyList(), Random(0)))
+    }
+
+    @Test
     fun `mutate with rate 1 may change chromosome length via insert or delete`() {
         val chromosome = parseChromosome("-a -b -c -d -e -f -g -h")
         val results = (1..50).map { evolver.mutate(chromosome, rate = 1f, random = Random(it)) }
         assertTrue(results.any { it.size != chromosome.size }, "at least one mutation should change length")
+    }
+
+    @Test
+    fun `default random overloads return valid chromosomes`() {
+        val p1 = parseChromosome("-a -b -c -d")
+        val p2 = parseChromosome("-e -f -g -h")
+        val chromosome = parseChromosome("-a -b -c -d")
+
+        val results = listOf(
+            evolver.crossoverSinglePoint(p1, p2),
+            evolver.crossoverTwoPoint(p1, p2),
+            evolver.crossoverUniform(p1, p2),
+            evolver.crossover(p1, p2),
+            evolver.insert(chromosome),
+            evolver.delete(chromosome),
+            evolver.swap(chromosome),
+        )
+
+        assertTrue(results.all { it.isNotEmpty() })
+        assertTrue(results.all { result -> result.all { it.token.startsWith("-") } })
+    }
+
+    @Test
+    fun `mutate default arguments keep valid chromosome`() {
+        val chromosome = parseChromosome("-a -b -c -d")
+
+        val result = evolver.mutate(chromosome)
+
+        assertTrue(result.isNotEmpty())
+        assertTrue(result.all { it.token.startsWith("-") })
     }
 }

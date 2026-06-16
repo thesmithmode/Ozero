@@ -409,7 +409,11 @@ class SingboxEngine @Inject constructor(
                 autoSelectBeanBlobs = blobs,
             )
         }
-        val blob = cachedBlob ?: return null
+        val blob = cachedSelectedProfileId
+            ?.takeIf { it != SELECTED_AUTO }
+            ?.let { cachedProfilesById[it]?.beanBlob }
+            ?: cachedBlob
+            ?: return null
         val type = runCatching {
             protocolTypeOf(KryoSerializer.deserialize<AbstractBean>(blob))
         }.getOrDefault(PROTOCOL_VLESS)
@@ -506,7 +510,7 @@ class SingboxEngine @Inject constructor(
                 }
             }
             val component = ComponentName(context, "ru.ozero.singboxprocess.SingboxEngineService")
-            val intent = Intent().setComponent(component)
+            val intent = Intent().apply { this.component = component }
             val bound = context.bindService(intent, conn, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
             if (!bound) {
                 runCatching { context.unbindService(conn) }

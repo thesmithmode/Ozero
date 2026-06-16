@@ -66,6 +66,7 @@ sealed interface UrnetworkSettingsUiState {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
+@Suppress("TooManyFunctions")
 class UrnetworkLocationsViewModel @Inject constructor(
     private val bridge: UrnetworkSdkBridge,
     private val settingsRepository: SettingsRepository,
@@ -110,7 +111,8 @@ class UrnetworkLocationsViewModel @Inject constructor(
                 allRegions = cfg.cachedRegions.map { it.toLocationItem() }
                 allCities = cfg.cachedCities.map { it.toLocationItem() }
                 allBestMatches = cfg.cachedBestMatches.map { it.toLocationItem() }
-                if (hasCachedLocations()) {
+                val hasBootstrapJwt = cfg.byClientJwt?.isNotBlank() == true
+                if (hasCachedLocations(allCountries, allRegions, allCities, allBestMatches)) {
                     _uiState.update { current ->
                         when (current) {
                             UrnetworkSettingsUiState.Loading -> buildCachedReady()
@@ -119,8 +121,22 @@ class UrnetworkLocationsViewModel @Inject constructor(
                                 regions = allRegions,
                                 cities = allCities,
                                 bestMatches = if (searchQuery.value.isBlank()) emptyList() else allBestMatches,
-                                selectedLocation = selectedLocationForUi(),
+                                selectedLocation = current.selectedLocation ?: selectedLocationForUi(),
                             )
+                            is UrnetworkSettingsUiState.NotConnected -> buildCachedReady()
+                        }
+                    }
+                } else {
+                    _uiState.update { current ->
+                        when (current) {
+                            UrnetworkSettingsUiState.Loading ->
+                                if (hasBootstrapJwt) current else UrnetworkSettingsUiState.NotConnected
+                            is UrnetworkSettingsUiState.Ready ->
+                                if (shouldKeepReadyWithoutConfigCache(current)) {
+                                    current.copy(selectedLocation = current.selectedLocation ?: selectedLocationForUi())
+                                } else {
+                                    UrnetworkSettingsUiState.NotConnected
+                                }
                             UrnetworkSettingsUiState.NotConnected -> current
                         }
                     }
@@ -134,6 +150,9 @@ class UrnetworkLocationsViewModel @Inject constructor(
                 val ready = bridge.initDeviceForLocations(byClientJwt, wallet)
                 if (ready && _uiState.value !is UrnetworkSettingsUiState.Ready) {
                     refreshOnce()
+                    if (_uiState.value !is UrnetworkSettingsUiState.Ready) {
+                        _uiState.value = buildEmptyReady()
+                    }
                 }
             }
         }
@@ -155,12 +174,12 @@ class UrnetworkLocationsViewModel @Inject constructor(
                             if (current is UrnetworkSettingsUiState.Ready) {
                                 current.copy(providePaused = true)
                             } else {
-                                current
+                                buildEmptyReady().copy(providePaused = true)
                             }
                         }
                     } else {
                         teardownLocationsVc()
-                        if (hasCachedLocations()) {
+                        if (hasCachedLocations(allCountries, allRegions, allCities, allBestMatches)) {
                             _uiState.update { current ->
                                 if (current is UrnetworkSettingsUiState.Ready) {
                                     current.copy(providePaused = true)
@@ -251,7 +270,17 @@ class UrnetworkLocationsViewModel @Inject constructor(
         }
         runCatching { bridge.setPreferredLocation(targetSelection.normalized()) }
         _uiState.update { current ->
-            if (current is UrnetworkSettingsUiState.Ready) current.copy(selectedLocation = location) else current
+            when (current) {
+                is UrnetworkSettingsUiState.Ready -> current.copy(selectedLocation = location)
+                is UrnetworkSettingsUiState.Loading,
+                is UrnetworkSettingsUiState.NotConnected -> readyState(
+                    countries = allCountries,
+                    regions = allRegions,
+                    cities = allCities,
+                    bestMatches = if (searchQuery.value.isBlank()) emptyList() else allBestMatches,
+                    selectedLocation = location,
+                )
+            }
         }
     }
 
@@ -289,7 +318,17 @@ class UrnetworkLocationsViewModel @Inject constructor(
         }
         viewModelScope.launch { configStore.setProvideEnabled(!paused) }
         _uiState.update { current ->
-            if (current is UrnetworkSettingsUiState.Ready) current.copy(providePaused = paused) else current
+            when (current) {
+                is UrnetworkSettingsUiState.Ready -> current.copy(providePaused = paused)
+                is UrnetworkSettingsUiState.Loading,
+                is UrnetworkSettingsUiState.NotConnected -> readyState(
+                    countries = allCountries,
+                    regions = allRegions,
+                    cities = allCities,
+                    bestMatches = if (searchQuery.value.isBlank()) emptyList() else allBestMatches,
+                    providePaused = paused,
+                )
+            }
         }
     }
 
@@ -363,10 +402,12 @@ class UrnetworkLocationsViewModel @Inject constructor(
         return s is UrnetworkSettingsUiState.Ready && s.countries.isNotEmpty()
     }
 
-    private fun hasCachedLocations(): Boolean =
-        allCountries.isNotEmpty() || allRegions.isNotEmpty() || allCities.isNotEmpty() || allBestMatches.isNotEmpty()
-
     private fun isDeviceUnavailable(): Boolean = !bridge.isDeviceAvailable() && !bridge.isRunning()
+
+    private fun shouldKeepReadyWithoutConfigCache(current: UrnetworkSettingsUiState.Ready): Boolean {
+        if (bridge.isDeviceAvailable() || bridge.isRunning()) return true
+        return shouldKeepPausedReadyWithoutConfigCache(current)
+    }
 
     private fun handleNullVcFallback() {
         if (isDeviceUnavailable()) {
@@ -379,24 +420,37 @@ class UrnetworkLocationsViewModel @Inject constructor(
     }
 
     private fun buildEmptyReady(): UrnetworkSettingsUiState.Ready =
-        UrnetworkSettingsUiState.Ready(
+        readyState(
             countries = emptyList(),
             regions = emptyList(),
             cities = emptyList(),
             bestMatches = emptyList(),
-            selectedLocation = selectedLocationForUi(),
-            providePaused = if (isUrnetworkActive.value) bridge.isProvidePaused() else false,
         )
 
     private fun buildCachedReady(): UrnetworkSettingsUiState.Ready =
-        UrnetworkSettingsUiState.Ready(
+        readyState(
             countries = allCountries,
             regions = allRegions,
             cities = allCities,
             bestMatches = if (searchQuery.value.isBlank()) emptyList() else allBestMatches,
-            selectedLocation = selectedLocationForUi(),
             providePaused = true,
         )
+
+    private fun readyState(
+        countries: List<UrnetworkLocationItem>,
+        regions: List<UrnetworkLocationItem>,
+        cities: List<UrnetworkLocationItem>,
+        bestMatches: List<UrnetworkLocationItem>,
+        selectedLocation: UrnetworkSdkBridge.LocationToken? = null,
+        providePaused: Boolean? = null,
+    ): UrnetworkSettingsUiState.Ready = UrnetworkSettingsUiState.Ready(
+        countries = countries,
+        regions = regions,
+        cities = cities,
+        bestMatches = bestMatches,
+        selectedLocation = selectedLocation ?: selectedLocationForUi(),
+        providePaused = providePaused ?: if (isUrnetworkActive.value) bridge.isProvidePaused() else false,
+    )
 
     private fun teardownLocationsVc() {
         locationsVc?.also {
@@ -448,6 +502,23 @@ class UrnetworkLocationsViewModel @Inject constructor(
     }
 }
 
+private fun hasCachedLocations(
+    countries: List<UrnetworkLocationItem>,
+    regions: List<UrnetworkLocationItem>,
+    cities: List<UrnetworkLocationItem>,
+    bestMatches: List<UrnetworkLocationItem>,
+): Boolean = countries.isNotEmpty() || regions.isNotEmpty() || cities.isNotEmpty() || bestMatches.isNotEmpty()
+
+private fun shouldKeepPausedReadyWithoutConfigCache(
+    current: UrnetworkSettingsUiState.Ready,
+): Boolean = current.providePaused &&
+    !hasCachedLocations(
+        current.countries,
+        current.regions,
+        current.cities,
+        current.bestMatches,
+    )
+
 private fun com.bringyour.sdk.ConnectLocationList?.toLocationItems(): List<UrnetworkLocationItem> =
     buildList {
         val list = this@toLocationItems ?: return@buildList
@@ -458,11 +529,7 @@ private fun com.bringyour.sdk.ConnectLocationList?.toLocationItems(): List<Urnet
                 UrnetworkLocationItem(
                     location = SdkLocationToken(loc),
                     name = loc.name ?: loc.country ?: "Unknown",
-                    nameRu = if (code.length == 2) {
-                        Locale("", code).getDisplayCountry(Locale("ru"))
-                    } else {
-                        ""
-                    },
+                    nameRu = countryNameRu(code),
                     countryCode = code,
                     flag = countryCodeToFlag(code),
                     providerCount = loc.providerCount,
@@ -477,7 +544,7 @@ private fun UrnetworkCachedLocation.toLocationItem(): UrnetworkLocationItem =
     UrnetworkLocationItem(
         location = this,
         name = name,
-        nameRu = Locale("", countryCode.orEmpty()).getDisplayCountry(Locale("ru")),
+        nameRu = countryNameRu(countryCode.orEmpty()),
         countryCode = countryCode.orEmpty(),
         flag = countryCodeToFlag(countryCode.orEmpty()),
         providerCount = providerCount,
@@ -496,9 +563,19 @@ private fun UrnetworkLocationItem.toCachedLocation(): UrnetworkCachedLocation =
         isStrongPrivacy = isStrongPrivacy,
     )
 
+private fun countryNameRu(code: String): String {
+    val normalized = normalizedCountryCode(code) ?: return ""
+    return Locale("", normalized).getDisplayCountry(Locale("ru"))
+}
+
 private fun countryCodeToFlag(code: String): String {
-    if (code.length != 2) return ""
-    val first = code[0].uppercaseChar().code - 'A'.code + 0x1F1E6
-    val second = code[1].uppercaseChar().code - 'A'.code + 0x1F1E6
+    val normalized = normalizedCountryCode(code) ?: return ""
+    val first = normalized[0].code - 'A'.code + 0x1F1E6
+    val second = normalized[1].code - 'A'.code + 0x1F1E6
     return String(intArrayOf(first, second), 0, 2)
+}
+
+private fun normalizedCountryCode(code: String): String? {
+    val normalized = code.uppercase(Locale.ROOT)
+    return normalized.takeIf { it.length == 2 && it.all { ch -> ch in 'A'..'Z' } }
 }

@@ -2,14 +2,14 @@ package ru.ozero.app.relay
 
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -19,62 +19,72 @@ import ru.ozero.commonvpn.TunnelState
 import ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkConfig
 import ru.ozero.engineurnetwork.UrnetworkJwtBootstrapper
+import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
+import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.setByClientJwt
+import ru.ozero.engineurnetwork.setProvideControlMode
 import ru.ozero.engineurnetwork.setProvideEnabled
+import ru.ozero.engineurnetwork.setProvideNetworkMode
 import ru.ozero.enginescore.EngineId
 import kotlin.test.assertEquals
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class UrnetworkRelayCoordinatorTest {
 
-    private val dispatcher = UnconfinedTestDispatcher()
     private lateinit var coordinatorScope: CoroutineScope
 
     private lateinit var tunnelStateFlow: MutableStateFlow<TunnelState>
     private lateinit var configStore: InMemoryUrnetworkConfigStore
     private lateinit var bridge: FakeBridge
     private lateinit var bootstrapper: FakeJwtBootstrapper
+    private lateinit var tunnelController: TunnelController
     private lateinit var coordinator: UrnetworkRelayCoordinator
 
     @BeforeEach
     fun setUp() {
-        coordinatorScope = CoroutineScope(dispatcher + SupervisorJob())
         tunnelStateFlow = MutableStateFlow(TunnelState.Idle)
         configStore = InMemoryUrnetworkConfigStore(UrnetworkConfig(walletOverride = "test-wallet"))
         bridge = FakeBridge()
         bootstrapper = FakeJwtBootstrapper()
 
-        val tunnelController = mockk<TunnelController>()
+        tunnelController = mockk()
         every { tunnelController.state } returns tunnelStateFlow
-
-        coordinator = UrnetworkRelayCoordinator(
-            bridge = bridge,
-            configStore = configStore,
-            tunnelController = tunnelController,
-            jwtBootstrapper = bootstrapper,
-            pipeFactory = FakePipeFactory(),
-            scope = coordinatorScope,
-        )
-        coordinator.start()
     }
 
     @AfterEach
     fun tearDown() {
-        coordinator.stop()
-        coordinatorScope.cancel()
+        if (::coordinator.isInitialized) {
+            coordinator.stop()
+        }
     }
 
     private fun setByClientJwt(value: String?) {
         configStore.inject { it.copy(byClientJwt = value) }
     }
 
-    private fun relayTest(block: suspend TestScope.() -> Unit) = runTest(dispatcher) {
+    private fun relayTest(
+        networkMonitor: RelayNetworkMonitor? = null,
+        relayLockManager: RelayLockManager? = null,
+        pipeFactory: DummyPipeFactory = FakePipeFactory(),
+        block: suspend TestScope.() -> Unit,
+    ) = runTest(UnconfinedTestDispatcher()) {
+        coordinatorScope = backgroundScope
+        coordinator = UrnetworkRelayCoordinator(
+            bridge = bridge,
+            configStore = configStore,
+            tunnelController = tunnelController,
+            jwtBootstrapper = bootstrapper,
+            networkMonitor = networkMonitor,
+            relayLockManager = relayLockManager,
+            pipeFactory = pipeFactory,
+            scope = coordinatorScope,
+        )
+        coordinator.start()
         try {
             block()
         } finally {
             coordinator.stop()
-            coordinatorScope.cancel()
         }
     }
 
@@ -231,7 +241,8 @@ class UrnetworkRelayCoordinatorTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        advanceUntilIdle()
+        advanceTimeBy(35_000L)
+        runCurrent()
 
         assertEquals(0, bridge.connectBestAvailableCalls)
         assertEquals(3, bridge.startCalls, "retry 3 attempts")
@@ -280,9 +291,81 @@ class UrnetworkRelayCoordinatorTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        advanceUntilIdle()
+        advanceTimeBy(35_000L)
+        runCurrent()
 
         assertEquals(0, bridge.attachTunCalls)
+    }
+
+    @Test
+    fun `relay applies provide control and network modes from config`() = relayTest {
+        setByClientJwt("test-jwt")
+        configStore.setProvideControlMode(UrnetworkProvideControlMode.AUTO)
+        configStore.setProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
+        tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+        assertEquals(UrnetworkProvideControlMode.AUTO, bridge.lastControlMode)
+        assertEquals(UrnetworkProvideNetworkMode.ALL, bridge.lastNetworkMode)
+    }
+
+    @Test
+    fun `relay starts monitor and acquires lock only when provide is enabled`() {
+        val monitor = mockk<RelayNetworkMonitor>(relaxed = true)
+        val locks = mockk<RelayLockManager>(relaxed = true)
+        relayTest(networkMonitor = monitor, relayLockManager = locks) {
+            setByClientJwt("test-jwt")
+            configStore.setProvideEnabled(true)
+            configStore.setProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
+            tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+            verify { monitor.start(UrnetworkProvideNetworkMode.ALL, true) }
+            verify { locks.acquire() }
+        }
+    }
+
+    @Test
+    fun `relay starts monitor but skips lock when provide is disabled`() {
+        val monitor = mockk<RelayNetworkMonitor>(relaxed = true)
+        val locks = mockk<RelayLockManager>(relaxed = true)
+        relayTest(networkMonitor = monitor, relayLockManager = locks) {
+            setByClientJwt("test-jwt")
+            configStore.setProvideEnabled(false)
+            tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+            verify { monitor.start(UrnetworkProvideNetworkMode.WIFI, false) }
+            verify(exactly = 0) { locks.acquire() }
+        }
+    }
+
+    @Test
+    fun `relay closes dummy pipe when attach fails`() {
+        val pipe = RecordingPipe()
+        bridge.attachResult = UrnetworkSdkBridge.AttachResult.Failed("attach failed")
+        relayTest(pipeFactory = FakePipeFactory(pipe)) {
+            setByClientJwt("test-jwt")
+            tunnelStateFlow.value = TunnelState.Connected(EngineId.WARP, socksPort = 0)
+
+            assertEquals(1, bridge.attachTunCalls)
+            assertEquals(1, pipe.closeCalls)
+        }
+    }
+
+    @Test
+    fun `watchdog stops unhealthy owned relay and releases resources`() {
+        val monitor = mockk<RelayNetworkMonitor>(relaxed = true)
+        val locks = mockk<RelayLockManager>(relaxed = true)
+        relayTest(networkMonitor = monitor, relayLockManager = locks) {
+            setByClientJwt("test-jwt")
+            bridge.diagnosticsResult = "device=null"
+            tunnelStateFlow.value = TunnelState.Connected(EngineId.WARP, socksPort = 0)
+
+            advanceTimeBy(60_000L)
+            runCurrent()
+
+            assertEquals(1, bridge.stopCalls)
+            verify { monitor.stop() }
+            verify { locks.release() }
+        }
     }
 
     private class FakeJwtBootstrapper : UrnetworkJwtBootstrapper {
@@ -303,8 +386,17 @@ class UrnetworkRelayCoordinatorTest {
         }
     }
 
-    private class FakePipeFactory : DummyPipeFactory {
-        override fun create() = DummyPipeFactory.PipeHandle(42, AutoCloseable {})
+    private class FakePipeFactory(
+        private val writeEnd: AutoCloseable = AutoCloseable {},
+    ) : DummyPipeFactory {
+        override fun create() = DummyPipeFactory.PipeHandle(42, writeEnd)
+    }
+
+    private class RecordingPipe : AutoCloseable {
+        var closeCalls = 0
+        override fun close() {
+            closeCalls++
+        }
     }
 
     private class FakeBridge : UrnetworkSdkBridge {
@@ -315,8 +407,11 @@ class UrnetworkRelayCoordinatorTest {
         var lastProvidePaused: Boolean? = null
         var running = false
         var startResult: UrnetworkSdkBridge.StartResult = UrnetworkSdkBridge.StartResult.Success
+        var attachResult: UrnetworkSdkBridge.AttachResult = UrnetworkSdkBridge.AttachResult.Success
         var attachTunCalls = 0
         var diagnosticsResult: String = "running=true"
+        var lastControlMode: UrnetworkProvideControlMode? = null
+        var lastNetworkMode: UrnetworkProvideNetworkMode? = null
 
         override suspend fun start(
             walletAddress: String,
@@ -334,7 +429,7 @@ class UrnetworkRelayCoordinatorTest {
         override fun isRunning() = running
         override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult {
             attachTunCalls++
-            return UrnetworkSdkBridge.AttachResult.Success
+            return attachResult
         }
         override fun connectTo(location: UrnetworkSdkBridge.LocationToken) = Unit
         override fun connectBestAvailable() {
@@ -345,6 +440,12 @@ class UrnetworkRelayCoordinatorTest {
         override fun setProvidePaused(paused: Boolean) {
             setProvidePausedCalls++
             lastProvidePaused = paused
+        }
+        override fun setProvideControlMode(mode: UrnetworkProvideControlMode) {
+            lastControlMode = mode
+        }
+        override fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) {
+            lastNetworkMode = mode
         }
         override fun isProvidePaused() = false
         override fun peerCount() = 0

@@ -8,7 +8,7 @@ data class SubscriptionInfo(
 )
 
 object SubscriptionInfoParser {
-    private val fieldRegex = Regex("""(\w+)=(\d+)""")
+    private val fieldRegex = Regex("""(?:^|[;,\s])(\w+)=(\d+)(?=$|[;,\s])""")
 
     fun parse(header: String?): SubscriptionInfo? {
         if (header.isNullOrBlank()) return null

@@ -18,11 +18,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect-open-pr-for-same-sha:
+    name: Detect open PR with same SHA
+    runs-on: ubuntu-latest
+    outputs:
+      skip_push: ${{ steps.detect-open-pr.outputs.skip_push }}
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check open PR to main for current SHA
+        id: detect-open-pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const commitSha = context.sha;
+            const pulls = await github.paginate(
+              github.rest.repos.listPullRequestsAssociatedWithCommit,
+              {
+                owner,
+                repo,
+                commit_sha: commitSha
+              }
+            );
+            const hasOpenPrToMain = pulls.some(
+              (pr) =>
+                pr.state === 'open' &&
+                pr.base?.ref === 'main' &&
+                pr.head?.sha === commitSha
+            );
+            core.setOutput('skip_push', hasOpenPrToMain ? 'true' : 'false');
+
   kotlin-style:
     name: ktlint + detekt
     runs-on: ubuntu-latest
+    needs: detect-open-pr-for-same-sha
     timeout-minutes: 10
-    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && github.ref != 'refs/heads/main') }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && github.ref != 'refs/heads/main' && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true')) }}
     permissions:
       contents: read
 
@@ -51,8 +84,9 @@ jobs:
   extra-checks:
     name: Python + shell + Dockerfile
     runs-on: ubuntu-latest
+    needs: detect-open-pr-for-same-sha
     timeout-minutes: 10
-    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && github.ref != 'refs/heads/main') }}
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && github.ref != 'refs/heads/main' && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true')) }}
     permissions:
       contents: read
 
@@ -92,12 +126,149 @@ jobs:
           dockerfile: build-tools/Dockerfile
           failure-threshold: error
 
+  coverage-gate:
+    name: Coverage gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: Get URnetwork AAR tag
+        id: aar-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG=$(gh release list --limit 100 --json tagName \
+            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
+            | head -n1 | tr -d '"')
+          if [ -z "$TAG" ]; then
+            echo "::error::no urnetwork-sdk release found"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Cache URnetwork AAR
+        uses: actions/cache@v5
+        id: aar-cache
+        with:
+          path: engine-urnetwork/libs
+          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}-go-stripped-v1
+
+      - name: Download URnetwork AAR
+        if: steps.aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p engine-urnetwork/libs
+          gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
+          for aar in engine-urnetwork/libs/*.aar; do
+            [ -f "$aar" ] || continue
+            tmpdir=$(mktemp -d)
+            unzip -o "$aar" -d "$tmpdir/aar-exploded"
+            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
+            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
+            rm -rf "$tmpdir"
+          done
+
+      - name: Cache Singbox libs
+        uses: actions/cache@v5
+        id: singbox-aar-cache
+        with:
+          path: |
+            singbox-core/libs
+            singbox-core/libs-stubs
+            singbox-core/src/main/jniLibs
+          key: singbox-libbox-1.13.12-exploded-v6
+
+      - name: Download and explode Singbox AAR
+        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          mkdir -p singbox-core/libs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
+
+      - name: coverage verification first
+        run: >
+          ./gradlew
+          :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification
+          :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport :common-vpn:jacocoTestCoverageVerification
+          :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport :engine-urnetwork:jacocoTestCoverageVerification
+          --stacktrace --continue
+
+      - name: Verify tests were discovered
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py app common-vpn engine-urnetwork
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-coverage-gate
+          path: |
+            app/build/reports/jacoco/**
+            common-vpn/build/reports/jacoco/**
+            engine-urnetwork/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-coverage-gate
+          path: |
+            app/build/reports/tests/**
+            common-vpn/build/reports/tests/**
+            engine-urnetwork/build/reports/tests/**
+          retention-days: 14
+
   test-buildsrc:
     name: Tests — buildSrc (supply-chain SHA256)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: kotlin-style
-    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -117,11 +288,13 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
-      - name: buildSrc unit tests
-        run: ./gradlew :buildSrc:test --stacktrace --continue
+      - name: buildSrc unit tests + coverage
+        run: ./gradlew :buildSrc:test :buildSrc:jacocoTestReport :buildSrc:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: python3 scripts/verify-junit-nonzero.py buildSrc
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py buildSrc
 
       - name: Upload buildSrc test reports
         if: always()
@@ -131,12 +304,22 @@ jobs:
           path: buildSrc/build/reports/tests/**
           retention-days: 14
 
+      - name: Upload buildSrc coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-buildsrc
+          path: buildSrc/build/reports/jacoco/**
+          retention-days: 14
+
   assemble-debug:
     name: assembleDebug
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: kotlin-style
-    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -152,7 +335,7 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
@@ -253,8 +436,10 @@ jobs:
     name: Tests — app
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: kotlin-style
-    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -270,7 +455,7 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
@@ -353,7 +538,9 @@ jobs:
         run: ./gradlew :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: python3 scripts/verify-junit-nonzero.py app
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py app
 
       - name: Upload coverage report
         if: always()
@@ -375,8 +562,10 @@ jobs:
     name: Tests — common-vpn
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: kotlin-style
-    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -392,7 +581,7 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
@@ -403,7 +592,9 @@ jobs:
         run: ./gradlew :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport :common-vpn:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: python3 scripts/verify-junit-nonzero.py common-vpn
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py common-vpn
 
       - name: Upload coverage report
         if: always()
@@ -425,8 +616,10 @@ jobs:
     name: Tests — engine-warp
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: kotlin-style
-    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -442,7 +635,7 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
@@ -453,7 +646,9 @@ jobs:
         run: ./gradlew :engine-warp:testDebugUnitTest :engine-warp:jacocoTestReport :engine-warp:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: python3 scripts/verify-junit-nonzero.py engine-warp
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py engine-warp
 
       - name: Upload coverage report
         if: always()
@@ -471,12 +666,14 @@ jobs:
           path: engine-warp/build/reports/tests/**
           retention-days: 14
 
-  test-engines-urnetwork-byedpi:
-    name: Tests — engine-urnetwork + engine-byedpi
+  test-engine-urnetwork:
+    name: Tests — engine-urnetwork
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: kotlin-style
-    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -492,7 +689,7 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
@@ -538,44 +735,37 @@ jobs:
           done
 
       - name: testDebugUnitTest + coverage
-        run: >
-          ./gradlew
-          :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport :engine-urnetwork:jacocoTestCoverageVerification
-          :engine-byedpi:testDebugUnitTest :engine-byedpi:jacocoTestReport :engine-byedpi:jacocoTestCoverageVerification
-          :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification
-          --stacktrace --continue
+        run: ./gradlew :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport :engine-urnetwork:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: python3 scripts/verify-junit-nonzero.py engine-urnetwork engine-byedpi engine-fptn
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py engine-urnetwork
 
-      - name: Upload coverage reports
+      - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: jacoco-engines-urnetwork-byedpi
-          path: |
-            engine-urnetwork/build/reports/jacoco/**
-            engine-byedpi/build/reports/jacoco/**
-            engine-fptn/build/reports/jacoco/**
+          name: jacoco-engine-urnetwork
+          path: engine-urnetwork/build/reports/jacoco/**
           retention-days: 14
 
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-reports-engines-urnetwork-byedpi
-          path: |
-            engine-urnetwork/build/reports/tests/**
-            engine-byedpi/build/reports/tests/**
-            engine-fptn/build/reports/tests/**
+          name: test-reports-engine-urnetwork
+          path: engine-urnetwork/build/reports/tests/**
           retention-days: 14
 
-  test-core-modules:
-    name: Tests — core + common modules
+  test-engine-byedpi:
+    name: Tests — engine-byedpi
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: kotlin-style
-    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -591,7 +781,136 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: testDebugUnitTest + coverage
+        run: ./gradlew :engine-byedpi:testDebugUnitTest :engine-byedpi:jacocoTestReport :engine-byedpi:jacocoTestCoverageVerification --stacktrace --continue
+
+      - name: Verify tests were discovered
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py engine-byedpi
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-engine-byedpi
+          path: engine-byedpi/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-engine-byedpi
+          path: engine-byedpi/build/reports/tests/**
+          retention-days: 14
+
+  test-engine-fptn:
+    name: Tests — engine-fptn
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: testDebugUnitTest + coverage
+        run: ./gradlew :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification --stacktrace --continue
+
+      - name: Verify tests were discovered
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py engine-fptn
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-engine-fptn
+          path: engine-fptn/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-engine-fptn
+          path: engine-fptn/build/reports/tests/**
+          retention-days: 14
+
+  test-engines-urnetwork-byedpi:
+    name: Tests — engine-urnetwork + engine-byedpi
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      - detect-open-pr-for-same-sha
+      - test-engine-urnetwork
+      - test-engine-byedpi
+      - test-engine-fptn
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Verify split engine checks
+        run: |
+          set -euo pipefail
+          test "${{ needs.test-engine-urnetwork.result }}" = "success"
+          test "${{ needs.test-engine-byedpi.result }}" = "success"
+          test "${{ needs.test-engine-fptn.result }}" = "success"
+
+  test-core-modules:
+    name: Tests — core + common modules
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
@@ -648,8 +967,9 @@ jobs:
           --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: >
-          python3 scripts/verify-junit-nonzero.py
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py \
           core-storage core-backup engines-core common-dns common-crypto common-net
 
       - name: Upload coverage reports
@@ -680,12 +1000,14 @@ jobs:
             common-net/build/reports/tests/**
           retention-days: 14
 
-  test-singbox-and-extra-modules:
-    name: Tests — singbox + extra modules
+  test-engine-masterdns:
+    name: Tests — engine-masterdns
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: kotlin-style
-    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
+    timeout-minutes: 10
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
     permissions:
       contents: read
 
@@ -701,7 +1023,61 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: testDebugUnitTest + coverage
+        run: ./gradlew :engine-masterdns:testDebugUnitTest :engine-masterdns:jacocoTestReport :engine-masterdns:jacocoTestCoverageVerification --stacktrace --continue
+
+      - name: Verify tests were discovered
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py engine-masterdns
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-engine-masterdns
+          path: engine-masterdns/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-engine-masterdns
+          path: engine-masterdns/build/reports/tests/**
+          retention-days: 14
+
+  test-engine-singbox:
+    name: Tests — engine-singbox
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle with caching
         uses: gradle/actions/setup-gradle@v6
@@ -742,56 +1118,638 @@ jobs:
           ls -la singbox-core/libs/
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
-      - name: test + coverage
-        run: >
-          ./gradlew
-          :engine-masterdns:testDebugUnitTest :engine-masterdns:jacocoTestReport :engine-masterdns:jacocoTestCoverageVerification
-          :engine-singbox:testDebugUnitTest :engine-singbox:jacocoTestReport :engine-singbox:jacocoTestCoverageVerification
-          :singbox-process:testDebugUnitTest :singbox-process:jacocoTestReport :singbox-process:jacocoTestCoverageVerification
-          :singbox-core:testDebugUnitTest :singbox-core:jacocoTestReport :singbox-core:jacocoTestCoverageVerification
-          :singbox-fmt:testDebugUnitTest :singbox-fmt:jacocoTestReport :singbox-fmt:jacocoTestCoverageVerification
-          :singbox-config:testDebugUnitTest :singbox-config:jacocoTestReport :singbox-config:jacocoTestCoverageVerification
-          :singbox-room:testDebugUnitTest :singbox-room:jacocoTestReport :singbox-room:jacocoTestCoverageVerification
-          :singbox-subscription:testDebugUnitTest :singbox-subscription:jacocoTestReport :singbox-subscription:jacocoTestCoverageVerification
-          :shared-warp-settings:test :shared-warp-settings:jacocoTestReport :shared-warp-settings:jacocoTestCoverageVerification
-          --stacktrace --continue
+      - name: testDebugUnitTest + coverage
+        run: ./gradlew :engine-singbox:testDebugUnitTest :engine-singbox:jacocoTestReport :engine-singbox:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
-        run: >
-          python3 scripts/verify-junit-nonzero.py
-          engine-masterdns engine-singbox singbox-process singbox-core singbox-fmt singbox-config
-          singbox-room singbox-subscription shared-warp-settings
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py engine-singbox
 
-      - name: Upload coverage reports
+      - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: jacoco-singbox-extra-modules
-          path: |
-            engine-masterdns/build/reports/jacoco/**
-            engine-singbox/build/reports/jacoco/**
-            singbox-process/build/reports/jacoco/**
-            singbox-core/build/reports/jacoco/**
-            singbox-fmt/build/reports/jacoco/**
-            singbox-config/build/reports/jacoco/**
-            singbox-room/build/reports/jacoco/**
-            singbox-subscription/build/reports/jacoco/**
-            shared-warp-settings/build/reports/jacoco/**
+          name: jacoco-engine-singbox
+          path: engine-singbox/build/reports/jacoco/**
           retention-days: 14
 
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-reports-singbox-extra-modules
-          path: |
-            engine-masterdns/build/reports/tests/**
-            engine-singbox/build/reports/tests/**
-            singbox-process/build/reports/tests/**
-            singbox-core/build/reports/tests/**
-            singbox-fmt/build/reports/tests/**
-            singbox-config/build/reports/tests/**
-            singbox-room/build/reports/tests/**
-            singbox-subscription/build/reports/tests/**
-            shared-warp-settings/build/reports/tests/**
+          name: test-reports-engine-singbox
+          path: engine-singbox/build/reports/tests/**
           retention-days: 14
+
+  test-singbox-process:
+    name: Tests — singbox-process
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: Cache Singbox libs
+        uses: actions/cache@v5
+        id: singbox-aar-cache
+        with:
+          path: |
+            singbox-core/libs
+            singbox-core/libs-stubs
+            singbox-core/src/main/jniLibs
+          key: singbox-libbox-1.13.12-exploded-v6
+
+      - name: Download and explode Singbox AAR
+        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          mkdir -p singbox-core/libs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
+          ls -la singbox-core/libs/
+          find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
+
+      - name: testDebugUnitTest + coverage
+        run: ./gradlew :singbox-process:testDebugUnitTest :singbox-process:jacocoTestReport :singbox-process:jacocoTestCoverageVerification --stacktrace --continue
+
+      - name: Verify tests were discovered
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py singbox-process
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-singbox-process
+          path: singbox-process/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-singbox-process
+          path: singbox-process/build/reports/tests/**
+          retention-days: 14
+
+  test-singbox-core:
+    name: Tests — singbox-core
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: Cache Singbox libs
+        uses: actions/cache@v5
+        id: singbox-aar-cache
+        with:
+          path: |
+            singbox-core/libs
+            singbox-core/libs-stubs
+            singbox-core/src/main/jniLibs
+          key: singbox-libbox-1.13.12-exploded-v6
+
+      - name: Download and explode Singbox AAR
+        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          mkdir -p singbox-core/libs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
+          ls -la singbox-core/libs/
+          find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
+
+      - name: testDebugUnitTest + coverage
+        run: ./gradlew :singbox-core:testDebugUnitTest :singbox-core:jacocoTestReport :singbox-core:jacocoTestCoverageVerification --stacktrace --continue
+
+      - name: Verify tests were discovered
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py singbox-core
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-singbox-core
+          path: singbox-core/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-singbox-core
+          path: singbox-core/build/reports/tests/**
+          retention-days: 14
+
+  test-singbox-fmt:
+    name: Tests — singbox-fmt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: Cache Singbox libs
+        uses: actions/cache@v5
+        id: singbox-aar-cache
+        with:
+          path: |
+            singbox-core/libs
+            singbox-core/libs-stubs
+            singbox-core/src/main/jniLibs
+          key: singbox-libbox-1.13.12-exploded-v6
+
+      - name: Download and explode Singbox AAR
+        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          mkdir -p singbox-core/libs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
+          ls -la singbox-core/libs/
+          find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
+
+      - name: testDebugUnitTest + coverage
+        run: ./gradlew :singbox-fmt:testDebugUnitTest :singbox-fmt:jacocoTestReport :singbox-fmt:jacocoTestCoverageVerification --stacktrace --continue
+
+      - name: Verify tests were discovered
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py singbox-fmt
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-singbox-fmt
+          path: singbox-fmt/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-singbox-fmt
+          path: singbox-fmt/build/reports/tests/**
+          retention-days: 14
+
+  test-singbox-config:
+    name: Tests — singbox-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: Cache Singbox libs
+        uses: actions/cache@v5
+        id: singbox-aar-cache
+        with:
+          path: |
+            singbox-core/libs
+            singbox-core/libs-stubs
+            singbox-core/src/main/jniLibs
+          key: singbox-libbox-1.13.12-exploded-v6
+
+      - name: Download and explode Singbox AAR
+        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          mkdir -p singbox-core/libs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
+          ls -la singbox-core/libs/
+          find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
+
+      - name: testDebugUnitTest + coverage
+        run: ./gradlew :singbox-config:testDebugUnitTest :singbox-config:jacocoTestReport :singbox-config:jacocoTestCoverageVerification --stacktrace --continue
+
+      - name: Verify tests were discovered
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py singbox-config
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-singbox-config
+          path: singbox-config/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-singbox-config
+          path: singbox-config/build/reports/tests/**
+          retention-days: 14
+
+  test-singbox-room:
+    name: Tests — singbox-room
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: Cache Singbox libs
+        uses: actions/cache@v5
+        id: singbox-aar-cache
+        with:
+          path: |
+            singbox-core/libs
+            singbox-core/libs-stubs
+            singbox-core/src/main/jniLibs
+          key: singbox-libbox-1.13.12-exploded-v6
+
+      - name: Download and explode Singbox AAR
+        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          mkdir -p singbox-core/libs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
+          ls -la singbox-core/libs/
+          find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
+
+      - name: testDebugUnitTest + coverage
+        run: ./gradlew :singbox-room:testDebugUnitTest :singbox-room:jacocoTestReport :singbox-room:jacocoTestCoverageVerification --stacktrace --continue
+
+      - name: Verify tests were discovered
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py singbox-room
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-singbox-room
+          path: singbox-room/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-singbox-room
+          path: singbox-room/build/reports/tests/**
+          retention-days: 14
+
+  test-singbox-subscription:
+    name: Tests — singbox-subscription
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: Cache Singbox libs
+        uses: actions/cache@v5
+        id: singbox-aar-cache
+        with:
+          path: |
+            singbox-core/libs
+            singbox-core/libs-stubs
+            singbox-core/src/main/jniLibs
+          key: singbox-libbox-1.13.12-exploded-v6
+
+      - name: Download and explode Singbox AAR
+        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          mkdir -p singbox-core/libs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
+          ls -la singbox-core/libs/
+          find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
+
+      - name: testDebugUnitTest + coverage
+        run: ./gradlew :singbox-subscription:testDebugUnitTest :singbox-subscription:jacocoTestReport :singbox-subscription:jacocoTestCoverageVerification --stacktrace --continue
+
+      - name: Verify tests were discovered
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py singbox-subscription
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-singbox-subscription
+          path: singbox-subscription/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-singbox-subscription
+          path: singbox-subscription/build/reports/tests/**
+          retention-days: 14
+
+  test-shared-warp-settings:
+    name: Tests — shared-warp-settings
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: test + coverage
+        run: ./gradlew :shared-warp-settings:test :shared-warp-settings:jacocoTestReport :shared-warp-settings:jacocoTestCoverageVerification --stacktrace --continue
+
+      - name: Verify tests were discovered
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py shared-warp-settings
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-shared-warp-settings
+          path: shared-warp-settings/build/reports/jacoco/**
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-shared-warp-settings
+          path: shared-warp-settings/build/reports/tests/**
+          retention-days: 14
+
+  test-singbox-and-extra-modules:
+    name: Tests — singbox + extra modules
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      - detect-open-pr-for-same-sha
+      - test-engine-masterdns
+      - test-engine-singbox
+      - test-singbox-process
+      - test-singbox-core
+      - test-singbox-fmt
+      - test-singbox-config
+      - test-singbox-room
+      - test-singbox-subscription
+      - test-shared-warp-settings
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && github.base_ref == 'main' && (github.head_ref == 'dev' || github.head_ref == 'feature' || startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/'))) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/feature' || startsWith(github.ref, 'refs/heads/feat/') || startsWith(github.ref, 'refs/heads/fix/')) && !(github.event_name == 'push' && needs.detect-open-pr-for-same-sha.outputs.skip_push == 'true'))) }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Verify split singbox checks
+        run: |
+          set -euo pipefail
+          test "${{ needs.test-engine-masterdns.result }}" = "success"
+          test "${{ needs.test-engine-singbox.result }}" = "success"
+          test "${{ needs.test-singbox-process.result }}" = "success"
+          test "${{ needs.test-singbox-core.result }}" = "success"
+          test "${{ needs.test-singbox-fmt.result }}" = "success"
+          test "${{ needs.test-singbox-config.result }}" = "success"
+          test "${{ needs.test-singbox-room.result }}" = "success"
+          test "${{ needs.test-singbox-subscription.result }}" = "success"
+          test "${{ needs.test-shared-warp-settings.result }}" = "success"
