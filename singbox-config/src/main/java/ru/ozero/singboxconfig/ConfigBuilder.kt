@@ -44,7 +44,6 @@ object ConfigBuilder {
     }
 
     fun buildChainConfig(bean: AbstractBean, socksPort: Int, upstream: Upstream? = null): String {
-        require(isSupportedBean(bean)) { "Unsupported transport: ${(bean as? StandardV2RayBean)?.type}" }
         val outbound = beanOutbound(bean, "proxy", detour = upstream?.let { "upstream" })
         return buildChainFullConfig(socksPort, listOf(outbound), upstream)
     }
