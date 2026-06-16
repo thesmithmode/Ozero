@@ -346,8 +346,12 @@ class RealUrnetworkSdkBridgeContractTest {
             "connectBestAvailable must persist only on successful connect.",
         )
         val connectIndex = bestBlock.indexOf("cv.connectBestAvailable()")
-        val persistIndex = bestBlock.indexOf("persistConnectLocation(bestAvailableConnectLocation())")
+        val persistIndex = bestBlock.indexOf("persistLocalConnectLocation(bestAvailableConnectLocation())")
         assertTrue(connectIndex < persistIndex, "connectBestAvailable must persist after connect succeeds.")
+        assertTrue(
+            !bestBlock.contains("persistConnectLocation(bestAvailableConnectLocation())"),
+            "connectBestAvailable must not write synthetic Best Available back into DeviceLocal.",
+        )
     }
 
     @Test

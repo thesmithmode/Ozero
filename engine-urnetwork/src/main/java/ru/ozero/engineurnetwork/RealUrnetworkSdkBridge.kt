@@ -372,7 +372,7 @@ class RealUrnetworkSdkBridge(
         val cv = connectVcRef.get() ?: return
         runCatching { cv.connectBestAvailable() }
             .onSuccess {
-                persistConnectLocation(bestAvailableConnectLocation())
+                persistLocalConnectLocation(bestAvailableConnectLocation())
                 connectIssuedRef.set(true)
             }
             .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
