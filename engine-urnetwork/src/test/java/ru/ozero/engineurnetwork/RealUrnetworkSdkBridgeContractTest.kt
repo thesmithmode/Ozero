@@ -296,6 +296,29 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `attachRelayTun не запускает consumer connect для relay dummy IoLoop`() {
+        val attachTunEntry = source.substringAfter("override suspend fun attachTun")
+            .substringBefore("override suspend fun attachRelayTun")
+        val attachRelayEntry = source.substringAfter("override suspend fun attachRelayTun")
+            .substringBefore("private suspend fun attachTun")
+        val attachBlock = source.substringAfter("private suspend fun attachTun(")
+            .substringBefore("private fun cleanupOnFailure")
+        assertTrue(
+            attachTunEntry.contains("issueConsumerConnect = true"),
+            "consumer attachTun должен сохранить connectBestAvailable для активного URnetwork engine.",
+        )
+        assertTrue(
+            attachRelayEntry.contains("issueConsumerConnect = false"),
+            "relay dummy IoLoop не должен запускать consumer route selection.",
+        )
+        assertTrue(
+            attachBlock.contains("if (issueConsumerConnect)") &&
+                attachBlock.contains("IoLoop fd=\$tunFd tunnelStarted relay attach"),
+            "attachTunUnderLock должен явно разделять consumer attach и relay attach.",
+        )
+    }
+
+    @Test
     fun `connect methods persist selected location only after successful connect`() {
         val connectToBlock = source.substringAfter("override fun connectTo(")
             .substringBefore("override fun connectBestAvailable()")
@@ -560,7 +583,7 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `selectedLocation listener persists SDK chosen country after Best Available connect`() {
+    fun `selectedLocation listener persists SDK chosen country without writing back to DeviceLocal`() {
         val startBlock = source.substringAfter("private suspend fun runStartOnMain")
             .substringBefore("override suspend fun stop")
         assertTrue(
@@ -579,8 +602,16 @@ class RealUrnetworkSdkBridgeContractTest {
         )
         assertTrue(
             listenerBlock.contains("addSelectedLocationListener") &&
-                listenerBlock.contains("persistConnectLocation(location)"),
+                listenerBlock.contains("persistObservedConnectLocation(location)"),
             "selectedLocation listener must persist actual SDK location, otherwise settings UI only sees <best>.",
+        )
+        val observedBlock = source.substringAfter("private fun persistObservedConnectLocation")
+            .substringBefore("private fun persistLocalConnectLocation")
+        assertTrue(
+            observedBlock.contains("persistLocalConnectLocation(location)") &&
+                !observedBlock.contains("device?.connectLocation") &&
+                !observedBlock.contains("device?.defaultLocation"),
+            "SDK-selected location callback must not write back into DeviceLocal; it can re-enter selectedLocationChanged.",
         )
         val stopBlock = source.substringAfter("private suspend fun stopUnderLock")
             .substringBefore("private fun cleanupOnFailure")

@@ -19,6 +19,7 @@ interface UrnetworkSdkBridge {
     suspend fun stop()
     fun isRunning(): Boolean
     suspend fun attachTun(tunFd: Int): AttachResult
+    suspend fun attachRelayTun(tunFd: Int): AttachResult = attachTun(tunFd)
 
     fun connectTo(location: LocationToken)
     fun connectBestAvailable()
