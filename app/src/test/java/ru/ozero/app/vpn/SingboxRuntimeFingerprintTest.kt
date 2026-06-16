@@ -92,6 +92,33 @@ class SingboxRuntimeFingerprintTest {
         }
 
     @Test
+    fun `selected profile fingerprint resolves active chain rows outside supplied profile window`() =
+        kotlinx.coroutines.test.runTest {
+            val prefs = prefs(selected = 10L)
+            val profiles = listOf(profile(10, byteArrayOf(1, 1)))
+            val chainSteps = listOf(
+                chainStep(30, 0),
+                chainStep(10, 1),
+            )
+
+            val fingerprint = singboxRuntimeFingerprint(
+                prefs = prefs,
+                profiles = profiles,
+                chainSteps = chainSteps,
+                resolveProfileById = { id -> profile(id, byteArrayOf(3, 3)) },
+            )
+
+            assertEquals(
+                listOf(
+                    10L,
+                    byteArrayOf(1, 1).contentHashCode(),
+                    listOf(30L to byteArrayOf(3, 3).contentHashCode()),
+                ),
+                fingerprint,
+            )
+        }
+
+    @Test
     fun `selected profile fingerprint keeps fail closed fallback when synchronous row is absent`() =
         kotlinx.coroutines.test.runTest {
             val prefs = prefs(selected = 10L, bean = byteArrayOf(5, 5))

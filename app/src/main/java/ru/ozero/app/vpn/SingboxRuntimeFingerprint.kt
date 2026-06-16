@@ -71,13 +71,21 @@ internal suspend fun singboxRuntimeFingerprint(
     resolveProfileById: suspend (Long) -> ProxyProfile?,
 ): Any {
     val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
-    if (selectedProfileId == null || selectedProfileId == SingboxEngine.SELECTED_AUTO) {
+    if (selectedProfileId == SingboxEngine.SELECTED_AUTO) {
         return singboxRuntimeFingerprint(prefs, profiles, chainSteps)
     }
-    if (profiles.any { it.id == selectedProfileId }) {
+    val profilesById = profiles.associateBy { it.id }
+    val missingProfileIds = buildList {
+        if (selectedProfileId != null && selectedProfileId !in profilesById) add(selectedProfileId)
+        chainSteps
+            .map { it.profileId }
+            .filter { it !in profilesById && it != selectedProfileId }
+            .distinct()
+            .forEach(::add)
+    }
+    if (missingProfileIds.isEmpty()) {
         return singboxRuntimeFingerprint(prefs, profiles, chainSteps)
     }
-    val resolvedProfile = resolveProfileById(selectedProfileId)
-    val resolvedProfiles = if (resolvedProfile == null) profiles else profiles + resolvedProfile
+    val resolvedProfiles = profiles + missingProfileIds.mapNotNull { id -> resolveProfileById(id) }
     return singboxRuntimeFingerprint(prefs, resolvedProfiles, chainSteps)
 }

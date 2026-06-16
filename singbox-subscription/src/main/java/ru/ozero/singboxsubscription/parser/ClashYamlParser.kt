@@ -13,6 +13,8 @@ import ru.ozero.singboxfmt.VMessBean
 
 object ClashYamlParser {
     private const val MAX_YAML_CODE_POINTS = 16 * 1024 * 1024
+    private const val MIN_PORT = 1
+    private const val MAX_PORT = 65_535
     private val proxiesKeyPattern = Regex("""(?m)^\s*proxies\s*:""")
 
     fun parse(text: String): List<AbstractBean> {
@@ -68,7 +70,7 @@ object ClashYamlParser {
             pluginOpts = fields.string("plugin-opts", "plugin_opts", entrySeparator = ";")
         }
         else -> null
-    }?.takeIf { it.serverAddress.isNotBlank() && it.serverPort > 0 }
+    }?.takeIf { it.serverAddress.isNotBlank() && it.serverPort in MIN_PORT..MAX_PORT }
 
     private fun AbstractBean.applyCommon(fields: Map<String, Any?>) {
         name = fields.string("name")

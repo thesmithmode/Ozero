@@ -25,6 +25,7 @@
     <string name="singbox_refresh_all_button">Обновить все</string>
     <string name="singbox_ping_all_button">Тест</string>
     <string name="singbox_group_ping">Тест</string>
+    <string name="singbox_latency_failed">Ошибка</string>
     <string name="singbox_auto_mode_title">Авто-выбор</string>
     <string name="singbox_auto_mode_desc">Подключается к серверу с наименьшим пингом, автоматически переключается при деградации</string>
     <string name="singbox_advanced_title">Параметры Sing-box</string>

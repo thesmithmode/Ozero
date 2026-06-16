@@ -10,6 +10,9 @@ import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
 
 object RawShareLinksParser {
+    private const val MIN_PORT = 1
+    private const val MAX_PORT = 65_535
+
     fun parse(text: String): List<AbstractBean> {
         val links = parseShareLinks(text)
         return links.ifEmpty { parseSingboxJson(text) }.ifEmpty { ClashYamlParser.parse(text) }
@@ -33,6 +36,7 @@ object RawShareLinksParser {
                     }
                 }.getOrNull()
             }
+            .filter { it.hasValidPort() }
 
     private fun parseSingboxJson(text: String): List<AbstractBean> = runCatching {
         val root = JSONObject(text)
@@ -82,8 +86,10 @@ object RawShareLinksParser {
             outbound.has("server") &&
                 outbound.has("server_port") &&
                 it.serverAddress.isNotBlank() &&
-                it.serverPort > 0
+                it.hasValidPort()
         }
+
+    private fun AbstractBean.hasValidPort(): Boolean = serverPort in MIN_PORT..MAX_PORT
 
     private fun AbstractBean.applyCommon(outbound: JSONObject) {
         name = outbound.optString("tag")

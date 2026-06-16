@@ -488,9 +488,9 @@ private fun ProfileItem(
             profile.latencyMs == SingboxProbeService.LATENCY_FAILED -> {
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    text = "---",
+                    text = stringResource(R.string.singbox_latency_failed),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
         }

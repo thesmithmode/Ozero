@@ -4,16 +4,16 @@
     <string name="masterdns_config_toml">Conteúdo de client_config.toml</string>
     <string name="masterdns_resolvers">Servidores DNS (um por linha)</string>
     <string name="masterdns_setup_title">Configure seu próprio servidor em 15 minutos</string>
-    <string name="masterdns_setup_prereq">Requer um VPS (1 vCPU, 512 MB RAM) e um domínio que você possa delegar via registros NS. Todos os comandos são copiados com um toque.</string>
-    <string name="masterdns_setup_step1_title">Delegar um subdomínio</string>
-    <string name="masterdns_setup_step1_body">No DNS do seu domínio (substitua example.com e o IP):\nns1.example.com  A   server-IP\nv.example.com    NS  ns1.example.com</string>
-    <string name="masterdns_setup_step2_title">Instalar o servidor (Debian/Ubuntu)</string>
-    <string name="masterdns_setup_step3_title">Gerar a chave de criptografia (AES-256-GCM)</string>
-    <string name="masterdns_setup_step4_title">Editar /etc/masterdnsvpn/server_config.toml com seu domínio</string>
+    <string name="masterdns_setup_prereq">Requer um VPS (1 vCPU, 512 MB RAM), UDP/53 aberto e um domínio onde você possa criar um registro A e uma delegação NS. O domínio do cliente deve corresponder exatamente ao DOMAIN do servidor.</string>
+    <string name="masterdns_setup_step1_title">Criar registros DNS</string>
+    <string name="masterdns_setup_step1_body">No DNS do seu domínio, crie dois registros (substitua example.com e o IP):\nns.example.com  A   server-IP\nv.example.com   NS  ns.example.com\nSe usar Cloudflare, mantenha o registro A como DNS only.</string>
+    <string name="masterdns_setup_step2_title">Executar o instalador oficial no VPS</string>
+    <string name="masterdns_setup_step3_title">Verificar a delegação do subdomínio</string>
+    <string name="masterdns_setup_step4_title">Verificar /etc/masterdnsvpn/server_config.toml</string>
     <string name="masterdns_setup_step4_body">DOMAIN = [\"v.example.com\"]\nPROTOCOL_TYPE = \"SOCKS5\"\nUDP_PORT = 53\nDATA_ENCRYPTION_METHOD = 5\nENCRYPTION_KEY_FILE = \"/etc/masterdnsvpn/encrypt_key.txt\"</string>
-    <string name="masterdns_setup_step5_title">Iniciar o serviço e abrir UDP/53 para a internet</string>
-    <string name="masterdns_setup_step6_title">Cole a chave no campo «client_config.toml» abaixo</string>
-    <string name="masterdns_setup_step6_body">DOMAINS = [\"v.example.com\"]\nDATA_ENCRYPTION_METHOD = 5\nENCRYPTION_KEY = \"&lt;conteúdo de encrypt_key.txt&gt;\"\nPROTOCOL_TYPE = \"SOCKS5\"\nRESOLVER_BALANCING_STRATEGY = 3</string>
+    <string name="masterdns_setup_step5_title">Abrir UDP/53 e iniciar o serviço</string>
+    <string name="masterdns_setup_step6_title">Criar client_config.toml no app</string>
+    <string name="masterdns_setup_step6_body">DOMAINS = [\"v.example.com\"]\nSERVER = \"server-IP\"\nDATA_ENCRYPTION_METHOD = 5\nENCRYPTION_KEY = \"&lt;chave de encrypt_key.txt&gt;\"\nPROTOCOL_TYPE = \"SOCKS5\"\nRESOLVER_BALANCING_STRATEGY = 3</string>
     <string name="masterdns_copy_button">Copiar</string>
     <string name="masterdns_copied_toast">Copiado</string>
     <string name="settings_masterdns_title">MasterDNS</string>

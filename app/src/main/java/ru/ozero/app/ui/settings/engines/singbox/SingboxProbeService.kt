@@ -87,8 +87,9 @@ class SingboxProbeService internal constructor(
                         try {
                             val latency = probeLatencyMs(bean)
                             if (latency == LATENCY_SKIPPED_ACTIVE_RUNTIME) continue
-                            profileDao.updateLatency(profile.id, latency)
-                            results.add(ProbeResult(index, profile, latency))
+                            val storedLatency = if (latency >= 0) latency else LATENCY_FAILED
+                            profileDao.updateLatency(profile.id, storedLatency)
+                            results.add(ProbeResult(index, profile, storedLatency))
                         } finally {
                             onProfileTestingChanged(profile.id, false)
                         }
