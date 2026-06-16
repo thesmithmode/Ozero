@@ -343,7 +343,21 @@ class MasterDnsDockerScriptsContractTest {
         assertTrue(script.contains("PORT_BUSY|proto="))
         assertTrue(script.contains("|addr="))
         assertTrue(script.contains("|owner="))
-        assertTrue(script.contains("!ignored(addr)"))
+        assertTrue(script.contains("!ignored(addr) && scoped(addr)"))
+        assertTrue(script.contains("addr == \"0.0.0.0\""))
+    }
+
+    @Test
+    fun `checkPort53 scopes docker and ss conflicts to publish address or wildcard`() {
+        val script = MasterDnsDockerScripts.checkPort53(TEST_SERVER_IPV4)
+
+        assertTrue(script.contains("-v publish_addr=\"\$publish_addr\""))
+        assertTrue(script.contains("addr == publish_addr"))
+        assertTrue(script.contains("addr == \"0.0.0.0\""))
+        assertTrue(script.contains("addr == \"*\""))
+        assertTrue(script.contains("addr == \"::\""))
+        assertTrue(script.contains("if (scoped(addr))"))
+        assertTrue(script.contains("!ignored(addr) && scoped(addr)"))
     }
 
     @Test
@@ -360,7 +374,7 @@ class MasterDnsDockerScriptsContractTest {
         val script = MasterDnsDockerScripts.checkPort53(TEST_SERVER_IPV4)
         assertTrue(script.contains("ss_conflict udp -lunp"))
         assertTrue(script.contains("sub(/%.*$/"))
-        assertTrue(script.contains("!ignored(addr)"))
+        assertTrue(script.contains("!ignored(addr) && scoped(addr)"))
     }
 
     @Test
@@ -487,6 +501,10 @@ class MasterDnsDockerScriptsContractTest {
 
         for (script in listOf(checkScript, runScript)) {
             assertTrue(script.contains("server_host='dns.example.test'"))
+            assertTrue(script.contains("local_ipv4()"))
+            assertTrue(script.contains("ip -4 addr show"))
+            assertTrue(script.contains("local_ipv4 \"\$literal_ipv4\""))
+            assertTrue(script.contains("local_ipv4 \"\$resolved_ipv4\""))
             assertTrue(script.contains("getent ahostsv4"))
             assertTrue(script.contains("hostname -I 2>/dev/null | awk '{ for (i = 1; i <= NF; i++)"))
             assertTrue(script.contains("^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$"))
