@@ -350,6 +350,24 @@ class SingboxEngineAutoSelectTest {
     }
 
     @Test
+    fun `auto mode skips invalid ports before building config`() {
+        val profiles = listOf(
+            makeProfile(1L, 1L, "bad.example.com", 4_449_499),
+            makeProfile(2L, 1L, "remote.example.com", 443),
+        )
+        val prefs = mutablePreferencesOf(selectedProfileKey to SingboxEngine.SELECTED_AUTO)
+        val engine = buildEngine(prefs = prefs, profilesByGroup = mapOf(1L to profiles))
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNotNull(result)
+        assertTrue(result is EngineConfig.Singbox)
+        assertEquals(1, result.autoSelectBeanBlobs.size)
+        assertTrue(result.autoSelectBeanBlobs.single().contentEquals(profiles[1].beanBlob))
+    }
+
+    @Test
     fun `buildManualConfig maps protocol type from selected bean class`() {
         val cases = listOf(
             makeVlessBlob() to SingboxEngine.PROTOCOL_VLESS,

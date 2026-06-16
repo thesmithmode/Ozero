@@ -93,6 +93,19 @@ class ConfigBuilderAutoSelectTest {
     }
 
     @Test
+    fun `should skip beans with invalid port before rendering auto config`() {
+        val invalid = makeVless("bad.example.com", 4_449_499)
+        val valid = makeVless("ok.example.com", 443)
+
+        val json = ConfigBuilder.buildSingboxAutoConfig(listOf(invalid, valid))
+
+        assertFalse(ConfigBuilder.isSupportedBean(invalid))
+        assertContains(json, "\"server\":\"ok.example.com\"")
+        assertFalse(json.contains("bad.example.com"))
+        assertFalse(json.contains("4449499"))
+    }
+
+    @Test
     fun `should route traffic via proxy tag`() {
         val json = ConfigBuilder.buildSingboxAutoConfig(listOf(makeVless()))
 

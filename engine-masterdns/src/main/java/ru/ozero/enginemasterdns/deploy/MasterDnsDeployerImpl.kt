@@ -368,7 +368,7 @@ private fun buildClientToml(serverIp: String, encryptionKey: String): String =
     RESOLVER_BALANCING_STRATEGY = 3
     ENCRYPTION_KEY = "$encryptionKey"
     SERVER = "$serverIp"
-    DOMAINS = []
+    DOMAINS = ["${MasterDnsDockerScripts.DEFAULT_DOMAIN}"]
     """.trimIndent()
 
 private fun String.takeShort(maxLen: Int = 1_200): String {

@@ -19,6 +19,7 @@ class RawShareLinksParserEdgeTest {
                 { "type": "trojan", "server": "", "server_port": 443, "password": "x" },
                 { "type": "vmess", "server": "no-port.example.com", "uuid": "id" },
                 { "type": "vless", "server": "bad-port.example.com", "server_port": 0, "uuid": "id" },
+                { "type": "vless", "server": "too-large-port.example.com", "server_port": 4449499, "uuid": "id" },
                 {
                   "type": "vmess",
                   "tag": "Plain VMess",
@@ -68,6 +69,11 @@ class RawShareLinksParserEdgeTest {
                 port: 80
                 uuid: 12345678-1234-1234-1234-123456789abc
                 tls: false
+              - name: Too Large Port
+                type: vless
+                server: too-large.example.com
+                port: 4449499
+                uuid: 12345678-1234-1234-1234-123456789abc
               - name: Map String
                 type: ss
                 server: ss-map.example.com
@@ -148,6 +154,19 @@ class RawShareLinksParserEdgeTest {
         assertEquals(2, result.size)
         assertEquals("vless.example.com", result[0].serverAddress)
         assertEquals("trojan.example.com", result[1].serverAddress)
+    }
+
+    @Test
+    fun `should skip share links with too large port`() {
+        val text = """
+            vless://12345678-1234-1234-1234-123456789abc@too-large.example.com:4449499?type=tcp
+            vless://12345678-1234-1234-1234-123456789abc@valid.example.com:443?type=tcp
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(text)
+
+        assertEquals(1, result.size)
+        assertEquals("valid.example.com", result.single().serverAddress)
     }
 
     @Test

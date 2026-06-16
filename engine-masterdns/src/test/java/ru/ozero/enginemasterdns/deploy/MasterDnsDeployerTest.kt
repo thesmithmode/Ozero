@@ -868,6 +868,7 @@ class MasterDnsDeployerTest {
         assertEquals("port_53_busy|proto=udp", mapPort.invoke(null, "PORT_BUSY|proto=udp"))
         val toml = buildToml.invoke(null, "203.0.113.10", "secret-key") as String
         assertTrue(toml.contains("SERVER = \"203.0.113.10\""))
+        assertTrue(toml.contains("DOMAINS = [\"${MasterDnsDockerScripts.DEFAULT_DOMAIN}\"]"))
         assertTrue(toml.contains("ENCRYPTION_KEY = \"secret-key\""))
     }
 

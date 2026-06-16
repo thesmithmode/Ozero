@@ -578,7 +578,7 @@ private fun ServerSetupCard(onCopy: (String) -> Unit) {
                 SetupStep(
                     number = 3,
                     title = stringResource(R.string.masterdns_setup_step3_title),
-                    code = KEYGEN_CMD,
+                    code = VERIFY_DNS_CMD,
                     onCopy = onCopy,
                 )
                 Spacer(Modifier.height(12.dp))
@@ -645,11 +645,14 @@ private fun SetupStep(
 }
 
 private const val INSTALL_CMD =
-    "curl -fsSL https://raw.githubusercontent.com/masterking32/MasterDnsVPN/main/" +
-        "server_linux_install.sh | bash"
+    "bash <(curl -Ls https://raw.githubusercontent.com/masterking32/MasterDnsVPN/main/server_linux_install.sh)"
 
-private const val KEYGEN_CMD =
-    "openssl rand -hex 32 > /etc/masterdnsvpn/encrypt_key.txt && " +
-        "chmod 600 /etc/masterdnsvpn/encrypt_key.txt"
+private const val VERIFY_DNS_CMD =
+    "dig v.example.com NS\n" +
+        "dig @ns.example.com v.example.com A"
 
-private const val START_CMD = "systemctl enable --now masterdnsvpn-server"
+private const val START_CMD =
+    "ufw allow 53/udp || true\n" +
+        "firewall-cmd --add-port=53/udp --permanent 2>/dev/null || true\n" +
+        "firewall-cmd --reload 2>/dev/null || true\n" +
+        "systemctl enable --now masterdnsvpn-server || systemctl restart masterdnsvpn-server"

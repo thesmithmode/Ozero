@@ -108,7 +108,7 @@ class SingboxProbeServiceTest {
     }
 
     @Test
-    fun `probeAndAutoSelect does not overwrite latency when singbox runtime is busy`() = runTest {
+    fun `probeAndAutoSelect marks profile failed when singbox runtime is busy`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
@@ -121,7 +121,22 @@ class SingboxProbeServiceTest {
         )
             .probeAndAutoSelect(listOf(profile))
 
-        assertNull(dao.latencies[7L])
+        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[7L])
+        assertNull(prefsFlow.value[selectedProfileKey])
+    }
+
+    @Test
+    fun `probeAndAutoSelect marks invalid port as failed and never calls probe`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val invalidPort = makeProfile(id = 9L, host = "bad-port.example", port = 4_449_499)
+        val probe = CountingProfileProbe()
+
+        SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(listOf(invalidPort))
+
+        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[9L])
+        assertEquals(0, probe.calls.get())
         assertNull(prefsFlow.value[selectedProfileKey])
     }
 
@@ -208,7 +223,7 @@ class SingboxProbeServiceTest {
     }
 
     @Test
-    fun `probeAndAutoSelect ignores negative latency when another profile succeeds`() = runTest {
+    fun `probeAndAutoSelect marks negative latency failed when another profile succeeds`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
@@ -221,7 +236,7 @@ class SingboxProbeServiceTest {
             FakeProfileProbe(mapOf("failed.example:443" to -5, "ok.example:443" to 33)),
         ).probeAndAutoSelect(listOf(failed, successful))
 
-        assertEquals(-5, dao.latencies[1L])
+        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[1L])
         assertEquals(33, dao.latencies[2L])
         assertEquals(2L, prefsFlow.value[selectedProfileKey])
     }
@@ -260,7 +275,7 @@ class SingboxProbeServiceTest {
         ).probeAndAutoSelect(listOf(profile)) { id, testing -> events += id to testing }
 
         assertEquals(listOf(5L to true, 5L to false), events)
-        assertTrue(dao.latencies.isEmpty())
+        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[5L])
     }
 
     private fun makeProfile(

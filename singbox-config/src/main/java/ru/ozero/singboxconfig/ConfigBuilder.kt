@@ -14,6 +14,8 @@ private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
 object ConfigBuilder {
 
     private val SUPPORTED_TRANSPORTS = setOf("tcp", "ws", "grpc", "http", "h2", "httpupgrade", "")
+    private const val MIN_PORT = 1
+    private const val MAX_PORT = 65_535
 
     fun buildSingboxConfig(bean: AbstractBean, probeSocksPort: Int? = null): String {
         require(isSupportedBean(bean)) { "Unsupported transport: ${(bean as? StandardV2RayBean)?.type}" }
@@ -36,11 +38,13 @@ object ConfigBuilder {
     }
 
     fun isSupportedBean(bean: AbstractBean): Boolean {
+        if (bean.serverPort !in MIN_PORT..MAX_PORT) return false
         if (bean !is StandardV2RayBean) return true
         return bean.type in SUPPORTED_TRANSPORTS
     }
 
     fun buildChainConfig(bean: AbstractBean, socksPort: Int, upstream: Upstream? = null): String {
+        require(isSupportedBean(bean)) { "Unsupported transport: ${(bean as? StandardV2RayBean)?.type}" }
         val outbound = beanOutbound(bean, "proxy", detour = upstream?.let { "upstream" })
         return buildChainFullConfig(socksPort, listOf(outbound), upstream)
     }

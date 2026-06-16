@@ -18,6 +18,7 @@
     <string name="singbox_refresh_all_button">Atualizar tudo</string>
     <string name="singbox_ping_all_button">Teste</string>
     <string name="singbox_group_ping">Teste</string>
+    <string name="singbox_latency_failed">Erro</string>
     <string name="singbox_auto_mode_title">Seleção automática</string>
     <string name="singbox_auto_mode_desc">Conecta ao servidor com menor ping e troca automaticamente quando a latência piora</string>
     <string name="singbox_advanced_title">Configurações Sing-box</string>

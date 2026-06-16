@@ -119,12 +119,22 @@ class MasterDnsDockerScriptsContractTest {
 
         assertTrue(configIndex >= 0)
         assertTrue(runIndex > configIndex)
-        assertTrue(cmd.contains("DOMAIN = []"))
+        assertTrue(cmd.contains("DOMAIN = [\"${MasterDnsDockerScripts.DEFAULT_DOMAIN}\"]"))
+        assertFalse(cmd.contains("DOMAIN = []"))
         assertTrue(cmd.contains("PROTOCOL_TYPE = \"SOCKS5\""))
         assertTrue(cmd.contains("UDP_PORT = 53"))
         assertTrue(cmd.contains("DATA_ENCRYPTION_METHOD = 5"))
         assertTrue(cmd.contains("ENCRYPTION_KEY_FILE = \"/etc/masterdnsvpn/encrypt_key.txt\""))
         assertTrue(cmd.contains("run_diag config_init"))
+    }
+
+    @Test
+    fun `runContainer migrates existing empty server domain config`() {
+        val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
+
+        assertTrue(cmd.contains("grep -Eq '^DOMAIN[[:space:]]*=[[:space:]]*\\[[[:space:]]*\\]"))
+        assertTrue(cmd.contains("sed 's/^DOMAIN[[:space:]]*=[[:space:]]*\\[[[:space:]]*\\]"))
+        assertTrue(cmd.contains("DOMAIN = [\"${MasterDnsDockerScripts.DEFAULT_DOMAIN}\"]"))
     }
 
     @Test

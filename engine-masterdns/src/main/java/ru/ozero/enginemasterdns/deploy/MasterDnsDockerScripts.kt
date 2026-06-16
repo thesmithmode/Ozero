@@ -305,12 +305,19 @@ internal object MasterDnsDockerScripts {
                 fi
                 if [ ! -s /etc/masterdnsvpn/server_config.toml ]; then
                     cat > /etc/masterdnsvpn/server_config.toml <<EOF
-DOMAIN = []
+DOMAIN = ["${DEFAULT_DOMAIN}"]
 PROTOCOL_TYPE = "SOCKS5"
 UDP_PORT = 53
 DATA_ENCRYPTION_METHOD = 5
 ENCRYPTION_KEY_FILE = "/etc/masterdnsvpn/encrypt_key.txt"
 EOF
+                    chmod 600 /etc/masterdnsvpn/server_config.toml
+                elif grep -Eq '^DOMAIN[[:space:]]*=[[:space:]]*\[[[:space:]]*\][[:space:]]*$' /etc/masterdnsvpn/server_config.toml; then
+                    tmp_config=/etc/masterdnsvpn/server_config.toml.tmp
+                    sed 's/^DOMAIN[[:space:]]*=[[:space:]]*\[[[:space:]]*\][[:space:]]*${'$'}/DOMAIN = ["${DEFAULT_DOMAIN}"]/' \
+                        /etc/masterdnsvpn/server_config.toml > "${'$'}tmp_config"
+                    cat "${'$'}tmp_config" > /etc/masterdnsvpn/server_config.toml
+                    rm -f "${'$'}tmp_config"
                     chmod 600 /etc/masterdnsvpn/server_config.toml
                 fi
                 test -s /etc/masterdnsvpn/encrypt_key.txt
@@ -441,6 +448,7 @@ EOF
 
     const val MIN_FREE_RAM_MB = 256
     const val MIN_FREE_DISK_MB = 500
+    const val DEFAULT_DOMAIN = "ozero.invalid"
 
     private fun shellQuote(value: String): String = "'" + value.replace("'", "'\"'\"'") + "'"
 }
