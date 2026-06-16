@@ -25,6 +25,7 @@ class MasterDnsDeployerTest {
     }
 
     private fun setupHappyPath() {
+        transport.setResponse("LEGACY_MASTERDNS_CLEANUP_OK", MasterDnsDockerScripts.MARKER_LEGACY_MASTERDNS_CLEANUP_OK)
         transport.setResponse("bind_probe", MasterDnsDockerScripts.MARKER_PORT_FREE)
         transport.setResponse("free -m", "512 1024")
         transport.setResponse("apt-get", MasterDnsDockerScripts.MARKER_DOCKER_OK)
@@ -54,6 +55,16 @@ class MasterDnsDeployerTest {
         assertTrue(states[4] is MasterDnsDeployState.StartingContainer)
         assertTrue(states[5] is MasterDnsDeployState.ExtractingKey)
         assertInstanceOf(MasterDnsDeployState.Done::class.java, states[6])
+    }
+
+    @Test
+    fun `deploy runs legacy MasterDNS cleanup before port check`() = runTest {
+        deployer.deploy(credentials()).toList()
+
+        val cleanupIndex = transport.executedCommands.indexOfFirst { it.contains("LEGACY_MASTERDNS_CLEANUP_OK") }
+        val portIndex = transport.executedCommands.indexOfFirst { it.contains("bind_probe") }
+        assertTrue(cleanupIndex >= 0)
+        assertTrue(portIndex > cleanupIndex)
     }
 
     @Test

@@ -146,6 +146,21 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `cleanupLegacyMasterDns only targets legacy MasterDNS service and process names`() {
+        val cmd = MasterDnsDockerScripts.cleanupLegacyMasterDns
+        assertTrue(cmd.contains("LEGACY_MASTERDNS_CLEANUP_OK"))
+        assertTrue(cmd.contains("masterdns|masterdnsvpn"))
+        assertTrue(cmd.contains("MasterDnsVPN_Server_Linux|masterdnsvpn-server|MasterDnsVPN"))
+        assertTrue(cmd.contains("systemctl stop"))
+        assertTrue(cmd.contains("pkill -f"))
+        assertFalse(cmd.contains("docker volume rm"))
+        assertFalse(cmd.contains("docker system prune"))
+        assertFalse(cmd.contains("systemctl stop systemd-resolved"))
+        assertFalse(cmd.contains("pkill -f 'dnsmasq"))
+        assertFalse(cmd.contains("pkill -f 'named"))
+    }
+
+    @Test
     fun `checkPort53 inspects UDP local address without peer-column false positive`() {
         val cmd = MasterDnsDockerScripts.checkPort53
         assertTrue(cmd.contains("ss_conflict udp -lunp"))
@@ -255,9 +270,9 @@ class MasterDnsDockerScriptsContractTest {
     @Test
     fun `checkPort53 never reports free after bind probe failure without owner details`() {
         val script = MasterDnsDockerScripts.checkPort53
-        assertTrue(script.contains("bind_probe udp; bind_rc="))
+        assertTrue(script.contains("bind_probe udp \"\$publish_addr\"; bind_rc="))
         assertTrue(script.contains("owner=bind_probe:exit_"))
-        assertTrue(script.contains("addr=0.0.0.0:53"))
+        assertTrue(script.contains("addr=\$publish_addr:53"))
     }
 
     @Test
@@ -311,12 +326,15 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
-    fun `checkPort53 test-binds UDP zero address used by runContainer`() {
+    fun `checkPort53 test-binds UDP publish address used by runContainer`() {
         val script = MasterDnsDockerScripts.checkPort53
+        assertTrue(script.contains("publish_host_ip"))
+        assertTrue(script.contains("ip route get 1.1.1.1"))
         assertTrue(script.contains("bind_probe udp"))
         assertTrue(script.contains("socket.SOCK_DGRAM"))
-        assertTrue(script.contains("sock.bind((\"0.0.0.0\", 53))"))
-        assertTrue(MasterDnsDockerScripts.runContainer.contains("-p 53:53/udp"))
+        assertTrue(script.contains("sock.bind((addr, 53))"))
+        assertTrue(MasterDnsDockerScripts.runContainer.contains("publish_host_ip"))
+        assertTrue(MasterDnsDockerScripts.runContainer.contains("-p \"\$publish_addr:53:53/udp\""))
     }
 
     @Test

@@ -23,25 +23,40 @@ internal object MasterDnsDockerScripts {
             created|exited|dead|restarting|paused) sudo docker rm -f masterdns-ozero 2>/dev/null || true ;;
             running) echo PORT_FREE; exit 0 ;;
         esac
+        publish_host_ip() {
+            ip route get 1.1.1.1 2>/dev/null |
+                awk '{ for (i = 1; i <= NF; i++) if (${'$'}i == "src") { print $(i + 1); exit } }'
+        }
+        publish_addr=${'$'}(publish_host_ip)
+        [ -n "${'$'}publish_addr" ] || publish_addr=${'$'}(hostname -I 2>/dev/null | awk '{print ${'$'}1}')
+        [ -n "${'$'}publish_addr" ] || publish_addr=0.0.0.0
         docker_conflict() { { sudo docker ps --format '{{.Names}}|{{.Ports}}' 2>/dev/null; sudo docker ps -a --filter status=created --format '{{.Names}}|{{.Ports}}' 2>/dev/null; } | awk -F'|' '${'$'}1 != "masterdns-ozero" { split(${'$'}2, ports, ","); for (i in ports) { p=ports[i]; gsub(/^ +| +${'$'}/, "", p); if (p ~ /->53\/udp/) { proto=p; sub(/^.*->53\//, "", proto); sub(/ .*/, "", proto); host=p; sub(/->.*${'$'}/, "", host); addr=host; sub(/:53${'$'}/, "", addr); gsub(/^\[/, "", addr); gsub(/\]${'$'}/, "", addr); if (addr == "") addr="0.0.0.0"; print "PORT_BUSY|proto=" proto "|addr=" addr "|owner=docker:" ${'$'}1; exit } } } }'; }
         ss_conflict() { proto="${'$'}1"; flags="${'$'}2"; sudo ss -H "${'$'}flags" 2>/dev/null | awk -v proto="${'$'}proto" 'function clean(addr) { gsub(/^\[/, "", addr); gsub(/\]${'$'}/, "", addr); sub(/%.*${'$'}/, "", addr); return addr } function ignored(addr) { return addr == "127.0.0.53" || addr == "127.0.0.54" || addr == "127.0.0.1" || addr == "::1" } { local=""; for (i = 1; i <= NF; i++) if (${'$'}i ~ /:53${'$'}/ || ${'$'}i ~ /\]:53${'$'}/) { local=${'$'}i; break } if (local == "") next; addr=local; sub(/:53${'$'}/, "", addr); addr=clean(addr); if (!ignored(addr)) { name="unknown"; if (match(${'$'}0, /"[^"]+"/)) name=substr(${'$'}0, RSTART + 1, RLENGTH - 2); print "PORT_BUSY|proto=" proto "|addr=" addr "|owner=" name; exit } }'; }
-        bind_probe() { proto="${'$'}1"; py="${'$'}(command -v python3 2>/dev/null || command -v python 2>/dev/null)"; [ -n "${'$'}py" ] || return 0; sudo "${'$'}py" - "${'$'}proto" <<'PY'
+        bind_probe() { proto="${'$'}1"; addr="${'$'}2"; py="${'$'}(command -v python3 2>/dev/null || command -v python 2>/dev/null)"; [ -n "${'$'}py" ] || return 0; sudo "${'$'}py" - "${'$'}proto" "${'$'}addr" <<'PY'
         import errno
         import socket
         import sys
         proto = sys.argv[1]
+        addr = sys.argv[2]
         sock_type = socket.SOCK_DGRAM if proto == "udp" else socket.SOCK_STREAM
         sock = socket.socket(socket.AF_INET, sock_type)
         try:
-            sock.bind(("0.0.0.0", 53))
+            sock.bind((addr, 53))
         except OSError as exc:
             sys.exit(98 if exc.errno in (errno.EADDRINUSE, errno.EACCES) else 1)
         finally:
             sock.close()
         PY
         }
-        bind_probe udp; bind_rc=${'$'}?
-        if [ "${'$'}bind_rc" != "0" ]; then busy="${'$'}(docker_conflict)"; [ -n "${'$'}busy" ] && { echo "${'$'}busy"; exit 0; }; busy="${'$'}(ss_conflict udp -lunp)"; [ -n "${'$'}busy" ] && { echo "${'$'}busy"; exit 0; }; echo "PORT_BUSY|proto=udp|addr=0.0.0.0:53|owner=bind_probe:exit_${'$'}bind_rc"; exit 0; fi
+        bind_probe udp "${'$'}publish_addr"; bind_rc=${'$'}?
+        if [ "${'$'}bind_rc" != "0" ]; then
+            busy="${'$'}(docker_conflict)"
+            [ -n "${'$'}busy" ] && { echo "${'$'}busy"; exit 0; }
+            busy="${'$'}(ss_conflict udp -lunp)"
+            [ -n "${'$'}busy" ] && { echo "${'$'}busy"; exit 0; }
+            echo "PORT_BUSY|proto=udp|addr=${'$'}publish_addr:53|owner=bind_probe:exit_${'$'}bind_rc"
+            exit 0
+        fi
         busy="${'$'}(docker_conflict)"; [ -n "${'$'}busy" ] && { echo "${'$'}busy"; exit 0; }
         busy="${'$'}(ss_conflict udp -lunp)"; [ -n "${'$'}busy" ] && { echo "${'$'}busy"; exit 0; }
         echo PORT_FREE
@@ -62,6 +77,27 @@ internal object MasterDnsDockerScripts {
             exit 0
         fi
         echo AMNEZIA_DNS_NOT_FOUND
+        """.trimIndent()
+
+    val cleanupLegacyMasterDns: String =
+        """
+        units=${'$'}(
+            systemctl list-unit-files --type=service --no-legend 2>/dev/null |
+                awk '{print ${'$'}1}' |
+                grep -Ei '^(masterdns|masterdnsvpn).*[.]service${'$'}' || true
+        )
+        for unit in ${'$'}units; do
+            sudo systemctl stop "${'$'}unit" >/dev/null 2>&1 || true
+            sudo systemctl disable "${'$'}unit" >/dev/null 2>&1 || true
+        done
+        if sudo ss -H -lunp 2>/dev/null |
+            grep -E '(:|\])53\b|:53 ' |
+            grep -Eiv '127[.]0[.]0[.](1|53|54)|::1' |
+            grep -Eiq 'masterdns|masterdnsvpn|MasterDnsVPN';
+        then
+            sudo pkill -f 'MasterDnsVPN_Server_Linux|masterdnsvpn-server|MasterDnsVPN' 2>/dev/null || true
+        fi
+        echo LEGACY_MASTERDNS_CLEANUP_OK
         """.trimIndent()
 
     const val checkResources =
@@ -239,10 +275,17 @@ internal object MasterDnsDockerScripts {
         esac
         sudo docker volume inspect masterdns-key >/dev/null 2>&1 ||
             sudo docker volume create masterdns-key >/dev/null
+        publish_host_ip() {
+            ip route get 1.1.1.1 2>/dev/null |
+                awk '{ for (i = 1; i <= NF; i++) if (${'$'}i == "src") { print $(i + 1); exit } }'
+        }
+        publish_addr=${'$'}(publish_host_ip)
+        [ -n "${'$'}publish_addr" ] || publish_addr=${'$'}(hostname -I 2>/dev/null | awk '{print ${'$'}1}')
+        [ -n "${'$'}publish_addr" ] || publish_addr=0.0.0.0
         run_out=${'$'}(
             sudo docker run -d --name masterdns-ozero --restart always \
                 -v masterdns-key:/etc/masterdnsvpn \
-                -p 53:53/udp masterdns-ozero 2>&1
+                -p "${'$'}publish_addr:53:53/udp" masterdns-ozero 2>&1
         )
         run_rc=${'$'}?
         if [ ${'$'}run_rc -ne 0 ]; then run_diag docker_run ${'$'}run_rc "${'$'}run_out"; exit 0; fi
@@ -329,6 +372,7 @@ internal object MasterDnsDockerScripts {
     const val MARKER_AMNEZIA_DNS_NOT_FOUND = "AMNEZIA_DNS_NOT_FOUND"
     const val MARKER_AMNEZIA_DNS_REMOVED = "AMNEZIA_DNS_REMOVED"
     const val MARKER_AMNEZIA_DNS_REMOVE_FAILED = "AMNEZIA_DNS_REMOVE_FAILED"
+    const val MARKER_LEGACY_MASTERDNS_CLEANUP_OK = "LEGACY_MASTERDNS_CLEANUP_OK"
     const val MARKER_PORT_BUSY = "PORT_BUSY"
     const val MARKER_PORT_FREE = "PORT_FREE"
     const val MARKER_DOCKER_OK = "DOCKER_OK"

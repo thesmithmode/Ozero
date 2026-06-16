@@ -45,6 +45,7 @@ import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyProfile
+import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -144,6 +145,13 @@ class SingboxEngine @Inject constructor(
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
 
         chainMode = upstream !is Upstream.None || config.proxyMode
+        PersistentLoggers.debug(
+            TAG,
+            "start: proxyMode=${config.proxyMode} upstream=${upstream::class.simpleName} " +
+                "protocolType=${config.protocolType} autoCount=${config.autoSelectBeanBlobs.size} " +
+                "chainCount=${config.chainBeanBlobs.size} " +
+                "hasWireGuard=${config.wireGuardConfig != null} beanBytes=${config.beanBlob.size}",
+        )
         if (config.proxyMode && upstream is Upstream.None) {
             return startProxyMode(config, upstream = null)
         }
@@ -161,6 +169,10 @@ class SingboxEngine @Inject constructor(
         val json = buildPendingConfig(config, probePort) ?: run {
             return StartResult.Failure("failed to build sing-box config")
         }
+        PersistentLoggers.debug(
+            TAG,
+            "start TUN config built probePort=$probePort fingerprint=${json.fingerprint()} len=${json.length}",
+        )
 
         bindOrFail()?.let {
             clearPendingStart()
@@ -252,6 +264,11 @@ class SingboxEngine @Inject constructor(
                     .getOrElse { return StartResult.Failure("chain config: ${it.message}") }
             }
         }
+        PersistentLoggers.debug(
+            TAG,
+            "startProxyMode config built port=$port upstream=${upstream != null} " +
+                "fingerprint=${json.fingerprint()} len=${json.length}",
+        )
 
         bindOrFail()?.let {
             activeSocksPort = 0
@@ -262,6 +279,10 @@ class SingboxEngine @Inject constructor(
         return runCatching {
             p.startProxyMode(json, localProtector)
             val runtimeRunning = runCatching { p.runtimeRunning() }.getOrDefault(false)
+            PersistentLoggers.debug(
+                TAG,
+                "startProxyMode AIDL returned port=$port runtimeRunning=$runtimeRunning",
+            )
             if (!runtimeRunning) {
                 activeSocksPort = 0
                 return StartResult.Failure("sing-box proxy runtime failed to start")
@@ -286,12 +307,21 @@ class SingboxEngine @Inject constructor(
         return runCatching {
             val pfd = ParcelFileDescriptor.fromFd(tunFd)
             try {
+                PersistentLoggers.debug(
+                    TAG,
+                    "attachTun start rawFd=$tunFd pendingPort=$pendingSocksPort " +
+                        "fingerprint=${json.fingerprint()} len=${json.length}",
+                )
                 p.startWithConfig(pfd, json, localProtector)
             } finally {
                 runCatching { pfd.close() }
             }
             delay(150)
             val runtimeRunning = runCatching { p.runtimeRunning() }.getOrDefault(false)
+            PersistentLoggers.debug(
+                TAG,
+                "attachTun AIDL returned rawFd=$tunFd pendingPort=$pendingSocksPort runtimeRunning=$runtimeRunning",
+            )
             if (!runtimeRunning) {
                 clearPendingStart()
                 return TunAttachResult.Failure("sing-box runtime failed to start")
@@ -326,9 +356,14 @@ class SingboxEngine @Inject constructor(
     override fun stopTimeoutMs(): Long = ENGINE_STOP_TIMEOUT_MS
 
     override suspend fun probe(): ProbeResult {
+        return probeInternal(clearOnRoutedFailure = true)
+    }
+
+    private suspend fun probeInternal(clearOnRoutedFailure: Boolean): ProbeResult {
         val p = proxy ?: return ProbeResult.Failure("sing-box process is not connected")
         val port = activeSocksPort.takeIf { it > 0 }
             ?: return ProbeResult.Failure("sing-box SOCKS probe port is not active")
+        PersistentLoggers.debug(TAG, "probe start port=$port chainMode=$chainMode")
         val runtimeRunning = runCatching { p.runtimeRunning() }.getOrElse {
             clearRuntimeState()
             return ProbeResult.Failure("sing-box runtime health check failed: ${it.message}", it)
@@ -341,16 +376,34 @@ class SingboxEngine @Inject constructor(
         return if (latency >= 0) {
             ProbeResult.Success(latencyMs = latency)
         } else {
-            activeSocksPort = 0
+            PersistentLoggers.warn(
+                TAG,
+                "probe failed: routed probe returned $latency port=$port " +
+                    "chainMode=$chainMode runtimeRunning=$runtimeRunning",
+            )
+            if (clearOnRoutedFailure) activeSocksPort = 0
             ProbeResult.Failure("sing-box routed probe failed")
         }
     }
 
-    override suspend fun awaitReady(): EnginePlugin.ReadyResult =
-        when (val result = probe()) {
-            is ProbeResult.Success -> EnginePlugin.ReadyResult.Ready
-            is ProbeResult.Failure -> EnginePlugin.ReadyResult.Timeout(result.reason)
+    override suspend fun awaitReady(): EnginePlugin.ReadyResult {
+        var lastFailure: ProbeResult.Failure? = null
+        repeat(READY_PROBE_ATTEMPTS) { attempt ->
+            when (val result = probeInternal(clearOnRoutedFailure = false)) {
+                is ProbeResult.Success -> return EnginePlugin.ReadyResult.Ready
+                is ProbeResult.Failure -> {
+                    lastFailure = result
+                    PersistentLoggers.debug(
+                        TAG,
+                        "awaitReady probe failed attempt=${attempt + 1}/$READY_PROBE_ATTEMPTS reason=${result.reason}",
+                    )
+                    if (attempt != READY_PROBE_ATTEMPTS - 1) delay(READY_PROBE_RETRY_MS)
+                }
+            }
         }
+        activeSocksPort = 0
+        return EnginePlugin.ReadyResult.Timeout(lastFailure?.reason ?: "sing-box routed probe failed")
+    }
 
     override fun stats(): Flow<EngineStats> = flow {
         while (true) {
@@ -570,6 +623,8 @@ class SingboxEngine @Inject constructor(
         private const val STATS_POLL_MS = 1_000L
         private const val REMOTE_STOP_TIMEOUT_MS = 3_000L
         private const val ENGINE_STOP_TIMEOUT_MS = 4_000L
+        private const val READY_PROBE_ATTEMPTS = 5
+        private const val READY_PROBE_RETRY_MS = 500L
         private const val MAX_AUTO_SELECT_OUTBOUNDS = 50
         private const val CHAIN_PORT_BASE = 49408
         private const val CHAIN_PORT_RANGE = 256
@@ -583,4 +638,9 @@ class SingboxEngine @Inject constructor(
         const val PROTOCOL_TROJAN = 2
         const val PROTOCOL_SHADOWSOCKS = 3
     }
+}
+
+private fun String.fingerprint(): String {
+    val digest = MessageDigest.getInstance("SHA-256").digest(toByteArray(Charsets.UTF_8))
+    return digest.take(6).joinToString("") { "%02x".format(it) }
 }

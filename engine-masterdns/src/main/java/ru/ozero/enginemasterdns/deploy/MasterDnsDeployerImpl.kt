@@ -121,10 +121,20 @@ internal class MasterDnsDeployerImpl(
             emit(MasterDnsDeployState.Error(sudoError))
             return false
         }
+        cleanupLegacyMasterDns()
         emit(MasterDnsDeployState.CheckingPreflight)
         if (!checkAmneziaDns53Conflict("deploy: amnezia-dns port 53 check")) return false
         if (!checkPort53Availability("deploy: port 53 check")) return false
         return checkResources()
+    }
+
+    private suspend fun cleanupLegacyMasterDns() {
+        PersistentLoggers.debug(TAG, "deploy: cleanup legacy MasterDNS artifacts")
+        val result = transport.exec(MasterDnsDockerScripts.cleanupLegacyMasterDns)
+        PersistentLoggers.debug(TAG, "deploy: legacy cleanup result=${result.takeShort()}")
+        if (!result.contains(MasterDnsDockerScripts.MARKER_LEGACY_MASTERDNS_CLEANUP_OK)) {
+            PersistentLoggers.warn(TAG, "deploy: legacy cleanup returned unexpected result=${result.take(120)}")
+        }
     }
 
     private suspend fun FlowCollector<MasterDnsDeployState>.postDockerPortChecks(): Boolean {
@@ -199,7 +209,7 @@ internal class MasterDnsDeployerImpl(
             return false
         }
         emit(MasterDnsDeployState.StartingContainer)
-        PersistentLoggers.debug(TAG, "deploy: docker run masterdns-ozero -p 53:53/udp")
+        PersistentLoggers.debug(TAG, "deploy: docker run masterdns-ozero published on external host ip udp/53")
         val runResult = transport.exec(MasterDnsDockerScripts.runContainer)
         PersistentLoggers.debug(TAG, "deploy: run result=${runResult.takeShort()}")
         if (!runResult.contains(MasterDnsDockerScripts.MARKER_RUN_OK)) {

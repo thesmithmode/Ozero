@@ -2,6 +2,7 @@ package ru.ozero.enginesingbox
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import ru.ozero.enginescore.PersistentLoggers
 import java.net.HttpURLConnection
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -20,7 +21,10 @@ class SingboxHttp204RoutedProbe(
 ) : SingboxRoutedProbe {
 
     override suspend fun probeLatencyMs(socksPort: Int): Long = withContext(Dispatchers.IO) {
-        if (socksPort <= 0) return@withContext LATENCY_FAILED
+        if (socksPort <= 0) {
+            PersistentLoggers.warn(TAG, "routed probe failed: invalid socksPort=$socksPort")
+            return@withContext LATENCY_FAILED
+        }
         val start = nanoTime()
         runCatching {
             val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress(socksHost, socksPort))
@@ -35,15 +39,27 @@ class SingboxHttp204RoutedProbe(
                 if (code == HttpURLConnection.HTTP_NO_CONTENT) {
                     TimeUnit.NANOSECONDS.toMillis(nanoTime() - start).coerceAtLeast(1L)
                 } else {
+                    PersistentLoggers.warn(
+                        TAG,
+                        "routed probe failed: httpCode=$code urlHost=${probeUrl.host} socksPort=$socksPort",
+                    )
                     LATENCY_FAILED
                 }
             } finally {
                 connection.disconnect()
             }
-        }.getOrDefault(LATENCY_FAILED)
+        }.getOrElse { error ->
+            PersistentLoggers.warn(
+                TAG,
+                "routed probe failed: ${error::class.java.simpleName}: ${error.message} " +
+                    "urlHost=${probeUrl.host} socksPort=$socksPort timeoutMs=$timeoutMs",
+            )
+            LATENCY_FAILED
+        }
     }
 
     companion object {
+        private const val TAG = "SingboxRoutedProbe"
         const val PROBE_URL = "https://www.gstatic.com/generate_204"
         const val LATENCY_FAILED = -1L
         private const val LOOPBACK = "127.0.0.1"

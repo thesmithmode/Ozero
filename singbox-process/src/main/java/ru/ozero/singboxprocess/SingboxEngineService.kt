@@ -16,6 +16,7 @@ import ru.ozero.enginesingbox.ISingboxStatusCallback
 import ru.ozero.enginesingbox.SingboxStats
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.singboxcore.Libsingboxgojni
+import java.security.MessageDigest
 
 class SingboxEngineService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -28,8 +29,18 @@ class SingboxEngineService : Service() {
             protector: ISingboxProtector,
         ) {
             val rawFd = tunFd.detachFd()
-            kotlinx.coroutines.runBlocking {
-                SingboxRuntime.start(rawFd, singboxJsonConfig, SingboxProtectorBridge(protector))
+            PersistentLoggers.debug(
+                TAG,
+                "startWithConfig entry rawFd=$rawFd configLen=${singboxJsonConfig.length} " +
+                    "fingerprint=${singboxJsonConfig.fingerprint()}",
+            )
+            try {
+                kotlinx.coroutines.runBlocking {
+                    SingboxRuntime.start(rawFd, singboxJsonConfig, SingboxProtectorBridge(protector))
+                }
+            } catch (t: Throwable) {
+                PersistentLoggers.error(TAG, "startWithConfig failed: ${t::class.java.simpleName}: ${t.message}", t)
+                throw t
             }
         }
 
@@ -40,8 +51,17 @@ class SingboxEngineService : Service() {
         ) {
             val rawFd = tunFd.detachFd()
             val json = java.io.File(configFilePath).readText()
-            kotlinx.coroutines.runBlocking {
-                SingboxRuntime.start(rawFd, json, SingboxProtectorBridge(protector))
+            PersistentLoggers.debug(
+                TAG,
+                "startWithConfigFile entry rawFd=$rawFd configLen=${json.length} fingerprint=${json.fingerprint()}",
+            )
+            try {
+                kotlinx.coroutines.runBlocking {
+                    SingboxRuntime.start(rawFd, json, SingboxProtectorBridge(protector))
+                }
+            } catch (t: Throwable) {
+                PersistentLoggers.error(TAG, "startWithConfigFile failed: ${t::class.java.simpleName}: ${t.message}", t)
+                throw t
             }
         }
 
@@ -49,8 +69,18 @@ class SingboxEngineService : Service() {
             singboxJsonConfig: String,
             protector: ISingboxProtector,
         ) {
-            kotlinx.coroutines.runBlocking {
-                SingboxRuntime.start(NO_TUN_FD, singboxJsonConfig, SingboxProtectorBridge(protector))
+            PersistentLoggers.debug(
+                TAG,
+                "startProxyMode entry configLen=${singboxJsonConfig.length} " +
+                    "fingerprint=${singboxJsonConfig.fingerprint()}",
+            )
+            try {
+                kotlinx.coroutines.runBlocking {
+                    SingboxRuntime.start(NO_TUN_FD, singboxJsonConfig, SingboxProtectorBridge(protector))
+                }
+            } catch (t: Throwable) {
+                PersistentLoggers.error(TAG, "startProxyMode failed: ${t::class.java.simpleName}: ${t.message}", t)
+                throw t
             }
         }
 
@@ -129,4 +159,9 @@ class SingboxEngineService : Service() {
         private const val DEFAULT_STOP_TIMEOUT_MS = 3_000L
         private const val NO_TUN_FD = -1
     }
+}
+
+private fun String.fingerprint(): String {
+    val digest = MessageDigest.getInstance("SHA-256").digest(toByteArray(Charsets.UTF_8))
+    return digest.take(6).joinToString("") { "%02x".format(it) }
 }
