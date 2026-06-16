@@ -16,7 +16,10 @@ internal object MasterDnsDockerScripts {
             " *) echo ERR_SUDO_NOT_ALLOWED;;" +
             " esac"
 
-    val checkPort53: String =
+    fun checkPort53(serverHost: String): String =
+        "server_host=${shellQuote(serverHost)}\n" + checkPort53Body
+
+    private val checkPort53Body: String =
         """
         masterdns_state=${'$'}(sudo docker inspect -f '{{.State.Status}}' masterdns-ozero 2>/dev/null || true)
         case "${'$'}masterdns_state" in
@@ -24,11 +27,21 @@ internal object MasterDnsDockerScripts {
             running) echo PORT_FREE; exit 0 ;;
         esac
         publish_host_ip() {
+            host="${'$'}server_host"
+            case "${'$'}host" in
+                *:*) host="" ;;
+            esac
+            if [ -n "${'$'}host" ]; then
+                literal_ipv4=${'$'}(printf '%s\n' "${'$'}host" | awk '/^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+${'$'}/ { print; exit }')
+                [ -n "${'$'}literal_ipv4" ] && { printf '%s\n' "${'$'}literal_ipv4"; return 0; }
+                resolved_ipv4=${'$'}(getent ahostsv4 "${'$'}host" 2>/dev/null | awk '{ print ${'$'}1; exit }')
+                [ -n "${'$'}resolved_ipv4" ] && { printf '%s\n' "${'$'}resolved_ipv4"; return 0; }
+            fi
             ip route get 1.1.1.1 2>/dev/null |
-                awk '{ for (i = 1; i <= NF; i++) if (${'$'}i == "src") { print $(i + 1); exit } }'
+                awk '{ for (i = 1; i <= NF; i++) if (${'$'}i == "src" && $(i + 1) ~ /^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+${'$'}/) { print $(i + 1); exit } }'
         }
         publish_addr=${'$'}(publish_host_ip)
-        [ -n "${'$'}publish_addr" ] || publish_addr=${'$'}(hostname -I 2>/dev/null | awk '{print ${'$'}1}')
+        [ -n "${'$'}publish_addr" ] || publish_addr=${'$'}(hostname -I 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if (${'$'}i ~ /^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+${'$'}/) { print ${'$'}i; exit } }')
         [ -n "${'$'}publish_addr" ] || publish_addr=0.0.0.0
         docker_conflict() { { sudo docker ps --format '{{.Names}}|{{.Ports}}' 2>/dev/null; sudo docker ps -a --filter status=created --format '{{.Names}}|{{.Ports}}' 2>/dev/null; } | awk -F'|' '${'$'}1 != "masterdns-ozero" { split(${'$'}2, ports, ","); for (i in ports) { p=ports[i]; gsub(/^ +| +${'$'}/, "", p); if (p ~ /->53\/udp/) { proto=p; sub(/^.*->53\//, "", proto); sub(/ .*/, "", proto); host=p; sub(/->.*${'$'}/, "", host); addr=host; sub(/:53${'$'}/, "", addr); gsub(/^\[/, "", addr); gsub(/\]${'$'}/, "", addr); if (addr == "") addr="0.0.0.0"; print "PORT_BUSY|proto=" proto "|addr=" addr "|owner=docker:" ${'$'}1; exit } } } }'; }
         ss_conflict() { proto="${'$'}1"; flags="${'$'}2"; sudo ss -H "${'$'}flags" 2>/dev/null | awk -v proto="${'$'}proto" 'function clean(addr) { gsub(/^\[/, "", addr); gsub(/\]${'$'}/, "", addr); sub(/%.*${'$'}/, "", addr); return addr } function ignored(addr) { return addr == "127.0.0.53" || addr == "127.0.0.54" || addr == "127.0.0.1" || addr == "::1" } { local=""; for (i = 1; i <= NF; i++) if (${'$'}i ~ /:53${'$'}/ || ${'$'}i ~ /\]:53${'$'}/) { local=${'$'}i; break } if (local == "") next; addr=local; sub(/:53${'$'}/, "", addr); addr=clean(addr); if (!ignored(addr)) { name="unknown"; if (match(${'$'}0, /"[^"]+"/)) name=substr(${'$'}0, RSTART + 1, RLENGTH - 2); print "PORT_BUSY|proto=" proto "|addr=" addr "|owner=" name; exit } }'; }
@@ -248,7 +261,10 @@ internal object MasterDnsDockerScripts {
         fi
         """.trimIndent()
 
-    val runContainer: String =
+    fun runContainer(serverHost: String): String =
+        "server_host=${shellQuote(serverHost)}\n" + runContainerBody
+
+    private val runContainerBody: String =
         """
         run_diag() {
             phase="${'$'}1"
@@ -276,11 +292,21 @@ internal object MasterDnsDockerScripts {
         sudo docker volume inspect masterdns-key >/dev/null 2>&1 ||
             sudo docker volume create masterdns-key >/dev/null
         publish_host_ip() {
+            host="${'$'}server_host"
+            case "${'$'}host" in
+                *:*) host="" ;;
+            esac
+            if [ -n "${'$'}host" ]; then
+                literal_ipv4=${'$'}(printf '%s\n' "${'$'}host" | awk '/^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+${'$'}/ { print; exit }')
+                [ -n "${'$'}literal_ipv4" ] && { printf '%s\n' "${'$'}literal_ipv4"; return 0; }
+                resolved_ipv4=${'$'}(getent ahostsv4 "${'$'}host" 2>/dev/null | awk '{ print ${'$'}1; exit }')
+                [ -n "${'$'}resolved_ipv4" ] && { printf '%s\n' "${'$'}resolved_ipv4"; return 0; }
+            fi
             ip route get 1.1.1.1 2>/dev/null |
-                awk '{ for (i = 1; i <= NF; i++) if (${'$'}i == "src") { print $(i + 1); exit } }'
+                awk '{ for (i = 1; i <= NF; i++) if (${'$'}i == "src" && $(i + 1) ~ /^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+${'$'}/) { print $(i + 1); exit } }'
         }
         publish_addr=${'$'}(publish_host_ip)
-        [ -n "${'$'}publish_addr" ] || publish_addr=${'$'}(hostname -I 2>/dev/null | awk '{print ${'$'}1}')
+        [ -n "${'$'}publish_addr" ] || publish_addr=${'$'}(hostname -I 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if (${'$'}i ~ /^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+${'$'}/) { print ${'$'}i; exit } }')
         [ -n "${'$'}publish_addr" ] || publish_addr=0.0.0.0
         run_out=${'$'}(
             sudo docker run -d --name masterdns-ozero --restart always \
@@ -397,4 +423,6 @@ internal object MasterDnsDockerScripts {
 
     const val MIN_FREE_RAM_MB = 256
     const val MIN_FREE_DISK_MB = 500
+
+    private fun shellQuote(value: String): String = "'" + value.replace("'", "'\"'\"'") + "'"
 }

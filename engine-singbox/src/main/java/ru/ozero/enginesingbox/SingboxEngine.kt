@@ -45,7 +45,6 @@ import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyProfile
-import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -171,7 +170,7 @@ class SingboxEngine @Inject constructor(
         }
         PersistentLoggers.debug(
             TAG,
-            "start TUN config built probePort=$probePort fingerprint=${json.fingerprint()} len=${json.length}",
+            "start TUN config built probePort=$probePort fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
         )
 
         bindOrFail()?.let {
@@ -267,7 +266,7 @@ class SingboxEngine @Inject constructor(
         PersistentLoggers.debug(
             TAG,
             "startProxyMode config built port=$port upstream=${upstream != null} " +
-                "fingerprint=${json.fingerprint()} len=${json.length}",
+                "fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
         )
 
         bindOrFail()?.let {
@@ -310,7 +309,7 @@ class SingboxEngine @Inject constructor(
                 PersistentLoggers.debug(
                     TAG,
                     "attachTun start rawFd=$tunFd pendingPort=$pendingSocksPort " +
-                        "fingerprint=${json.fingerprint()} len=${json.length}",
+                        "fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
                 )
                 p.startWithConfig(pfd, json, localProtector)
             } finally {
@@ -638,9 +637,4 @@ class SingboxEngine @Inject constructor(
         const val PROTOCOL_TROJAN = 2
         const val PROTOCOL_SHADOWSOCKS = 3
     }
-}
-
-private fun String.fingerprint(): String {
-    val digest = MessageDigest.getInstance("SHA-256").digest(toByteArray(Charsets.UTF_8))
-    return digest.take(6).joinToString("") { "%02x".format(it) }
 }

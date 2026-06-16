@@ -14,10 +14,10 @@ internal class MasterDnsDeployerImpl(
         PersistentLoggers.debug(TAG, "deploy: start host=${credentials.host}:${credentials.port}")
         if (!connectAndAuth(credentials, "deploy")) return@flow
         try {
-            if (!preflightChecks()) return@flow
+            if (!preflightChecks(credentials.host)) return@flow
             if (!installDocker()) return@flow
-            if (!postDockerPortChecks()) return@flow
-            if (!buildAndRun()) return@flow
+            if (!postDockerPortChecks(credentials.host)) return@flow
+            if (!buildAndRun(credentials.host)) return@flow
             val key = extractKey() ?: return@flow
             PersistentLoggers.debug(TAG, "deploy: done host=${credentials.host} key_len=${key.length}")
             emit(MasterDnsDeployState.Done(buildClientToml(credentials.host, key)))
@@ -62,10 +62,10 @@ internal class MasterDnsDeployerImpl(
                 emit(MasterDnsDeployState.Error("amnezia_dns_remove_failed"))
                 return@flow
             }
-            if (!preflightChecks()) return@flow
+            if (!preflightChecks(credentials.host)) return@flow
             if (!installDocker()) return@flow
-            if (!postDockerPortChecks()) return@flow
-            if (!buildAndRun()) return@flow
+            if (!postDockerPortChecks(credentials.host)) return@flow
+            if (!buildAndRun(credentials.host)) return@flow
             val key = extractKey() ?: return@flow
             PersistentLoggers.debug(
                 TAG,
@@ -112,7 +112,7 @@ internal class MasterDnsDeployerImpl(
         return authed
     }
 
-    private suspend fun FlowCollector<MasterDnsDeployState>.preflightChecks(): Boolean {
+    private suspend fun FlowCollector<MasterDnsDeployState>.preflightChecks(serverHost: String): Boolean {
         PersistentLoggers.debug(TAG, "deploy: sudo check")
         val sudoResult = transport.exec(MasterDnsDockerScripts.checkSudoNoPassword)
         PersistentLoggers.debug(TAG, "deploy: sudo result=${sudoResult.takeShort()}")
@@ -121,10 +121,9 @@ internal class MasterDnsDeployerImpl(
             emit(MasterDnsDeployState.Error(sudoError))
             return false
         }
-        cleanupLegacyMasterDns()
         emit(MasterDnsDeployState.CheckingPreflight)
         if (!checkAmneziaDns53Conflict("deploy: amnezia-dns port 53 check")) return false
-        if (!checkPort53Availability("deploy: port 53 check")) return false
+        if (!checkPort53Availability(serverHost, "deploy: port 53 check")) return false
         return checkResources()
     }
 
@@ -137,9 +136,9 @@ internal class MasterDnsDeployerImpl(
         }
     }
 
-    private suspend fun FlowCollector<MasterDnsDeployState>.postDockerPortChecks(): Boolean {
+    private suspend fun FlowCollector<MasterDnsDeployState>.postDockerPortChecks(serverHost: String): Boolean {
         if (!checkAmneziaDns53Conflict("deploy: post-docker amnezia-dns port 53 check")) return false
-        return checkPort53Availability("deploy: post-docker port 53 check")
+        return checkPort53Availability(serverHost, "deploy: post-docker port 53 check")
     }
 
     private suspend fun FlowCollector<MasterDnsDeployState>.checkAmneziaDns53Conflict(logLabel: String): Boolean {
@@ -153,16 +152,26 @@ internal class MasterDnsDeployerImpl(
         return true
     }
 
-    private suspend fun FlowCollector<MasterDnsDeployState>.checkPort53Availability(logLabel: String): Boolean {
+    private suspend fun FlowCollector<MasterDnsDeployState>.checkPort53Availability(
+        serverHost: String,
+        logLabel: String,
+    ): Boolean {
         PersistentLoggers.debug(TAG, logLabel)
-        val portResult = transport.exec(MasterDnsDockerScripts.checkPort53)
-        PersistentLoggers.debug(TAG, "deploy: port result=${portResult.takeShort()}")
-        val portBusy = parsePortBusy(portResult)
+        val portResult = transport.exec(MasterDnsDockerScripts.checkPort53(serverHost))
+        var finalPortResult = portResult
+        PersistentLoggers.debug(TAG, "deploy: port result=${finalPortResult.takeShort()}")
+        val initialPortBusy = parsePortBusy(finalPortResult)
+        if (initialPortBusy?.owner.isLegacyMasterDnsOwner()) {
+            cleanupLegacyMasterDns()
+            finalPortResult = transport.exec(MasterDnsDockerScripts.checkPort53(serverHost))
+            PersistentLoggers.debug(TAG, "deploy: port after legacy cleanup result=${finalPortResult.takeShort()}")
+        }
+        val portBusy = parsePortBusy(finalPortResult)
         if (portBusy != null) {
             emit(portBusy)
             return false
         }
-        val portError = mapPortResult(portResult)
+        val portError = mapPortResult(finalPortResult)
         if (portError != null) {
             emit(MasterDnsDeployState.Error(portError))
             return false
@@ -199,7 +208,7 @@ internal class MasterDnsDeployerImpl(
         return true
     }
 
-    private suspend fun FlowCollector<MasterDnsDeployState>.buildAndRun(): Boolean {
+    private suspend fun FlowCollector<MasterDnsDeployState>.buildAndRun(serverHost: String): Boolean {
         emit(MasterDnsDeployState.BuildingImage)
         PersistentLoggers.debug(TAG, "deploy: docker build masterdns-ozero (timeout 300s)")
         val buildResult = transport.exec(MasterDnsDockerScripts.deployMasterDns, timeoutMs = 300_000L)
@@ -210,7 +219,7 @@ internal class MasterDnsDeployerImpl(
         }
         emit(MasterDnsDeployState.StartingContainer)
         PersistentLoggers.debug(TAG, "deploy: docker run masterdns-ozero published on external host ip udp/53")
-        val runResult = transport.exec(MasterDnsDockerScripts.runContainer)
+        val runResult = transport.exec(MasterDnsDockerScripts.runContainer(serverHost))
         PersistentLoggers.debug(TAG, "deploy: run result=${runResult.takeShort()}")
         if (!runResult.contains(MasterDnsDockerScripts.MARKER_RUN_OK)) {
             emit(MasterDnsDeployState.Error(mapRunError(runResult)))
@@ -341,6 +350,13 @@ private fun mapPortResult(result: String): String? {
     } else {
         "port_53_busy|$details"
     }
+}
+
+private fun String?.isLegacyMasterDnsOwner(): Boolean {
+    if (this == null) return false
+    return contains("masterdns", ignoreCase = true) ||
+        contains("masterdnsvpn", ignoreCase = true) ||
+        contains("MasterDnsVPN", ignoreCase = true)
 }
 
 private fun buildClientToml(serverIp: String, encryptionKey: String): String =

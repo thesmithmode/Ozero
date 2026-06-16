@@ -18,7 +18,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `runContainer ensures named volume masterdns-key for encrypt key persistence`() {
-        val cmd = MasterDnsDockerScripts.runContainer
+        val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
         assertTrue(cmd.contains("docker volume inspect masterdns-key"), "must check volume existence")
         assertTrue(cmd.contains("docker volume create masterdns-key"), "must create volume if absent")
         assertTrue(
@@ -73,7 +73,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `runContainer removes stale masterdns container before run without touching key volume`() {
-        val cmd = MasterDnsDockerScripts.runContainer
+        val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
         assertTrue(cmd.contains("docker inspect -f '{{.State.Status}}' masterdns-ozero"))
         assertTrue(cmd.contains("created|exited|dead"))
         assertTrue(cmd.contains("sudo docker rm -f masterdns-ozero"))
@@ -82,7 +82,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `runContainer returns structured run diagnostics with inspect state error and log tail`() {
-        val cmd = MasterDnsDockerScripts.runContainer
+        val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
         assertTrue(cmd.contains("ERR_RUN|phase=%s|exit=%s|%s|error=%s|logs=%s"))
         assertTrue(cmd.contains("state={{.State.Status}}|exit={{.State.ExitCode}}|error={{.State.Error}}"))
         assertTrue(cmd.contains("docker logs --tail 20 masterdns-ozero"))
@@ -92,7 +92,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `runContainer generates encrypt key only if missing - idempotent redeploy preserves key`() {
-        val cmd = MasterDnsDockerScripts.runContainer
+        val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
         assertTrue(
             cmd.contains("test -f /etc/masterdnsvpn/encrypt_key.txt"),
             "must check key existence before generating — иначе каждый deploy перезаписывает key",
@@ -162,7 +162,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `checkPort53 inspects UDP local address without peer-column false positive`() {
-        val cmd = MasterDnsDockerScripts.checkPort53
+        val cmd = MasterDnsDockerScripts.checkPort53(TEST_SERVER_IPV4)
         assertTrue(cmd.contains("ss_conflict udp -lunp"))
         assertTrue(cmd.contains("for (i = 1; i <= NF; i++)"))
         assertTrue(cmd.contains("local=\"\""))
@@ -180,7 +180,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `runContainer restarts container after first-time key generation`() {
-        val cmd = MasterDnsDockerScripts.runContainer
+        val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
         assertTrue(
             cmd.contains("docker restart masterdns-ozero"),
             "После создания key файла нужно restart container — masterdnsvpn-server читает key на старте, " +
@@ -248,7 +248,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `checkPort53 emits structured owner address protocol when busy`() {
-        val script = MasterDnsDockerScripts.checkPort53
+        val script = MasterDnsDockerScripts.checkPort53(TEST_SERVER_IPV4)
         assertTrue(script.contains("PORT_BUSY|proto="))
         assertTrue(script.contains("|addr="))
         assertTrue(script.contains("|owner="))
@@ -258,7 +258,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `checkPort53 inspects docker containers and removes stale own container before bind verdict`() {
-        val script = MasterDnsDockerScripts.checkPort53
+        val script = MasterDnsDockerScripts.checkPort53(TEST_SERVER_IPV4)
         assertTrue(script.contains("docker ps --format '{{.Names}}|{{.Ports}}'"))
         assertTrue(script.contains("docker ps -a --filter status=created --format '{{.Names}}|{{.Ports}}'"))
         assertTrue(script.contains("masterdns_state="))
@@ -269,7 +269,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `checkPort53 never reports free after bind probe failure without owner details`() {
-        val script = MasterDnsDockerScripts.checkPort53
+        val script = MasterDnsDockerScripts.checkPort53(TEST_SERVER_IPV4)
         assertTrue(script.contains("bind_probe udp \"\$publish_addr\"; bind_rc="))
         assertTrue(script.contains("owner=bind_probe:exit_"))
         assertTrue(script.contains("addr=\$publish_addr:53"))
@@ -314,7 +314,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `checkPort53 loopback-only systemd-resolved does not produce busy contract`() {
-        val script = MasterDnsDockerScripts.checkPort53
+        val script = MasterDnsDockerScripts.checkPort53(TEST_SERVER_IPV4)
         assertTrue(script.contains("127.0.0.53"))
         assertTrue(script.contains("127.0.0.54"))
         assertTrue(script.contains("127.0.0.1"))
@@ -327,19 +327,19 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `checkPort53 test-binds UDP publish address used by runContainer`() {
-        val script = MasterDnsDockerScripts.checkPort53
+        val script = MasterDnsDockerScripts.checkPort53(TEST_SERVER_IPV4)
         assertTrue(script.contains("publish_host_ip"))
         assertTrue(script.contains("ip route get 1.1.1.1"))
         assertTrue(script.contains("bind_probe udp"))
         assertTrue(script.contains("socket.SOCK_DGRAM"))
         assertTrue(script.contains("sock.bind((addr, 53))"))
-        assertTrue(MasterDnsDockerScripts.runContainer.contains("publish_host_ip"))
-        assertTrue(MasterDnsDockerScripts.runContainer.contains("-p \"\$publish_addr:53:53/udp\""))
+        assertTrue(MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4).contains("publish_host_ip"))
+        assertTrue(MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4).contains("-p \"\$publish_addr:53:53/udp\""))
     }
 
     @Test
     fun `checkPort53 reports zero IPv4 listener as busy with machine marker`() {
-        val script = MasterDnsDockerScripts.checkPort53
+        val script = MasterDnsDockerScripts.checkPort53(TEST_SERVER_IPV4)
         assertTrue(script.contains("PORT_BUSY|proto="))
         assertTrue(script.contains("|addr="))
         assertTrue(script.contains("|owner="))
@@ -348,7 +348,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `checkPort53 reports wildcard IPv6 listener as busy`() {
-        val script = MasterDnsDockerScripts.checkPort53
+        val script = MasterDnsDockerScripts.checkPort53(TEST_SERVER_IPV4)
         assertTrue(script.contains("gsub(/^\\[/"))
         assertTrue(script.contains("gsub(/\\]$/"))
         assertTrue(script.contains("addr == \"::1\""))
@@ -357,7 +357,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `checkPort53 reports external server IPv4 listener as busy`() {
-        val script = MasterDnsDockerScripts.checkPort53
+        val script = MasterDnsDockerScripts.checkPort53(TEST_SERVER_IPV4)
         assertTrue(script.contains("ss_conflict udp -lunp"))
         assertTrue(script.contains("sub(/%.*$/"))
         assertTrue(script.contains("!ignored(addr)"))
@@ -365,7 +365,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `checkPort53 reports Docker UDP publish as busy`() {
-        val script = MasterDnsDockerScripts.checkPort53
+        val script = MasterDnsDockerScripts.checkPort53(TEST_SERVER_IPV4)
         assertTrue(script.contains("docker_conflict"))
         assertTrue(script.contains("->53\\/udp"))
         assertTrue(script.contains("proto="))
@@ -374,7 +374,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `checkPort53 ignores Docker TCP publish because runContainer binds only UDP`() {
-        val script = MasterDnsDockerScripts.checkPort53
+        val script = MasterDnsDockerScripts.checkPort53(TEST_SERVER_IPV4)
         assertFalse(script.contains("->53\\/(udp|tcp)"))
         assertFalse(script.contains("->53\\/tcp"))
         assertTrue(script.contains("sub(/^.*->53\\//"))
@@ -382,7 +382,7 @@ class MasterDnsDockerScriptsContractTest {
 
     @Test
     fun `runContainer uses retry loop instead of fixed sleep for readiness probe`() {
-        val cmd = MasterDnsDockerScripts.runContainer
+        val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
         assertFalse(
             cmd.contains("sleep 2;"),
             "Fixed sleep 2 race condition — readEncryptKey может вернуть пусто если контейнер ещё не готов. " +
@@ -478,5 +478,23 @@ class MasterDnsDockerScriptsContractTest {
         assertEquals("ERR_SUDO_NO_HOME", MasterDnsDockerScripts.MARKER_ERR_SUDO_NO_HOME)
         assertEquals("ERR_SUDO_NOT_IN_GROUP", MasterDnsDockerScripts.MARKER_ERR_SUDO_NOT_IN_GROUP)
         assertEquals("SUDO_OK", MasterDnsDockerScripts.MARKER_SUDO_OK)
+    }
+
+    @Test
+    fun `publish address is derived from configured server host and constrained to IPv4`() {
+        val checkScript = MasterDnsDockerScripts.checkPort53("dns.example.test")
+        val runScript = MasterDnsDockerScripts.runContainer("dns.example.test")
+
+        for (script in listOf(checkScript, runScript)) {
+            assertTrue(script.contains("server_host='dns.example.test'"))
+            assertTrue(script.contains("getent ahostsv4"))
+            assertTrue(script.contains("hostname -I 2>/dev/null | awk '{ for (i = 1; i <= NF; i++)"))
+            assertTrue(script.contains("^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$"))
+            assertFalse(script.contains("hostname -I 2>/dev/null | awk '{print $1}'"))
+        }
+    }
+
+    private companion object {
+        const val TEST_SERVER_IPV4 = "203.0.113.10"
     }
 }

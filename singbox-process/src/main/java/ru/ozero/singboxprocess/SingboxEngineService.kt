@@ -14,9 +14,9 @@ import ru.ozero.enginesingbox.ISingboxEngineProcess
 import ru.ozero.enginesingbox.ISingboxProtector
 import ru.ozero.enginesingbox.ISingboxStatusCallback
 import ru.ozero.enginesingbox.SingboxStats
+import ru.ozero.enginesingbox.singboxConfigFingerprint
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.singboxcore.Libsingboxgojni
-import java.security.MessageDigest
 
 class SingboxEngineService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -32,7 +32,7 @@ class SingboxEngineService : Service() {
             PersistentLoggers.debug(
                 TAG,
                 "startWithConfig entry rawFd=$rawFd configLen=${singboxJsonConfig.length} " +
-                    "fingerprint=${singboxJsonConfig.fingerprint()}",
+                    "fingerprint=${singboxJsonConfig.singboxConfigFingerprint()}",
             )
             try {
                 kotlinx.coroutines.runBlocking {
@@ -53,7 +53,8 @@ class SingboxEngineService : Service() {
             val json = java.io.File(configFilePath).readText()
             PersistentLoggers.debug(
                 TAG,
-                "startWithConfigFile entry rawFd=$rawFd configLen=${json.length} fingerprint=${json.fingerprint()}",
+                "startWithConfigFile entry rawFd=$rawFd configLen=${json.length} " +
+                    "fingerprint=${json.singboxConfigFingerprint()}",
             )
             try {
                 kotlinx.coroutines.runBlocking {
@@ -72,7 +73,7 @@ class SingboxEngineService : Service() {
             PersistentLoggers.debug(
                 TAG,
                 "startProxyMode entry configLen=${singboxJsonConfig.length} " +
-                    "fingerprint=${singboxJsonConfig.fingerprint()}",
+                    "fingerprint=${singboxJsonConfig.singboxConfigFingerprint()}",
             )
             try {
                 kotlinx.coroutines.runBlocking {
@@ -159,9 +160,4 @@ class SingboxEngineService : Service() {
         private const val DEFAULT_STOP_TIMEOUT_MS = 3_000L
         private const val NO_TUN_FD = -1
     }
-}
-
-private fun String.fingerprint(): String {
-    val digest = MessageDigest.getInstance("SHA-256").digest(toByteArray(Charsets.UTF_8))
-    return digest.take(6).joinToString("") { "%02x".format(it) }
 }

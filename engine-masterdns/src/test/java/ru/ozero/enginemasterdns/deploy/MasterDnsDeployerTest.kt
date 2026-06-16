@@ -58,13 +58,32 @@ class MasterDnsDeployerTest {
     }
 
     @Test
-    fun `deploy runs legacy MasterDNS cleanup before port check`() = runTest {
+    fun `deploy does not run legacy MasterDNS cleanup when port is free`() = runTest {
         deployer.deploy(credentials()).toList()
 
+        assertFalse(transport.executedCommands.any { it.contains("LEGACY_MASTERDNS_CLEANUP_OK") })
+    }
+
+    @Test
+    fun `deploy runs legacy MasterDNS cleanup only after legacy port conflict and then rechecks`() = runTest {
+        transport.setResponses(
+            "bind_probe",
+            listOf(
+                "PORT_BUSY|proto=udp|addr=10.0.0.1:53|owner=MasterDnsVPN",
+                MasterDnsDockerScripts.MARKER_PORT_FREE,
+                MasterDnsDockerScripts.MARKER_PORT_FREE,
+            ),
+        )
+
+        val states = deployer.deploy(credentials()).toList()
+
+        assertInstanceOf(MasterDnsDeployState.Done::class.java, states.last())
         val cleanupIndex = transport.executedCommands.indexOfFirst { it.contains("LEGACY_MASTERDNS_CLEANUP_OK") }
-        val portIndex = transport.executedCommands.indexOfFirst { it.contains("bind_probe") }
-        assertTrue(cleanupIndex >= 0)
-        assertTrue(portIndex > cleanupIndex)
+        val portIndexes = transport.executedCommands
+            .mapIndexedNotNull { index, command -> index.takeIf { command.contains("bind_probe") } }
+        assertEquals(3, portIndexes.size)
+        assertTrue(cleanupIndex > portIndexes[0])
+        assertTrue(portIndexes[1] > cleanupIndex)
     }
 
     @Test
@@ -184,6 +203,16 @@ class MasterDnsDeployerTest {
         assertEquals("0.0.0.0:53", portBusy.address)
         assertEquals("bind_probe:exit_98", portBusy.owner)
         assertFalse(transport.executedCommands.any { it.contains("docker run -d") })
+    }
+
+    @Test
+    fun `deploy does not cleanup similarly named services when conflict owner is not legacy MasterDNS`() = runTest {
+        transport.setResponse("bind_probe", "PORT_BUSY|proto=udp|addr=10.0.0.1:53|owner=bind_probe:exit_98")
+
+        deployer.deploy(credentials()).toList()
+
+        assertFalse(transport.executedCommands.any { it.contains("LEGACY_MASTERDNS_CLEANUP_OK") })
+        assertFalse(transport.executedCommands.any { it.contains("systemctl stop") })
     }
 
     @Test
