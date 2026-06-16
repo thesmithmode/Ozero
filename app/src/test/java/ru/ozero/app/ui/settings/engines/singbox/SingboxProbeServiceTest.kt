@@ -108,11 +108,12 @@ class SingboxProbeServiceTest {
     }
 
     @Test
-    fun `probeAndAutoSelect marks profile failed when singbox runtime is busy`() = runTest {
+    fun `probeAndAutoSelect preserves latency when singbox runtime is busy`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
         val profile = makeProfile(id = 7L, host = "busy.example", port = 443)
+        dao.latencies[7L] = 31
 
         SingboxProbeService(
             dao,
@@ -121,7 +122,7 @@ class SingboxProbeServiceTest {
         )
             .probeAndAutoSelect(listOf(profile))
 
-        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[7L])
+        assertEquals(31, dao.latencies[7L])
         assertNull(prefsFlow.value[selectedProfileKey])
     }
 
@@ -275,7 +276,7 @@ class SingboxProbeServiceTest {
         ).probeAndAutoSelect(listOf(profile)) { id, testing -> events += id to testing }
 
         assertEquals(listOf(5L to true, 5L to false), events)
-        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[5L])
+        assertNull(dao.latencies[5L])
     }
 
     private fun makeProfile(
