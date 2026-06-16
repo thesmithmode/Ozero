@@ -122,7 +122,7 @@ object SingboxModule {
         override val engineId: EngineId = EngineId.SINGBOX
         override val changes = combine(
             dataStore.data,
-            profileDao.getAllFlow(),
+            profileDao.getAutoCandidatesFlow(MAX_SINGBOX_RUNTIME_PROFILE_SCAN),
             proxyChainDao.getAllFlow(),
         ) { prefs, profiles, chainSteps ->
             singboxRuntimeFingerprint(
@@ -136,4 +136,6 @@ object SingboxModule {
         override val replayAfterStarting: Boolean = true
         override val restartReason: String = "singbox profile changed while connected -> restart"
     }
+
+    private const val MAX_SINGBOX_RUNTIME_PROFILE_SCAN = 2_000
 }

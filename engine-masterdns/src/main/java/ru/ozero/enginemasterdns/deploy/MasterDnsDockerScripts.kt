@@ -31,11 +31,16 @@ internal object MasterDnsDockerScripts {
             case "${'$'}host" in
                 *:*) host="" ;;
             esac
+            local_ipv4() {
+                candidate="${'$'}1"
+                [ -n "${'$'}candidate" ] || return 1
+                ip -4 addr show 2>/dev/null | awk -v candidate="${'$'}candidate" '${'$'}1 == "inet" { split(${'$'}2, cidr, "/"); if (cidr[1] == candidate) found = 1 } END { exit(found ? 0 : 1) }'
+            }
             if [ -n "${'$'}host" ]; then
                 literal_ipv4=${'$'}(printf '%s\n' "${'$'}host" | awk '/^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+${'$'}/ { print; exit }')
-                [ -n "${'$'}literal_ipv4" ] && { printf '%s\n' "${'$'}literal_ipv4"; return 0; }
+                [ -n "${'$'}literal_ipv4" ] && local_ipv4 "${'$'}literal_ipv4" && { printf '%s\n' "${'$'}literal_ipv4"; return 0; }
                 resolved_ipv4=${'$'}(getent ahostsv4 "${'$'}host" 2>/dev/null | awk '{ print ${'$'}1; exit }')
-                [ -n "${'$'}resolved_ipv4" ] && { printf '%s\n' "${'$'}resolved_ipv4"; return 0; }
+                [ -n "${'$'}resolved_ipv4" ] && local_ipv4 "${'$'}resolved_ipv4" && { printf '%s\n' "${'$'}resolved_ipv4"; return 0; }
             fi
             ip route get 1.1.1.1 2>/dev/null |
                 awk '{ for (i = 1; i <= NF; i++) if (${'$'}i == "src" && $(i + 1) ~ /^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+${'$'}/) { print $(i + 1); exit } }'
@@ -43,8 +48,8 @@ internal object MasterDnsDockerScripts {
         publish_addr=${'$'}(publish_host_ip)
         [ -n "${'$'}publish_addr" ] || publish_addr=${'$'}(hostname -I 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if (${'$'}i ~ /^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+${'$'}/) { print ${'$'}i; exit } }')
         [ -n "${'$'}publish_addr" ] || publish_addr=0.0.0.0
-        docker_conflict() { { sudo docker ps --format '{{.Names}}|{{.Ports}}' 2>/dev/null; sudo docker ps -a --filter status=created --format '{{.Names}}|{{.Ports}}' 2>/dev/null; } | awk -F'|' '${'$'}1 != "masterdns-ozero" { split(${'$'}2, ports, ","); for (i in ports) { p=ports[i]; gsub(/^ +| +${'$'}/, "", p); if (p ~ /->53\/udp/) { proto=p; sub(/^.*->53\//, "", proto); sub(/ .*/, "", proto); host=p; sub(/->.*${'$'}/, "", host); addr=host; sub(/:53${'$'}/, "", addr); gsub(/^\[/, "", addr); gsub(/\]${'$'}/, "", addr); if (addr == "") addr="0.0.0.0"; print "PORT_BUSY|proto=" proto "|addr=" addr "|owner=docker:" ${'$'}1; exit } } } }'; }
-        ss_conflict() { proto="${'$'}1"; flags="${'$'}2"; sudo ss -H "${'$'}flags" 2>/dev/null | awk -v proto="${'$'}proto" 'function clean(addr) { gsub(/^\[/, "", addr); gsub(/\]${'$'}/, "", addr); sub(/%.*${'$'}/, "", addr); return addr } function ignored(addr) { return addr == "127.0.0.53" || addr == "127.0.0.54" || addr == "127.0.0.1" || addr == "::1" } { local=""; for (i = 1; i <= NF; i++) if (${'$'}i ~ /:53${'$'}/ || ${'$'}i ~ /\]:53${'$'}/) { local=${'$'}i; break } if (local == "") next; addr=local; sub(/:53${'$'}/, "", addr); addr=clean(addr); if (!ignored(addr)) { name="unknown"; if (match(${'$'}0, /"[^"]+"/)) name=substr(${'$'}0, RSTART + 1, RLENGTH - 2); print "PORT_BUSY|proto=" proto "|addr=" addr "|owner=" name; exit } }'; }
+        docker_conflict() { { sudo docker ps --format '{{.Names}}|{{.Ports}}' 2>/dev/null; sudo docker ps -a --filter status=created --format '{{.Names}}|{{.Ports}}' 2>/dev/null; } | awk -F'|' -v publish_addr="${'$'}publish_addr" 'function scoped(addr) { return addr == publish_addr || addr == "0.0.0.0" || addr == "*" || addr == "::" } ${'$'}1 != "masterdns-ozero" { split(${'$'}2, ports, ","); for (i in ports) { p=ports[i]; gsub(/^ +| +${'$'}/, "", p); if (p ~ /->53\/udp/) { proto=p; sub(/^.*->53\//, "", proto); sub(/ .*/, "", proto); host=p; sub(/->.*${'$'}/, "", host); addr=host; sub(/:53${'$'}/, "", addr); gsub(/^\[/, "", addr); gsub(/\]${'$'}/, "", addr); if (addr == "") addr="0.0.0.0"; if (scoped(addr)) { print "PORT_BUSY|proto=" proto "|addr=" addr "|owner=docker:" ${'$'}1; exit } } } } }'; }
+        ss_conflict() { proto="${'$'}1"; flags="${'$'}2"; sudo ss -H "${'$'}flags" 2>/dev/null | awk -v proto="${'$'}proto" -v publish_addr="${'$'}publish_addr" 'function clean(addr) { gsub(/^\[/, "", addr); gsub(/\]${'$'}/, "", addr); sub(/%.*${'$'}/, "", addr); return addr } function ignored(addr) { return addr == "127.0.0.53" || addr == "127.0.0.54" || addr == "127.0.0.1" || addr == "::1" } function scoped(addr) { return addr == publish_addr || addr == "0.0.0.0" || addr == "*" || addr == "::" } { local=""; for (i = 1; i <= NF; i++) if (${'$'}i ~ /:53${'$'}/ || ${'$'}i ~ /\]:53${'$'}/) { local=${'$'}i; break } if (local == "") next; addr=local; sub(/:53${'$'}/, "", addr); addr=clean(addr); if (!ignored(addr) && scoped(addr)) { name="unknown"; if (match(${'$'}0, /"[^"]+"/)) name=substr(${'$'}0, RSTART + 1, RLENGTH - 2); print "PORT_BUSY|proto=" proto "|addr=" addr "|owner=" name; exit } }'; }
         bind_probe() { proto="${'$'}1"; addr="${'$'}2"; py="${'$'}(command -v python3 2>/dev/null || command -v python 2>/dev/null)"; [ -n "${'$'}py" ] || return 0; sudo "${'$'}py" - "${'$'}proto" "${'$'}addr" <<'PY'
         import errno
         import socket
@@ -234,7 +239,7 @@ internal object MasterDnsDockerScripts {
             if [ "${'$'}{install_rc:-0}" -ne 0 ]; then \
                 echo "INSTALL_NONZERO_BUT_BINARY_FOUND|exit=${'$'}{install_rc:-0}"; \
             fi
-        RUN mkdir -p /etc/masterdnsvpn
+        RUN mkdir -p /etc/masterdnsvpn && ln -sf /etc/masterdnsvpn/server_config.toml /server_config.toml
         EXPOSE 53/udp
         CMD ["/usr/local/bin/masterdnsvpn-server"]
         EODF
@@ -291,16 +296,44 @@ internal object MasterDnsDockerScripts {
         esac
         sudo docker volume inspect masterdns-key >/dev/null 2>&1 ||
             sudo docker volume create masterdns-key >/dev/null
+        config_out=${'$'}(
+            sudo docker run --rm -v masterdns-key:/etc/masterdnsvpn masterdns-ozero sh -c '
+                set -eu
+                if [ ! -s /etc/masterdnsvpn/encrypt_key.txt ]; then
+                    openssl rand -hex 32 > /etc/masterdnsvpn/encrypt_key.txt
+                    chmod 600 /etc/masterdnsvpn/encrypt_key.txt
+                fi
+                if [ ! -s /etc/masterdnsvpn/server_config.toml ]; then
+                    cat > /etc/masterdnsvpn/server_config.toml <<EOF
+DOMAIN = []
+PROTOCOL_TYPE = "SOCKS5"
+UDP_PORT = 53
+DATA_ENCRYPTION_METHOD = 5
+ENCRYPTION_KEY_FILE = "/etc/masterdnsvpn/encrypt_key.txt"
+EOF
+                    chmod 600 /etc/masterdnsvpn/server_config.toml
+                fi
+                test -s /etc/masterdnsvpn/encrypt_key.txt
+                test -s /etc/masterdnsvpn/server_config.toml
+            ' 2>&1
+        )
+        config_rc=${'$'}?
+        if [ ${'$'}config_rc -ne 0 ]; then run_diag config_init ${'$'}config_rc "${'$'}config_out"; exit 0; fi
         publish_host_ip() {
             host="${'$'}server_host"
             case "${'$'}host" in
                 *:*) host="" ;;
             esac
+            local_ipv4() {
+                candidate="${'$'}1"
+                [ -n "${'$'}candidate" ] || return 1
+                ip -4 addr show 2>/dev/null | awk -v candidate="${'$'}candidate" '${'$'}1 == "inet" { split(${'$'}2, cidr, "/"); if (cidr[1] == candidate) found = 1 } END { exit(found ? 0 : 1) }'
+            }
             if [ -n "${'$'}host" ]; then
                 literal_ipv4=${'$'}(printf '%s\n' "${'$'}host" | awk '/^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+${'$'}/ { print; exit }')
-                [ -n "${'$'}literal_ipv4" ] && { printf '%s\n' "${'$'}literal_ipv4"; return 0; }
+                [ -n "${'$'}literal_ipv4" ] && local_ipv4 "${'$'}literal_ipv4" && { printf '%s\n' "${'$'}literal_ipv4"; return 0; }
                 resolved_ipv4=${'$'}(getent ahostsv4 "${'$'}host" 2>/dev/null | awk '{ print ${'$'}1; exit }')
-                [ -n "${'$'}resolved_ipv4" ] && { printf '%s\n' "${'$'}resolved_ipv4"; return 0; }
+                [ -n "${'$'}resolved_ipv4" ] && local_ipv4 "${'$'}resolved_ipv4" && { printf '%s\n' "${'$'}resolved_ipv4"; return 0; }
             fi
             ip route get 1.1.1.1 2>/dev/null |
                 awk '{ for (i = 1; i <= NF; i++) if (${'$'}i == "src" && $(i + 1) ~ /^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+${'$'}/) { print $(i + 1); exit } }'
@@ -321,21 +354,6 @@ internal object MasterDnsDockerScripts {
             sleep 1
         done
         if [ ${'$'}ready -ne 1 ]; then run_diag readiness 1 "container did not become ready"; exit 0; fi
-        key_out=${'$'}(
-            sudo docker exec masterdns-ozero sh -c \
-                'test -f /etc/masterdnsvpn/encrypt_key.txt || \
-                (openssl rand -hex 32 > /etc/masterdnsvpn/encrypt_key.txt && \
-                chmod 600 /etc/masterdnsvpn/encrypt_key.txt && exit 42)' 2>&1
-        )
-        rc=${'$'}?
-        if [ ${'$'}rc -ne 0 ] && [ ${'$'}rc -ne 42 ]; then run_diag key_init ${'$'}rc "${'$'}key_out"; exit 0; fi
-        if [ ${'$'}rc -eq 42 ]; then
-            sudo docker restart masterdns-ozero >/dev/null 2>&1 || {
-                restart_rc=${'$'}?
-                run_diag restart ${'$'}restart_rc "docker restart failed"
-                exit 0
-            }
-        fi
         echo RUN_OK
         """.trimIndent()
 

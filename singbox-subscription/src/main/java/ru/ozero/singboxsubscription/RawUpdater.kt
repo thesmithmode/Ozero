@@ -43,7 +43,7 @@ class RawUpdater(
                 val beans = Base64BundleParser.parse(body)
                     .ifEmpty { RawShareLinksParser.parse(body) }
 
-                val profiles = beans.mapIndexed { idx, bean ->
+                val profiles = beans.take(MAX_PROFILES_PER_GROUP).mapIndexed { idx, bean ->
                     ProxyProfile(
                         groupId = group.id,
                         name = bean.name.ifBlank { "Server ${idx + 1}" },
@@ -52,7 +52,7 @@ class RawUpdater(
                         userOrder = idx,
                     )
                 }
-                val existingProfiles = profileDao.getByGroupId(group.id)
+                val existingProfiles = profileDao.getAutoCandidatesByGroupId(group.id, MAX_PROFILES_PER_GROUP)
                 val incomingBaseKeyCounts = profiles
                     .groupingBy { it.stableBaseIdentityKey() }
                     .eachCount()
@@ -72,7 +72,7 @@ class RawUpdater(
                         existingByBaseIdentity[baseKey]?.removeFirstOrNull()
                     }
                     if (matched != null) {
-                        profile.copy(id = matched.id)
+                        profile.copy(id = matched.id, latencyMs = matched.latencyMs)
                     } else {
                         profile
                     }
@@ -111,6 +111,7 @@ class RawUpdater(
         const val PROTOCOL_SHADOWSOCKS = 3
 
         private const val USER_AGENT = "Ozero/1 sing-box-subscription"
+        private const val MAX_PROFILES_PER_GROUP = 2_000
 
         private fun normalizeError(e: Throwable): Throwable = when {
             e is SSLHandshakeException && e.message?.contains("Chain validation failed", ignoreCase = true) == true ->

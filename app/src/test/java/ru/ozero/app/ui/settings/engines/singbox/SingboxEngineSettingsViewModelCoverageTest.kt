@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -268,7 +269,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
-    fun `chain profile ids filter missing profiles from state`() = runTest {
+    fun `chain profile ids keep profiles outside visible state`() = runTest {
         val harness = Harness(
             initialProfiles = listOf(
                 profile(id = 10L, groupId = 1L, name = "First", userOrder = 0),
@@ -283,7 +284,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
 
-        assertEquals(listOf(10L, 20L), harness.viewModel.state.value.chainProfileIds)
+        assertEquals(listOf(10L, 99L, 20L), harness.viewModel.state.value.chainProfileIds)
     }
 
     @Test
@@ -568,6 +569,23 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
+    fun `import from file caps profiles inserted from huge input`() = runTest {
+        val harness = Harness()
+        val links = (1..2_001).joinToString("\n") { index ->
+            "vless://12345678-1234-1234-1234-${index.toString().padStart(12, '0')}" +
+                "@host-$index.example.com:443?type=tcp#P$index"
+        }
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+
+        harness.viewModel.onImportFromFile(links, "huge.txt")
+        advanceUntilIdle()
+
+        assertEquals("huge", harness.insertedGroups.single().name)
+        assertEquals(2_000, harness.profileDao.insertedProfiles.size)
+    }
+
+    @Test
     fun `onPing ignores empty groups and clears previous pinging state`() = runTest {
         val harness = Harness(initialGroups = listOf(group(id = 1L, userOrder = 0)))
         harness.startStateCollection(backgroundScope)
@@ -601,6 +619,25 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
         assertNull(harness.viewModel.state.value.expandedGroupId)
         coVerify(exactly = 0) { harness.rawUpdater.refresh(any()) }
+    }
+
+    @Test
+    fun `state and expanded group cap visible profile lists`() = runTest {
+        val profiles = (1L..600L).map { id ->
+            profile(id = id, groupId = 1L, name = "P$id", userOrder = id.toInt())
+        }
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0)),
+            initialProfiles = profiles,
+        )
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+
+        harness.viewModel.onGroupExpand(1L)
+        advanceUntilIdle()
+
+        assertEquals(500, harness.viewModel.state.value.allProfiles.size)
+        assertEquals(500, harness.viewModel.state.value.groupProfiles.getValue(1L).size)
     }
 
     @Test
@@ -710,6 +747,24 @@ class SingboxEngineSettingsViewModelCoverageTest {
         assertEquals(listOf("One.example.com", "Two.example.com"), harness.probeCalls.sorted())
         assertEquals(listOf(101L), harness.viewModel.state.value.groupProfiles.getValue(1L).map { it.id })
         assertFalse(harness.viewModel.state.value.isAutoSelecting)
+    }
+
+    @Test
+    fun `onAutoSelectBest caps probe candidates`() = runTest {
+        val profiles = (1L..70L).map { id ->
+            profile(id = id, groupId = 1L, name = "P$id", userOrder = id.toInt())
+        }
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0)),
+            initialProfiles = profiles,
+        )
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+
+        harness.viewModel.onAutoSelectBest()
+        advanceUntilIdle()
+
+        assertEquals(50, harness.probeCalls.size)
     }
 
     @Test
@@ -960,11 +1015,23 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
         override fun getAllFlow(): Flow<List<ProxyProfile>> = flow
 
+        override fun getAllLimitedFlow(limit: Int): Flow<List<ProxyProfile>> =
+            flow.map { it.take(limit) }
+
+        override fun getAutoCandidatesFlow(limit: Int): Flow<List<ProxyProfile>> =
+            flow.map { it.sortedByAutoPriority().take(limit) }
+
         override fun getByGroupIdFlow(groupId: Long): Flow<List<ProxyProfile>> =
             MutableStateFlow(flow.value.filter { it.groupId == groupId })
 
         override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> =
             flow.value.filter { it.groupId == groupId }
+
+        override suspend fun getByGroupIdLimited(groupId: Long, limit: Int): List<ProxyProfile> =
+            flow.value.filter { it.groupId == groupId }.take(limit)
+
+        override suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile> =
+            flow.value.filter { it.groupId == groupId }.sortedByAutoPriority().take(limit)
 
         override suspend fun getById(id: Long): ProxyProfile? = flow.value.find { it.id == id }
 
@@ -1020,6 +1087,21 @@ class SingboxEngineSettingsViewModelCoverageTest {
         override suspend fun delete(profile: ProxyProfile) {
             flow.value = flow.value.filterNot { it.id == profile.id }
         }
+
+        private fun List<ProxyProfile>.sortedByAutoPriority(): List<ProxyProfile> =
+            sortedWith(
+                compareBy<ProxyProfile> {
+                    when {
+                        it.latencyMs >= 0 -> 0
+                        it.latencyMs == -1 -> 1
+                        else -> 2
+                    }
+                }
+                    .thenBy { if (it.latencyMs >= 0) it.latencyMs else it.userOrder }
+                    .thenBy { it.groupId }
+                    .thenBy { it.userOrder }
+                    .thenBy { it.id },
+            )
     }
 
     private inner class RecordingProxyChainDao(

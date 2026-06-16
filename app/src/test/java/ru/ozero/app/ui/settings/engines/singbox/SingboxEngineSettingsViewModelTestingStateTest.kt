@@ -54,7 +54,7 @@ class SingboxEngineSettingsViewModelTestingStateTest {
         val probeService = mockk<SingboxProbeService>(relaxed = true)
 
         every { groupDao.getAllFlow() } returns emptyFlow()
-        every { profileDao.getAllFlow() } returns emptyFlow()
+        every { profileDao.getAllLimitedFlow(500) } returns emptyFlow()
         every { proxyChainDao.getAllFlow() } returns emptyFlow()
 
         return SingboxEngineSettingsViewModel(

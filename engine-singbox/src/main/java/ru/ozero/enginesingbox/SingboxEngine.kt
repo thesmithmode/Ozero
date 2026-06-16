@@ -85,9 +85,9 @@ class SingboxEngine @Inject constructor(
             }
         }
         engineScope.launch {
-            profileDao.getAllFlow().collect { profiles ->
+            profileDao.getAutoCandidatesFlow(MAX_AUTO_PROFILE_SCAN).collect { profiles ->
                 cachedProfilesById = profiles.associateBy { it.id }
-                cachedAutoBlobs = profiles.map { it.beanBlob }
+                cachedAutoBlobs = autoSelectBlobWindow(profiles)
             }
         }
         engineScope.launch {
@@ -198,7 +198,7 @@ class SingboxEngine @Inject constructor(
             .onFailure { PersistentLoggers.warn(TAG, "beanBlob deserialize: ${it.message}") }
             .getOrNull() ?: return null
         val wrappers = chainWrapperBeans(config)
-        if (!ConfigBuilder.isSupportedBean(bean)) {
+        if (!ConfigBuilder.isSupportedBean(bean) || !bean.hasRoutableServerAddress()) {
             val fallbackBeans = supportedBeans(cachedAutoBlobs).take(MAX_AUTO_SELECT_OUTBOUNDS)
             if (fallbackBeans.isEmpty()) {
                 PersistentLoggers.warn(TAG, "selected bean unsupported and no supported fallback profiles")
@@ -246,7 +246,7 @@ class SingboxEngine @Inject constructor(
         } else {
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
                 .getOrElse { return StartResult.Failure("chain deserialize: ${it.message}") }
-            if (!ConfigBuilder.isSupportedBean(bean)) {
+            if (!ConfigBuilder.isSupportedBean(bean) || !bean.hasRoutableServerAddress()) {
                 val fallbackBeans = supportedBeans(cachedAutoBlobs).take(MAX_AUTO_SELECT_OUTBOUNDS)
                 if (fallbackBeans.isEmpty()) return StartResult.Failure("chain selected transport unsupported")
                 runCatching { ConfigBuilder.buildAutoChainConfig(fallbackBeans, port, upstream) }
@@ -451,8 +451,9 @@ class SingboxEngine @Inject constructor(
         if (cachedSelectedProfileId == SELECTED_AUTO) {
             val blobs = cachedAutoBlobs.ifEmpty {
                 runBlocking(Dispatchers.IO) {
-                    profileDao.getAllFlow().first()
-                }.map { it.beanBlob }
+                    profileDao.getAutoCandidatesFlow(MAX_AUTO_PROFILE_SCAN).first()
+                }
+                    .let { profiles -> autoSelectBlobWindow(profiles) }
             }
             if (blobs.isEmpty()) return null
             return EngineConfig.Singbox(
@@ -461,9 +462,10 @@ class SingboxEngine @Inject constructor(
                 autoSelectBeanBlobs = blobs,
             )
         }
-        val blob = cachedSelectedProfileId
+        val selectedProfile = cachedSelectedProfileId
             ?.takeIf { it != SELECTED_AUTO }
-            ?.let { cachedProfilesById[it]?.beanBlob }
+            ?.let { cachedProfilesById[it] ?: resolveProfileByIdBlocking(it) }
+        val blob = selectedProfile?.beanBlob
             ?: cachedBlob
             ?: return null
         val type = runCatching {
@@ -484,7 +486,7 @@ class SingboxEngine @Inject constructor(
         if (selected == SELECTED_AUTO) return emptyList()
         return cachedChainProfileIds
             .filter { it != selected }
-            .mapNotNull { cachedProfilesById[it]?.beanBlob }
+            .mapNotNull { id -> cachedProfilesById[id]?.beanBlob ?: resolveProfileByIdBlocking(id)?.beanBlob }
     }
 
     private fun chainWrapperBeans(config: EngineConfig.Singbox): List<AbstractBean> =
@@ -492,7 +494,7 @@ class SingboxEngine @Inject constructor(
             runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
                 .onFailure { PersistentLoggers.warn(TAG, "chain bean deserialize: ${it.message}") }
                 .getOrNull()
-                ?.takeIf { ConfigBuilder.isSupportedBean(it) }
+                ?.takeIf { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
         }
 
     private fun supportedBeans(blobs: List<ByteArray>): List<AbstractBean> =
@@ -500,8 +502,34 @@ class SingboxEngine @Inject constructor(
             runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
                 .onFailure { e -> PersistentLoggers.warn(TAG, "bean deserialize: ${e.message}") }
                 .getOrNull()
-                ?.takeIf { ConfigBuilder.isSupportedBean(it) }
+                ?.takeIf { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
         }
+
+    private fun isSupportedRoutableBlob(blob: ByteArray): Boolean =
+        runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
+            .getOrNull()
+            ?.let { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
+            ?: false
+
+    private fun autoSelectBlobWindow(profiles: List<ProxyProfile>): List<ByteArray> =
+        profiles
+            .filter { isSupportedRoutableBlob(it.beanBlob) }
+            .let { supported -> prioritizeSingboxAutoProfiles(supported, MAX_AUTO_SELECT_OUTBOUNDS) }
+            .map { it.beanBlob }
+
+    private fun resolveProfileByIdBlocking(id: Long): ProxyProfile? =
+        runBlocking(Dispatchers.IO) { profileDao.getById(id) }
+
+    private fun AbstractBean.hasRoutableServerAddress(): Boolean {
+        val host = serverAddress.trim().trim('[', ']').lowercase()
+        return host.isNotEmpty() &&
+            host != "localhost" &&
+            host != "0.0.0.0" &&
+            host != "::" &&
+            host != "::0" &&
+            host != "::1" &&
+            !host.startsWith("127.")
+    }
 
     private fun protocolTypeOf(bean: AbstractBean): Int = when (bean) {
         is VLESSBean -> PROTOCOL_VLESS
@@ -625,6 +653,7 @@ class SingboxEngine @Inject constructor(
         private const val READY_PROBE_ATTEMPTS = 5
         private const val READY_PROBE_RETRY_MS = 500L
         private const val MAX_AUTO_SELECT_OUTBOUNDS = 50
+        private const val MAX_AUTO_PROFILE_SCAN = 2_000
         private const val CHAIN_PORT_BASE = 49408
         private const val CHAIN_PORT_RANGE = 256
         private val chainPortCounter = java.util.concurrent.atomic.AtomicInteger(0)

@@ -35,11 +35,27 @@ class FakeProxyProfileDao : ProxyProfileDao {
     override fun getAllFlow(): Flow<List<ProxyProfile>> =
         flowOf(profiles.sortedWith(compareBy<ProxyProfile> { it.groupId }.thenBy { it.userOrder }.thenBy { it.id }))
 
+    override fun getAllLimitedFlow(limit: Int): Flow<List<ProxyProfile>> =
+        flowOf(
+            profiles
+                .sortedWith(compareBy<ProxyProfile> { it.groupId }.thenBy { it.userOrder }.thenBy { it.id })
+                .take(limit),
+        )
+
+    override fun getAutoCandidatesFlow(limit: Int): Flow<List<ProxyProfile>> =
+        flowOf(profiles.sortedByAutoPriority().take(limit))
+
     override fun getByGroupIdFlow(groupId: Long): Flow<List<ProxyProfile>> =
         flowOf(profiles.filter { it.groupId == groupId })
 
     override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> =
         profiles.filter { it.groupId == groupId }
+
+    override suspend fun getByGroupIdLimited(groupId: Long, limit: Int): List<ProxyProfile> =
+        profiles.filter { it.groupId == groupId }.take(limit)
+
+    override suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile> =
+        profiles.filter { it.groupId == groupId }.sortedByAutoPriority().take(limit)
 
     override suspend fun deleteByGroupId(groupId: Long) {
         profiles.removeAll { it.groupId == groupId }
@@ -69,4 +85,19 @@ class FakeProxyProfileDao : ProxyProfileDao {
     override suspend fun delete(profile: ProxyProfile) {
         profiles.removeAll { it.id == profile.id }
     }
+
+    private fun List<ProxyProfile>.sortedByAutoPriority(): List<ProxyProfile> =
+        sortedWith(
+            compareBy<ProxyProfile> {
+                when {
+                    it.latencyMs >= 0 -> 0
+                    it.latencyMs == -1 -> 1
+                    else -> 2
+                }
+            }
+                .thenBy { if (it.latencyMs >= 0) it.latencyMs else it.userOrder }
+                .thenBy { it.groupId }
+                .thenBy { it.userOrder }
+                .thenBy { it.id },
+        )
 }

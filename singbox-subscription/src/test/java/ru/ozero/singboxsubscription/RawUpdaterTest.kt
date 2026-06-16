@@ -86,6 +86,22 @@ class RawUpdaterTest {
     }
 
     @Test
+    fun `should cap huge raw subscriptions before replacing group profiles`() = runBlocking {
+        val links = (1..2_001).joinToString("\n") { index ->
+            "vless://12345678-1234-1234-1234-${index.toString().padStart(12, '0')}" +
+                "@s$index.example.com:443?type=tcp&security=none#S$index"
+        }
+        server.enqueue(MockResponse().setBody(links))
+        val g = group()
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isSuccess)
+        assertEquals(2_000, result.getOrNull())
+        assertEquals(2_000, profileDao.profiles.size)
+    }
+
+    @Test
     fun `should fetch clash yaml and insert profiles`() = runBlocking {
         server.enqueue(
             MockResponse().setBody(
@@ -446,6 +462,24 @@ class RawUpdaterTest {
 
         assertEquals(first.id, second.id)
         assertEquals("Renamed", second.name)
+    }
+
+    @Test
+    fun `should preserve profile latency when matched server refreshes`() = runBlocking {
+        server.enqueue(MockResponse().setBody(vless1))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val first = profileDao.profiles.single()
+        profileDao.profiles[0] = first.copy(latencyMs = 123)
+
+        server.enqueue(MockResponse().setBody(vless1RotatedRuntime))
+        rawUpdater.refresh(g)
+
+        val refreshed = profileDao.profiles.single()
+        assertEquals(first.id, refreshed.id)
+        assertEquals(123, refreshed.latencyMs)
+        assertTrue(!first.beanBlob.contentEquals(refreshed.beanBlob))
     }
 
     @Test

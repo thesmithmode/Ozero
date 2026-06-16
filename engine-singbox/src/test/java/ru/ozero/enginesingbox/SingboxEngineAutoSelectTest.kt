@@ -92,10 +92,18 @@ class SingboxEngineAutoSelectTest {
         object : ProxyProfileDao {
             private val allProfiles = profilesByGroup.values.flatten()
             override fun getAllFlow(): Flow<List<ProxyProfile>> = MutableStateFlow(allProfiles)
+            override fun getAllLimitedFlow(limit: Int): Flow<List<ProxyProfile>> =
+                MutableStateFlow(allProfiles.take(limit))
+            override fun getAutoCandidatesFlow(limit: Int): Flow<List<ProxyProfile>> =
+                MutableStateFlow(allProfiles.sortedByAutoPriority().take(limit))
             override fun getByGroupIdFlow(groupId: Long): Flow<List<ProxyProfile>> =
                 MutableStateFlow(profilesByGroup[groupId] ?: emptyList())
             override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> =
                 profilesByGroup[groupId] ?: emptyList()
+            override suspend fun getByGroupIdLimited(groupId: Long, limit: Int): List<ProxyProfile> =
+                profilesByGroup[groupId]?.take(limit) ?: emptyList()
+            override suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile> =
+                profilesByGroup[groupId]?.sortedByAutoPriority()?.take(limit) ?: emptyList()
             override suspend fun getById(id: Long): ProxyProfile? = allProfiles.find { it.id == id }
             override suspend fun insert(profile: ProxyProfile): Long = profile.id
             override suspend fun insertAll(profiles: List<ProxyProfile>) {}
@@ -110,6 +118,21 @@ class SingboxEngineAutoSelectTest {
                 profilesByGroup[groupId]?.size ?: 0
             override suspend fun update(profile: ProxyProfile) {}
             override suspend fun delete(profile: ProxyProfile) {}
+
+            private fun List<ProxyProfile>.sortedByAutoPriority(): List<ProxyProfile> =
+                sortedWith(
+                    compareBy<ProxyProfile> {
+                        when {
+                            it.latencyMs >= 0 -> 0
+                            it.latencyMs == -1 -> 1
+                            else -> 2
+                        }
+                    }
+                        .thenBy { if (it.latencyMs >= 0) it.latencyMs else it.userOrder }
+                        .thenBy { it.groupId }
+                        .thenBy { it.userOrder }
+                        .thenBy { it.id },
+                )
         }
 
     private fun fakeProxyChainDao(profileIds: List<Long> = emptyList()): ProxyChainDao =
@@ -262,6 +285,68 @@ class SingboxEngineAutoSelectTest {
         assertNotNull(result)
         assertTrue(result is EngineConfig.Singbox)
         assertEquals(3, result.autoSelectBeanBlobs.size)
+    }
+
+    @Test
+    fun `auto mode prioritizes known working profiles beyond first runtime window`() {
+        val profiles = (1L..80L).map { id ->
+            makeProfile(id, 1L, "s$id.example.com", 443).copy(
+                userOrder = id.toInt(),
+                latencyMs = if (id == 70L) 10 else -1,
+            )
+        }
+        val prefs = mutablePreferencesOf(selectedProfileKey to SingboxEngine.SELECTED_AUTO)
+        val engine = buildEngine(prefs = prefs, profilesByGroup = mapOf(1L to profiles))
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNotNull(result)
+        assertTrue(result is EngineConfig.Singbox)
+        assertEquals(50, result.autoSelectBeanBlobs.size)
+        assertTrue(result.autoSelectBeanBlobs.first().contentEquals(profiles[69].beanBlob))
+        assertTrue(result.autoSelectBeanBlobs.any { it.contentEquals(profiles.first().beanBlob) })
+    }
+
+    @Test
+    fun `auto mode does not depend on first database scan window`() {
+        val profiles = (1L..2_100L).map { id ->
+            makeProfile(id, 1L, "s$id.example.com", 443).copy(
+                userOrder = id.toInt(),
+                latencyMs = if (id == 2_100L) 7 else -1,
+            )
+        }
+        val prefs = mutablePreferencesOf(selectedProfileKey to SingboxEngine.SELECTED_AUTO)
+        val engine = buildEngine(prefs = prefs, profilesByGroup = mapOf(1L to profiles))
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNotNull(result)
+        assertTrue(result is EngineConfig.Singbox)
+        assertTrue(result.autoSelectBeanBlobs.first().contentEquals(profiles.last().beanBlob))
+    }
+
+    @Test
+    fun `auto mode skips localhost candidates before building config`() {
+        val profiles = listOf(
+            makeProfile(1L, 1L, "localhost", 443),
+            makeProfile(2L, 1L, "127.0.0.1", 443),
+            makeProfile(3L, 1L, "remote.example.com", 443),
+        )
+        val prefs = mutablePreferencesOf(selectedProfileKey to SingboxEngine.SELECTED_AUTO)
+        val engine = buildEngine(prefs = prefs, profilesByGroup = mapOf(1L to profiles))
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNotNull(result)
+        assertTrue(result is EngineConfig.Singbox)
+        assertEquals(1, result.autoSelectBeanBlobs.size)
+        assertTrue(result.autoSelectBeanBlobs.single().contentEquals(profiles[2].beanBlob))
+        val start = kotlinx.coroutines.runBlocking { engine.start(result, ru.ozero.enginescore.Upstream.None) }
+        assertTrue(start is ru.ozero.enginescore.StartResult.Failure)
+        assertTrue(!start.reason.contains("failed to build sing-box config"))
     }
 
     @Test
