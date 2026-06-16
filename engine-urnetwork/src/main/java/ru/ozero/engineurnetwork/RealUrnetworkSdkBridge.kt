@@ -372,7 +372,7 @@ class RealUrnetworkSdkBridge(
         val cv = connectVcRef.get() ?: return
         runCatching { cv.connectBestAvailable() }
             .onSuccess {
-                persistConnectLocation(bestAvailableConnectLocation())
+                persistLocalConnectLocation(bestAvailableConnectLocation())
                 connectIssuedRef.set(true)
             }
             .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
@@ -553,15 +553,24 @@ class RealUrnetworkSdkBridge(
 
     private fun persistConnectLocation(location: ConnectLocation) {
         val device = deviceRef.get()
+        persistLocalConnectLocation(location)
+        runCatching { device?.connectLocation = location }
+            .onFailure { PersistentLoggers.warn(TAG, "device connectLocation threw: ${it.message}") }
+        runCatching { device?.defaultLocation = location }
+            .onFailure { PersistentLoggers.warn(TAG, "device defaultLocation threw: ${it.message}") }
+    }
+
+    private fun persistObservedConnectLocation(location: ConnectLocation) {
+        persistLocalConnectLocation(location)
+    }
+
+    private fun persistLocalConnectLocation(location: ConnectLocation) {
+        val device = deviceRef.get()
         val localState = runCatching { device?.networkSpace?.asyncLocalState?.localState }.getOrNull()
         runCatching { localState?.connectLocation = location }
             .onFailure { PersistentLoggers.warn(TAG, "persist connectLocation threw: ${it.message}") }
         runCatching { localState?.defaultLocation = location }
             .onFailure { PersistentLoggers.warn(TAG, "persist defaultLocation threw: ${it.message}") }
-        runCatching { device?.connectLocation = location }
-            .onFailure { PersistentLoggers.warn(TAG, "device connectLocation threw: ${it.message}") }
-        runCatching { device?.defaultLocation = location }
-            .onFailure { PersistentLoggers.warn(TAG, "device defaultLocation threw: ${it.message}") }
     }
 
     private fun ConnectLocation.isMeaningfulConnectLocation(): Boolean =
@@ -715,7 +724,7 @@ class RealUrnetworkSdkBridge(
     private fun refreshSelectedLocation(cv: ConnectViewController?) {
         val location = runCatching { cv?.selectedLocation }.getOrNull() ?: return
         if (location.isMeaningfulConnectLocation()) {
-            persistConnectLocation(location)
+            persistObservedConnectLocation(location)
         }
     }
 
@@ -814,7 +823,16 @@ class RealUrnetworkSdkBridge(
     override suspend fun fetchNetworkReliability() = apiHelper.fetchNetworkReliability()
     override suspend fun fetchReferralCount() = apiHelper.fetchReferralCount()
 
-    override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult {
+    override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult =
+        attachTun(tunFd, issueConsumerConnect = true)
+
+    override suspend fun attachRelayTun(tunFd: Int): UrnetworkSdkBridge.AttachResult =
+        attachTun(tunFd, issueConsumerConnect = false)
+
+    private suspend fun attachTun(
+        tunFd: Int,
+        issueConsumerConnect: Boolean,
+    ): UrnetworkSdkBridge.AttachResult {
         if (tunFd < 0) {
             return UrnetworkSdkBridge.AttachResult.Failed("invalid fd=$tunFd")
         }
@@ -822,13 +840,16 @@ class RealUrnetworkSdkBridge(
             ?: return UrnetworkSdkBridge.AttachResult.Failed("attachTun called outside coroutine context")
         attachJobRef.set(myJob)
         return try {
-            lifecycleMutex.withLock { attachTunUnderLock(tunFd) }
+            lifecycleMutex.withLock { attachTunUnderLock(tunFd, issueConsumerConnect) }
         } finally {
             attachJobRef.compareAndSet(myJob, null)
         }
     }
 
-    private suspend fun attachTunUnderLock(tunFd: Int): UrnetworkSdkBridge.AttachResult {
+    private suspend fun attachTunUnderLock(
+        tunFd: Int,
+        issueConsumerConnect: Boolean,
+    ): UrnetworkSdkBridge.AttachResult {
         if (!running.get()) {
             return UrnetworkSdkBridge.AttachResult.Failed("bridge stopped - attachTun aborted")
         }
@@ -865,16 +886,20 @@ class RealUrnetworkSdkBridge(
                     .onFailure { PersistentLoggers.warn(TAG, "setTunnelStarted(true) threw: ${it.message}") }
                 val providePausedNow = runCatching { device.providePaused }.getOrNull()
                 Log.i(TAG, "tunnelStarted fd=$tunFd providePaused=$providePausedNow")
-                val preferred = preferredLocationRef.get()
-                if (preferred != null) {
-                    Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted preferredLocation=${preferred.summary()}")
-                    preferredLocationConnector.connect(preferred, capturedDevice, cv)
-                    connectIssuedRef.set(true)
+                if (issueConsumerConnect) {
+                    val preferred = preferredLocationRef.get()
+                    if (preferred != null) {
+                        Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted preferredLocation=${preferred.summary()}")
+                        preferredLocationConnector.connect(preferred, capturedDevice, cv)
+                        connectIssuedRef.set(true)
+                    } else {
+                        runCatching { cv.connectBestAvailable() }
+                            .onSuccess { connectIssuedRef.set(true) }
+                            .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
+                        Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted connectBestAvailable called")
+                    }
                 } else {
-                    runCatching { cv.connectBestAvailable() }
-                        .onSuccess { connectIssuedRef.set(true) }
-                        .onFailure { PersistentLoggers.warn(TAG, "connectBestAvailable threw: ${it.message}") }
-                    Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted connectBestAvailable called")
+                    Log.i(TAG, "IoLoop fd=$tunFd tunnelStarted relay attach")
                 }
                 UrnetworkSdkBridge.AttachResult.Success
             } catch (t: Throwable) {

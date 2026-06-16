@@ -228,11 +228,11 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `connectBestAvailable вызывается после успешного start`() = relayTest {
+    fun `relay не вызывает consumer connect после успешного start`() = relayTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        assertEquals(1, bridge.connectBestAvailableCalls)
+        assertEquals(0, bridge.connectBestAvailableCalls)
     }
 
     @Test
@@ -258,22 +258,25 @@ class UrnetworkRelayCoordinatorTest {
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
         assertEquals(1, bridge.startCalls)
-        assertEquals(1, bridge.connectBestAvailableCalls)
+        assertEquals(0, bridge.connectBestAvailableCalls)
+        assertEquals(1, bridge.attachRelayTunCalls)
     }
 
     @Test
-    fun `relay при смене WARP на ByeDPI перезапускается с connectBestAvailable`() = relayTest {
+    fun `relay при смене WARP на ByeDPI перезапускается без consumer connect`() = relayTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.WARP, socksPort = 0)
         assertEquals(1, bridge.startCalls)
-        assertEquals(1, bridge.connectBestAvailableCalls)
+        assertEquals(0, bridge.connectBestAvailableCalls)
+        assertEquals(1, bridge.attachRelayTunCalls)
 
         bridge.running = true
         tunnelStateFlow.value = TunnelState.Idle
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
         assertEquals(2, bridge.startCalls)
-        assertEquals(2, bridge.connectBestAvailableCalls)
+        assertEquals(0, bridge.connectBestAvailableCalls)
+        assertEquals(2, bridge.attachRelayTunCalls)
     }
 
     @Test
@@ -282,7 +285,8 @@ class UrnetworkRelayCoordinatorTest {
         tunnelStateFlow.value = TunnelState.Connected(EngineId.WARP, socksPort = 0)
 
         assertEquals(1, bridge.startCalls)
-        assertEquals(1, bridge.attachTunCalls, "dummy IoLoop должен быть создан после start")
+        assertEquals(0, bridge.attachTunCalls, "relay dummy IoLoop не должен идти через consumer attachTun")
+        assertEquals(1, bridge.attachRelayTunCalls, "dummy IoLoop должен быть создан после start")
     }
 
     @Test
@@ -294,7 +298,7 @@ class UrnetworkRelayCoordinatorTest {
         advanceTimeBy(35_000L)
         runCurrent()
 
-        assertEquals(0, bridge.attachTunCalls)
+        assertEquals(0, bridge.attachRelayTunCalls)
     }
 
     @Test
@@ -345,7 +349,7 @@ class UrnetworkRelayCoordinatorTest {
             setByClientJwt("test-jwt")
             tunnelStateFlow.value = TunnelState.Connected(EngineId.WARP, socksPort = 0)
 
-            assertEquals(1, bridge.attachTunCalls)
+            assertEquals(1, bridge.attachRelayTunCalls)
             assertEquals(1, pipe.closeCalls)
         }
     }
@@ -409,6 +413,7 @@ class UrnetworkRelayCoordinatorTest {
         var startResult: UrnetworkSdkBridge.StartResult = UrnetworkSdkBridge.StartResult.Success
         var attachResult: UrnetworkSdkBridge.AttachResult = UrnetworkSdkBridge.AttachResult.Success
         var attachTunCalls = 0
+        var attachRelayTunCalls = 0
         var diagnosticsResult: String = "running=true"
         var lastControlMode: UrnetworkProvideControlMode? = null
         var lastNetworkMode: UrnetworkProvideNetworkMode? = null
@@ -429,6 +434,10 @@ class UrnetworkRelayCoordinatorTest {
         override fun isRunning() = running
         override suspend fun attachTun(tunFd: Int): UrnetworkSdkBridge.AttachResult {
             attachTunCalls++
+            return attachResult
+        }
+        override suspend fun attachRelayTun(tunFd: Int): UrnetworkSdkBridge.AttachResult {
+            attachRelayTunCalls++
             return attachResult
         }
         override fun connectTo(location: UrnetworkSdkBridge.LocationToken) = Unit

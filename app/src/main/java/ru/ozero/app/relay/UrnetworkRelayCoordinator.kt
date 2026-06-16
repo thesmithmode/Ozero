@@ -114,8 +114,6 @@ class UrnetworkRelayCoordinator(
                 .getOrDefault(UrnetworkProvideNetworkMode.WIFI)
             runCatching { bridge.setProvideNetworkMode(networkMode) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: setProvideNetworkMode threw: ${it.message}") }
-            runCatching { bridge.connectBestAvailable() }
-                .onFailure { PersistentLoggers.warn(TAG, "mesh session: connectBestAvailable threw: ${it.message}") }
             runCatching { networkMonitor?.start(networkMode, provideEnabled) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: networkMonitor threw: ${it.message}") }
             if (provideEnabled) {
@@ -139,7 +137,7 @@ class UrnetworkRelayCoordinator(
         try {
             val pipe = pipeFactory.create()
             pipeWriteEndRef.set(pipe.writeEnd)
-            val attachResult = bridge.attachTun(pipe.readFd)
+            val attachResult = bridge.attachRelayTun(pipe.readFd)
             if (attachResult is UrnetworkSdkBridge.AttachResult.Success) {
                 PersistentLoggers.info(TAG, "mesh session: dummy IoLoop attached (upstream offline-mode pattern)")
             } else {

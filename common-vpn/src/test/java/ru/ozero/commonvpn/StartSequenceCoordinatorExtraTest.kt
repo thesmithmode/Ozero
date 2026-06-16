@@ -8,6 +8,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -161,6 +162,38 @@ class StartSequenceCoordinatorExtraTest {
             id = EngineId.MASTERDNS,
             preflightResult = EnginePreflight.Result.Ok,
             socksPort = 2132,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            rejected,
+            accepted,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.PROXY,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.WARP, EngineId.MASTERDNS),
+            ),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(0, rejected.startedConfigs.size)
+        assertEquals(1, accepted.startedConfigs.size)
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+        assertFalse(fixture.stopRequested.get())
+    }
+
+    @Test
+    fun `auto preflight hard timeout skips candidate and starts next accepted candidate`() = runTest {
+        val rejected = FakeEnginePlugin(
+            id = EngineId.WARP,
+            preflightResult = EnginePreflight.Result.Ok,
+            preflightDelayMs = StartSequenceCoordinator.PREFLIGHT_HARD_TIMEOUT_MS + 1,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val accepted = FakeEnginePlugin(
+            id = EngineId.MASTERDNS,
+            preflightResult = EnginePreflight.Result.Ok,
+            socksPort = 2133,
             capabilities = standaloneProxyCapabilities(),
         )
         val fixture = startFixture(
@@ -1468,6 +1501,38 @@ class StartSequenceCoordinatorExtraTest {
     }
 
     @Test
+    fun `auto tun first candidate chain exception resets probing state before next candidate`() = runTest {
+        val first = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            startThrows = true,
+            capabilities = tunnelCapabilities(),
+        )
+        val second = FakeEnginePlugin(
+            id = EngineId.MASTERDNS,
+            socksPort = 2158,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            first,
+            second,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.BYEDPI, EngineId.MASTERDNS),
+            ),
+        )
+        fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(1, first.startedConfigs.size)
+        assertEquals(1, second.startedConfigs.size)
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+        assertFalse(fixture.stopRequested.get())
+    }
+
+    @Test
     fun `auto tun first candidate establish null resets after probing failure`() = runTest {
         val first = FakeEnginePlugin(
             id = EngineId.BYEDPI,
@@ -2174,12 +2239,15 @@ class StartSequenceCoordinatorExtraTest {
         private val readyResult: EnginePlugin.ReadyResult = EnginePlugin.ReadyResult.Ready,
         private val preflightResult: EnginePreflight.Result? = null,
         private val preflightThrows: Boolean = false,
+        private val preflightDelayMs: Long = 0L,
+        private val startThrows: Boolean = false,
     ) : EnginePlugin {
         val startedConfigs = mutableListOf<EngineConfig>()
         var stopCalls = 0
 
         override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
             startedConfigs += config
+            if (startThrows) error("chain start down")
             return startResult
         }
 
@@ -2194,11 +2262,17 @@ class StartSequenceCoordinatorExtraTest {
         override fun buildProxyConfig(settings: SettingsModel?): EngineConfig? = engineConfig()
         override fun preflight(): EnginePreflight? = preflightResult?.let { result ->
             EnginePreflight { _ ->
+                if (preflightDelayMs > 0L) delay(preflightDelayMs)
                 if (preflightThrows) error("preflight down")
                 result
             }
         } ?: if (preflightThrows) {
             EnginePreflight { _ -> error("preflight down") }
+        } else if (preflightDelayMs > 0L) {
+            EnginePreflight { _ ->
+                delay(preflightDelayMs)
+                EnginePreflight.Result.Ok
+            }
         } else {
             null
         }
