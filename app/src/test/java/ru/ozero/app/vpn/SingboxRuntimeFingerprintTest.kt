@@ -4,6 +4,8 @@ import androidx.datastore.preferences.core.Preferences
 import org.junit.jupiter.api.Test
 import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.enginesingbox.SingboxEngine
+import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxroom.entity.ProxyChainStep
 import ru.ozero.singboxroom.entity.ProxyProfile
 import kotlin.test.assertEquals
@@ -11,16 +13,23 @@ import kotlin.test.assertEquals
 class SingboxRuntimeFingerprintTest {
 
     @Test
-    fun `selected auto fingerprints all profile blobs in order`() {
+    fun `selected auto fingerprints bounded prioritized runtime candidate blobs`() {
         val prefs = prefs(selected = SingboxEngine.SELECTED_AUTO)
-        val profiles = listOf(profile(1, byteArrayOf(1, 2)), profile(2, byteArrayOf(3, 4)))
+        val profiles = (1L..80L).map { id ->
+            profile(id, validBlob(id)).copy(
+                userOrder = id.toInt(),
+                latencyMs = if (id == 70L) 10 else -1,
+            )
+        }
 
         val fingerprint = singboxRuntimeFingerprint(prefs, profiles, emptyList())
 
+        val expectedIds = listOf(70L) + (1L..49L)
+        val expected = expectedIds.map { id -> id to validBlob(id).contentHashCode() }
         assertEquals(
             listOf(
                 SingboxEngine.SELECTED_AUTO,
-                listOf(1L to byteArrayOf(1, 2).contentHashCode(), 2L to byteArrayOf(3, 4).contentHashCode()),
+                expected,
             ),
             fingerprint,
         )
@@ -122,6 +131,16 @@ class SingboxRuntimeFingerprintTest {
         beanBlob = blob,
         protocolType = 0,
         userOrder = id.toInt(),
+    )
+
+    private fun validBlob(id: Long): ByteArray = KryoSerializer.serialize(
+        VLESSBean().apply {
+            uuid = "12345678-1234-1234-1234-${id.toString().padStart(12, '0')}"
+            serverAddress = "s$id.example.com"
+            serverPort = 443
+            type = "tcp"
+            security = "none"
+        },
     )
 
     private fun chainStep(profileId: Long, userOrder: Int) = ProxyChainStep(

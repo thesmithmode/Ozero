@@ -28,6 +28,13 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `Dockerfile exposes root server config path expected by upstream binary`() {
+        val cmd = MasterDnsDockerScripts.deployMasterDns
+        assertTrue(cmd.contains("ln -sf /etc/masterdnsvpn/server_config.toml /server_config.toml"))
+        assertFalse(cmd.contains("COPY server_config.toml"))
+    }
+
+    @Test
     fun `deployMasterDns fails build with bin missing marker when upstream installer produces no server binary`() {
         val cmd = MasterDnsDockerScripts.deployMasterDns
         assertFalse(cmd.contains("| bash 2>&1 || true"))
@@ -94,7 +101,7 @@ class MasterDnsDockerScriptsContractTest {
     fun `runContainer generates encrypt key only if missing - idempotent redeploy preserves key`() {
         val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
         assertTrue(
-            cmd.contains("test -f /etc/masterdnsvpn/encrypt_key.txt"),
+            cmd.contains("[ ! -s /etc/masterdnsvpn/encrypt_key.txt ]"),
             "must check key existence before generating — иначе каждый deploy перезаписывает key",
         )
         assertTrue(cmd.contains("openssl rand -hex 32"), "must have openssl rand fallback для первой генерации")
@@ -102,6 +109,22 @@ class MasterDnsDockerScriptsContractTest {
             cmd.contains("chmod 600"),
             "encrypt_key.txt должен быть 600 — секрет не должен быть world-readable",
         )
+    }
+
+    @Test
+    fun `runContainer writes server config before starting masterdns container`() {
+        val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
+        val configIndex = cmd.indexOf("server_config.toml")
+        val runIndex = cmd.indexOf("docker run -d --name masterdns-ozero")
+
+        assertTrue(configIndex >= 0)
+        assertTrue(runIndex > configIndex)
+        assertTrue(cmd.contains("DOMAIN = []"))
+        assertTrue(cmd.contains("PROTOCOL_TYPE = \"SOCKS5\""))
+        assertTrue(cmd.contains("UDP_PORT = 53"))
+        assertTrue(cmd.contains("DATA_ENCRYPTION_METHOD = 5"))
+        assertTrue(cmd.contains("ENCRYPTION_KEY_FILE = \"/etc/masterdnsvpn/encrypt_key.txt\""))
+        assertTrue(cmd.contains("run_diag config_init"))
     }
 
     @Test
@@ -179,13 +202,13 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
-    fun `runContainer restarts container after first-time key generation`() {
+    fun `runContainer does not need restart after pre-start config generation`() {
         val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
-        assertTrue(
+        assertFalse(
             cmd.contains("docker restart masterdns-ozero"),
-            "После создания key файла нужно restart container — masterdnsvpn-server читает key на старте, " +
-                "до restart он работает без key",
+            "config and key are initialized before docker run, so restart must not be needed",
         )
+        assertTrue(cmd.indexOf("server_config.toml") < cmd.indexOf("docker run -d --name masterdns-ozero"))
     }
 
     @Test
@@ -363,10 +386,15 @@ class MasterDnsDockerScriptsContractTest {
     @Test
     fun `checkPort53 reports wildcard IPv6 listener as busy`() {
         val script = MasterDnsDockerScripts.checkPort53(TEST_SERVER_IPV4)
+        val ignoredBody = Regex("""function ignored\(addr\) \{ return ([^}]+) }""")
+            .find(script)
+            ?.groupValues
+            ?.get(1)
+            ?: ""
         assertTrue(script.contains("gsub(/^\\[/"))
         assertTrue(script.contains("gsub(/\\]$/"))
-        assertTrue(script.contains("addr == \"::1\""))
-        assertFalse(script.contains("addr == \"::\""), "[::]:53 must remain an external conflict, not ignored.")
+        assertTrue(ignoredBody.contains("addr == \"::1\""))
+        assertFalse(ignoredBody.contains("addr == \"::\""), "[::]:53 must remain an external conflict, not ignored.")
     }
 
     @Test

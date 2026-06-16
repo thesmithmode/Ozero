@@ -29,12 +29,13 @@ class SingboxEngineBuildManualConfigSentinelTest {
     fun `should SingboxEngine prefer selected row blob over stale BEAN_KEY`() {
         val content = engineFile().readText()
         val block = content.substringAfter("override fun buildManualConfig(settings: SettingsModel?): EngineConfig?")
-        val rowBlobIdx = block.indexOf("cachedProfilesById[it]?.beanBlob")
+        val rowBlobIdx = block.indexOf("cachedProfilesById[it] ?: resolveProfileByIdBlocking(it)")
         val beanIdx = block.indexOf("cachedBlob")
         assertTrue(
             rowBlobIdx >= 0 &&
                 beanIdx >= 0 &&
                 rowBlobIdx < beanIdx &&
+                block.contains("selectedProfile?.beanBlob") &&
                 block.contains("chainWrapperBlobs(cachedSelectedProfileId)"),
             "SingboxEngine must use the selected profile row blob first and fall back to the cached DataStore blob only when the row is missing. Block:\n$block",
         )

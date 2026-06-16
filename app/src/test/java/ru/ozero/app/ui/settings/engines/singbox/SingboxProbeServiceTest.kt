@@ -93,15 +93,17 @@ class SingboxProbeServiceTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
+        val probe = CountingProfileProbe()
 
         ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
             val tcpOnly = makeProfile(id = 7L, host = "127.0.0.1", port = server.localPort)
 
-            SingboxProbeService(dao, dataStore, FakeProfileProbe(emptyMap()))
+            SingboxProbeService(dao, dataStore, probe)
                 .probeAndAutoSelect(listOf(tcpOnly))
         }
 
         assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[7L])
+        assertEquals(0, probe.calls.get())
         assertNull(prefsFlow.value[selectedProfileKey])
     }
 
@@ -305,8 +307,13 @@ class SingboxProbeServiceTest {
             profiles.map { it.id.takeIf { id -> id != 0L } ?: 1L }
         override suspend fun getById(id: Long): ProxyProfile? = null
         override fun getAllFlow(): Flow<List<ProxyProfile>> = MutableStateFlow(emptyList())
+        override fun getAllLimitedFlow(limit: Int): Flow<List<ProxyProfile>> = MutableStateFlow(emptyList())
+        override fun getAutoCandidatesFlow(limit: Int): Flow<List<ProxyProfile>> = MutableStateFlow(emptyList())
         override fun getByGroupIdFlow(groupId: Long): Flow<List<ProxyProfile>> = MutableStateFlow(emptyList())
         override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> = emptyList()
+        override suspend fun getByGroupIdLimited(groupId: Long, limit: Int): List<ProxyProfile> = emptyList()
+        override suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile> =
+            emptyList()
         override suspend fun deleteByGroupId(groupId: Long) = Unit
         override suspend fun getIdsByGroupId(groupId: Long): List<Long> = emptyList()
         override suspend fun deleteByIds(ids: List<Long>) = Unit

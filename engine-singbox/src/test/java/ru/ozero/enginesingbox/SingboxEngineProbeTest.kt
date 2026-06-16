@@ -477,8 +477,13 @@ class SingboxEngineProbeTest {
     private fun fakeProfileDao(): ProxyProfileDao =
         object : ProxyProfileDao {
             override fun getAllFlow(): Flow<List<ProxyProfile>> = MutableStateFlow(emptyList())
+            override fun getAllLimitedFlow(limit: Int): Flow<List<ProxyProfile>> = MutableStateFlow(emptyList())
+            override fun getAutoCandidatesFlow(limit: Int): Flow<List<ProxyProfile>> = MutableStateFlow(emptyList())
             override fun getByGroupIdFlow(groupId: Long): Flow<List<ProxyProfile>> = MutableStateFlow(emptyList())
             override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> = emptyList()
+            override suspend fun getByGroupIdLimited(groupId: Long, limit: Int): List<ProxyProfile> = emptyList()
+            override suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile> =
+                emptyList()
             override suspend fun getById(id: Long): ProxyProfile? = null
             override suspend fun insert(profile: ProxyProfile): Long = profile.id
             override suspend fun insertAll(profiles: List<ProxyProfile>) = Unit

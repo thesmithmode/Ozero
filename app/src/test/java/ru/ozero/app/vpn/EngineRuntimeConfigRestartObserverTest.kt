@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -28,6 +29,8 @@ import ru.ozero.enginefptn.runtimeFingerprint
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EngineRuntimeConfigProvider
 import ru.ozero.enginesingbox.SingboxEngine
+import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyChainStep
@@ -783,8 +786,8 @@ class EngineRuntimeConfigRestartObserverTest {
         )
         val profiles = MutableStateFlow(
             listOf(
-                proxyProfile(id = 1, blob = byteArrayOf(1)),
-                proxyProfile(id = 2, blob = byteArrayOf(2)),
+                proxyProfile(id = 1, blob = validSingboxBlob(1)),
+                proxyProfile(id = 2, blob = validSingboxBlob(2)),
             ),
         )
         val chain = MutableStateFlow(emptyList<ProxyChainStep>())
@@ -895,8 +898,8 @@ class EngineRuntimeConfigRestartObserverTest {
 
         val baseline = provider.changes.first()
         profiles.value = listOf(
-            proxyProfile(id = 2, blob = byteArrayOf(2)),
-            proxyProfile(id = 1, blob = byteArrayOf(1)),
+            proxyProfile(id = 2, blob = validSingboxBlob(2)),
+            proxyProfile(id = 1, blob = validSingboxBlob(1)),
         )
         val reordered = provider.changes.first()
 
@@ -926,8 +929,8 @@ class EngineRuntimeConfigRestartObserverTest {
         )
         val profiles = MutableStateFlow(
             listOf(
-                proxyProfile(id = 1, blob = byteArrayOf(1)),
-                proxyProfile(id = 9, blob = byteArrayOf(9)),
+                proxyProfile(id = 1, blob = validSingboxBlob(1)),
+                proxyProfile(id = 9, blob = validSingboxBlob(9)),
             ),
         )
         val chain = MutableStateFlow(emptyList<ProxyChainStep>())
@@ -939,8 +942,8 @@ class EngineRuntimeConfigRestartObserverTest {
 
         val baseline = provider.changes.first()
         profiles.value = listOf(
-            proxyProfile(id = 1, blob = byteArrayOf(1)),
-            proxyProfile(id = 9, blob = byteArrayOf(7)),
+            proxyProfile(id = 1, blob = validSingboxBlob(1)),
+            proxyProfile(id = 9, blob = validSingboxBlob(7)),
         )
         val anyProfileChanged = provider.changes.first()
 
@@ -975,9 +978,15 @@ class EngineRuntimeConfigRestartObserverTest {
                 profiles.map { it.id.takeIf { id -> id != 0L } ?: 1L }
             override suspend fun getById(id: Long): ProxyProfile? = lookupById(id)
             override fun getAllFlow() = flow
+            override fun getAllLimitedFlow(limit: Int) = flow.map { it.take(limit) }
+            override fun getAutoCandidatesFlow(limit: Int) = flow.map { it.sortedByAutoPriority().take(limit) }
             override fun getByGroupIdFlow(groupId: Long) = flow
             override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> =
                 flow.value.filter { it.groupId == groupId }
+            override suspend fun getByGroupIdLimited(groupId: Long, limit: Int): List<ProxyProfile> =
+                flow.value.filter { it.groupId == groupId }.take(limit)
+            override suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile> =
+                flow.value.filter { it.groupId == groupId }.sortedByAutoPriority().take(limit)
             override suspend fun deleteByGroupId(groupId: Long) = Unit
             override suspend fun getIdsByGroupId(groupId: Long): List<Long> =
                 flow.value.filter { it.groupId == groupId }.map { it.id }
@@ -986,6 +995,21 @@ class EngineRuntimeConfigRestartObserverTest {
             override suspend fun countByGroupId(groupId: Long): Int = flow.value.count { it.groupId == groupId }
             override suspend fun update(profile: ProxyProfile) = Unit
             override suspend fun delete(profile: ProxyProfile) = Unit
+
+            private fun List<ProxyProfile>.sortedByAutoPriority(): List<ProxyProfile> =
+                sortedWith(
+                    compareBy<ProxyProfile> {
+                        when {
+                            it.latencyMs >= 0 -> 0
+                            it.latencyMs == -1 -> 1
+                            else -> 2
+                        }
+                    }
+                        .thenBy { if (it.latencyMs >= 0) it.latencyMs else it.userOrder }
+                        .thenBy { it.groupId }
+                        .thenBy { it.userOrder }
+                        .thenBy { it.id },
+                )
         }
 
     private fun fakeProxyChainDao(flow: MutableStateFlow<List<ProxyChainStep>>): ProxyChainDao =
@@ -1008,6 +1032,16 @@ class EngineRuntimeConfigRestartObserverTest {
             beanBlob = blob,
             protocolType = 0,
         )
+
+    private fun validSingboxBlob(seed: Long): ByteArray = KryoSerializer.serialize(
+        VLESSBean().apply {
+            uuid = "12345678-1234-1234-1234-${seed.toString().padStart(12, '0')}"
+            serverAddress = "s$seed.example.com"
+            serverPort = 443
+            type = "tcp"
+            security = "none"
+        },
+    )
 
     private fun newObserver() = EngineRuntimeConfigRestartObserver(
         providers = emptySet(),

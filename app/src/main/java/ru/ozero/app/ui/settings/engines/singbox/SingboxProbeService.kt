@@ -66,7 +66,7 @@ class SingboxProbeService internal constructor(
     ) {
         val probeCandidates = profiles.mapNotNull { profile ->
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(profile.beanBlob) }.getOrNull()
-            if (bean == null || !ConfigBuilder.isSupportedBean(bean)) {
+            if (bean == null || !ConfigBuilder.isSupportedBean(bean) || !bean.hasRoutableServerAddress()) {
                 profileDao.updateLatency(profile.id, LATENCY_FAILED)
                 null
             } else {
@@ -147,6 +147,7 @@ private class SingboxServiceProfileProbe(
     override suspend fun probeLatencyMs(bean: AbstractBean): Int = mutex.withLock {
         withContext(Dispatchers.IO) {
             val port = allocateProbePort()
+            if (!bean.hasRoutableServerAddress()) return@withContext SingboxProbeService.LATENCY_FAILED
             val config = runCatching { ConfigBuilder.buildChainConfig(bean, port, upstream = null) }
                 .getOrElse { return@withContext SingboxProbeService.LATENCY_FAILED }
             val binding = bindProcess()
@@ -229,4 +230,15 @@ private class SingboxServiceProfileProbe(
         const val REMOTE_STOP_TIMEOUT_MS = 3_000L
         const val BIND_TIMEOUT_MS = 5_000L
     }
+}
+
+private fun AbstractBean.hasRoutableServerAddress(): Boolean {
+    val host = serverAddress.trim().trim('[', ']').lowercase()
+    return host.isNotEmpty() &&
+        host != "localhost" &&
+        host != "0.0.0.0" &&
+        host != "::" &&
+        host != "::0" &&
+        host != "::1" &&
+        !host.startsWith("127.")
 }

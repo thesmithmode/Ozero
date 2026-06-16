@@ -1,6 +1,7 @@
 package ru.ozero.singboxroom
 
 import androidx.room.Room
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -14,8 +15,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
-import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.ProxyChainStep
+import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 
 @RunWith(RobolectricTestRunner::class)
@@ -83,6 +84,72 @@ class ProxyProfileDaoTest {
         assertEquals(2, profiles.size)
         assertEquals("A", profiles[0].name)
         assertEquals("B", profiles[1].name)
+    }
+
+    @Test
+    fun `limited queries should keep deterministic profile order`() = runBlocking {
+        val group1 = insertGroup("Group 1")
+        val group2 = insertGroup("Group 2")
+        val dao = db.proxyProfileDao()
+        val blob = byteArrayOf(0)
+        dao.insert(
+            ProxyProfile(groupId = group1, name = "G1-B", beanBlob = blob, protocolType = 1, userOrder = 2),
+        )
+        dao.insert(
+            ProxyProfile(groupId = group1, name = "G1-A", beanBlob = blob, protocolType = 1, userOrder = 1),
+        )
+        dao.insert(
+            ProxyProfile(groupId = group2, name = "G2-A", beanBlob = blob, protocolType = 1, userOrder = 0),
+        )
+
+        val allLimited = dao.getAllLimitedFlow(2).first()
+        val groupLimited = dao.getByGroupIdLimited(group1, 1)
+
+        assertEquals(listOf("G1-A", "G1-B"), allLimited.map { it.name })
+        assertEquals(listOf("G1-A"), groupLimited.map { it.name })
+    }
+
+    @Test
+    fun `auto candidate queries should prefer measured healthy profiles`() = runBlocking {
+        val groupId = insertGroup()
+        val dao = db.proxyProfileDao()
+        val blob = byteArrayOf(0)
+        dao.insert(
+            ProxyProfile(
+                groupId = groupId,
+                name = "Untested",
+                beanBlob = blob,
+                protocolType = 1,
+                latencyMs = -1,
+                userOrder = 0,
+            ),
+        )
+        dao.insert(
+            ProxyProfile(
+                groupId = groupId,
+                name = "Healthy",
+                beanBlob = blob,
+                protocolType = 1,
+                latencyMs = 42,
+                userOrder = 1000,
+            ),
+        )
+        dao.insert(
+            ProxyProfile(
+                groupId = groupId,
+                name = "Failed",
+                beanBlob = blob,
+                protocolType = 1,
+                latencyMs = -2,
+                userOrder = 1,
+            ),
+        )
+
+        val globalCandidates = dao.getAutoCandidatesFlow(2).first()
+        val groupCandidates = dao.getAutoCandidatesByGroupId(groupId, 2)
+
+        assertEquals(listOf("Healthy", "Untested"), globalCandidates.map { it.name })
+        assertEquals(listOf("Healthy", "Untested"), groupCandidates.map { it.name })
     }
 
     @Test
