@@ -136,7 +136,7 @@ class MasterDnsDockerScriptsContractTest {
         assertFalse(cmd.contains("grep -Eq '^DOMAIN"))
         assertTrue(cmd.contains("sed \"s/^[[:space:]]*DOMAIN[[:space:]]*=[[:space:]]*\\[[[:space:]]*\\]"))
         assertFalse(cmd.contains("sed 's/^DOMAIN[[:space:]]*=[[:space:]]*\\[[[:space:]]*\\]"))
-        assertTrue(cmd.contains("grep -Ev \"^[[:space:]]*DOMAIN[[:space:]]*=\""))
+        assertTrue(cmd.contains("skip = 1"))
         assertTrue(cmd.contains("printf \"DOMAIN = [\\\"${MasterDnsDockerScripts.DEFAULT_DOMAIN}\\\"]\\n\""))
         assertTrue(cmd.contains("DOMAIN = [\"${MasterDnsDockerScripts.DEFAULT_DOMAIN}\"]"))
     }
@@ -146,9 +146,29 @@ class MasterDnsDockerScriptsContractTest {
         val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
 
         assertTrue(cmd.contains("^[[:space:]]*DOMAIN[[:space:]]*="))
-        assertTrue(cmd.contains("[[:space:]]*['\"'\"'\\\"]?[A-Za-z0-9]"))
+        assertTrue(cmd.contains("line ~ /[A-Za-z0-9]/"))
         assertFalse(cmd.contains("^DOMAIN[[:space:]]*=\\[[[:space:]]*\\\"?[A-Za-z0-9]"))
         assertFalse(cmd.contains("grep -Ev \"^DOMAIN[[:space:]]*=\""))
+    }
+
+    @Test
+    fun `runContainer preserves multiline non-empty domain config`() {
+        val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
+
+        assertTrue(cmd.contains("in_domain = 1"))
+        assertTrue(cmd.contains("line = \\$0"))
+        assertTrue(cmd.contains("\\$0 ~ /[A-Za-z0-9]/"))
+        assertTrue(cmd.contains("END { exit(found ? 0 : 1) }"))
+        assertFalse(cmd.contains("grep -Eq \"^[[:space:]]*DOMAIN[[:space:]]*=.*[A-Za-z0-9]"))
+    }
+
+    @Test
+    fun `runContainer fallback removes whole multiline domain block before prepending default`() {
+        val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
+
+        assertTrue(cmd.contains("skip {"))
+        assertTrue(cmd.contains("if (\\$0 ~ /\\]/) skip = 0"))
+        assertFalse(cmd.contains("grep -Ev \"^[[:space:]]*DOMAIN[[:space:]]*=\""))
     }
 
     @Test
