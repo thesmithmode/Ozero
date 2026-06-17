@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
 import org.junit.Test
@@ -167,6 +168,78 @@ class SettingsScreenTest {
 
         assert(captured == listOf(TrafficMode.PROXY)) {
             "expected PROXY callback, got $captured"
+        }
+    }
+
+    @Test
+    fun navigationRowsInvokeCallbacks() {
+        val opened = mutableListOf<String>()
+        composeRule.setContent {
+            OzeroTheme {
+                SettingsScreenContent(
+                    state = SettingsUiState.Content(SettingsModel.DEFAULT.copy(appMode = AppMode.EXPERT)),
+                    onBack = {},
+                    nav = SettingsNavActions(
+                        onOpenAllowedApps = { opened += "split" },
+                        onOpenServers = { opened += "servers" },
+                        onOpenAbout = { opened += "about" },
+                        onOpenLogs = { opened += "logs" },
+                        onOpenByeDpiEngineSettings = { opened += "byedpi" },
+                        onOpenUrnetworkSettings = { opened += "urnetwork" },
+                        onOpenWarpSettings = { opened += "warp" },
+                        onOpenStatsHistory = { opened += "stats" },
+                        onOpenBackup = { opened += "backup" },
+                        onOpenAutoModeSettings = { opened += "auto" },
+                        onOpenLanguage = { opened += "language" },
+                        onOpenMasterDnsSettings = { opened += "masterdns" },
+                        onOpenFptnSettings = { opened += "fptn" },
+                        onOpenSingboxSettings = { opened += "singbox" },
+                    ),
+                    onIpv6Toggle = {},
+                    onAutoStartToggle = {},
+                    onManualEngineSelect = {},
+                )
+            }
+        }
+
+        listOf(
+            SettingsTestTags.AUTO_MODE_OPEN_ROW to "auto",
+            SettingsTestTags.SERVERS_ROW to "servers",
+            "settings_byedpi_engine_row" to "byedpi",
+            "settings_urnetwork_row" to "urnetwork",
+            "settings_warp_row" to "warp",
+            "settings_masterdns_row" to "masterdns",
+            "settings_fptn_row" to "fptn",
+            "settings_singbox_row" to "singbox",
+            SettingsTestTags.ALLOWED_APPS_ROW to "split",
+            "settings_stats_history_row" to "stats",
+            "settings_backup_row" to "backup",
+            SettingsTestTags.LANGUAGE_ROW to "language",
+            "settings_about_row" to "about",
+            SettingsTestTags.LOGS_ROW to "logs",
+        ).forEach { (tag, _) ->
+            composeRule.onNodeWithTag(tag).performScrollTo().performClick()
+        }
+
+        assert(
+            opened == listOf(
+                "auto",
+                "servers",
+                "byedpi",
+                "urnetwork",
+                "warp",
+                "masterdns",
+                "fptn",
+                "singbox",
+                "split",
+                "stats",
+                "backup",
+                "language",
+                "about",
+                "logs",
+            ),
+        ) {
+            "unexpected navigation callbacks: $opened"
         }
     }
 
