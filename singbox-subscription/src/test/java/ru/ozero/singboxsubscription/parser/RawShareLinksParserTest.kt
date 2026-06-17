@@ -128,6 +128,18 @@ class RawShareLinksParserTest {
     }
 
     @Test
+    fun `should stop bare share link before trailing label`() {
+        val text = "vless://12345678-1234-1234-1234-123456789abc@proxy.example.com:443 backup"
+
+        val result = RawShareLinksParser.parse(text)
+
+        assertEquals(1, result.size)
+        val bean = result.first() as VLESSBean
+        assertEquals("proxy.example.com", bean.serverAddress)
+        assertEquals(443, bean.serverPort)
+    }
+
+    @Test
     fun `should extract server address from parsed vless bean`() {
         val result = RawShareLinksParser.parse(sampleVless)
         val bean = result.first() as VLESSBean

@@ -158,6 +158,7 @@ class MasterDnsDockerScriptsContractTest {
         assertTrue(cmd.contains("in_domain = 1"))
         assertTrue(cmd.contains("line = ${'$'}0"))
         assertTrue(cmd.contains("${'$'}0 ~ /[A-Za-z0-9]/"))
+        assertTrue(cmd.contains("sub(/[[:space:]]+#.*/, \"\", line)"))
         assertTrue(cmd.contains("awk -f /tmp/masterdns-domain-present.awk"))
         assertTrue(cmd.contains("END { exit(found ? 0 : 1) }"))
         assertFalse(cmd.contains("grep -Eq \"^[[:space:]]*DOMAIN[[:space:]]*=.*[A-Za-z0-9]"))

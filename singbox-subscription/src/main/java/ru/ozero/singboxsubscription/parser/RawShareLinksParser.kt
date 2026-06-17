@@ -44,14 +44,25 @@ object RawShareLinksParser {
             .toList()
         if (starts.isEmpty()) return emptyList()
         return starts.mapIndexed { index, start ->
-            val end = starts.getOrNull(index + 1)?.let { next ->
+            val limit = starts.getOrNull(index + 1)?.let { next ->
                 line.lastIndexOf(' ', next - 1).takeIf { it >= start } ?: next
             } ?: line.length
+            val end = linkTokenEnd(line, start, limit)
             line.substring(start, end).trim()
         }
     }
 
     private val SHARE_LINK_START = Regex("""(?:^|\s)(?:vless|vmess|trojan|ss)://""")
+
+    private fun linkTokenEnd(line: String, start: Int, limit: Int): Int {
+        var inFragment = false
+        for (index in start until limit) {
+            val char = line[index]
+            if (char == '#') inFragment = true
+            if (!inFragment && char.isWhitespace()) return index
+        }
+        return limit
+    }
 
     private fun parseSingboxJson(text: String): List<AbstractBean> = runCatching {
         val root = JSONObject(text)

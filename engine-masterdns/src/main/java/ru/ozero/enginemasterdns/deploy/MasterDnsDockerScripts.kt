@@ -324,14 +324,17 @@ EOF
 /^[[:space:]]*DOMAIN[[:space:]]*=/ {
     in_domain = 1
     line = ${'$'}0
+    sub(/[[:space:]]+#.*/, "", line)
     sub(/^[^[]*\[/, "", line)
     if (line ~ /[A-Za-z0-9]/) found = 1
     if (line ~ /\]/) in_domain = 0
     next
 }
 in_domain {
-    if (${'$'}0 ~ /[A-Za-z0-9]/) found = 1
-    if (${'$'}0 ~ /\]/) in_domain = 0
+    line = ${'$'}0
+    sub(/[[:space:]]+#.*/, "", line)
+    if (line ~ /[A-Za-z0-9]/) found = 1
+    if (line ~ /\]/) in_domain = 0
 }
 END { exit(found ? 0 : 1) }
 AWK_DOMAIN_PRESENT
