@@ -67,7 +67,7 @@ class StrategyTestViewModelApplyTest {
         vm.onApply(command)
         advanceUntilIdle()
 
-        assertEquals(listOf(command), repo.byedpiUpdates)
+        assertEquals(listOf<String?>(command), repo.byedpiUpdates)
         assertEquals(listOf(false), repo.byedpiUseUiModeUpdates)
         assertFalse(repo.current().byedpiUseUiMode)
         assertEquals(command, repo.current().byedpiWinningArgs)

@@ -320,7 +320,7 @@ EOF
                     rm -f "${'$'}tmp_config"
                     chmod 600 /etc/masterdnsvpn/server_config.toml
                 fi
-                if ! grep -Eq "^[[:space:]]*DOMAIN[[:space:]]*=[[:space:]]*\[[[:space:]]*['\"]?[A-Za-z0-9]" /etc/masterdnsvpn/server_config.toml; then
+                if ! grep -Eq "^[[:space:]]*DOMAIN[[:space:]]*=[[:space:]]*\[[[:space:]]*['"'"'\"]?[A-Za-z0-9]" /etc/masterdnsvpn/server_config.toml; then
                     tmp_config=/etc/masterdnsvpn/server_config.toml.tmp
                     grep -Ev "^[[:space:]]*DOMAIN[[:space:]]*=" /etc/masterdnsvpn/server_config.toml > "${'$'}tmp_config" || true
                     printf "DOMAIN = [\"${DEFAULT_DOMAIN}\"]\n" > /etc/masterdnsvpn/server_config.toml

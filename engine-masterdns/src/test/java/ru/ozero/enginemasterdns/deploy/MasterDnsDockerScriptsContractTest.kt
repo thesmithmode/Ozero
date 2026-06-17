@@ -146,7 +146,7 @@ class MasterDnsDockerScriptsContractTest {
         val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
 
         assertTrue(cmd.contains("^[[:space:]]*DOMAIN[[:space:]]*="))
-        assertTrue(cmd.contains("[[:space:]]*['\\\"]?[A-Za-z0-9]"))
+        assertTrue(cmd.contains("[[:space:]]*['\"'\"'\\\"]?[A-Za-z0-9]"))
         assertFalse(cmd.contains("^DOMAIN[[:space:]]*=\\[[[:space:]]*\\\"?[A-Za-z0-9]"))
         assertFalse(cmd.contains("grep -Ev \"^DOMAIN[[:space:]]*=\""))
     }
@@ -155,7 +155,9 @@ class MasterDnsDockerScriptsContractTest {
     fun `runContainer config init shell keeps nested sh-c single quote balanced`() {
         val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
         val configInit = cmd.substringAfter("masterdns-ozero sh -c '").substringBefore("' 2>&1")
-        val escapedSingleQuotes = configInit.replace("'\\''", "")
+        val escapedSingleQuotes = configInit
+            .replace("'\\''", "")
+            .replace("'\"'\"'", "")
 
         assertFalse(escapedSingleQuotes.contains("'"))
         assertFalse(escapedSingleQuotes.contains("sed '"))
