@@ -25,6 +25,7 @@ class EngineSettingsRestartObserver(
     data class Snapshot(
         val manualEngine: EngineId?,
         val byedpiWinningArgs: String?,
+        val byedpiUseUiMode: Boolean,
         val ipv6Enabled: Boolean,
         val trafficMode: TrafficMode,
         val customDnsServers: List<String>,
@@ -41,6 +42,7 @@ class EngineSettingsRestartObserver(
                 Snapshot(
                     manualEngine = it.manualEngine,
                     byedpiWinningArgs = it.byedpiWinningArgs?.trim(),
+                    byedpiUseUiMode = it.byedpiUseUiMode,
                     ipv6Enabled = it.ipv6Enabled,
                     trafficMode = it.trafficMode,
                     customDnsServers = it.customDnsServers,
@@ -124,7 +126,10 @@ class EngineSettingsRestartObserver(
             trafficMode == other.trafficMode &&
             customDnsServers == other.customDnsServers
         return when (engineId) {
-            EngineId.BYEDPI -> byedpiWinningArgs == other.byedpiWinningArgs && commonRuntimeMatches
+            EngineId.BYEDPI ->
+                byedpiWinningArgs == other.byedpiWinningArgs &&
+                    byedpiUseUiMode == other.byedpiUseUiMode &&
+                    commonRuntimeMatches
             else -> commonRuntimeMatches
         }
     }

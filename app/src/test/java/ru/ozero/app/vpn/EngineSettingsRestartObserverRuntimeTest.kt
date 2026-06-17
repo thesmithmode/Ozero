@@ -204,6 +204,7 @@ class EngineSettingsRestartObserverRuntimeTest {
     private fun snapshot(
         manualEngine: EngineId?,
         byedpiWinningArgs: String? = null,
+        byedpiUseUiMode: Boolean = false,
         ipv6Enabled: Boolean = false,
         trafficMode: TrafficMode = TrafficMode.TUN,
         customDnsServers: List<String> = emptyList(),
@@ -211,6 +212,7 @@ class EngineSettingsRestartObserverRuntimeTest {
     ): EngineSettingsRestartObserver.Snapshot = EngineSettingsRestartObserver.Snapshot(
         manualEngine = manualEngine,
         byedpiWinningArgs = byedpiWinningArgs,
+        byedpiUseUiMode = byedpiUseUiMode,
         ipv6Enabled = ipv6Enabled,
         trafficMode = trafficMode,
         customDnsServers = customDnsServers,

@@ -132,13 +132,23 @@ class MasterDnsDockerScriptsContractTest {
     fun `runContainer migrates existing empty server domain config`() {
         val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
 
-        assertTrue(cmd.contains("grep -Eq \"^DOMAIN[[:space:]]*=[[:space:]]*\\[[[:space:]]*\\]"))
+        assertTrue(cmd.contains("grep -Eq \"^[[:space:]]*DOMAIN[[:space:]]*=[[:space:]]*\\[[[:space:]]*\\]"))
         assertFalse(cmd.contains("grep -Eq '^DOMAIN"))
-        assertTrue(cmd.contains("sed \"s/^DOMAIN[[:space:]]*=[[:space:]]*\\[[[:space:]]*\\]"))
+        assertTrue(cmd.contains("sed \"s/^[[:space:]]*DOMAIN[[:space:]]*=[[:space:]]*\\[[[:space:]]*\\]"))
         assertFalse(cmd.contains("sed 's/^DOMAIN[[:space:]]*=[[:space:]]*\\[[[:space:]]*\\]"))
-        assertTrue(cmd.contains("grep -Ev \"^DOMAIN[[:space:]]*=\""))
+        assertTrue(cmd.contains("grep -Ev \"^[[:space:]]*DOMAIN[[:space:]]*=\""))
         assertTrue(cmd.contains("printf \"DOMAIN = [\\\"${MasterDnsDockerScripts.DEFAULT_DOMAIN}\\\"]\\n\""))
         assertTrue(cmd.contains("DOMAIN = [\"${MasterDnsDockerScripts.DEFAULT_DOMAIN}\"]"))
+    }
+
+    @Test
+    fun `runContainer preserves indented or literal quoted non-empty domain config`() {
+        val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
+
+        assertTrue(cmd.contains("^[[:space:]]*DOMAIN[[:space:]]*="))
+        assertTrue(cmd.contains("[[:space:]]*['\\\"]?[A-Za-z0-9]"))
+        assertFalse(cmd.contains("^DOMAIN[[:space:]]*=\\[[[:space:]]*\\\"?[A-Za-z0-9]"))
+        assertFalse(cmd.contains("grep -Ev \"^DOMAIN[[:space:]]*=\""))
     }
 
     @Test

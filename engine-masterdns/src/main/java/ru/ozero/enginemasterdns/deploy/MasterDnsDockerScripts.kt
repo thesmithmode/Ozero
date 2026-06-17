@@ -312,17 +312,17 @@ DATA_ENCRYPTION_METHOD = 5
 ENCRYPTION_KEY_FILE = "/etc/masterdnsvpn/encrypt_key.txt"
 EOF
                     chmod 600 /etc/masterdnsvpn/server_config.toml
-                elif grep -Eq "^DOMAIN[[:space:]]*=[[:space:]]*\[[[:space:]]*\][[:space:]]*${'$'}" /etc/masterdnsvpn/server_config.toml; then
+                elif grep -Eq "^[[:space:]]*DOMAIN[[:space:]]*=[[:space:]]*\[[[:space:]]*\][[:space:]]*${'$'}" /etc/masterdnsvpn/server_config.toml; then
                     tmp_config=/etc/masterdnsvpn/server_config.toml.tmp
-                    sed "s/^DOMAIN[[:space:]]*=[[:space:]]*\[[[:space:]]*\][[:space:]]*${'$'}/DOMAIN = [\"${DEFAULT_DOMAIN}\"]/" \
+                    sed "s/^[[:space:]]*DOMAIN[[:space:]]*=[[:space:]]*\[[[:space:]]*\][[:space:]]*${'$'}/DOMAIN = [\"${DEFAULT_DOMAIN}\"]/" \
                         /etc/masterdnsvpn/server_config.toml > "${'$'}tmp_config"
                     cat "${'$'}tmp_config" > /etc/masterdnsvpn/server_config.toml
                     rm -f "${'$'}tmp_config"
                     chmod 600 /etc/masterdnsvpn/server_config.toml
                 fi
-                if ! grep -Eq "^DOMAIN[[:space:]]*=[[:space:]]*\[[[:space:]]*\"?[A-Za-z0-9]" /etc/masterdnsvpn/server_config.toml; then
+                if ! grep -Eq "^[[:space:]]*DOMAIN[[:space:]]*=[[:space:]]*\[[[:space:]]*['\"]?[A-Za-z0-9]" /etc/masterdnsvpn/server_config.toml; then
                     tmp_config=/etc/masterdnsvpn/server_config.toml.tmp
-                    grep -Ev "^DOMAIN[[:space:]]*=" /etc/masterdnsvpn/server_config.toml > "${'$'}tmp_config" || true
+                    grep -Ev "^[[:space:]]*DOMAIN[[:space:]]*=" /etc/masterdnsvpn/server_config.toml > "${'$'}tmp_config" || true
                     printf "DOMAIN = [\"${DEFAULT_DOMAIN}\"]\n" > /etc/masterdnsvpn/server_config.toml
                     cat "${'$'}tmp_config" >> /etc/masterdnsvpn/server_config.toml
                     rm -f "${'$'}tmp_config"

@@ -29,6 +29,7 @@ class EngineSettingsRestartObserverHandleStartupStateTest : EngineSettingsRestar
         val snapshot = EngineSettingsRestartObserver.Snapshot(
             manualEngine = EngineId.WARP,
             byedpiWinningArgs = null,
+            byedpiUseUiMode = false,
             ipv6Enabled = false,
             trafficMode = TrafficMode.TUN,
             customDnsServers = emptyList(),
@@ -79,6 +80,7 @@ class EngineSettingsRestartObserverHandleStartupStateTest : EngineSettingsRestar
         val snapshot = EngineSettingsRestartObserver.Snapshot(
             manualEngine = EngineId.WARP,
             byedpiWinningArgs = null,
+            byedpiUseUiMode = false,
             ipv6Enabled = false,
             trafficMode = TrafficMode.TUN,
             customDnsServers = emptyList(),
@@ -126,6 +128,7 @@ class EngineSettingsRestartObserverHandleStartupStateTest : EngineSettingsRestar
         val snapshot = EngineSettingsRestartObserver.Snapshot(
             manualEngine = EngineId.FPTN,
             byedpiWinningArgs = "--changed",
+            byedpiUseUiMode = false,
             ipv6Enabled = false,
             trafficMode = TrafficMode.TUN,
             customDnsServers = listOf("45.90.28.168", "45.90.30.168"),
@@ -158,6 +161,7 @@ class EngineSettingsRestartObserverHandleStartupStateTest : EngineSettingsRestar
         val initial = EngineSettingsRestartObserver.Snapshot(
             manualEngine = EngineId.FPTN,
             byedpiWinningArgs = null,
+            byedpiUseUiMode = false,
             ipv6Enabled = false,
             trafficMode = TrafficMode.TUN,
             customDnsServers = listOf("1.1.1.1"),

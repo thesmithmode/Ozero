@@ -28,12 +28,16 @@ class SshjTransportContractTest {
     }
 
     @Test
-    fun `exec applies timeout before blocking stdout read`() {
+    fun `exec drains stdout and stderr before waiting for exit status`() {
         val execBlock = source.substringAfter("override fun exec")
             .substringBefore("override fun close")
         assertTrue(
-            execBlock.indexOf("cmd.join(timeoutMs") < execBlock.indexOf("IOUtils.readFully(cmd.inputStream)"),
-            "exec must join with timeout before readFully(inputStream), otherwise hung remote command bypasses timeout",
+            execBlock.indexOf("stdoutFuture") < execBlock.indexOf("cmd.join(timeoutMs"),
+            "exec must start stdout drain before join, otherwise verbose remote commands can block on SSH buffers",
+        )
+        assertTrue(
+            execBlock.indexOf("stderrFuture") < execBlock.indexOf("cmd.join(timeoutMs"),
+            "exec must start stderr drain before join, otherwise verbose remote commands can block on SSH buffers",
         )
         assertTrue(execBlock.contains("exit == null"))
         assertTrue(execBlock.contains("cmd.close()"))

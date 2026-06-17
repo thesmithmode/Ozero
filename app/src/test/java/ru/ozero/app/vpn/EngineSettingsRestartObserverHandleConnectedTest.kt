@@ -29,6 +29,7 @@ class EngineSettingsRestartObserverHandleConnectedTest : EngineSettingsRestartOb
         val snapshot = EngineSettingsRestartObserver.Snapshot(
             manualEngine = EngineId.WARP,
             byedpiWinningArgs = null,
+            byedpiUseUiMode = false,
             ipv6Enabled = false,
             trafficMode = TrafficMode.TUN,
             customDnsServers = emptyList(),
@@ -53,6 +54,7 @@ class EngineSettingsRestartObserverHandleConnectedTest : EngineSettingsRestartOb
         val snapshot = EngineSettingsRestartObserver.Snapshot(
             manualEngine = EngineId.FPTN,
             byedpiWinningArgs = null,
+            byedpiUseUiMode = false,
             ipv6Enabled = false,
             trafficMode = TrafficMode.PROXY,
             customDnsServers = emptyList(),
@@ -65,6 +67,32 @@ class EngineSettingsRestartObserverHandleConnectedTest : EngineSettingsRestartOb
             1,
             restarts.size,
             "A same-engine settings change that appears after stable Connected is user-visible and must restart.",
+        )
+    }
+
+    @Test
+    fun `handle restart — connected ByeDPI restarts when only UI mode changes`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
+        val state = MutableStateFlow<TunnelState>(TunnelState.Connected(EngineId.BYEDPI, 1080))
+        val restarts = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val observer = EngineSettingsRestartObserver(
+            settingsFlow = flow,
+            vpnStateProvider = { state.value },
+            onRestartConnected = { restarts += it },
+        )
+        val previous = snapshot(
+            manualEngine = EngineId.BYEDPI,
+            byedpiWinningArgs = "-Y -Ar -s5",
+            byedpiUseUiMode = true,
+        )
+        val applied = previous.copy(byedpiUseUiMode = false)
+
+        observer.handle(trigger(previous = previous, snapshot = applied))
+
+        assertEquals(
+            listOf(applied),
+            restarts,
+            "Apply can change only ByeDPI mode when args already match; running UI config must restart.",
         )
     }
 
