@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -70,7 +71,7 @@ class SplitTunnelScreenTest {
             .onNodeWithTag(SplitTunnelTestTags.MODE_SEGMENT_PREFIX + SplitTunnelMode.ALLOWLIST.name)
             .performClick()
 
-        assert(captured == listOf(SplitTunnelMode.ALLOWLIST))
+        assertEquals(listOf(SplitTunnelMode.ALLOWLIST), captured)
     }
 
     @Test
@@ -93,7 +94,7 @@ class SplitTunnelScreenTest {
         }
 
         composeRule.onNodeWithTag(SplitTunnelTestTags.SEARCH).performTextInput("foo")
-        assert(captured.joinToString("") == "foo")
+        assertEquals("foo", captured.joinToString(""))
     }
 
     @Test
@@ -163,7 +164,7 @@ class SplitTunnelScreenTest {
             }
         }
         composeRule.onNodeWithTag(SplitTunnelTestTags.BACK).performClick()
-        assert(back)
+        assertEquals(true, back)
     }
 
     private fun render(state: SplitTunnelUiState) {

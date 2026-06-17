@@ -49,6 +49,7 @@ import ru.ozero.engineurnetwork.UrnetworkWindowType
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @Suppress("LargeClass")
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -318,7 +319,7 @@ class MainViewModelTest {
         tunnelController.updateStats(sample)
         advanceUntilIdle()
         val historyDuringConnected = viewModel.speedHistory.value
-        assert(historyDuringConnected.isNotEmpty()) { "speedHistory должна заполниться на updateStats" }
+        assertTrue(historyDuringConnected.isNotEmpty())
 
         tunnelController.onSwitchingStarted(EngineId.BYEDPI, EngineId.WARP)
         tunnelController.onDisconnecting()
@@ -340,15 +341,13 @@ class MainViewModelTest {
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
         tunnelController.updateStats(sample)
         advanceUntilIdle()
-        assert(viewModel.speedHistory.value.isNotEmpty())
+        assertTrue(viewModel.speedHistory.value.isNotEmpty())
 
         tunnelController.onDisconnecting()
         tunnelController.reset()
         advanceUntilIdle()
 
-        assert(viewModel.speedHistory.value.isEmpty()) {
-            "без активного switching speedHistory обязана очиститься на reset (stats=null)"
-        }
+        assertEquals(emptyList(), viewModel.speedHistory.value)
     }
 
     @Test

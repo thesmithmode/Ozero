@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -64,7 +65,7 @@ class SettingsScreenTest {
         }
 
         composeRule.onNodeWithTag(SettingsTestTags.BACK).performClick()
-        assert(clicked) { "back callback not invoked" }
+        assertEquals(true, clicked)
     }
 
     @Test
@@ -113,7 +114,7 @@ class SettingsScreenTest {
             .onNodeWithTag(SettingsTestTags.MANUAL_ENGINE_PREFIX + EngineId.BYEDPI.name)
             .performClick()
 
-        assert(clicked) { "BYEDPI radio click did not invoke callback" }
+        assertEquals(true, clicked)
     }
 
     @Test
@@ -143,9 +144,7 @@ class SettingsScreenTest {
 
         composeRule.onNodeWithTag(SettingsTestTags.APP_MODE_EXPERT).performClick()
 
-        assert(captured == listOf(AppMode.EXPERT)) {
-            "expected EXPERT callback, got $captured"
-        }
+        assertEquals(listOf(AppMode.EXPERT), captured)
     }
 
     @Test
@@ -166,9 +165,7 @@ class SettingsScreenTest {
 
         composeRule.onNodeWithTag(SettingsTestTags.TRAFFIC_MODE_PROXY).performClick()
 
-        assert(captured == listOf(TrafficMode.PROXY)) {
-            "expected PROXY callback, got $captured"
-        }
+        assertEquals(listOf(TrafficMode.PROXY), captured)
     }
 
     @Test
@@ -221,8 +218,8 @@ class SettingsScreenTest {
             composeRule.onNodeWithTag(tag).performScrollTo().performClick()
         }
 
-        assert(
-            opened == listOf(
+        assertEquals(
+            listOf(
                 "auto",
                 "servers",
                 "byedpi",
@@ -238,9 +235,8 @@ class SettingsScreenTest {
                 "about",
                 "logs",
             ),
-        ) {
-            "unexpected navigation callbacks: $opened"
-        }
+            opened,
+        )
     }
 
     private fun renderContent(model: SettingsModel) {

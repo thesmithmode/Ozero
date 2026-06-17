@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -206,7 +207,7 @@ private fun BackupResultEffects(
 }
 
 @Composable
-private fun CategoryPickerDialog(
+internal fun CategoryPickerDialog(
     title: String,
     available: Set<BackupCategory>,
     initiallySelected: Set<BackupCategory>,
@@ -235,6 +236,7 @@ private fun CategoryPickerDialog(
                             onCheckedChange = { isChecked ->
                                 selected = if (isChecked) selected + category else selected - category
                             },
+                            modifier = Modifier.testTag(BackupTestTags.CATEGORY_CHECKBOX_PREFIX + category.name),
                         )
                         Spacer(Modifier.padding(end = 8.dp))
                         Text(
@@ -253,12 +255,16 @@ private fun CategoryPickerDialog(
             TextButton(
                 onClick = { onConfirm(selected.intersect(available)) },
                 enabled = selected.intersect(available).isNotEmpty(),
+                modifier = Modifier.testTag(BackupTestTags.CATEGORY_CONFIRM),
             ) {
                 Text(stringResource(R.string.backup_confirm))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag(BackupTestTags.CATEGORY_CANCEL),
+            ) {
                 Text(stringResource(R.string.backup_cancel))
             }
         },
