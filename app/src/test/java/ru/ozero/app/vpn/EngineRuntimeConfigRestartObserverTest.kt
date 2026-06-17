@@ -265,6 +265,39 @@ class EngineRuntimeConfigRestartObserverTest {
     }
 
     @Test
+    fun `observeFlow retries pending replay when restart fails after startup connects`() = runTest(dispatcher) {
+        val changes = MutableStateFlow<Any?>("initial")
+        val state = MutableStateFlow<TunnelState>(TunnelState.Connecting(EngineId.FPTN))
+        val restarts = mutableListOf<String>()
+        var restartOk = false
+
+        newObserver().observeFlow(
+            scope = observerScope(),
+            changes = changes,
+            engineId = EngineId.FPTN,
+            reason = "fptn changed",
+            includeStarting = false,
+            replayAfterStarting = true,
+            state = state,
+            restart = {
+                restarts += it
+                restartOk
+            },
+        )
+        runCurrent()
+
+        changes.value = "runtime-edit"
+        runCurrent()
+        state.value = TunnelState.Connected(EngineId.FPTN, 0)
+        runCurrent()
+        restartOk = true
+        state.value = TunnelState.Connected(EngineId.FPTN, 1)
+        runCurrent()
+
+        assertEquals(listOf("fptn changed", "fptn changed"), restarts)
+    }
+
+    @Test
     fun `observeFlow clears pending FPTN replay when startup edit is reverted`() = runTest(dispatcher) {
         val changes = MutableStateFlow<Any?>("initial")
         val state = MutableStateFlow<TunnelState>(TunnelState.Probing(EngineId.FPTN))
@@ -288,6 +321,37 @@ class EngineRuntimeConfigRestartObserverTest {
         changes.value = "runtime-edit"
         runCurrent()
         changes.value = "initial"
+        runCurrent()
+        state.value = TunnelState.Connected(EngineId.FPTN, 0)
+        runCurrent()
+
+        assertTrue(restarts.isEmpty())
+    }
+
+    @Test
+    fun `observeFlow drops pending FPTN replay when startup returns idle before connected`() = runTest(dispatcher) {
+        val changes = MutableStateFlow<Any?>("initial")
+        val state = MutableStateFlow<TunnelState>(TunnelState.Probing(EngineId.FPTN))
+        val restarts = mutableListOf<String>()
+
+        newObserver().observeFlow(
+            scope = observerScope(),
+            changes = changes,
+            engineId = EngineId.FPTN,
+            reason = "fptn changed",
+            includeStarting = false,
+            replayAfterStarting = true,
+            state = state,
+            restart = {
+                restarts += it
+                true
+            },
+        )
+        runCurrent()
+
+        changes.value = "runtime-edit"
+        runCurrent()
+        state.value = TunnelState.Idle
         runCurrent()
         state.value = TunnelState.Connected(EngineId.FPTN, 0)
         runCurrent()

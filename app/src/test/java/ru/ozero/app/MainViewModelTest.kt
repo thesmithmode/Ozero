@@ -263,6 +263,31 @@ class MainViewModelTest {
     }
 
     @Test
+    fun onVpnPermissionDeniedFromConnectingKeepsCurrentEngine() = runTest {
+        tunnelController.onProbing(EngineId.WARP)
+        tunnelController.onConnecting(EngineId.WARP)
+        advanceUntilIdle()
+
+        viewModel.onVpnPermissionDenied()
+        advanceUntilIdle()
+
+        val failed = assertIs<TunnelState.Failed>(tunnelController.state.value)
+        assertEquals(EngineId.WARP, failed.engineId)
+    }
+
+    @Test
+    fun onVpnPermissionDeniedFromNamedProbingKeepsCurrentEngine() = runTest {
+        tunnelController.onProbing(EngineId.URNETWORK)
+        advanceUntilIdle()
+
+        viewModel.onVpnPermissionDenied()
+        advanceUntilIdle()
+
+        val failed = assertIs<TunnelState.Failed>(tunnelController.state.value)
+        assertEquals(EngineId.URNETWORK, failed.engineId)
+    }
+
+    @Test
     fun onVpnPermissionDeniedFromIdleIsNoOp() = runTest {
         viewModel.onVpnPermissionDenied()
         advanceUntilIdle()
