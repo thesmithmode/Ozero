@@ -159,6 +159,7 @@ class ServersViewModelTest {
         val state = viewModel.uiState.value as ServersUiState.Content
         assertEquals("b", state.exitId)
         assertNull(state.exit)
+        assertFalse(state.canSave)
     }
 
     @Test

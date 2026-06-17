@@ -15,6 +15,6 @@ sealed interface ServersUiState {
         val entry: ServerEntity? get() = servers.firstOrNull { it.id == entryId }
         val exit: ServerEntity? get() = servers.firstOrNull { it.id == exitId }
         val canSave: Boolean
-            get() = entryId != null && exitId != null && entryId != exitId
+            get() = entry != null && exit != null && entryId != exitId
     }
 }
