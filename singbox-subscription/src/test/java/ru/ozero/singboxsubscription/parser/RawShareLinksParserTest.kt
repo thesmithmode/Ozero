@@ -100,6 +100,34 @@ class RawShareLinksParserTest {
     }
 
     @Test
+    fun `should preserve unescaped spaces in share link names`() {
+        val vless = "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443" +
+            "?type=tcp&security=none#Aetris Netherlands 01"
+        val trojan = "trojan://secret@trojan.example.com:443?security=tls#Trojan City Node"
+        val text = "$vless\n$trojan"
+
+        val result = RawShareLinksParser.parse(text)
+
+        assertEquals(2, result.size)
+        assertEquals("Aetris Netherlands 01", result[0].name)
+        assertEquals("Trojan City Node", result[1].name)
+    }
+
+    @Test
+    fun `should split adjacent share links without cutting fragment words`() {
+        val vless1 = "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443" +
+            "?type=tcp&security=none#First Node"
+        val vless2 = "vless://bbbbbbbb-2222-2222-2222-bbbbbbbbbbbb@s2.example.com:443" +
+            "?type=tcp&security=none#Second Node"
+
+        val result = RawShareLinksParser.parse("$vless1 $vless2")
+
+        assertEquals(2, result.size)
+        assertEquals("First Node", result[0].name)
+        assertEquals("Second Node", result[1].name)
+    }
+
+    @Test
     fun `should extract server address from parsed vless bean`() {
         val result = RawShareLinksParser.parse(sampleVless)
         val bean = result.first() as VLESSBean

@@ -156,8 +156,9 @@ class MasterDnsDockerScriptsContractTest {
         val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
 
         assertTrue(cmd.contains("in_domain = 1"))
-        assertTrue(cmd.contains("line = \\$0"))
-        assertTrue(cmd.contains("\\$0 ~ /[A-Za-z0-9]/"))
+        assertTrue(cmd.contains("line = ${'$'}0"))
+        assertTrue(cmd.contains("${'$'}0 ~ /[A-Za-z0-9]/"))
+        assertTrue(cmd.contains("awk -f /tmp/masterdns-domain-present.awk"))
         assertTrue(cmd.contains("END { exit(found ? 0 : 1) }"))
         assertFalse(cmd.contains("grep -Eq \"^[[:space:]]*DOMAIN[[:space:]]*=.*[A-Za-z0-9]"))
     }
@@ -167,12 +168,13 @@ class MasterDnsDockerScriptsContractTest {
         val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
 
         assertTrue(cmd.contains("skip {"))
-        assertTrue(cmd.contains("if (\\$0 ~ /\\]/) skip = 0"))
+        assertTrue(cmd.contains("if (${'$'}0 ~ /\\]/) skip = 0"))
+        assertTrue(cmd.contains("awk -f /tmp/masterdns-domain-strip.awk"))
         assertFalse(cmd.contains("grep -Ev \"^[[:space:]]*DOMAIN[[:space:]]*=\""))
     }
 
     @Test
-    fun `runContainer config init shell keeps nested sh-c single quote balanced`() {
+    fun `runContainer config init shell keeps nested sh-c shell quoting inert`() {
         val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
         val configInit = cmd.substringAfter("masterdns-ozero sh -c '").substringBefore("' 2>&1")
         val escapedSingleQuotes = configInit
@@ -182,6 +184,9 @@ class MasterDnsDockerScriptsContractTest {
         assertFalse(escapedSingleQuotes.contains("'"))
         assertFalse(escapedSingleQuotes.contains("sed '"))
         assertTrue(configInit.contains("sed \""))
+        assertFalse(configInit.contains("awk \""))
+        assertTrue(configInit.contains("<<\\AWK_DOMAIN_PRESENT"))
+        assertTrue(configInit.contains("<<\\AWK_DOMAIN_STRIP"))
         assertTrue(configInit.contains("elif grep -Eq"))
         assertTrue(configInit.contains("fi"))
     }

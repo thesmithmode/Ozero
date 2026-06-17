@@ -15,6 +15,7 @@ fun interface SingboxRoutedProbe {
 
 class SingboxHttp204RoutedProbe(
     private val probeUrl: URL = URL(PROBE_URL),
+    private val fallbackProbeUrls: List<URL> = FALLBACK_PROBE_URLS.map(::URL),
     private val socksHost: String = LOOPBACK,
     private val timeoutMs: Int = DEFAULT_TIMEOUT_MS,
     private val nanoTime: () -> Long = System::nanoTime,
@@ -25,10 +26,19 @@ class SingboxHttp204RoutedProbe(
             PersistentLoggers.warn(TAG, "routed probe failed: invalid socksPort=$socksPort")
             return@withContext LATENCY_FAILED
         }
+        val urls = listOf(probeUrl) + fallbackProbeUrls
+        for (url in urls.distinctBy { it.toString() }) {
+            val latency = probeSingleUrl(url, socksPort)
+            if (latency >= 0) return@withContext latency
+        }
+        LATENCY_FAILED
+    }
+
+    private fun probeSingleUrl(url: URL, socksPort: Int): Long {
         val start = nanoTime()
-        runCatching {
+        return runCatching {
             val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress(socksHost, socksPort))
-            val connection = probeUrl.openConnection(proxy) as HttpURLConnection
+            val connection = url.openConnection(proxy) as HttpURLConnection
             try {
                 connection.requestMethod = "GET"
                 connection.instanceFollowRedirects = false
@@ -36,12 +46,12 @@ class SingboxHttp204RoutedProbe(
                 connection.connectTimeout = timeoutMs
                 connection.readTimeout = timeoutMs
                 val code = connection.responseCode
-                if (code == HttpURLConnection.HTTP_NO_CONTENT) {
+                if (code in SUCCESS_HTTP_CODES) {
                     TimeUnit.NANOSECONDS.toMillis(nanoTime() - start).coerceAtLeast(1L)
                 } else {
                     PersistentLoggers.warn(
                         TAG,
-                        "routed probe failed: httpCode=$code urlHost=${probeUrl.host} socksPort=$socksPort",
+                        "routed probe failed: httpCode=$code urlHost=${url.host} socksPort=$socksPort",
                     )
                     LATENCY_FAILED
                 }
@@ -52,7 +62,7 @@ class SingboxHttp204RoutedProbe(
             PersistentLoggers.warn(
                 TAG,
                 "routed probe failed: ${error::class.java.simpleName}: ${error.message} " +
-                    "urlHost=${probeUrl.host} socksPort=$socksPort timeoutMs=$timeoutMs",
+                    "urlHost=${url.host} socksPort=$socksPort timeoutMs=$timeoutMs",
             )
             LATENCY_FAILED
         }
@@ -61,8 +71,13 @@ class SingboxHttp204RoutedProbe(
     companion object {
         private const val TAG = "SingboxRoutedProbe"
         const val PROBE_URL = "https://www.gstatic.com/generate_204"
+        val FALLBACK_PROBE_URLS = listOf(
+            "https://cp.cloudflare.com/generate_204",
+            "https://www.cloudflare.com/cdn-cgi/trace",
+        )
         const val LATENCY_FAILED = -1L
         private const val LOOPBACK = "127.0.0.1"
         private const val DEFAULT_TIMEOUT_MS = 3_000
+        private val SUCCESS_HTTP_CODES = 200..399
     }
 }

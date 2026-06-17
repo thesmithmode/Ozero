@@ -186,6 +186,24 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
+    fun `new subscription group is appended after highest existing user order`() = runTest {
+        val harness = Harness(
+            initialGroups = listOf(
+                group(id = 1L, userOrder = 0),
+                group(id = 2L, userOrder = 10),
+            ),
+        )
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+
+        harness.viewModel.onAddGroupFieldChanged(name = "Tail", url = "https://example.com/tail")
+        harness.viewModel.onAddGroupConfirm()
+        advanceUntilIdle()
+
+        assertEquals(11, harness.insertedGroups.single().userOrder)
+    }
+
+    @Test
     fun `manual links dialog show and hide preserve then reset fields`() = runTest {
         val harness = Harness()
         harness.startStateCollection(backgroundScope)
@@ -670,6 +688,23 @@ class SingboxEngineSettingsViewModelCoverageTest {
         coVerify(exactly = 1) { harness.rawUpdater.refresh(match { it.id == 1L }) }
         coVerify(exactly = 1) { harness.rawUpdater.refresh(match { it.id == 2L }) }
         assertTrue(harness.viewModel.state.value.isRefreshing.isEmpty())
+    }
+
+    @Test
+    fun `onRefresh updates subscriptions without implicit profile probing`() = runTest {
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0)),
+            initialProfiles = listOf(profile(id = 101L, groupId = 1L, name = "Probe", userOrder = 0)),
+        )
+        coEvery { harness.rawUpdater.refresh(any()) } returns Result.success(1)
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+
+        harness.viewModel.onRefresh(1L)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { harness.rawUpdater.refresh(match { it.id == 1L }) }
+        assertTrue(harness.probeCalls.isEmpty())
     }
 
     @Test

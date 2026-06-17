@@ -44,6 +44,18 @@ class V2RayFmtUtilsTest {
     }
 
     @Test
+    fun `parseSecurityParams accepts server name and insecure aliases from VLESS subscriptions`() {
+        val bean = V2RayFmt.parseVLESS(
+            "vless://12345678-1234-1234-1234-123456789abc@203.0.113.10:443" +
+                "?security=tls&serverName=front.example.com&allow-insecure=true#Private",
+        )
+
+        assertEquals("tls", bean.security)
+        assertEquals("front.example.com", bean.sni)
+        assertTrue(bean.allowInsecure)
+    }
+
+    @Test
     fun `parseSecurityParams uses safe defaults`() {
         val bean = VLESSBean()
 

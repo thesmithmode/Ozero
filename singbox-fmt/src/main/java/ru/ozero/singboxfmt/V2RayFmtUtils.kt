@@ -12,13 +12,21 @@ internal object V2RayFmtUtils {
 
     fun parseSecurityParams(bean: StandardV2RayBean, parsed: UriCompat) {
         bean.security = parsed.getQueryParameter("security") ?: "none"
-        bean.sni = parsed.getQueryParameter("sni") ?: ""
+        bean.sni = parsed.firstQueryParameter("sni", "serverName", "servername", "server_name") ?: ""
         bean.alpn = parsed.getQueryParameter("alpn") ?: ""
         bean.utlsFingerprint = parsed.getQueryParameter("fp") ?: ""
         bean.realityPublicKey = parsed.getQueryParameter("pbk") ?: ""
         bean.realityShortId = parsed.getQueryParameter("sid") ?: ""
         bean.realityFingerprint = parsed.getQueryParameter("fp") ?: "chrome"
-        bean.allowInsecure = listOf("allowInsecure", "allow_insecure", "insecure", "skip-cert-verify")
+        bean.allowInsecure = listOf(
+            "allowInsecure",
+            "allow-insecure",
+            "allow_insecure",
+            "insecure",
+            "skip-cert-verify",
+            "skipCertVerify",
+            "skip_cert_verify",
+        )
             .any { parsed.getQueryParameter(it).isTruthy() }
     }
 
@@ -69,4 +77,7 @@ internal object V2RayFmtUtils {
         "1", "true", "yes" -> true
         else -> false
     }
+
+    private fun UriCompat.firstQueryParameter(vararg keys: String): String? =
+        keys.firstNotNullOfOrNull { getQueryParameter(it)?.takeIf(String::isNotBlank) }
 }

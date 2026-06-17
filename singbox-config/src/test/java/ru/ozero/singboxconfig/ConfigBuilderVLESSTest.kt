@@ -2,6 +2,7 @@ package ru.ozero.singboxconfig
 
 import org.junit.jupiter.api.Test
 import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.V2RayFmt
 import kotlin.test.assertContains
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -219,6 +220,19 @@ class ConfigBuilderVLESSTest {
         val bean = makeBean(host = "203.0.113.10", type = "ws", security = "tls").apply {
             this.host = "front.example.com"
         }
+        val json = ConfigBuilder.buildSingboxConfig(bean)
+
+        assertContains(json, "\"server_name\":\"front.example.com\"")
+        assertFalse(json.contains("\"server_name\":\"203.0.113.10\""))
+    }
+
+    @Test
+    fun `tls server name alias from VLESS subscription is preserved in generated config`() {
+        val bean = V2RayFmt.parseVLESS(
+            "vless://12345678-1234-1234-1234-123456789abc@203.0.113.10:443" +
+                "?security=tls&serverName=front.example.com#Private",
+        )
+
         val json = ConfigBuilder.buildSingboxConfig(bean)
 
         assertContains(json, "\"server_name\":\"front.example.com\"")
