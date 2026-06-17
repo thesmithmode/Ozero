@@ -157,7 +157,8 @@ class ServersViewModelTest {
 
         assertEquals(emptyList<ServerEntity>(), dao.upserts)
         val state = viewModel.uiState.value as ServersUiState.Content
-        assertFalse(state.canSave)
+        assertEquals("b", state.exitId)
+        assertNull(state.exit)
     }
 
     @Test
