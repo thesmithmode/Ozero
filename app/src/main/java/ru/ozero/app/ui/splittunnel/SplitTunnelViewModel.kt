@@ -112,6 +112,7 @@ class SplitTunnelViewModel @Inject constructor(
     }
 
     fun onClearAll() {
+        if (tunnelController.state.value !is TunnelState.Idle) return
         viewModelScope.launch {
             val snapshot = runCatching { dao.observeAll().first() }.getOrNull() ?: return@launch
             snapshot.forEach { dao.delete(it.packageName) }

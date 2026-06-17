@@ -78,6 +78,19 @@ class ServersViewModelTest {
     }
 
     @Test
+    fun `onExitSelect sets exit id only`() = runTest {
+        dao.emit(sample)
+        advanceUntilIdle()
+
+        viewModel.onExitSelect("b")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value as ServersUiState.Content
+        assertNull(state.entryId)
+        assertEquals("b", state.exitId)
+    }
+
+    @Test
     fun `canSave false when only one selected`() = runTest {
         dao.emit(sample)
         advanceUntilIdle()
@@ -130,6 +143,24 @@ class ServersViewModelTest {
     }
 
     @Test
+    fun `onSavePair no-op when selected server disappeared`() = runTest {
+        dao.emit(sample)
+        advanceUntilIdle()
+
+        viewModel.onEntrySelect("a")
+        viewModel.onExitSelect("b")
+        dao.emit(listOf(server("a", "RU", "entry")))
+        advanceUntilIdle()
+
+        viewModel.onSavePair()
+        advanceUntilIdle()
+
+        assertEquals(emptyList<ServerEntity>(), dao.upserts)
+        val state = viewModel.uiState.value as ServersUiState.Content
+        assertFalse(state.canSave)
+    }
+
+    @Test
     fun `onClearPair clears pairId on selected entries`() = runTest {
         val paired = listOf(
             server("a", "RU", "entry").copy(pairId = "b"),
@@ -146,6 +177,22 @@ class ServersViewModelTest {
         advanceUntilIdle()
 
         assertTrue(dao.upserts.all { it.pairId == null })
+    }
+
+    @Test
+    fun `onClearPair no-op when selected pair is incomplete`() = runTest {
+        val paired = listOf(server("a", "RU", "entry").copy(pairId = "b"))
+        dao.emit(paired)
+        advanceUntilIdle()
+
+        viewModel.onEntrySelect("a")
+        viewModel.onExitSelect("b")
+        advanceUntilIdle()
+
+        viewModel.onClearPair()
+        advanceUntilIdle()
+
+        assertEquals(emptyList<ServerEntity>(), dao.upserts)
     }
 
     private fun server(id: String, country: String, role: String) =
