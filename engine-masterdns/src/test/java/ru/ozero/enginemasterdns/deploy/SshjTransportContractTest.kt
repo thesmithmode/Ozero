@@ -28,6 +28,19 @@ class SshjTransportContractTest {
     }
 
     @Test
+    fun `exec applies timeout before blocking stdout read`() {
+        val execBlock = source.substringAfter("override fun exec")
+            .substringBefore("override fun close")
+        assertTrue(
+            execBlock.indexOf("cmd.join(timeoutMs") < execBlock.indexOf("IOUtils.readFully(cmd.inputStream)"),
+            "exec must join with timeout before readFully(inputStream), otherwise hung remote command bypasses timeout",
+        )
+        assertTrue(execBlock.contains("exit == null"))
+        assertTrue(execBlock.contains("cmd.close()"))
+        assertTrue(execBlock.contains("ERR_TIMEOUT|timeoutMs="))
+    }
+
+    @Test
     fun `curve25519 kex excluded to avoid X25519 NoSuchAlgorithmException on Android BC`() {
         assertTrue(
             source.contains("curve25519") && source.contains("filter"),

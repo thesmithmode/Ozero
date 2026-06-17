@@ -1,8 +1,6 @@
 package ru.ozero.app.ui.settings.engines
 
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,8 +18,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -41,15 +37,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -68,13 +60,6 @@ fun MasterDnsSettingsScreen(
 ) {
     BackHandler(onBack = onBack)
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val clipboard = LocalClipboardManager.current
-    val context = LocalContext.current
-    val copiedMsg = stringResource(R.string.masterdns_copied_toast)
-    val onCopy: (String) -> Unit = { value ->
-        clipboard.setText(AnnotatedString(value))
-        Toast.makeText(context, copiedMsg, Toast.LENGTH_SHORT).show()
-    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -105,7 +90,6 @@ fun MasterDnsSettingsScreen(
                 onAmneziaDnsConflictCancel = viewModel::onAmneziaDnsConflictCancel,
                 onAmneziaDnsRemoveAndContinue = viewModel::onAmneziaDnsRemoveAndContinue,
             )
-            ServerSetupCard(onCopy = onCopy)
             OutlinedTextField(
                 value = state.configToml,
                 onValueChange = viewModel::onConfigTomlChange,
@@ -526,133 +510,3 @@ internal fun masterDnsDeployErrorText(code: String): MasterDnsDeployErrorText = 
     code == "unexpected_error" -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_unexpected)
     else -> MasterDnsDeployErrorText(R.string.masterdns_deploy_error_generic, listOf(code))
 }
-
-@Composable
-private fun ServerSetupCard(onCopy: (String) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = stringResource(R.string.masterdns_setup_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.weight(1f),
-                )
-                Icon(
-                    imageVector = if (expanded) {
-                        Icons.Filled.KeyboardArrowUp
-                    } else {
-                        Icons.Filled.KeyboardArrowDown
-                    },
-                    contentDescription = null,
-                )
-            }
-            if (expanded) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.masterdns_setup_prereq),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                )
-                Spacer(Modifier.height(16.dp))
-                SetupStep(
-                    number = 1,
-                    title = stringResource(R.string.masterdns_setup_step1_title),
-                    code = stringResource(R.string.masterdns_setup_step1_body),
-                    onCopy = onCopy,
-                )
-                Spacer(Modifier.height(12.dp))
-                SetupStep(
-                    number = 2,
-                    title = stringResource(R.string.masterdns_setup_step2_title),
-                    code = INSTALL_CMD,
-                    onCopy = onCopy,
-                )
-                Spacer(Modifier.height(12.dp))
-                SetupStep(
-                    number = 3,
-                    title = stringResource(R.string.masterdns_setup_step3_title),
-                    code = VERIFY_DNS_CMD,
-                    onCopy = onCopy,
-                )
-                Spacer(Modifier.height(12.dp))
-                SetupStep(
-                    number = 4,
-                    title = stringResource(R.string.masterdns_setup_step4_title),
-                    code = stringResource(R.string.masterdns_setup_step4_body),
-                    onCopy = onCopy,
-                )
-                Spacer(Modifier.height(12.dp))
-                SetupStep(
-                    number = 5,
-                    title = stringResource(R.string.masterdns_setup_step5_title),
-                    code = START_CMD,
-                    onCopy = onCopy,
-                )
-                Spacer(Modifier.height(12.dp))
-                SetupStep(
-                    number = 6,
-                    title = stringResource(R.string.masterdns_setup_step6_title),
-                    code = stringResource(R.string.masterdns_setup_step6_body),
-                    onCopy = onCopy,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SetupStep(
-    number: Int,
-    title: String,
-    code: String,
-    onCopy: (String) -> Unit,
-) {
-    Column {
-        Text(
-            text = "$number. $title",
-            style = MaterialTheme.typography.titleSmall,
-        )
-        Spacer(Modifier.height(6.dp))
-        Surface(
-            shape = RoundedCornerShape(6.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(
-                text = code,
-                modifier = Modifier.padding(8.dp),
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = FontFamily.Monospace,
-                ),
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            TextButton(onClick = { onCopy(code) }) {
-                Text(stringResource(R.string.masterdns_copy_button))
-            }
-        }
-    }
-}
-
-private const val INSTALL_CMD =
-    "bash <(curl -Ls https://raw.githubusercontent.com/masterking32/MasterDnsVPN/main/server_linux_install.sh)"
-
-private const val VERIFY_DNS_CMD =
-    "dig v.example.com NS\n" +
-        "dig @ns.example.com v.example.com A"
-
-private const val START_CMD =
-    "ufw allow 53/udp || true\n" +
-        "firewall-cmd --add-port=53/udp --permanent 2>/dev/null || true\n" +
-        "firewall-cmd --reload 2>/dev/null || true\n" +
-        "systemctl enable --now masterdnsvpn-server || systemctl restart masterdnsvpn-server"

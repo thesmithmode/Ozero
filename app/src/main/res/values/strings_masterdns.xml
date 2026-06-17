@@ -3,19 +3,6 @@
     <string name="masterdns_engine_name">MasterDNS</string>
     <string name="masterdns_config_toml">Конфигурация client_config.toml</string>
     <string name="masterdns_resolvers">DNS-резолверы (по одному на строку)</string>
-    <string name="masterdns_setup_title">Как поднять свой сервер за 15 минут</string>
-    <string name="masterdns_setup_prereq">Нужен VPS (1 vCPU, 512 МБ RAM), открытый UDP/53 и домен, где можно создать A-запись и NS-делегирование. Домен в клиенте должен точно совпадать с DOMAIN на сервере.</string>
-    <string name="masterdns_setup_step1_title">Создать DNS-записи</string>
-    <string name="masterdns_setup_step1_body">В DNS основного домена создайте две записи (замените example.com и IP):\nns.example.com  A   IP-сервера\nv.example.com   NS  ns.example.com\nЕсли домен в Cloudflare, A-запись должна быть DNS only.</string>
-    <string name="masterdns_setup_step2_title">Запустить официальный установщик на VPS</string>
-    <string name="masterdns_setup_step3_title">Проверить делегирование поддомена</string>
-    <string name="masterdns_setup_step4_title">Проверить /etc/masterdnsvpn/server_config.toml</string>
-    <string name="masterdns_setup_step4_body">DOMAIN = [\"v.example.com\"]\nPROTOCOL_TYPE = \"SOCKS5\"\nUDP_PORT = 53\nDATA_ENCRYPTION_METHOD = 5\nENCRYPTION_KEY_FILE = \"/etc/masterdnsvpn/encrypt_key.txt\"</string>
-    <string name="masterdns_setup_step5_title">Открыть UDP/53 и запустить сервис</string>
-    <string name="masterdns_setup_step6_title">Собрать client_config.toml в приложении</string>
-    <string name="masterdns_setup_step6_body">DOMAINS = [\"v.example.com\"]\nSERVER = \"IP-сервера\"\nDATA_ENCRYPTION_METHOD = 5\nENCRYPTION_KEY = \"&lt;ключ из encrypt_key.txt&gt;\"\nPROTOCOL_TYPE = \"SOCKS5\"\nRESOLVER_BALANCING_STRATEGY = 3</string>
-    <string name="masterdns_copy_button">Скопировать</string>
-    <string name="masterdns_copied_toast">Скопировано</string>
     <string name="settings_masterdns_title">MasterDNS</string>
     <string name="settings_masterdns_summary">DNS-туннель — экстренный fallback при недоступности обычных протоколов.</string>
     <string name="masterdns_deploy_section_title">Автодеплой сервера</string>

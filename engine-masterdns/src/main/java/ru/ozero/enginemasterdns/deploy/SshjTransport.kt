@@ -37,11 +37,16 @@ internal class SshjTransport : SshTransport {
         val session = ssh.startSession()
         return try {
             val cmd = session.exec(command)
-            val stdout = IOUtils.readFully(cmd.inputStream).toString()
-            val stderr = runCatching { IOUtils.readFully(cmd.errorStream).toString() }.getOrDefault("")
             cmd.join(timeoutMs, TimeUnit.MILLISECONDS)
             val exit = cmd.exitStatus
-            if (exit != null && exit != 0) {
+            if (exit == null) {
+                runCatching { cmd.close() }
+                PersistentLoggers.warn(TAG, "exec[timeout=${timeoutMs}ms] cmd=${command.take(CMD_LOG_MAX)}")
+                return "ERR_TIMEOUT|timeoutMs=$timeoutMs"
+            }
+            val stdout = IOUtils.readFully(cmd.inputStream).toString()
+            val stderr = runCatching { IOUtils.readFully(cmd.errorStream).toString() }.getOrDefault("")
+            if (exit != 0) {
                 PersistentLoggers.warn(
                     TAG,
                     "exec[exit=$exit] cmd=${command.take(CMD_LOG_MAX)}" +

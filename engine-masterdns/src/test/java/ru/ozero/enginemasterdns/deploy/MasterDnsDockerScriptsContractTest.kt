@@ -132,9 +132,25 @@ class MasterDnsDockerScriptsContractTest {
     fun `runContainer migrates existing empty server domain config`() {
         val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
 
-        assertTrue(cmd.contains("grep -Eq '^DOMAIN[[:space:]]*=[[:space:]]*\\[[[:space:]]*\\]"))
-        assertTrue(cmd.contains("sed 's/^DOMAIN[[:space:]]*=[[:space:]]*\\[[[:space:]]*\\]"))
+        assertTrue(cmd.contains("grep -Eq \"^DOMAIN[[:space:]]*=[[:space:]]*\\[[[:space:]]*\\]"))
+        assertFalse(cmd.contains("grep -Eq '^DOMAIN"))
+        assertTrue(cmd.contains("sed \"s/^DOMAIN[[:space:]]*=[[:space:]]*\\[[[:space:]]*\\]"))
+        assertFalse(cmd.contains("sed 's/^DOMAIN[[:space:]]*=[[:space:]]*\\[[[:space:]]*\\]"))
+        assertTrue(cmd.contains("grep -Ev \"^DOMAIN[[:space:]]*=\""))
+        assertTrue(cmd.contains("printf \"DOMAIN = [\\\"${MasterDnsDockerScripts.DEFAULT_DOMAIN}\\\"]\\n\""))
         assertTrue(cmd.contains("DOMAIN = [\"${MasterDnsDockerScripts.DEFAULT_DOMAIN}\"]"))
+    }
+
+    @Test
+    fun `runContainer config init shell keeps nested sh-c single quote balanced`() {
+        val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
+        val configInit = cmd.substringAfter("masterdns-ozero sh -c '").substringBefore("' 2>&1")
+
+        assertFalse(configInit.contains("'"))
+        assertFalse(configInit.contains("sed '"))
+        assertTrue(configInit.contains("sed \""))
+        assertTrue(configInit.contains("elif grep -Eq"))
+        assertTrue(configInit.contains("fi"))
     }
 
     @Test
