@@ -28,6 +28,23 @@ class SshjTransportContractTest {
     }
 
     @Test
+    fun `exec drains stdout and stderr before waiting for exit status`() {
+        val execBlock = source.substringAfter("override fun exec")
+            .substringBefore("override fun close")
+        assertTrue(
+            execBlock.indexOf("stdoutFuture") < execBlock.indexOf("cmd.join(timeoutMs"),
+            "exec must start stdout drain before join, otherwise verbose remote commands can block on SSH buffers",
+        )
+        assertTrue(
+            execBlock.indexOf("stderrFuture") < execBlock.indexOf("cmd.join(timeoutMs"),
+            "exec must start stderr drain before join, otherwise verbose remote commands can block on SSH buffers",
+        )
+        assertTrue(execBlock.contains("exit == null"))
+        assertTrue(execBlock.contains("cmd.close()"))
+        assertTrue(execBlock.contains("ERR_TIMEOUT|timeoutMs="))
+    }
+
+    @Test
     fun `curve25519 kex excluded to avoid X25519 NoSuchAlgorithmException on Android BC`() {
         assertTrue(
             source.contains("curve25519") && source.contains("filter"),

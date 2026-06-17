@@ -324,6 +324,19 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `customDnsServers from DataStore validates raw CSV before emitting`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.CUSTOM_DNS_SERVERS] =
+                " 8.8.8.8 , 999.999.999.999 , bad host , 2001:4860:4860::8888 "
+        }
+
+        assertEquals(
+            listOf("8.8.8.8", "2001:4860:4860::8888"),
+            repository.settings.first().customDnsServers,
+        )
+    }
+
+    @Test
     fun `setCustomDnsServers removes key when all entries invalid`() = runTest {
         repository.setCustomDnsServers(listOf("8.8.8.8"))
         repository.setCustomDnsServers(listOf("256.256.256.256", "bad,entry"))
@@ -339,6 +352,18 @@ class SettingsRepositoryTest {
         val current = repository.settings.first()
         assertEquals(HostsMode.BLACKLIST, current.hostsMode)
         assertEquals(listOf("example.com", "127.0.0.1:5353"), current.hosts)
+    }
+
+    @Test
+    fun `hosts from DataStore validates raw CSV before emitting`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.HOSTS_LIST] = " example.com , bad host , 127.0.0.1:5353 , "
+        }
+
+        assertEquals(
+            listOf("example.com", "127.0.0.1:5353"),
+            repository.settings.first().hosts,
+        )
     }
 
     @Test
@@ -367,6 +392,19 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `urnetwork country code from DataStore is normalized and invalid raw value is ignored`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] = " br "
+        }
+        assertEquals("BR", repository.settings.first().urnetworkCountryCode)
+
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] = "brazil"
+        }
+        assertNull(repository.settings.first().urnetworkCountryCode)
+    }
+
+    @Test
     fun `byedpi ui mode and settings round trip`() = runTest {
         repository.setByedpiUseUiMode(true)
         repository.setByedpiUiSettings(ByeDpiUiSettings.DEFAULT.copy(fakeSni = "front.example.com"))
@@ -374,6 +412,27 @@ class SettingsRepositoryTest {
         val current = repository.settings.first()
         assertTrue(current.byedpiUseUiMode)
         assertEquals("front.example.com", current.byedpiUiSettings.fakeSni)
+    }
+
+    @Test
+    fun `malformed byedpi ui settings json falls back to defaults`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON] = "{not-json"
+        }
+
+        assertEquals(ByeDpiUiSettings.DEFAULT, repository.settings.first().byedpiUiSettings)
+    }
+
+    @Test
+    fun `byedpi ui settings raw json tolerates invalid enum and blank oob char`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON] =
+                """{"schemaVersion":1,"desyncMethod":"UNKNOWN","oobChar":""}"""
+        }
+
+        val settings = repository.settings.first().byedpiUiSettings
+        assertEquals(ByeDpiUiSettings.DEFAULT.desyncMethod, settings.desyncMethod)
+        assertEquals(ByeDpiUiSettings.DEFAULT.oobChar, settings.oobChar)
     }
 
     @Test

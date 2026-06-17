@@ -312,11 +312,45 @@ DATA_ENCRYPTION_METHOD = 5
 ENCRYPTION_KEY_FILE = "/etc/masterdnsvpn/encrypt_key.txt"
 EOF
                     chmod 600 /etc/masterdnsvpn/server_config.toml
-                elif grep -Eq '^DOMAIN[[:space:]]*=[[:space:]]*\[[[:space:]]*\][[:space:]]*$' /etc/masterdnsvpn/server_config.toml; then
+                elif grep -Eq "^[[:space:]]*DOMAIN[[:space:]]*=[[:space:]]*\[[[:space:]]*\][[:space:]]*${'$'}" /etc/masterdnsvpn/server_config.toml; then
                     tmp_config=/etc/masterdnsvpn/server_config.toml.tmp
-                    sed 's/^DOMAIN[[:space:]]*=[[:space:]]*\[[[:space:]]*\][[:space:]]*${'$'}/DOMAIN = ["${DEFAULT_DOMAIN}"]/' \
+                    sed "s/^[[:space:]]*DOMAIN[[:space:]]*=[[:space:]]*\[[[:space:]]*\][[:space:]]*${'$'}/DOMAIN = [\"${DEFAULT_DOMAIN}\"]/" \
                         /etc/masterdnsvpn/server_config.toml > "${'$'}tmp_config"
                     cat "${'$'}tmp_config" > /etc/masterdnsvpn/server_config.toml
+                    rm -f "${'$'}tmp_config"
+                    chmod 600 /etc/masterdnsvpn/server_config.toml
+                fi
+                if ! awk "
+                    /^[[:space:]]*DOMAIN[[:space:]]*=/ {
+                        in_domain = 1
+                        line = \${'$'}0
+                        sub(/^[^[]*\[/, "", line)
+                        if (line ~ /[A-Za-z0-9]/) found = 1
+                        if (line ~ /\]/) in_domain = 0
+                        next
+                    }
+                    in_domain {
+                        if (\${'$'}0 ~ /[A-Za-z0-9]/) found = 1
+                        if (\${'$'}0 ~ /\]/) in_domain = 0
+                    }
+                    END { exit(found ? 0 : 1) }
+                " /etc/masterdnsvpn/server_config.toml; then
+                    tmp_config=/etc/masterdnsvpn/server_config.toml.tmp
+                    awk "
+                        /^[[:space:]]*DOMAIN[[:space:]]*=/ {
+                            line = \${'$'}0
+                            sub(/^[^[]*\[/, "", line)
+                            if (line !~ /\]/) skip = 1
+                            next
+                        }
+                        skip {
+                            if (\${'$'}0 ~ /\]/) skip = 0
+                            next
+                        }
+                        { print }
+                    " /etc/masterdnsvpn/server_config.toml > "${'$'}tmp_config"
+                    printf "DOMAIN = [\"${DEFAULT_DOMAIN}\"]\n" > /etc/masterdnsvpn/server_config.toml
+                    cat "${'$'}tmp_config" >> /etc/masterdnsvpn/server_config.toml
                     rm -f "${'$'}tmp_config"
                     chmod 600 /etc/masterdnsvpn/server_config.toml
                 fi

@@ -375,8 +375,13 @@ class MainViewModel @Inject constructor(
 
     fun onVpnPermissionDenied() {
         val current = state.value
-        if (current is TunnelState.Probing || current is TunnelState.Connecting) {
-            tunnelController.onEngineDied(EngineId.BYEDPI, "VPN permission denied")
+        val engineId = when (current) {
+            is TunnelState.Probing -> current.engineId ?: EngineId.BYEDPI
+            is TunnelState.Connecting -> current.engineId
+            else -> null
+        }
+        if (engineId != null) {
+            tunnelController.onEngineDied(engineId, "VPN permission denied")
         }
     }
 

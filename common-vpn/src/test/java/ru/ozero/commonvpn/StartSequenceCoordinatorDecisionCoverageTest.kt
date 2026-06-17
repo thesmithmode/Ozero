@@ -114,6 +114,39 @@ class StartSequenceCoordinatorDecisionCoverageTest {
     }
 
     @Test
+    fun `run in auto proxy mode skips failed preflight candidate and starts next accepted engine`() =
+        kotlinx.coroutines.test.runTest {
+            val failed = DecisionPlugin(
+                EngineId.WARP,
+                manualConfig = EngineConfig.WarpProxy(2080),
+                proxyConfig = EngineConfig.WarpProxy(2080),
+                capabilities = proxyCapabilities(providesStandalone = true),
+                preflightResult = EnginePreflight.Result.Fail("offline"),
+            )
+            val accepted = DecisionPlugin(
+                EngineId.BYEDPI,
+                manualConfig = EngineConfig.ByeDpi(socksPort = 2081),
+                proxyConfig = EngineConfig.ByeDpi(socksPort = 2081),
+                capabilities = proxyCapabilities(providesStandalone = true),
+                preflightResult = EnginePreflight.Result.Ok,
+            )
+            val coordinator = coordinator(
+                failed,
+                accepted,
+                settings = SettingsModel(
+                    trafficMode = TrafficMode.PROXY,
+                    manualEngine = null,
+                    engineAutoPriority = listOf(EngineId.WARP, EngineId.BYEDPI),
+                ),
+            )
+
+            coordinator.run()
+
+            assertEquals(0, failed.startCalls)
+            assertEquals(1, accepted.startCalls)
+        }
+
+    @Test
     fun `build config returns null for missing plugin and selects proxy config only in proxy mode`() {
         val plugin = DecisionPlugin(
             EngineId.WARP,
@@ -166,6 +199,7 @@ class StartSequenceCoordinatorDecisionCoverageTest {
     private fun coordinator(
         vararg plugins: EnginePlugin,
         watchdog: EngineWatchdogCoordinator = mockk(relaxed = true),
+        settings: SettingsModel = SettingsModel(),
     ): StartSequenceCoordinator {
         val pluginSet = plugins.toSet()
         return StartSequenceCoordinator(
@@ -180,7 +214,7 @@ class StartSequenceCoordinatorDecisionCoverageTest {
                 engineWatchdog = watchdog,
                 statsLogger = mockk(relaxed = true),
                 splitTunnelRulesProvider = SplitTunnelRulesProvider.NoOp,
-                settingsRepository = StaticSettingsRepository(),
+                settingsRepository = StaticSettingsRepository(settings),
                 sessionStatsRecorder = SessionStatsRecorder.NoOp,
             ),
             state = StartSequenceState(
@@ -239,8 +273,10 @@ class StartSequenceCoordinatorDecisionCoverageTest {
         private val preflightResult: EnginePreflight.Result? = null,
         private val preflightThrows: Boolean = false,
     ) : EnginePlugin {
+        var startCalls = 0
+
         override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult =
-            StartResult.Success(2080)
+            StartResult.Success(2080).also { startCalls += 1 }
 
         override suspend fun stop() = Unit
         override suspend fun probe(): ProbeResult = ProbeResult.Success(1L)
@@ -274,8 +310,8 @@ class StartSequenceCoordinatorDecisionCoverageTest {
             ru.ozero.enginescore.TunAttachResult.Success
     }
 
-    private class StaticSettingsRepository : SettingsRepository {
-        override val settings: Flow<SettingsModel> = flowOf(SettingsModel())
+    private class StaticSettingsRepository(settings: SettingsModel = SettingsModel()) : SettingsRepository {
+        override val settings: Flow<SettingsModel> = flowOf(settings)
         override suspend fun setSplitMode(mode: ru.ozero.enginescore.settings.SplitTunnelMode) = Unit
         override suspend fun setIpv6Enabled(enabled: Boolean) = Unit
         override suspend fun setAutoStart(enabled: Boolean) = Unit

@@ -271,6 +271,26 @@ class SplitTunnelViewModelTest {
     }
 
     @Test
+    fun `onClearAll игнорируется когда tunnel не Idle`() = runTest {
+        dao.emit(
+            listOf(
+                AppSplitRule("com.user.foo", isExcluded = false),
+                AppSplitRule("com.user.bar", isExcluded = false),
+            ),
+        )
+        tunnelController.onProbing(EngineId.BYEDPI)
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, socksPort = 1080)
+        advanceUntilIdle()
+
+        viewModel.onClearAll()
+        advanceUntilIdle()
+
+        assertEquals(emptyList<String>(), dao.deletes, "Connected → clear all игнор")
+        assertEquals(2, dao.flow.value.size)
+    }
+
+    @Test
     fun `included apps всплывают наверх списка`() = runTest {
         dao.emit(listOf(AppSplitRule("com.user.foo", isExcluded = false)))
         advanceUntilIdle()
@@ -507,6 +527,35 @@ class SplitTunnelViewModelTest {
         assertEquals(listOf("com.user.bar"), refreshed.apps.map { it.packageName })
     }
 
+    @Test
+    fun `stale slower refresh result не перетирает более свежий refresh`() = runTest {
+        val refreshProvider = MultiRefreshGatedAppListProvider(sample)
+        val vm = SplitTunnelViewModel(refreshProvider, dao, settings, tunnelController)
+        advanceUntilIdle()
+
+        vm.refreshApps()
+        vm.refreshApps()
+        advanceUntilIdle()
+
+        refreshProvider.completeRefresh(
+            1,
+            listOf(InstalledApp("com.user.fresh", "Fresh", isSystem = false)),
+        )
+        advanceUntilIdle()
+
+        val fresh = assertIs<SplitTunnelUiState.Content>(vm.uiState.value)
+        assertEquals(listOf("com.user.fresh"), fresh.apps.map { it.packageName })
+
+        refreshProvider.completeRefresh(
+            0,
+            listOf(InstalledApp("com.user.stale", "Stale", isSystem = false)),
+        )
+        advanceUntilIdle()
+
+        val afterStale = assertIs<SplitTunnelUiState.Content>(vm.uiState.value)
+        assertEquals(listOf("com.user.fresh"), afterStale.apps.map { it.packageName })
+    }
+
     private class FakeAppListProvider(apps: List<InstalledApp>) : AppListProvider {
         private val events = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
         private var currentApps = apps
@@ -577,6 +626,25 @@ class SplitTunnelViewModelTest {
         }
         fun emitPackageChange() {
             events.tryEmit(Unit)
+        }
+    }
+
+    private class MultiRefreshGatedAppListProvider(initialApps: List<InstalledApp>) : AppListProvider {
+        private val events = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
+        private var currentApps = initialApps
+        private val refreshSignals = mutableListOf<CompletableDeferred<List<InstalledApp>>>()
+        override val packageChanges: Flow<Unit> = events.asSharedFlow()
+        override suspend fun loadApps(): List<InstalledApp> = currentApps
+        override suspend fun refreshApps(): List<InstalledApp> {
+            val signal = CompletableDeferred<List<InstalledApp>>()
+            refreshSignals += signal
+            val refreshed = signal.await()
+            currentApps = refreshed
+            return refreshed
+        }
+        override suspend fun loadIcon(packageName: String): androidx.compose.ui.graphics.ImageBitmap? = null
+        fun completeRefresh(index: Int, apps: List<InstalledApp>) {
+            refreshSignals[index].complete(apps)
         }
     }
 

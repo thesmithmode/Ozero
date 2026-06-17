@@ -186,11 +186,11 @@ fun StrategyTestScreen(
     )
 }
 
-private enum class SheetTarget { Saved, Settings, DomainLists }
+internal enum class SheetTarget { Saved, Settings, DomainLists }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StrategyTestScaffold(
+internal fun StrategyTestScaffold(
     isRunning: Boolean,
     strategies: List<StrategyResult>,
     savedStrategies: List<SavedStrategy>,

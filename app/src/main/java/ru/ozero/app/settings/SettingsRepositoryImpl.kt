@@ -172,8 +172,7 @@ class SettingsRepositoryImpl @Inject constructor(
         engineAutoPriority = readEngineAutoPriority(),
         urnetworkEnabled = this[SettingsKeys.URNETWORK_ENABLED] ?: SettingsModel.DEFAULT_URNETWORK_ENABLED,
         urnetworkJwt = this[SettingsKeys.URNETWORK_JWT],
-        urnetworkCountryCode = this[SettingsKeys.URNETWORK_COUNTRY_CODE]
-            ?: SettingsModel.DEFAULT_URNETWORK_COUNTRY_CODE,
+        urnetworkCountryCode = readUrnetworkCountryCode(),
         byedpiWinningArgs = this[SettingsKeys.BYDPI_WINNING_ARGS],
         byedpiDefaultAccepted = this[SettingsKeys.BYDPI_DEFAULT_ACCEPTED]
             ?: SettingsModel.DEFAULT_BYEDPI_DEFAULT_ACCEPTED,
@@ -193,7 +192,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     private fun Preferences.readCustomDnsServers(): List<String> {
         val raw = this[SettingsKeys.CUSTOM_DNS_SERVERS] ?: return SettingsModel.DEFAULT_CUSTOM_DNS_SERVERS
-        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() && isValidDnsAddress(it) }
     }
 
     private fun Preferences.readHostsMode(): HostsMode {
@@ -203,8 +202,15 @@ class SettingsRepositoryImpl @Inject constructor(
 
     private fun Preferences.readHosts(): List<String> {
         val raw = this[SettingsKeys.HOSTS_LIST] ?: return SettingsModel.DEFAULT_HOSTS
-        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() && isValidHostname(it) }
     }
+
+    private fun Preferences.readUrnetworkCountryCode(): String? =
+        this[SettingsKeys.URNETWORK_COUNTRY_CODE]
+            ?.trim()
+            ?.uppercase()
+            ?.takeIf { it.length == 2 && it.all { ch -> ch.isLetter() } }
+            ?: SettingsModel.DEFAULT_URNETWORK_COUNTRY_CODE
 
     private fun Preferences.readSplitMode(): SplitTunnelMode {
         val raw = this[SettingsKeys.SPLIT_MODE] ?: return SettingsModel.DEFAULT_SPLIT_MODE

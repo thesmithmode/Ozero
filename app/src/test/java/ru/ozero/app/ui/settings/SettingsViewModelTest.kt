@@ -189,6 +189,14 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `onMoveAutoPriority no-op when delta is zero`() = runTest(dispatcher) {
+        val current = listOf(EngineId.BYEDPI, EngineId.WARP)
+        viewModel.onMoveAutoPriority(current, EngineId.BYEDPI, 0)
+        advanceUntilIdle()
+        assertEquals(emptyList(), repository.autoPriorityUpdates)
+    }
+
+    @Test
     fun `onAlwaysOnBannerDismissed forwards true to repository`() = runTest(dispatcher) {
         viewModel.onAlwaysOnBannerDismissed()
         advanceUntilIdle()

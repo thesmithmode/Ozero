@@ -201,7 +201,7 @@ private fun ServerDropdown(
         Column(modifier = Modifier.padding(12.dp)) {
             Text(text = label, style = MaterialTheme.typography.labelMedium)
             Text(
-                text = selected?.let { "${it.country} · ${it.protocol} (${it.role})" } ?: "—",
+                text = selected?.label() ?: "-",
                 style = MaterialTheme.typography.bodyLarge,
             )
         }
@@ -209,7 +209,7 @@ private fun ServerDropdown(
             servers.forEach { server ->
                 DropdownMenuItem(
                     text = {
-                        Text("${server.country} · ${server.protocol} (${server.role})")
+                        Text(server.label())
                     },
                     onClick = {
                         onSelect(server.id)
@@ -221,6 +221,8 @@ private fun ServerDropdown(
         }
     }
 }
+
+private fun ServerEntity.label(): String = "$country - $protocol ($role)"
 
 @Composable
 private fun PreviewCard(state: ServersUiState.Content) {

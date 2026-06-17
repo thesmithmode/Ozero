@@ -729,6 +729,136 @@ class StartSequenceCoordinatorBehaviorTest {
     }
 
     @Test
+    fun `auto TUN cleanup stops failed candidate before starting next candidate`() = runTest {
+        val events = mutableListOf<String>()
+        val first = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2211,
+            capabilities = tunnelCapabilities(),
+            onStart = { events += "start BYEDPI" },
+            onStop = { events += "stop BYEDPI" },
+        )
+        val second = FakeEnginePlugin(
+            id = EngineId.WARP,
+            socksPort = 2212,
+            capabilities = tunnelCapabilities(),
+            onStart = { events += "start WARP" },
+            onStop = { events += "stop WARP" },
+        )
+        val fixture = startFixture(
+            first,
+            second,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.BYEDPI, EngineId.WARP),
+            ),
+        )
+        val firstFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 2211
+            every { close() } answers {
+                events += "close BYEDPI fd"
+                Unit
+            }
+        }
+        val secondFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 2212
+        }
+        val firstBuilder = mockk<VpnService.Builder> {
+            every { establish() } returns firstFd
+        }
+        val secondBuilder = mockk<VpnService.Builder> {
+            every { establish() } returns secondFd
+        }
+        var buildCalls = 0
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any()) } answers {
+            if (buildCalls++ == 0) firstBuilder else secondBuilder
+        }
+        every { fixture.tunnelGateway.start(any()) } answers {
+            events += "tunnel ${firstArg<HevTunnelConfig>().socksPort}"
+            if (firstArg<HevTunnelConfig>().socksPort == 2211) -1 else 0
+        }
+
+        fixture.coordinator.run()
+
+        assertEquals(
+            listOf(
+                "start BYEDPI",
+                "tunnel 2211",
+                "stop BYEDPI",
+                "close BYEDPI fd",
+                "start WARP",
+                "tunnel 2212",
+            ),
+            events,
+        )
+        assertEquals(1, first.stopCalls)
+        assertEquals(0, second.stopCalls)
+        verify(exactly = 1) { firstFd.close() }
+        verify(exactly = 0) { secondFd.close() }
+        verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(EngineId.BYEDPI, any()) }
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+    }
+
+    @Test
+    fun `auto TUN reports runtime failure only for last candidate`() = runTest {
+        val first = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            socksPort = 2221,
+            capabilities = tunnelCapabilities(),
+        )
+        val second = FakeEnginePlugin(
+            id = EngineId.WARP,
+            socksPort = 2222,
+            capabilities = tunnelCapabilities(),
+        )
+        val fixture = startFixture(
+            first,
+            second,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.BYEDPI, EngineId.WARP),
+            ),
+        )
+        val firstFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 2221
+        }
+        val secondFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 2222
+        }
+        val firstBuilder = mockk<VpnService.Builder> {
+            every { establish() } returns firstFd
+        }
+        val secondBuilder = mockk<VpnService.Builder> {
+            every { establish() } returns secondFd
+        }
+        var buildCalls = 0
+        every { fixture.tunBuilderHelper.buildTunBuilder(any(), any(), any()) } answers {
+            if (buildCalls++ == 0) firstBuilder else secondBuilder
+        }
+        every { fixture.tunnelGateway.start(any()) } returns -1
+
+        fixture.coordinator.run()
+
+        assertEquals(1, first.startedConfigs.size)
+        assertEquals(1, first.stopCalls)
+        assertEquals(1, second.startedConfigs.size)
+        assertEquals(1, second.stopCalls)
+        verify(exactly = 1) {
+            fixture.tunnelGateway.start(match { it.tunPfd === firstFd && it.socksPort == 2221 })
+        }
+        verify(exactly = 1) {
+            fixture.tunnelGateway.start(match { it.tunPfd === secondFd && it.socksPort == 2222 })
+        }
+        verify(exactly = 1) { firstFd.close() }
+        verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(EngineId.BYEDPI, any()) }
+        verify(exactly = 1) { fixture.engineWatchdog.handleEngineFailure(EngineId.WARP, "tunnel code=-1") }
+        assertTrue(fixture.stopRequested.get())
+        assertIs<TunnelState.Failed>(fixture.tunnelController.state.value)
+    }
+
+    @Test
     fun `manual TUN chain failure reports engine failure before establishing TUN`() = runTest {
         val engine = FakeEnginePlugin(
             id = EngineId.BYEDPI,
@@ -1097,16 +1227,20 @@ class StartSequenceCoordinatorBehaviorTest {
         private val startResult: StartResult = StartResult.Success(socksPort),
         private val readyResult: EnginePlugin.ReadyResult = EnginePlugin.ReadyResult.Ready,
         private val preflightResult: EnginePreflight.Result? = null,
+        private val onStart: () -> Unit = {},
+        private val onStop: () -> Unit = {},
     ) : EnginePlugin {
         val startedConfigs = mutableListOf<EngineConfig>()
         var stopCalls = 0
 
         override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
+            onStart()
             startedConfigs += config
             return startResult
         }
 
         override suspend fun stop() {
+            onStop()
             stopCalls++
         }
 

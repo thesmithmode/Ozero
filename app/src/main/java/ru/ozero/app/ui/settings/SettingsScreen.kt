@@ -454,7 +454,7 @@ private fun EnginesSection(
 private fun LogsSection(onOpenLogs: () -> Unit) {
     androidx.compose.material3.OutlinedButton(
         onClick = onOpenLogs,
-        modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+        modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth().testTag(SettingsTestTags.LOGS_ROW),
     ) {
         Text(stringResource(R.string.settings_logs))
     }
