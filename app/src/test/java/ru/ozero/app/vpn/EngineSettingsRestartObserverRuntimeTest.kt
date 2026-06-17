@@ -183,6 +183,55 @@ class EngineSettingsRestartObserverRuntimeTest {
         job.cancel()
     }
 
+    @Test
+    fun `handle restart when connected BYEDPI UI mode changes but args stay same`() = runTest(dispatcher) {
+        val state = MutableStateFlow<TunnelState>(TunnelState.Connected(EngineId.BYEDPI, 1080))
+        val restarts = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val observer = newObserver(state) { restarts += it }
+        val previous = snapshot(
+            manualEngine = EngineId.BYEDPI,
+            byedpiWinningArgs = "--same",
+            byedpiUseUiMode = true,
+        )
+        val current = previous.copy(byedpiUseUiMode = false)
+
+        observer.handle(trigger(previous = previous, snapshot = current))
+
+        assertEquals(
+            listOf(current),
+            restarts,
+            "BYEDPI CMD/UI mode changes affect ByeDpiEngine.buildManualConfig even when winning args text is unchanged.",
+        )
+    }
+
+    @Test
+    fun `triggers include BYEDPI UI mode in snapshot diff`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
+        val observer = newObserver(flow, alwaysConnected())
+        val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
+        val job = collectTriggers(observer, collected)
+        advanceUntilIdle()
+
+        val baseline = SettingsModel.DEFAULT.copy(
+            manualEngine = EngineId.BYEDPI,
+            byedpiWinningArgs = "--same",
+            byedpiUseUiMode = true,
+        )
+        flow.emit(baseline)
+        advanceRestartDebounce()
+        advanceUntilIdle()
+        flow.emit(baseline.copy(byedpiUseUiMode = false))
+        advanceRestartDebounce()
+        advanceUntilIdle()
+
+        assertEquals(1, collected.size)
+        assertEquals(true, collected.single().previous.byedpiUseUiMode)
+        assertEquals(false, collected.single().snapshot.byedpiUseUiMode)
+        assertEquals("--same", collected.single().previous.byedpiWinningArgs)
+        assertEquals("--same", collected.single().snapshot.byedpiWinningArgs)
+        job.cancel()
+    }
+
     private fun newObserver(
         state: MutableStateFlow<TunnelState>,
         onRestartConnected: (EngineSettingsRestartObserver.Snapshot) -> Unit,
