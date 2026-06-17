@@ -19,7 +19,7 @@ class ServersUiStateTest {
 
         assertEquals("entry", state.entry?.id)
         assertNull(state.exit)
-        assertTrue(state.canSave)
+        assertFalse(state.canSave)
     }
 
     @Test

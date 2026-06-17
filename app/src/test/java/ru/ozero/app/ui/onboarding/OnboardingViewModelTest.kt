@@ -5,7 +5,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -102,12 +104,16 @@ class OnboardingViewModelTest {
 
     @Test
     fun `currentLocale reflects selected locale`() = runTest {
-        vm.currentLocale.value
+        val collector = backgroundScope.launch(dispatcher) {
+            vm.currentLocale.collect()
+        }
+        dispatcher.scheduler.advanceUntilIdle()
 
         vm.onLocaleSelect("pt")
-        advanceUntilIdle()
+        dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals("pt", vm.currentLocale.value)
+        collector.cancel()
     }
 
     @Test
@@ -126,12 +132,16 @@ class OnboardingViewModelTest {
 
     @Test
     fun `currentAppMode reflects selected app mode`() = runTest {
-        vm.currentAppMode.value
+        val collector = backgroundScope.launch(dispatcher) {
+            vm.currentAppMode.collect()
+        }
+        dispatcher.scheduler.advanceUntilIdle()
 
         vm.onAppModeSelect(AppMode.EXPERT)
-        advanceUntilIdle()
+        dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(AppMode.EXPERT, vm.currentAppMode.value)
+        collector.cancel()
     }
 
     @Test
