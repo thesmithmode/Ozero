@@ -392,6 +392,19 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `urnetwork country code from DataStore is normalized and invalid raw value is ignored`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] = " br "
+        }
+        assertEquals("BR", repository.settings.first().urnetworkCountryCode)
+
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.URNETWORK_COUNTRY_CODE] = "brazil"
+        }
+        assertNull(repository.settings.first().urnetworkCountryCode)
+    }
+
+    @Test
     fun `byedpi ui mode and settings round trip`() = runTest {
         repository.setByedpiUseUiMode(true)
         repository.setByedpiUiSettings(ByeDpiUiSettings.DEFAULT.copy(fakeSni = "front.example.com"))
@@ -399,6 +412,27 @@ class SettingsRepositoryTest {
         val current = repository.settings.first()
         assertTrue(current.byedpiUseUiMode)
         assertEquals("front.example.com", current.byedpiUiSettings.fakeSni)
+    }
+
+    @Test
+    fun `malformed byedpi ui settings json falls back to defaults`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON] = "{not-json"
+        }
+
+        assertEquals(ByeDpiUiSettings.DEFAULT, repository.settings.first().byedpiUiSettings)
+    }
+
+    @Test
+    fun `byedpi ui settings raw json tolerates invalid enum and blank oob char`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON] =
+                """{"schemaVersion":1,"desyncMethod":"UNKNOWN","oobChar":""}"""
+        }
+
+        val settings = repository.settings.first().byedpiUiSettings
+        assertEquals(ByeDpiUiSettings.DEFAULT.desyncMethod, settings.desyncMethod)
+        assertEquals(ByeDpiUiSettings.DEFAULT.oobChar, settings.oobChar)
     }
 
     @Test

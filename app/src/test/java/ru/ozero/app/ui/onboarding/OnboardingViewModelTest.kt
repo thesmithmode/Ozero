@@ -101,6 +101,16 @@ class OnboardingViewModelTest {
     }
 
     @Test
+    fun `currentLocale reflects selected locale`() = runTest {
+        vm.currentLocale.value
+
+        vm.onLocaleSelect("pt")
+        advanceUntilIdle()
+
+        assertEquals("pt", vm.currentLocale.value)
+    }
+
+    @Test
     fun `onLocaleSelect with null clears tag`() = runTest {
         vm.onLocaleSelect(null)
         advanceUntilIdle()
@@ -112,6 +122,16 @@ class OnboardingViewModelTest {
         vm.onAppModeSelect(AppMode.EXPERT)
         advanceUntilIdle()
         assertEquals(listOf(AppMode.EXPERT), settings.appModeWrites)
+    }
+
+    @Test
+    fun `currentAppMode reflects selected app mode`() = runTest {
+        vm.currentAppMode.value
+
+        vm.onAppModeSelect(AppMode.EXPERT)
+        advanceUntilIdle()
+
+        assertEquals(AppMode.EXPERT, vm.currentAppMode.value)
     }
 
     @Test
