@@ -324,6 +324,19 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `customDnsServers from DataStore validates raw CSV before emitting`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.CUSTOM_DNS_SERVERS] =
+                " 8.8.8.8 , 999.999.999.999 , bad host , 2001:4860:4860::8888 "
+        }
+
+        assertEquals(
+            listOf("8.8.8.8", "2001:4860:4860::8888"),
+            repository.settings.first().customDnsServers,
+        )
+    }
+
+    @Test
     fun `setCustomDnsServers removes key when all entries invalid`() = runTest {
         repository.setCustomDnsServers(listOf("8.8.8.8"))
         repository.setCustomDnsServers(listOf("256.256.256.256", "bad,entry"))
@@ -339,6 +352,18 @@ class SettingsRepositoryTest {
         val current = repository.settings.first()
         assertEquals(HostsMode.BLACKLIST, current.hostsMode)
         assertEquals(listOf("example.com", "127.0.0.1:5353"), current.hosts)
+    }
+
+    @Test
+    fun `hosts from DataStore validates raw CSV before emitting`() = runTest {
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.HOSTS_LIST] = " example.com , bad host , 127.0.0.1:5353 , "
+        }
+
+        assertEquals(
+            listOf("example.com", "127.0.0.1:5353"),
+            repository.settings.first().hosts,
+        )
     }
 
     @Test

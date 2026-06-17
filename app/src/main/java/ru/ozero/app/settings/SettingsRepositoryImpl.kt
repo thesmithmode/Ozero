@@ -193,7 +193,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     private fun Preferences.readCustomDnsServers(): List<String> {
         val raw = this[SettingsKeys.CUSTOM_DNS_SERVERS] ?: return SettingsModel.DEFAULT_CUSTOM_DNS_SERVERS
-        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() && isValidDnsAddress(it) }
     }
 
     private fun Preferences.readHostsMode(): HostsMode {
@@ -203,7 +203,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     private fun Preferences.readHosts(): List<String> {
         val raw = this[SettingsKeys.HOSTS_LIST] ?: return SettingsModel.DEFAULT_HOSTS
-        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() && isValidHostname(it) }
     }
 
     private fun Preferences.readSplitMode(): SplitTunnelMode {
