@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -94,7 +95,62 @@ class ServersScreenTest {
             }
         }
         composeRule.onNodeWithTag(ServersTestTags.SAVE).performClick()
-        assert(saved)
+        assertEquals(true, saved)
+    }
+
+    @Test
+    fun clearButtonInvokesCallbackWhenPairComplete() {
+        var cleared = false
+        composeRule.setContent {
+            OzeroTheme {
+                ServersScreenContent(
+                    state = ServersUiState.Content(
+                        servers = sample,
+                        entryId = "a",
+                        exitId = "b",
+                    ),
+                    onBack = {},
+                    onEntrySelect = {},
+                    onExitSelect = {},
+                    onSavePair = {},
+                    onClearPair = { cleared = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ServersTestTags.CLEAR)
+            .assertIsEnabled()
+            .performClick()
+
+        assertEquals(true, cleared)
+    }
+
+    @Test
+    fun dropdownOptionsInvokeSelectionCallbacks() {
+        val selected = mutableListOf<String>()
+        composeRule.setContent {
+            OzeroTheme {
+                ServersScreenContent(
+                    state = ServersUiState.Content(
+                        servers = sample,
+                        entryId = null,
+                        exitId = null,
+                    ),
+                    onBack = {},
+                    onEntrySelect = { selected += "entry:$it" },
+                    onExitSelect = { selected += "exit:$it" },
+                    onSavePair = {},
+                    onClearPair = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ServersTestTags.ENTRY_DROPDOWN).performClick()
+        composeRule.onNodeWithTag(ServersTestTags.ENTRY_OPTION_PREFIX + "a").performClick()
+        composeRule.onNodeWithTag(ServersTestTags.EXIT_DROPDOWN).performClick()
+        composeRule.onNodeWithTag(ServersTestTags.EXIT_OPTION_PREFIX + "b").performClick()
+
+        assertEquals(listOf("entry:a", "exit:b"), selected)
     }
 
     @Test
@@ -113,7 +169,7 @@ class ServersScreenTest {
             }
         }
         composeRule.onNodeWithTag(ServersTestTags.BACK).performClick()
-        assert(back)
+        assertEquals(true, back)
     }
 
     private fun server(id: String, country: String): ServerEntity =
