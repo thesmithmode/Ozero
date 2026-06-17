@@ -155,9 +155,10 @@ class MasterDnsDockerScriptsContractTest {
     fun `runContainer config init shell keeps nested sh-c single quote balanced`() {
         val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
         val configInit = cmd.substringAfter("masterdns-ozero sh -c '").substringBefore("' 2>&1")
+        val escapedSingleQuotes = configInit.replace("'\\''", "")
 
-        assertFalse(configInit.contains("'"))
-        assertFalse(configInit.contains("sed '"))
+        assertFalse(escapedSingleQuotes.contains("'"))
+        assertFalse(escapedSingleQuotes.contains("sed '"))
         assertTrue(configInit.contains("sed \""))
         assertTrue(configInit.contains("elif grep -Eq"))
         assertTrue(configInit.contains("fi"))

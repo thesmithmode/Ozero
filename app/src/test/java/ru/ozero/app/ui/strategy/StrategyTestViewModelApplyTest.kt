@@ -71,7 +71,8 @@ class StrategyTestViewModelApplyTest {
         assertEquals(listOf(false), repo.byedpiUseUiModeUpdates)
         assertFalse(repo.current().byedpiUseUiMode)
         assertEquals(command, repo.current().byedpiWinningArgs)
-        assertEquals(command, ByeDpiEngine().buildManualConfig(repo.current()).args)
+        val engineConfig = ByeDpiEngine().buildManualConfig(repo.current()) as EngineConfig.ByeDpi
+        assertEquals(command, engineConfig.args)
     }
 
     @Test
