@@ -197,6 +197,29 @@ class BackupViewModelTest {
     }
 
     @Test
+    fun `export failure while writing stream surfaces error instead of success`() = runTest(dispatcher) {
+        val context = contextWithOutput(
+            object : java.io.OutputStream() {
+                override fun write(b: Int) {
+                    throw java.io.IOException("disk full")
+                }
+            },
+        )
+        val data = sampleBackupData()
+
+        coEvery { manager.export(BackupCategory.ALL) } returns data
+        every { AppBackupSerializer.serializeEncrypted(data) } returns byteArrayOf(1, 2, 3)
+
+        val vm = BackupViewModel(manager)
+        vm.export(context, backupUri(), BackupCategory.ALL)
+        advanceUntilIdle()
+
+        val state = assertIs<BackupUiState.Error>(vm.uiState.value)
+        assertTrue(state.message.contains("disk full"))
+        coVerify(exactly = 1) { manager.export(BackupCategory.ALL) }
+    }
+
+    @Test
     fun `beginImport failure when input stream missing surfaces unknown error`() = runTest(dispatcher) {
         val resolver = mockk<ContentResolver>()
         every { resolver.openInputStream(any()) } returns null
