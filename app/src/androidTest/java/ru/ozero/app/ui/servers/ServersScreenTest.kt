@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
@@ -73,6 +74,19 @@ class ServersScreenTest {
             ),
         )
         composeRule.onNodeWithTag(ServersTestTags.SAVE).assertIsEnabled()
+    }
+
+    @Test
+    fun selectedServerLabelIsReadable() {
+        render(
+            ServersUiState.Content(
+                servers = sample,
+                entryId = "a",
+                exitId = null,
+            ),
+        )
+
+        composeRule.onNodeWithText("RU - vless (entry)").assertIsDisplayed()
     }
 
     @Test
