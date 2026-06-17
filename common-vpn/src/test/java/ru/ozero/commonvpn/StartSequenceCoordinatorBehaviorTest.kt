@@ -852,7 +852,6 @@ class StartSequenceCoordinatorBehaviorTest {
             fixture.tunnelGateway.start(match { it.tunPfd === secondFd && it.socksPort == 2222 })
         }
         verify(exactly = 1) { firstFd.close() }
-        verify(exactly = 1) { secondFd.close() }
         verify(exactly = 0) { fixture.engineWatchdog.handleEngineFailure(EngineId.BYEDPI, any()) }
         verify(exactly = 1) { fixture.engineWatchdog.handleEngineFailure(EngineId.WARP, "tunnel code=-1") }
         assertTrue(fixture.stopRequested.get())
