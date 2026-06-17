@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
@@ -60,6 +61,7 @@ class BackupViewModelTest {
         assertIs<BackupUiState.ExportSuccess>(vm.uiState.value)
         assertTrue(output.size() > 0)
         assertEquals(byteArrayOf(1, 2, 3, 4).toList(), output.toByteArray().toList())
+        coVerify(exactly = 1) { manager.export(setOf(BackupCategory.GENERAL_SETTINGS)) }
     }
 
     @Test
@@ -97,6 +99,36 @@ class BackupViewModelTest {
         advanceUntilIdle()
 
         assertIs<BackupUiState.ImportSuccess>(vm.uiState.value)
+
+        vm.confirmImport(setOf(BackupCategory.GENERAL_SETTINGS))
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { manager.import(data, any()) }
+    }
+
+    @Test
+    fun `beginImport replaces previous pending backup with latest parsed data`() = runTest(dispatcher) {
+        val first = sampleBackupData().copy(exportedAt = "2026-06-07T00:00:00Z")
+        val second = sampleBackupData().copy(exportedAt = "2026-06-08T00:00:00Z")
+        val contextA = contextWithInput(byteArrayOf(1))
+        val contextB = contextWithInput(byteArrayOf(2))
+
+        every { AppBackupSerializer.deserializeAuto(byteArrayOf(1)) } returns first
+        every { AppBackupSerializer.deserializeAuto(byteArrayOf(2)) } returns second
+        coEvery { manager.import(second, any()) } returns Unit
+
+        val vm = BackupViewModel(manager)
+        vm.beginImport(contextA, backupUri())
+        advanceUntilIdle()
+        vm.beginImport(contextB, backupUri())
+        advanceUntilIdle()
+
+        vm.confirmImport(setOf(BackupCategory.GENERAL_SETTINGS))
+        advanceUntilIdle()
+
+        assertIs<BackupUiState.ImportSuccess>(vm.uiState.value)
+        coVerify(exactly = 0) { manager.import(first, any()) }
+        coVerify(exactly = 1) { manager.import(second, setOf(BackupCategory.GENERAL_SETTINGS)) }
     }
 
     @Test
@@ -125,6 +157,27 @@ class BackupViewModelTest {
         advanceUntilIdle()
 
         assertIs<BackupUiState.Idle>(vm.uiState.value)
+        coVerify(exactly = 0) { manager.import(any(), any()) }
+    }
+
+    @Test
+    fun `cancelImport clears pending data so confirmImport cannot import stale backup`() = runTest(dispatcher) {
+        val context = contextWithInput(byteArrayOf(9, 8, 7))
+        val data = sampleBackupData()
+
+        every { AppBackupSerializer.deserializeAuto(byteArrayOf(9, 8, 7)) } returns data
+
+        val vm = BackupViewModel(manager)
+        vm.beginImport(context, backupUri())
+        advanceUntilIdle()
+        assertIs<BackupUiState.PendingImport>(vm.uiState.value)
+
+        vm.cancelImport()
+        vm.confirmImport(setOf(BackupCategory.GENERAL_SETTINGS))
+        advanceUntilIdle()
+
+        assertIs<BackupUiState.Idle>(vm.uiState.value)
+        coVerify(exactly = 0) { manager.import(any(), any()) }
     }
 
     @Test
@@ -176,6 +229,11 @@ class BackupViewModelTest {
 
         val state = assertIs<BackupUiState.Error>(vm.uiState.value)
         assertTrue(state.message.contains("import boom"))
+
+        vm.confirmImport(setOf(BackupCategory.GENERAL_SETTINGS))
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { manager.import(data, any()) }
         vm.cancelImport()
         assertIs<BackupUiState.Idle>(vm.uiState.value)
     }

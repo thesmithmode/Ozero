@@ -69,6 +69,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun onMoveAutoPriority(current: List<EngineId>, engine: EngineId, delta: Int) {
+        if (delta == 0) return
         val idx = current.indexOf(engine)
         if (idx < 0) return
         val target = idx + delta
