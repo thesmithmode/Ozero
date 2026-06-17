@@ -336,8 +336,13 @@ class StrategyTestViewModel @Inject constructor(
 
     fun onApply(command: String) {
         viewModelScope.launch {
-            runCatching { repository.setByedpiWinningArgs(command) }
+            val applied = runCatching {
+                repository.setByedpiWinningArgs(command)
+                repository.setByedpiUseUiMode(false)
+            }
                 .onFailure { PersistentLoggers.warn(TAG, "onApply failed: ${it.message}") }
+                .isSuccess
+            if (!applied) return@launch
             withContext(ioDispatcher) {
                 val savedName = _savedStrategies.value.find { it.command == command }?.name
                 val newHistory = runCatching { usageHistoryStore.record(command, savedName) }
