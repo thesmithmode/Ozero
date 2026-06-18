@@ -324,7 +324,7 @@ EOF
 /^[[:space:]]*DOMAIN[[:space:]]*=/ {
     in_domain = 1
     line = ${'$'}0
-    sub(/[[:space:]]+#.*/, "", line)
+    sub(/#.*/, "", line)
     bracket = index(line, "[")
     if (bracket > 0) line = substr(line, bracket + 1)
     if (line ~ /[A-Za-z0-9]/) found = 1
@@ -333,7 +333,7 @@ EOF
 }
 in_domain {
     line = ${'$'}0
-    sub(/[[:space:]]+#.*/, "", line)
+    sub(/#.*/, "", line)
     if (line ~ /[A-Za-z0-9]/) found = 1
     if (line ~ /\]/) in_domain = 0
 }

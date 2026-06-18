@@ -18,7 +18,7 @@ class MainContentStateHolderSentinelTest {
 
     @Test
     fun `ExpertMainContent принимает state и callbacks data class — не 19 параметров`() {
-        val sig = Regex("""private fun ExpertMainContent\(([^)]*)\)""", RegexOption.DOT_MATCHES_ALL)
+        val sig = Regex("""(?:private|internal) fun ExpertMainContent\(([^)]*)\)""", RegexOption.DOT_MATCHES_ALL)
             .find(source)?.groupValues?.get(1).orEmpty()
         val params = sig.split(",").map { it.trim() }.filter { it.isNotEmpty() }
         assertTrue(
@@ -33,7 +33,7 @@ class MainContentStateHolderSentinelTest {
 
     @Test
     fun `SimpleMainContent принимает state и callbacks data class — не 10 параметров`() {
-        val sig = Regex("""private fun SimpleMainContent\(([^)]*)\)""", RegexOption.DOT_MATCHES_ALL)
+        val sig = Regex("""(?:private|internal) fun SimpleMainContent\(([^)]*)\)""", RegexOption.DOT_MATCHES_ALL)
             .find(source)?.groupValues?.get(1).orEmpty()
         val params = sig.split(",").map { it.trim() }.filter { it.isNotEmpty() }
         assertTrue(
@@ -45,8 +45,8 @@ class MainContentStateHolderSentinelTest {
     @Test
     fun `ExpertMainContent не использует Suppress LongParameterList — антипаттерн убран`() {
         val funBlock = source.substringAfter("data class ExpertMainCallbacks")
-            .substringAfter("private fun ExpertMainContent")
-        val headerBlock = source.substringBefore("private fun ExpertMainContent")
+            .substringAfter("fun ExpertMainContent")
+        val headerBlock = source.substringBefore("fun ExpertMainContent")
             .takeLast(200)
         assertFalse(
             headerBlock.contains("@Suppress(\"LongParameterList\")"),
@@ -58,7 +58,7 @@ class MainContentStateHolderSentinelTest {
 
     @Test
     fun `SimpleMainContent не использует Suppress LongParameterList — антипаттерн убран`() {
-        val headerBlock = source.substringBefore("private fun SimpleMainContent")
+        val headerBlock = source.substringBefore("fun SimpleMainContent")
             .takeLast(200)
         assertFalse(
             headerBlock.contains("@Suppress(\"LongParameterList\")"),

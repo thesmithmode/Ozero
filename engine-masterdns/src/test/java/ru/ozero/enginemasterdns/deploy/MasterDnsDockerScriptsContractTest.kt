@@ -158,10 +158,20 @@ class MasterDnsDockerScriptsContractTest {
         assertTrue(cmd.contains("in_domain = 1"))
         assertTrue(cmd.contains("line = ${'$'}0"))
         assertTrue(cmd.contains("line ~ /[A-Za-z0-9]/"))
-        assertTrue(cmd.contains("sub(/[[:space:]]+#.*/, \"\", line)"))
+        assertTrue(cmd.contains("sub(/#.*/, \"\", line)"))
         assertTrue(cmd.contains("awk -f /tmp/masterdns-domain-present.awk"))
         assertTrue(cmd.contains("END { exit(found ? 0 : 1) }"))
         assertFalse(cmd.contains("grep -Eq \"^[[:space:]]*DOMAIN[[:space:]]*=.*[A-Za-z0-9]"))
+    }
+
+    @Test
+    fun `runContainer domain awk strips adjacent toml comments before detecting domains`() {
+        val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
+
+        assertTrue(cmd.contains("sub(/#.*/, \"\", line)"))
+        assertFalse(cmd.contains("sub(/[[:space:]]+#.*/, \"\", line)"))
+        assertTrue(cmd.contains("if ! awk -f /tmp/masterdns-domain-present.awk"))
+        assertTrue(cmd.contains("printf \"DOMAIN = [\\\"${MasterDnsDockerScripts.DEFAULT_DOMAIN}\\\"]\\n\""))
     }
 
     @Test
