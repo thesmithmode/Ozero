@@ -157,11 +157,20 @@ class MasterDnsDockerScriptsContractTest {
 
         assertTrue(cmd.contains("in_domain = 1"))
         assertTrue(cmd.contains("line = ${'$'}0"))
-        assertTrue(cmd.contains("${'$'}0 ~ /[A-Za-z0-9]/"))
+        assertTrue(cmd.contains("line ~ /[A-Za-z0-9]/"))
         assertTrue(cmd.contains("sub(/[[:space:]]+#.*/, \"\", line)"))
         assertTrue(cmd.contains("awk -f /tmp/masterdns-domain-present.awk"))
         assertTrue(cmd.contains("END { exit(found ? 0 : 1) }"))
         assertFalse(cmd.contains("grep -Eq \"^[[:space:]]*DOMAIN[[:space:]]*=.*[A-Za-z0-9]"))
+    }
+
+    @Test
+    fun `runContainer domain awk avoids non portable bracket regex`() {
+        val cmd = MasterDnsDockerScripts.runContainer(TEST_SERVER_IPV4)
+
+        assertFalse(cmd.contains("[^[]*\\["))
+        assertTrue(cmd.contains("bracket = index(line, \"[\")"))
+        assertTrue(cmd.contains("line = substr(line, bracket + 1)"))
     }
 
     @Test

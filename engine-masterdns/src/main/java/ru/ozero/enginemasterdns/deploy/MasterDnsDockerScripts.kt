@@ -325,7 +325,8 @@ EOF
     in_domain = 1
     line = ${'$'}0
     sub(/[[:space:]]+#.*/, "", line)
-    sub(/^[^[]*\[/, "", line)
+    bracket = index(line, "[")
+    if (bracket > 0) line = substr(line, bracket + 1)
     if (line ~ /[A-Za-z0-9]/) found = 1
     if (line ~ /\]/) in_domain = 0
     next
@@ -343,7 +344,8 @@ AWK_DOMAIN_PRESENT
                     cat > /tmp/masterdns-domain-strip.awk <<\AWK_DOMAIN_STRIP
 /^[[:space:]]*DOMAIN[[:space:]]*=/ {
     line = ${'$'}0
-    sub(/^[^[]*\[/, "", line)
+    bracket = index(line, "[")
+    if (bracket > 0) line = substr(line, bracket + 1)
     if (line !~ /\]/) skip = 1
     next
 }
