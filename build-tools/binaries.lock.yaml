@@ -61,6 +61,16 @@ artifacts:
     size_bytes: 50520609
     source_repo: https://github.com/apernet/hysteria
     source_commit: 15e31d48a09af0835773bd5c62cedbb3fc0e351d
+  - name: libmdnsvpn-arm64-v8a.so
+    engine: masterdns
+    abi: arm64-v8a
+    destination: jniLibs
+    target_filename: libmdnsvpn.so
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/masterdns-27c7e11/libmdnsvpn-arm64-v8a.so
+    sha256: 7c05c071827f195644435edd63ee7de9ad20608d27dd2815141cac6afbcb3050
+    size_bytes: 4522168
+    source_repo: https://github.com/masterking32/MasterDnsVPN
+    source_commit: 27c7e11ce9eb51d7db36b34188502e524a3184db
   - name: libtor-arm64-v8a.so
     engine: tor
     abi: arm64-v8a
