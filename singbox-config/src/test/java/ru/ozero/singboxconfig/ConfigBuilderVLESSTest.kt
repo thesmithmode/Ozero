@@ -8,6 +8,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ConfigBuilderVLESSTest {
+    private val validRealityPublicKey = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA"
 
     private fun makeBean(
         uuid: String = "12345678-1234-1234-1234-123456789abc",
@@ -159,7 +160,7 @@ class ConfigBuilderVLESSTest {
     fun `should include reality block when security is reality`() {
         val bean = makeBean(security = "reality").apply {
             sni = "reality.example.com"
-            realityPublicKey = "testPublicKey123"
+            realityPublicKey = validRealityPublicKey
             realityShortId = "ab12"
             realityFingerprint = "chrome"
         }
@@ -167,7 +168,7 @@ class ConfigBuilderVLESSTest {
 
         assertContains(json, "\"reality\":")
         assertContains(json, "\"enabled\":true")
-        assertContains(json, "testPublicKey123")
+        assertContains(json, validRealityPublicKey)
         assertContains(json, "ab12")
         assertContains(json, "chrome")
     }
@@ -340,7 +341,7 @@ class ConfigBuilderVLESSTest {
     fun `should include both reality block and flow when combined`() {
         val bean = makeBean(security = "reality", flow = "xtls-rprx-vision").apply {
             sni = "reality.example.com"
-            realityPublicKey = "realityKey123"
+            realityPublicKey = validRealityPublicKey
             realityShortId = "aabb1234"
             realityFingerprint = "safari"
         }
@@ -348,7 +349,7 @@ class ConfigBuilderVLESSTest {
 
         assertContains(json, "\"reality\":")
         assertContains(json, "xtls-rprx-vision")
-        assertContains(json, "realityKey123")
+        assertContains(json, validRealityPublicKey)
     }
 
     @Test
@@ -393,7 +394,7 @@ class ConfigBuilderVLESSTest {
             host = "full.example.com"
             path = "/websocket"
             grpcServiceName = "grpcService"
-            realityPublicKey = "testPublicKey"
+            realityPublicKey = validRealityPublicKey
             realityShortId = "deadbeef"
             realityFingerprint = "safari"
             name = "full-server"

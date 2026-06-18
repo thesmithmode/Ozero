@@ -78,6 +78,6 @@ class SingboxHttp204RoutedProbe(
         const val LATENCY_FAILED = -1L
         private const val LOOPBACK = "127.0.0.1"
         private const val DEFAULT_TIMEOUT_MS = 3_000
-        private val SUCCESS_HTTP_CODES = 200..399
+        private val SUCCESS_HTTP_CODES = 200..299
     }
 }

@@ -90,6 +90,22 @@ class SingboxHttp204RoutedProbeTest {
     }
 
     @Test
+    fun `routed probe rejects HTTP redirect response through SOCKS`() = runTest {
+        SocksHttpServer(statusCode = 302, reason = "Found").use { socks ->
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("http://127.0.0.1/generate_204"),
+                fallbackProbeUrls = emptyList(),
+                timeoutMs = 1_000,
+            )
+
+            val latency = probe.probeLatencyMs(socks.port)
+
+            assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
+            assertTrue(socks.requestText.startsWith("GET /generate_204 "))
+        }
+    }
+
+    @Test
     fun `routed probe rejects HTTP 500 response through SOCKS`() = runTest {
         SocksHttpServer(statusCode = 500, reason = "Server Error").use { socks ->
             val probe = SingboxHttp204RoutedProbe(

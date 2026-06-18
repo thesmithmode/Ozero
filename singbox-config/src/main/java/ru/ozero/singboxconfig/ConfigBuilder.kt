@@ -1,5 +1,6 @@
 package ru.ozero.singboxconfig
 
+import java.util.Base64
 import ru.ozero.enginescore.WireGuardOutboundConfig
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.ShadowsocksBean
@@ -9,6 +10,7 @@ import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
 
 private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
+private const val REALITY_PUBLIC_KEY_BYTES = 32
 
 @Suppress("TooManyFunctions")
 object ConfigBuilder {
@@ -40,7 +42,7 @@ object ConfigBuilder {
     fun isSupportedBean(bean: AbstractBean): Boolean {
         if (bean.serverPort !in MIN_PORT..MAX_PORT) return false
         if (bean !is StandardV2RayBean) return true
-        return bean.type in SUPPORTED_TRANSPORTS
+        return bean.type in SUPPORTED_TRANSPORTS && bean.hasSupportedSecurity()
     }
 
     fun buildChainConfig(bean: AbstractBean, socksPort: Int, upstream: Upstream? = null): String {
@@ -213,6 +215,26 @@ object ConfigBuilder {
             if (detour != null) append(""","detour":${jsonString(detour)}""")
             append('}')
         }
+}
+
+private fun StandardV2RayBean.hasSupportedSecurity(): Boolean {
+    if (security != "reality") return true
+    return realityPublicKey.isValidRealityPublicKey() && realityShortId.isValidRealityShortId()
+}
+
+private fun String.isValidRealityPublicKey(): Boolean {
+    val key = trim()
+    if (key.isEmpty()) return false
+    return runCatching {
+        Base64.getUrlDecoder().decode(key).size == REALITY_PUBLIC_KEY_BYTES
+    }.getOrDefault(false)
+}
+
+private fun String.isValidRealityShortId(): Boolean {
+    val shortId = trim()
+    return shortId.length <= 16 &&
+        shortId.length % 2 == 0 &&
+        shortId.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
 }
 
 private fun vlessOutbound(bean: VLESSBean, tag: String, detour: String? = null): String {

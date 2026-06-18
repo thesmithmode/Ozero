@@ -80,8 +80,7 @@ fun PowerDisc(
     )
     Box(
         modifier = modifier
-            .size(diameterDp.dp)
-            .testTag(POWER_DISC_TEST_TAG),
+            .size(diameterDp.dp),
         contentAlignment = Alignment.Center,
     ) {
         if (state != PowerDiscState.Off) {
@@ -118,7 +117,8 @@ fun PowerDisc(
                         colors = listOf(edgeColor, Color.Transparent),
                     ),
                 )
-                .clickable(onClick = onClick),
+                .clickable(onClick = onClick)
+                .testTag(POWER_DISC_TEST_TAG),
             contentAlignment = Alignment.Center,
         ) {
             Image(

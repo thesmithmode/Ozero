@@ -9,6 +9,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ConfigBuilderAutoSelectTest {
+    private val validRealityPublicKey = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA"
 
     private fun makeVless(host: String = "proxy.example.com", port: Int = 443) = VLESSBean().apply {
         uuid = "12345678-1234-1234-1234-123456789abc"
@@ -103,6 +104,43 @@ class ConfigBuilderAutoSelectTest {
         assertContains(json, "\"server\":\"ok.example.com\"")
         assertFalse(json.contains("bad.example.com"))
         assertFalse(json.contains("4449499"))
+    }
+
+    @Test
+    fun `auto config skips reality beans with invalid public key before rendering`() {
+        val invalid = makeVless("bad-reality.example.com").apply {
+            security = "reality"
+            realityPublicKey = "pub"
+            realityShortId = "01"
+        }
+        val valid = makeVless("ok-reality.example.com").apply {
+            security = "reality"
+            realityPublicKey = validRealityPublicKey
+            realityShortId = "02"
+        }
+
+        val json = ConfigBuilder.buildSingboxAutoConfig(listOf(invalid, valid))
+
+        assertFalse(ConfigBuilder.isSupportedBean(invalid))
+        assertTrue(ConfigBuilder.isSupportedBean(valid))
+        assertFalse(json.contains("bad-reality.example.com"))
+        assertContains(json, "\"server\":\"ok-reality.example.com\"")
+        assertContains(json, "\"tag\":\"proxy-0\"")
+        assertFalse(json.contains("\"tag\":\"proxy-1\""))
+    }
+
+    @Test
+    fun `single config rejects reality beans with invalid public key`() {
+        val invalid = makeVless("bad-reality.example.com").apply {
+            security = "reality"
+            realityPublicKey = "pub"
+            realityShortId = "01"
+        }
+
+        val result = runCatching { ConfigBuilder.buildSingboxConfig(invalid) }
+
+        assertTrue(result.isFailure)
+        assertContains(result.exceptionOrNull()?.message.orEmpty(), "Unsupported transport")
     }
 
     @Test
