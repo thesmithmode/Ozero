@@ -22,7 +22,7 @@ object RawShareLinksParser {
         text.lines()
             .map { it.trim() }
             .filter { it.isNotEmpty() && !it.startsWith("#") }
-            .flatMap { it.split(" ") }
+            .flatMap(::extractShareLinks)
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .mapNotNull { token ->
@@ -37,6 +37,32 @@ object RawShareLinksParser {
                 }.getOrNull()
             }
             .filter { it.hasValidPort() }
+
+    private fun extractShareLinks(line: String): List<String> {
+        val starts = SHARE_LINK_START.findAll(line)
+            .map { match -> match.range.first + match.value.indexOfFirst { !it.isWhitespace() } }
+            .toList()
+        if (starts.isEmpty()) return emptyList()
+        return starts.mapIndexed { index, start ->
+            val limit = starts.getOrNull(index + 1)?.let { next ->
+                line.lastIndexOf(' ', next - 1).takeIf { it >= start } ?: next
+            } ?: line.length
+            val end = linkTokenEnd(line, start, limit)
+            line.substring(start, end).trim()
+        }
+    }
+
+    private val SHARE_LINK_START = Regex("""(?:^|\s)(?:vless|vmess|trojan|ss)://""")
+
+    private fun linkTokenEnd(line: String, start: Int, limit: Int): Int {
+        var inFragment = false
+        for (index in start until limit) {
+            val char = line[index]
+            if (char == '#') inFragment = true
+            if (!inFragment && char.isWhitespace()) return index
+        }
+        return limit
+    }
 
     private fun parseSingboxJson(text: String): List<AbstractBean> = runCatching {
         val root = JSONObject(text)

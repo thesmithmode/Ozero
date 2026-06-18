@@ -286,16 +286,6 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         try {
             val result = rawUpdater.refresh(group)
             errorMsg = result.exceptionOrNull()?.message
-            val profiles = prioritizeSingboxAutoProfiles(
-                profileDao.getAutoCandidatesByGroupId(groupId, MAX_PROFILE_SCAN),
-                MAX_PROBE_PROFILES,
-            )
-            if (result.isSuccess && profiles.isNotEmpty()) {
-                probeService.probeAndAutoSelect(
-                    profiles = profiles,
-                    onProfileTestingChanged = ::onProfileTestingChanged,
-                )
-            }
         } catch (ce: CancellationException) {
             throw ce
         } catch (t: Throwable) {
@@ -340,7 +330,9 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         val rawName = _uiState.value.addGroupName.trim()
         val name = rawName.ifEmpty { "Ozero-${state.value.groups.size + 1}" }
         viewModelScope.launch {
-            groupDao.insert(SubscriptionGroup(name = name, subscriptionUrl = url, userOrder = state.value.groups.size))
+            groupDao.insert(
+                SubscriptionGroup(name = name, subscriptionUrl = url, userOrder = nextGroupOrder()),
+            )
             _uiState.update {
                 it.copy(showAddGroupDialog = false, addGroupName = "", addGroupUrl = "", addGroupError = null)
             }
@@ -389,7 +381,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         val name = rawName.ifEmpty { "Ozero-${state.value.groups.size + 1}" }
         viewModelScope.launch {
             val groupId = groupDao.insert(
-                SubscriptionGroup(name = name, subscriptionUrl = "", userOrder = state.value.groups.size),
+                SubscriptionGroup(name = name, subscriptionUrl = "", userOrder = nextGroupOrder()),
             )
             val profiles = parsed.take(MAX_IMPORT_PROFILES).mapIndexed { idx, bean ->
                 ProxyProfile(
@@ -428,7 +420,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         val name = fileName?.substringBeforeLast(".") ?: "Ozero-${state.value.groups.size + 1}"
         viewModelScope.launch {
             val groupId = groupDao.insert(
-                SubscriptionGroup(name = name, subscriptionUrl = "", userOrder = state.value.groups.size),
+                SubscriptionGroup(name = name, subscriptionUrl = "", userOrder = nextGroupOrder()),
             )
             val profiles = parsed.take(MAX_IMPORT_PROFILES).mapIndexed { idx, bean ->
                 ProxyProfile(
@@ -502,6 +494,9 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             it.copy(testingProfileIds = it.testingProfileIds - profileId)
         }
     }
+
+    private suspend fun nextGroupOrder(): Int =
+        (groupDao.getAll().maxOfOrNull { it.userOrder } ?: -1) + 1
 }
 
 private fun protocolTypeOf(bean: AbstractBean): Int = when (bean) {

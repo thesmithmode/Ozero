@@ -92,6 +92,21 @@ class ShutdownCoordinatorBehaviorTest {
     }
 
     @Test
+    fun `stopVpn uses latest start id when shutdown reaches stopSelf`() = runTest {
+        var latestStartId = 10
+        val fixture = shutdownFixture(this, latestStartIdProvider = { latestStartId })
+        coEvery { fixture.chainOrchestrator.stop() } coAnswers {
+            latestStartId = 77
+        }
+
+        fixture.coordinator.stopVpn()
+        fixture.coordinator.stopVpn()
+        advanceUntilIdle()
+
+        verify(exactly = 1) { fixture.stopSelfRequest.invoke(77) }
+    }
+
+    @Test
     fun `performShutdown resets state and can skip stopSelf for onDestroy path`() = runTest {
         val fixture = shutdownFixture(this)
         fixture.state.starting.set(true)
@@ -116,6 +131,7 @@ class ShutdownCoordinatorBehaviorTest {
         scope: CoroutineScope,
         sessionId: Long = -1L,
         sessionStartedAt: Long = 0L,
+        latestStartIdProvider: () -> Int = { 42 },
     ): ShutdownFixture {
         val tunnelController = TunnelController()
         val healthMonitor = mockk<HealthMonitor>(relaxed = true)
@@ -157,7 +173,7 @@ class ShutdownCoordinatorBehaviorTest {
                 sessionStatsRecorder = sessionRecorder,
             ),
             state = state,
-            latestStartIdProvider = { 42 },
+            latestStartIdProvider = latestStartIdProvider,
             stopForegroundRequest = stopForegroundRequest,
             stopSelfRequest = stopSelfRequest,
         )

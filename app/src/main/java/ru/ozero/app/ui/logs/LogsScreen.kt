@@ -52,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -108,7 +109,10 @@ internal fun LogsScreenContent(
             TopAppBar(
                 title = { Text(stringResource(R.string.logs_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.testTag(LogsScreenTestTags.BACK),
+                    ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.logs_back_cd),
@@ -117,7 +121,10 @@ internal fun LogsScreenContent(
                 },
                 actions = {
                     Box {
-                        TextButton(onClick = { exportMenuAction = ExportAction.COPY }) {
+                        TextButton(
+                            onClick = { exportMenuAction = ExportAction.COPY },
+                            modifier = Modifier.testTag(LogsScreenTestTags.COPY_MENU),
+                        ) {
                             Text(stringResource(R.string.logs_copy))
                         }
                         LogLevelDropdown(
@@ -131,7 +138,10 @@ internal fun LogsScreenContent(
                         )
                     }
                     Box {
-                        IconButton(onClick = { exportMenuAction = ExportAction.SHARE }) {
+                        IconButton(
+                            onClick = { exportMenuAction = ExportAction.SHARE },
+                            modifier = Modifier.testTag(LogsScreenTestTags.SHARE_MENU),
+                        ) {
                             Icon(Icons.Default.Share, contentDescription = stringResource(R.string.logs_share_cd))
                         }
                         LogLevelDropdown(
@@ -145,7 +155,10 @@ internal fun LogsScreenContent(
                             },
                         )
                     }
-                    IconButton(onClick = onClear) {
+                    IconButton(
+                        onClick = onClear,
+                        modifier = Modifier.testTag(LogsScreenTestTags.CLEAR_TOP),
+                    ) {
                         Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.logs_clear_cd))
                     }
                 },
@@ -305,13 +318,18 @@ private fun FilterChipRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         items.forEach { item ->
-            LogFilterChip(label = item, selected = item == selected, onClick = { onPick(item) })
+            LogFilterChip(
+                label = item,
+                selected = item == selected,
+                onClick = { onPick(item) },
+                tag = LogsScreenTestTags.filterChip(item),
+            )
         }
     }
 }
 
 @Composable
-private fun LogFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun LogFilterChip(label: String, selected: Boolean, onClick: () -> Unit, tag: String) {
     val bg = if (selected) OzeroPalette.StateConnected else Color.Transparent
     val textColor = if (selected) OzeroPalette.Ink else OzeroPalette.Text2
     val shape = RoundedCornerShape(8.dp)
@@ -325,6 +343,7 @@ private fun LogFilterChip(label: String, selected: Boolean, onClick: () -> Unit)
             .background(bg, shape)
             .then(borderMod)
             .clickable(onClick = onClick)
+            .testTag(tag)
             .padding(horizontal = 10.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -343,7 +362,9 @@ private fun LogEntryRow(entry: LogEntry) {
     val lvlColor = levelColor(entry.level)
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(LogsScreenTestTags.logRow(entry)),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.Top,
     ) {
@@ -412,14 +433,22 @@ private fun LogFooter(
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.weight(1f),
         )
-        TextButton(onClick = onExport, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
+        TextButton(
+            onClick = onExport,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.testTag(LogsScreenTestTags.EXPORT_FOOTER),
+        ) {
             Text(
                 text = stringResource(R.string.logs_export),
                 style = MaterialTheme.typography.labelSmall,
                 color = OzeroPalette.Text2,
             )
         }
-        TextButton(onClick = onClear, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
+        TextButton(
+            onClick = onClear,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.testTag(LogsScreenTestTags.CLEAR_FOOTER),
+        ) {
             Text(
                 text = stringResource(R.string.logs_clear_cd),
                 style = MaterialTheme.typography.labelSmall,
@@ -458,4 +487,20 @@ internal fun copyToClipboard(context: Context, label: String, text: String) {
             Toast.LENGTH_SHORT,
         ).show()
     }
+}
+
+object LogsScreenTestTags {
+    const val BACK = "logs_back"
+    const val COPY_MENU = "logs_copy_menu"
+    const val SHARE_MENU = "logs_share_menu"
+    const val CLEAR_TOP = "logs_clear_top"
+    const val EXPORT_FOOTER = "logs_export_footer"
+    const val CLEAR_FOOTER = "logs_clear_footer"
+    private const val FILTER_PREFIX = "logs_filter_"
+    private const val ROW_PREFIX = "logs_row_"
+
+    fun filterChip(label: String): String = FILTER_PREFIX + label
+
+    fun logRow(entry: LogEntry): String =
+        ROW_PREFIX + "${entry.timestampMs}_${entry.tag}_${entry.message.take(20)}"
 }

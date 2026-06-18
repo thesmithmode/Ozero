@@ -172,7 +172,7 @@ data class SimpleMainCallbacks(
 )
 
 @Composable
-private fun SimpleMainContent(
+internal fun SimpleMainContent(
     state: SimpleMainState,
     callbacks: SimpleMainCallbacks,
 ) {
@@ -293,7 +293,7 @@ data class ExpertMainCallbacks(
 )
 
 @Composable
-private fun ExpertMainContent(
+internal fun ExpertMainContent(
     state: ExpertMainState,
     callbacks: ExpertMainCallbacks,
 ) {

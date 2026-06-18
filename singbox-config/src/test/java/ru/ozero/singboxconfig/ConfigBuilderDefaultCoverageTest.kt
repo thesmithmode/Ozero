@@ -12,6 +12,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ConfigBuilderDefaultCoverageTest {
+    private val validRealityPublicKey = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA"
 
     @Test
     fun `public builders exercise default probe and detour arguments`() {
@@ -75,8 +76,8 @@ class ConfigBuilderDefaultCoverageTest {
         val grpcReality = vless("grpc").apply {
             grpcServiceName = "svc"
             security = "reality"
-            realityPublicKey = "pub"
-            realityShortId = "sid"
+            realityPublicKey = validRealityPublicKey
+            realityShortId = "01"
         }
         val ss = shadowsocks().apply {
             plugin = "obfs-local"

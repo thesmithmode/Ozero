@@ -320,35 +320,42 @@ EOF
                     rm -f "${'$'}tmp_config"
                     chmod 600 /etc/masterdnsvpn/server_config.toml
                 fi
-                if ! awk "
-                    /^[[:space:]]*DOMAIN[[:space:]]*=/ {
-                        in_domain = 1
-                        line = \${'$'}0
-                        sub(/^[^[]*\[/, "", line)
-                        if (line ~ /[A-Za-z0-9]/) found = 1
-                        if (line ~ /\]/) in_domain = 0
-                        next
-                    }
-                    in_domain {
-                        if (\${'$'}0 ~ /[A-Za-z0-9]/) found = 1
-                        if (\${'$'}0 ~ /\]/) in_domain = 0
-                    }
-                    END { exit(found ? 0 : 1) }
-                " /etc/masterdnsvpn/server_config.toml; then
+                cat > /tmp/masterdns-domain-present.awk <<\AWK_DOMAIN_PRESENT
+/^[[:space:]]*DOMAIN[[:space:]]*=/ {
+    in_domain = 1
+    line = ${'$'}0
+    sub(/#.*/, "", line)
+    bracket = index(line, "[")
+    if (bracket > 0) line = substr(line, bracket + 1)
+    if (line ~ /[A-Za-z0-9]/) found = 1
+    if (line ~ /\]/) in_domain = 0
+    next
+}
+in_domain {
+    line = ${'$'}0
+    sub(/#.*/, "", line)
+    if (line ~ /[A-Za-z0-9]/) found = 1
+    if (line ~ /\]/) in_domain = 0
+}
+END { exit(found ? 0 : 1) }
+AWK_DOMAIN_PRESENT
+                if ! awk -f /tmp/masterdns-domain-present.awk /etc/masterdnsvpn/server_config.toml; then
                     tmp_config=/etc/masterdnsvpn/server_config.toml.tmp
-                    awk "
-                        /^[[:space:]]*DOMAIN[[:space:]]*=/ {
-                            line = \${'$'}0
-                            sub(/^[^[]*\[/, "", line)
-                            if (line !~ /\]/) skip = 1
-                            next
-                        }
-                        skip {
-                            if (\${'$'}0 ~ /\]/) skip = 0
-                            next
-                        }
-                        { print }
-                    " /etc/masterdnsvpn/server_config.toml > "${'$'}tmp_config"
+                    cat > /tmp/masterdns-domain-strip.awk <<\AWK_DOMAIN_STRIP
+/^[[:space:]]*DOMAIN[[:space:]]*=/ {
+    line = ${'$'}0
+    bracket = index(line, "[")
+    if (bracket > 0) line = substr(line, bracket + 1)
+    if (line !~ /\]/) skip = 1
+    next
+}
+skip {
+    if (${'$'}0 ~ /\]/) skip = 0
+    next
+}
+{ print }
+AWK_DOMAIN_STRIP
+                    awk -f /tmp/masterdns-domain-strip.awk /etc/masterdnsvpn/server_config.toml > "${'$'}tmp_config"
                     printf "DOMAIN = [\"${DEFAULT_DOMAIN}\"]\n" > /etc/masterdnsvpn/server_config.toml
                     cat "${'$'}tmp_config" >> /etc/masterdnsvpn/server_config.toml
                     rm -f "${'$'}tmp_config"

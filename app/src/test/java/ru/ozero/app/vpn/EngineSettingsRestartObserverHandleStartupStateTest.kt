@@ -184,4 +184,37 @@ class EngineSettingsRestartObserverHandleStartupStateTest : EngineSettingsRestar
                 "A second same-engine snapshot while Probing/Connecting is a real settings change.",
         )
     }
+
+    @Test
+    fun `handle keeps accepted startup snapshot across Probing null permission gap`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
+        val state = MutableStateFlow<TunnelState>(TunnelState.Probing(EngineId.WARP))
+        val restarts = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val observer = EngineSettingsRestartObserver(
+            settingsFlow = flow,
+            vpnStateProvider = { state.value },
+            onRestartConnected = { restarts += it },
+        )
+        val byedpi = EngineSettingsRestartObserver.Snapshot(
+            manualEngine = EngineId.BYEDPI,
+            byedpiWinningArgs = "--old",
+            byedpiUseUiMode = false,
+            ipv6Enabled = false,
+            trafficMode = TrafficMode.TUN,
+            customDnsServers = emptyList(),
+            engineAutoPriority = null,
+        )
+        val warp = byedpi.copy(manualEngine = EngineId.WARP)
+
+        observer.handle(trigger(previous = byedpi, snapshot = warp))
+        state.value = TunnelState.Probing(null)
+        observer.handle(trigger(previous = byedpi, snapshot = warp))
+        state.value = TunnelState.Probing(EngineId.WARP)
+        observer.handle(trigger(previous = byedpi, snapshot = warp))
+
+        assertTrue(
+            restarts.isEmpty(),
+            "Probing(null) is a permission/startup gap and must not clear an already accepted startup snapshot.",
+        )
+    }
 }

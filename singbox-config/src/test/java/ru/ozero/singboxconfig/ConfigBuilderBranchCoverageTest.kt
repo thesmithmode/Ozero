@@ -14,6 +14,7 @@ import kotlin.test.assertFalse
 
 @Suppress("LongMethod")
 class ConfigBuilderBranchCoverageTest {
+    private val validRealityPublicKey = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA"
 
     @Test
     fun `full config adds probe socks inbound only for positive port`() {
@@ -150,8 +151,8 @@ class ConfigBuilderBranchCoverageTest {
             host = "front.example.com"
             sni = ""
             alpn = "h2,http/1.1"
-            realityPublicKey = "pub"
-            realityShortId = "sid"
+            realityPublicKey = validRealityPublicKey
+            realityShortId = "01"
             realityFingerprint = ""
         }
         val ws = vless().apply {
@@ -171,8 +172,8 @@ class ConfigBuilderBranchCoverageTest {
         val grpcJson = ConfigBuilder.buildSingboxConfig(grpc)
 
         assertContains(realityJson, "\"server_name\":\"front.example.com\"")
-        assertContains(realityJson, "\"public_key\":\"pub\"")
-        assertContains(realityJson, "\"short_id\":\"sid\"")
+        assertContains(realityJson, "\"public_key\":\"$validRealityPublicKey\"")
+        assertContains(realityJson, "\"short_id\":\"01\"")
         assertContains(realityJson, "\"fingerprint\":\"chrome\"")
         assertContains(wsJson, "\"type\":\"ws\"")
         assertContains(wsJson, "\"headers\":{\"Host\":\"ws.example.com\"}")
