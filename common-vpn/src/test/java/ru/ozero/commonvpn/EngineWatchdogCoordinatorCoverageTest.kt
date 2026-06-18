@@ -213,6 +213,49 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
+    fun `peer watchdog retries failed recovery attempts until success`() = runTest {
+        val plugin = FakeWatchdogPlugin(
+            stats = listOf(EngineStats(activeConnections = 0)),
+            recoverResults = listOf(
+                EnginePlugin.RecoverResult.Failed("first"),
+                EnginePlugin.RecoverResult.Failed("second"),
+                EnginePlugin.RecoverResult.Success,
+            ),
+            policy = EnginePlugin.PeerWatchdogPolicy(
+                timeoutMs = EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS,
+                recoverBeforeFirstPeer = true,
+            ),
+        )
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            plugins = setOf(plugin),
+            controller = connectedController(plugin.id),
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+        )
+
+        try {
+            watchdog.startPeerWatchdog(plugin.id)
+            advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
+            runCurrent()
+            advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_RECOVER_GRACE_MS)
+            runCurrent()
+            advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
+            runCurrent()
+            advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_RECOVER_GRACE_MS)
+            runCurrent()
+            advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_POLL_MS)
+            runCurrent()
+            advanceTimeBy(EngineWatchdogCoordinator.PEER_WATCHDOG_RECOVER_GRACE_MS - 1)
+            runCurrent()
+        } finally {
+            watchdog.cancelWatchers()
+        }
+
+        assertEquals(3, plugin.recoverCalls)
+    }
+
+    @Test
     fun `peer watchdog ignores zero peers before first peer by default`() = runTest {
         val plugin = FakeWatchdogPlugin(
             stats = listOf(EngineStats(activeConnections = 0)),

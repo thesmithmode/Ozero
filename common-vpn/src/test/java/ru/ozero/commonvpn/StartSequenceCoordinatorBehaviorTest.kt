@@ -729,6 +729,43 @@ class StartSequenceCoordinatorBehaviorTest {
     }
 
     @Test
+    fun `auto custom TUN skips candidate without spec and starts next candidate`() = runTest {
+        val first = CustomTunEngine(id = EngineId.WARP, socksPort = 2203, tunSpec = null)
+        val second = CustomTunEngine(id = EngineId.BYEDPI, socksPort = 2204)
+        val fixture = startFixture(
+            first,
+            second,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = null,
+                engineAutoPriority = listOf(EngineId.WARP, EngineId.BYEDPI),
+            ),
+        )
+        val dupFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { detachFd() } returns 2205
+        }
+        val tunFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+            every { fd } returns 2204
+            every { dup() } returns dupFd
+        }
+        val builder = mockk<VpnService.Builder>(relaxed = true) {
+            every { establish() } returns tunFd
+        }
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns builder
+
+        fixture.coordinator.run()
+
+        assertEquals(0, first.startedConfigs.size)
+        assertEquals(1, second.startedConfigs.size)
+        assertEquals(listOf(2205), second.attachedFds)
+        assertFalse(fixture.stopRequested.get())
+        assertEquals(tunFd, fixture.state.tunFdRef.get())
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+        verify(exactly = 0) { fixture.tunnelGateway.start(any()) }
+        verify(exactly = 1) { fixture.statsLogger.start() }
+    }
+
+    @Test
     fun `auto TUN cleanup stops failed candidate before starting next candidate`() = runTest {
         val events = mutableListOf<String>()
         val first = FakeEnginePlugin(
@@ -1316,6 +1353,58 @@ class StartSequenceCoordinatorBehaviorTest {
             dnsServers = listOf("1.1.1.1"),
         )
         override suspend fun attachTun(fd: Int): TunAttachResult = throw IllegalStateException("aidl dead")
+    }
+
+    private class CustomTunEngine(
+        override val id: EngineId,
+        private val socksPort: Int,
+        private val tunSpec: TunSpec? = defaultTunSpec(),
+    ) : EnginePlugin, TunFdAcceptor {
+        override val capabilities: EngineCapabilities = EngineCapabilities(
+            supportsTcp = true,
+            supportsUdp = true,
+            supportsDoH = false,
+            localOnly = true,
+            requiresServer = false,
+            supportsUpstreamSocks = false,
+            providesLocalSocks = true,
+            providesLocalSocksWithoutUpstream = false,
+        )
+        val startedConfigs = mutableListOf<EngineConfig>()
+        val attachedFds = mutableListOf<Int>()
+
+        override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
+            startedConfigs += config
+            return StartResult.Success(socksPort)
+        }
+
+        override suspend fun stop() = Unit
+        override suspend fun probe(): ProbeResult = ProbeResult.Success(1L)
+        override fun stats(): Flow<EngineStats> = emptyFlow()
+        override fun buildManualConfig(settings: SettingsModel?): EngineConfig = engineConfig()
+        override fun buildProxyConfig(settings: SettingsModel?): EngineConfig = engineConfig()
+        override suspend fun tunSpec(): TunSpec? = tunSpec
+
+        override suspend fun attachTun(fd: Int): TunAttachResult {
+            attachedFds += fd
+            return TunAttachResult.Success
+        }
+
+        private fun engineConfig(): EngineConfig = when (id) {
+            EngineId.WARP -> EngineConfig.WarpProxy(socksPort = socksPort)
+            else -> EngineConfig.ByeDpi(socksPort = socksPort)
+        }
+
+        private companion object {
+            fun defaultTunSpec(): TunSpec = TunSpec(
+                sessionName = "CustomTunEngine",
+                mtu = 1500,
+                blocking = true,
+                ipv4Address = "10.0.0.2",
+                ipv4PrefixLength = 32,
+                dnsServers = listOf("1.1.1.1"),
+            )
+        }
     }
 
     private class StaticSettingsRepository(
