@@ -421,6 +421,26 @@ jobs:
       - name: assembleDebug
         run: ./gradlew assembleDebug --stacktrace
 
+      - name: Assert APK contains MasterDNS subprocess binary
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/debug -name '*.apk' | head -n1)
+          if [ -z "$APK" ]; then
+            echo "::error::Debug APK was not produced"
+            exit 1
+          fi
+          if ! unzip -l "$APK" | grep -q "lib/arm64-v8a/libmdnsvpn.so"; then
+            echo "::error::APK is missing lib/arm64-v8a/libmdnsvpn.so"
+            unzip -l "$APK" | grep -E "lib/arm64-v8a/" || true
+            exit 1
+          fi
+          SIZE=$(unzip -l "$APK" "lib/arm64-v8a/libmdnsvpn.so" | awk 'NR==4{print $1}')
+          if [ "$SIZE" -lt 1000000 ]; then
+            echo "::error::libmdnsvpn.so is suspiciously small ($SIZE bytes)"
+            exit 1
+          fi
+          echo "APK contains MasterDNS subprocess binary"
+
       - name: lintVitalAnalyzeRelease (smoke — release-path lint without keystore)
         run: ./gradlew :app:lintVitalAnalyzeRelease --stacktrace
 
