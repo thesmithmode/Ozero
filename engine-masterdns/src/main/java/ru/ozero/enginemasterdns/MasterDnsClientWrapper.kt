@@ -1,6 +1,7 @@
 package ru.ozero.enginemasterdns
 
 import java.io.File
+import java.io.FileNotFoundException
 
 interface MasterDnsClientWrapperContract {
     val binary: File
@@ -12,9 +13,12 @@ interface MasterDnsClientWrapperContract {
     ): Process
 }
 
-class MasterDnsClientWrapper(private val nativeLibDir: String) : MasterDnsClientWrapperContract {
+class MasterDnsClientWrapper(
+    nativeLibDir: String?,
+    private val binaryProvider: () -> File = { nativeBinary(nativeLibDir) },
+) : MasterDnsClientWrapperContract {
 
-    override val binary: File get() = File(nativeLibDir, "libmdnsvpn.so")
+    override val binary: File get() = binaryProvider()
 
     override fun startClient(
         configPath: String,
@@ -22,13 +26,22 @@ class MasterDnsClientWrapper(private val nativeLibDir: String) : MasterDnsClient
         logPath: String?,
         upstreamSocksUrl: String?,
     ): Process {
-        val args = buildArgs(binary.absolutePath, configPath, resolversPath, logPath, upstreamSocksUrl)
+        val resolvedBinary = binary
+        val args = buildArgs(resolvedBinary.absolutePath, configPath, resolversPath, logPath, upstreamSocksUrl)
         return ProcessBuilder(args)
             .redirectErrorStream(true)
             .start()
     }
 
     companion object {
+        const val BINARY_NAME = "libmdnsvpn.so"
+
+        private fun nativeBinary(nativeLibDir: String?): File {
+            val dir = nativeLibDir?.takeIf { it.isNotBlank() }
+                ?: throw FileNotFoundException("masterdns_native_library_dir_missing")
+            return File(dir, BINARY_NAME)
+        }
+
         fun buildArgs(
             binaryPath: String,
             configPath: String,
