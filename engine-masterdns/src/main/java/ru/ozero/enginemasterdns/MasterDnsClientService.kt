@@ -4,6 +4,7 @@ import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -53,10 +54,11 @@ class MasterDnsClientService(
     override val state: StateFlow<MasterDnsClientState> = _state.asStateFlow()
 
     override fun start(runtime: MasterDnsRuntimeConfig) {
-        jobRef.getAndSet(null)?.cancel()
+        val newJob = scope.launch(start = CoroutineStart.LAZY) { runMutex.withLock { runClient(runtime) } }
+        jobRef.getAndSet(newJob)?.cancel()
         cancelChildJobs()
         killProcess()
-        jobRef.set(scope.launch { runMutex.withLock { runClient(runtime) } })
+        newJob.start()
     }
 
     override fun stop() {
@@ -148,18 +150,23 @@ class MasterDnsClientService(
     private suspend fun awaitReadiness(process: Process, runtime: MasterDnsRuntimeConfig): String? {
         var lastFailure: Throwable? = null
         val readiness = withTimeoutOrNull(runtime.readinessTimeoutMs) {
-            while (true) {
-                if (!process.isAlive) return@withTimeoutOrNull "masterdns exited before payload readiness"
-                try {
-                    readinessProbe(runtime)
-                    return@withTimeoutOrNull READINESS_OK
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (t: Throwable) {
-                    lastFailure = t
-                    delay(runtime.readinessPollIntervalMs)
+            var result: String? = null
+            while (result == null) {
+                if (!process.isAlive) {
+                    result = "masterdns exited before payload readiness"
+                } else {
+                    try {
+                        readinessProbe(runtime)
+                        result = READINESS_OK
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (t: Throwable) {
+                        lastFailure = t
+                        delay(runtime.readinessPollIntervalMs)
+                    }
                 }
             }
+            result
         }
         if (readiness == READINESS_OK) return null
         if (readiness != null) return readiness
