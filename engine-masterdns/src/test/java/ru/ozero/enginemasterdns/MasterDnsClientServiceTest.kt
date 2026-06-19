@@ -68,11 +68,46 @@ class MasterDnsClientServiceTest {
             ioDispatcher = StandardTestDispatcher(testScheduler),
         )
 
-        service.start(runtime())
+        service.start(runtime(readinessTimeoutMs = 10, readinessPollIntervalMs = 1))
 
         val state = service.state.first { it is MasterDnsClientState.Error }
         assertEquals("masterdns payload probe failed: no socks", (state as MasterDnsClientState.Error).message)
         assertTrue(process.destroyed)
+        service.stop()
+    }
+
+    @Test
+    fun `readiness retries until probe succeeds`(@TempDir tmp: Path) = runTest {
+        val process = FakeProcess(alive = true)
+        val workDir = File(tmp.toFile(), "masterdns")
+        var attempts = 0
+        val service = MasterDnsClientService(
+            workDirProvider = { workDir },
+            wrapperFactory = {
+                object : MasterDnsClientWrapperContract {
+                    override val binary: File = File("/tmp/libmdnsvpn.so")
+                    override fun startClient(
+                        configPath: String,
+                        resolversPath: String,
+                        logPath: String?,
+                    ): Process = process
+                }
+            },
+            writer = MasterDnsConfigWriter(workDir),
+            startupCheckMs = 1,
+            readinessProbe = {
+                attempts++
+                if (attempts < 3) throw IOException("not yet")
+            },
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+        )
+
+        service.start(runtime(readinessTimeoutMs = 1_000, readinessPollIntervalMs = 1))
+
+        val state = service.state.first { it is MasterDnsClientState.Running || it is MasterDnsClientState.Error }
+        assertTrue(state is MasterDnsClientState.Running)
+        assertEquals(3, attempts)
+        assertTrue(process.isAlive)
         service.stop()
     }
 
@@ -151,7 +186,7 @@ class MasterDnsClientServiceTest {
             wrapperFactory = wrapperFactory,
             writer = MasterDnsConfigWriter(workDir),
             startupCheckMs = 1,
-            readinessProbe = {},
+            readinessProbe = { _ -> },
             ioDispatcher = StandardTestDispatcher(testScheduler),
         )
         service.start(runtime())
@@ -189,7 +224,7 @@ class MasterDnsClientServiceTest {
                 override fun write(runtime: MasterDnsRuntimeConfig): Files = throw UnknownMasterDnsWriterFailure()
             },
             startupCheckMs = 1,
-            readinessProbe = {},
+            readinessProbe = { _ -> },
             ioDispatcher = StandardTestDispatcher(testScheduler),
         )
 
@@ -221,7 +256,7 @@ class MasterDnsClientServiceTest {
             },
             writer = MasterDnsConfigWriter(workDir),
             startupCheckMs = 1,
-            readinessProbe = {},
+            readinessProbe = { _ -> },
             ioDispatcher = StandardTestDispatcher(testScheduler),
         )
         service.start(runtime())
@@ -236,10 +271,15 @@ class MasterDnsClientServiceTest {
         service.stop()
     }
 
-    private fun runtime() = MasterDnsRuntimeConfig(
+    private fun runtime(
+        readinessTimeoutMs: Long = MasterDnsRuntimeConfig.DEFAULT_READINESS_TIMEOUT_MS,
+        readinessPollIntervalMs: Long = MasterDnsRuntimeConfig.DEFAULT_READINESS_POLL_INTERVAL_MS,
+    ) = MasterDnsRuntimeConfig(
         configToml = "DOMAINS = [\"v.x\"]\n",
         resolvers = listOf("8.8.8.8"),
         socksPort = 18000,
+        readinessTimeoutMs = readinessTimeoutMs,
+        readinessPollIntervalMs = readinessPollIntervalMs,
     )
 
     private fun makeService(
@@ -263,7 +303,7 @@ class MasterDnsClientServiceTest {
             },
             writer = MasterDnsConfigWriter(workDir),
             startupCheckMs = startupCheckMs,
-            readinessProbe = {},
+            readinessProbe = { _ -> },
             ioDispatcher = dispatcher,
         )
     }

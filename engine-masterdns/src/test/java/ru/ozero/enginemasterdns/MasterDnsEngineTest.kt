@@ -88,6 +88,19 @@ class MasterDnsEngineTest {
     }
 
     @Test
+    fun `start rejects upstream before allocating port`() = runTest {
+        val allocator = RecordingAllocator(18000)
+        val engine = MasterDnsEngine(
+            serviceFactory = { FakeService() },
+            portAllocator = allocator,
+        )
+
+        engine.start(masterDnsConfig(), Upstream.Socks5("127.0.0.1", 1080))
+
+        assertEquals(null, allocator.lastDesired)
+    }
+
+    @Test
     fun `start uses allocated port and resolvers in runtime config`() = runTest {
         val service = FakeService(succeedWithPort = 19090)
         val engine = MasterDnsEngine(
@@ -99,6 +112,31 @@ class MasterDnsEngineTest {
 
         assertEquals(19090, service.lastRuntime?.socksPort)
         assertEquals(listOf("8.8.8.8"), service.lastRuntime?.resolvers)
+    }
+
+    @Test
+    fun `start parses ozero readiness overrides into runtime config`() = runTest {
+        val service = FakeService()
+        val engine = MasterDnsEngine(
+            serviceFactory = { service },
+            portAllocator = StubAllocator(19090),
+        )
+        val config = masterDnsConfig().copy(
+            configToml = "DOMAINS = [\"v.x\"]\n" +
+                "OZERO_READINESS_HOST = \"example.com\"\n" +
+                "OZERO_READINESS_PORT = 8443\n" +
+                "OZERO_READINESS_TIMEOUT_MS = 1200\n" +
+                "OZERO_READINESS_POLL_INTERVAL_MS = 50\n" +
+                "OZERO_READINESS_CONNECT_TIMEOUT_MS = 700\n",
+        )
+
+        engine.start(config, Upstream.None)
+
+        assertEquals("example.com", service.lastRuntime?.readinessHost)
+        assertEquals(8443, service.lastRuntime?.readinessPort)
+        assertEquals(1200, service.lastRuntime?.readinessTimeoutMs)
+        assertEquals(50, service.lastRuntime?.readinessPollIntervalMs)
+        assertEquals(700, service.lastRuntime?.readinessConnectTimeoutMs)
     }
 
     @Test

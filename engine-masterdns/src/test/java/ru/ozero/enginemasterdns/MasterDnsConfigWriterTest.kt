@@ -121,6 +121,26 @@ class MasterDnsConfigWriterTest {
     }
 
     @Test
+    fun `ozero readiness keys are stripped from subprocess toml`(@TempDir tmp: Path) {
+        val writer = MasterDnsConfigWriter(File(tmp.toFile(), "masterdns"))
+        val runtime = MasterDnsRuntimeConfig(
+            configToml = "OZERO_READINESS_HOST = \"example.com\"\n" +
+                "OZERO_READINESS_PORT = 443\n" +
+                "OZERO_READINESS_TIMEOUT_MS = 1000\n" +
+                "OZERO_READINESS_POLL_INTERVAL_MS = 100\n" +
+                "OZERO_READINESS_CONNECT_TIMEOUT_MS = 500\n",
+            resolvers = emptyList(),
+            socksPort = 18800,
+        )
+
+        val files = writer.write(runtime)
+
+        val toml = File(files.configPath).readText()
+        assertFalse(toml.contains("OZERO_READINESS"))
+        assertTrue(toml.contains("LISTEN_PORT = 18800"))
+    }
+
+    @Test
     fun `blank source lines trimmed before overrides appended`(@TempDir tmp: Path) {
         val writer = MasterDnsConfigWriter(File(tmp.toFile(), "masterdns"))
         val runtime = MasterDnsRuntimeConfig(

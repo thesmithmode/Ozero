@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.PersistentLoggers
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
@@ -29,8 +30,14 @@ class MasterDnsClientService(
     private val wrapperFactory: () -> MasterDnsClientWrapperContract,
     private val writer: MasterDnsConfigWriter,
     private val startupCheckMs: Long = STARTUP_CHECK_MS,
-    private val readinessProbe: suspend (Int) -> Unit = { port ->
-        MasterDnsSocksPayloadProbe.probe("127.0.0.1", port)
+    private val readinessProbe: suspend (MasterDnsRuntimeConfig) -> Unit = { runtime ->
+        MasterDnsSocksPayloadProbe.probe(
+            socksHost = "127.0.0.1",
+            socksPort = runtime.socksPort,
+            targetHost = runtime.readinessHost,
+            targetPort = runtime.readinessPort,
+            timeoutMs = runtime.readinessConnectTimeoutMs,
+        )
     },
     ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : MasterDnsClientServiceContract {
@@ -85,11 +92,8 @@ class MasterDnsClientService(
                 PersistentLoggers.error(TAG, "masterdns exited early: $output")
                 return
             }
-            try {
-                readinessProbe(runtime.socksPort)
-            } catch (t: Throwable) {
-                _state.value = MasterDnsClientState.Error("masterdns payload probe failed: ${t.message}")
-                PersistentLoggers.error(TAG, "masterdns payload probe failed: ${t.message}", t)
+            awaitReadiness(process, runtime)?.let { failure ->
+                _state.value = MasterDnsClientState.Error(failure)
                 killProcess()
                 return
             }
@@ -141,6 +145,29 @@ class MasterDnsClientService(
         workDirProvider().mkdirs()
     }
 
+    private suspend fun awaitReadiness(process: Process, runtime: MasterDnsRuntimeConfig): String? {
+        var lastFailure: Throwable? = null
+        val readiness = withTimeoutOrNull(runtime.readinessTimeoutMs) {
+            while (true) {
+                if (!process.isAlive) return@withTimeoutOrNull "masterdns exited before payload readiness"
+                try {
+                    readinessProbe(runtime)
+                    return@withTimeoutOrNull READINESS_OK
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (t: Throwable) {
+                    lastFailure = t
+                    delay(runtime.readinessPollIntervalMs)
+                }
+            }
+        }
+        if (readiness == READINESS_OK) return null
+        if (readiness != null) return readiness
+        val reason = lastFailure?.message ?: "timeout"
+        PersistentLoggers.error(TAG, "masterdns payload probe failed: $reason", lastFailure)
+        return "masterdns payload probe failed: $reason"
+    }
+
     private fun killProcess() {
         processRef.getAndSet(null)?.let { process ->
             runCatching { process.destroy() }
@@ -150,6 +177,7 @@ class MasterDnsClientService(
 
     private companion object {
         const val TAG = "MasterDnsService"
+        const val READINESS_OK = "ok"
         const val STARTUP_CHECK_MS = 500L
         const val LIVENESS_POLL_MS = 500L
         const val MAX_LOG_LINES = 200
