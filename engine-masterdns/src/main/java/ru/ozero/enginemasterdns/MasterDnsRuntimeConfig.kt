@@ -4,5 +4,4 @@ data class MasterDnsRuntimeConfig(
     val configToml: String,
     val resolvers: List<String>,
     val socksPort: Int,
-    val upstreamSocksUrl: String? = null,
 )

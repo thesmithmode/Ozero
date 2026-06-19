@@ -32,7 +32,7 @@ class MasterDnsEngine(
         supportsDoH = false,
         localOnly = false,
         requiresServer = true,
-        supportsUpstreamSocks = true,
+        supportsUpstreamSocks = false,
     )
 
     @Volatile
@@ -54,12 +54,10 @@ class MasterDnsEngine(
         val md = config as? EngineConfig.MasterDns
             ?: return StartResult.Failure("expected EngineConfig.MasterDns, got ${config::class.simpleName}")
         val port = portAllocator.allocate(md.socksPort)
-        val upstreamUrl = when (upstream) {
-            is Upstream.Socks5 -> "socks5://${upstream.host}:${upstream.port}"
-            is Upstream.Http -> "http://${upstream.host}:${upstream.port}"
-            is Upstream.None -> null
+        if (upstream !is Upstream.None) {
+            return StartResult.Failure("MasterDNS does not support upstream proxy chaining")
         }
-        val runtime = MasterDnsRuntimeConfig(md.configToml, md.resolvers, port, upstreamUrl)
+        val runtime = MasterDnsRuntimeConfig(md.configToml, md.resolvers, port)
         val activeService = serviceFactory().also { service = it }
         activeService.start(runtime)
         val terminal = withTimeoutOrNull(startTimeoutMs) {

@@ -2,7 +2,6 @@ package ru.ozero.enginemasterdns
 
 import android.util.Log
 import kotlinx.coroutines.CancellationException
-import ru.ozero.enginescore.PersistentLoggers
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import ru.ozero.enginescore.PersistentLoggers
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
 
@@ -29,6 +29,9 @@ class MasterDnsClientService(
     private val wrapperFactory: () -> MasterDnsClientWrapperContract,
     private val writer: MasterDnsConfigWriter,
     private val startupCheckMs: Long = STARTUP_CHECK_MS,
+    private val readinessProbe: suspend (Int) -> Unit = { port ->
+        MasterDnsSocksPayloadProbe.probe("127.0.0.1", port)
+    },
     ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : MasterDnsClientServiceContract {
 
@@ -71,7 +74,6 @@ class MasterDnsClientService(
                 files.configPath,
                 files.resolversPath,
                 logPath = null,
-                upstreamSocksUrl = runtime.upstreamSocksUrl,
             )
             processRef.getAndSet(process)?.let { stale ->
                 runCatching { stale.destroyForcibly() }
@@ -81,6 +83,14 @@ class MasterDnsClientService(
                 val output = process.inputStream.bufferedReader().use { it.readText() }
                 _state.value = MasterDnsClientState.Error("masterdns exited: $output")
                 PersistentLoggers.error(TAG, "masterdns exited early: $output")
+                return
+            }
+            try {
+                readinessProbe(runtime.socksPort)
+            } catch (t: Throwable) {
+                _state.value = MasterDnsClientState.Error("masterdns payload probe failed: ${t.message}")
+                PersistentLoggers.error(TAG, "masterdns payload probe failed: ${t.message}", t)
+                killProcess()
                 return
             }
             _state.value = MasterDnsClientState.Running(runtime.socksPort)
