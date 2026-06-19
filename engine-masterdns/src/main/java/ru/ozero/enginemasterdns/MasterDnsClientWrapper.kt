@@ -9,7 +9,6 @@ interface MasterDnsClientWrapperContract {
         configPath: String,
         resolversPath: String,
         logPath: String?,
-        upstreamSocksUrl: String? = null,
     ): Process
 }
 
@@ -24,10 +23,9 @@ class MasterDnsClientWrapper(
         configPath: String,
         resolversPath: String,
         logPath: String?,
-        upstreamSocksUrl: String?,
     ): Process {
         val resolvedBinary = binary
-        val args = buildArgs(resolvedBinary.absolutePath, configPath, resolversPath, logPath, upstreamSocksUrl)
+        val args = buildArgs(resolvedBinary.absolutePath, configPath, resolversPath, logPath)
         return ProcessBuilder(args)
             .redirectErrorStream(true)
             .start()
@@ -47,7 +45,6 @@ class MasterDnsClientWrapper(
             configPath: String,
             resolversPath: String,
             logPath: String?,
-            upstreamSocksUrl: String? = null,
         ): List<String> = buildList {
             add(binaryPath)
             add("-config")
@@ -57,10 +54,6 @@ class MasterDnsClientWrapper(
             if (logPath != null) {
                 add("-log")
                 add(logPath)
-            }
-            if (upstreamSocksUrl != null) {
-                add("--socks5-proxy-url")
-                add(upstreamSocksUrl)
             }
         }
     }

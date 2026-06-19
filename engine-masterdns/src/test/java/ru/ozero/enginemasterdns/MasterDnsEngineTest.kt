@@ -34,7 +34,7 @@ class MasterDnsEngineTest {
         assertFalse(c.supportsDoH)
         assertFalse(c.localOnly)
         assertTrue(c.requiresServer)
-        assertTrue(c.supportsUpstreamSocks)
+        assertFalse(c.supportsUpstreamSocks)
     }
 
     @Test
@@ -58,29 +58,33 @@ class MasterDnsEngineTest {
     }
 
     @Test
-    fun `start passes socks upstream URL into runtime config`() = runTest {
+    fun `start rejects socks upstream because binary has no upstream CLI`() = runTest {
         val service = FakeService()
         val engine = MasterDnsEngine(
             serviceFactory = { service },
             portAllocator = StubAllocator(18000),
         )
 
-        engine.start(masterDnsConfig(), Upstream.Socks5("127.0.0.1", 1080))
+        val result = engine.start(masterDnsConfig(), Upstream.Socks5("127.0.0.1", 1080))
 
-        assertEquals("socks5://127.0.0.1:1080", service.lastRuntime?.upstreamSocksUrl)
+        assertTrue(result is StartResult.Failure)
+        assertEquals("MasterDNS does not support upstream proxy chaining", (result as StartResult.Failure).reason)
+        assertEquals(null, service.lastRuntime)
     }
 
     @Test
-    fun `start passes http upstream URL into runtime config`() = runTest {
+    fun `start rejects http upstream because binary has no upstream CLI`() = runTest {
         val service = FakeService()
         val engine = MasterDnsEngine(
             serviceFactory = { service },
             portAllocator = StubAllocator(18000),
         )
 
-        engine.start(masterDnsConfig(), Upstream.Http("127.0.0.1", 8080))
+        val result = engine.start(masterDnsConfig(), Upstream.Http("127.0.0.1", 8080))
 
-        assertEquals("http://127.0.0.1:8080", service.lastRuntime?.upstreamSocksUrl)
+        assertTrue(result is StartResult.Failure)
+        assertEquals("MasterDNS does not support upstream proxy chaining", (result as StartResult.Failure).reason)
+        assertEquals(null, service.lastRuntime)
     }
 
     @Test
@@ -95,7 +99,6 @@ class MasterDnsEngineTest {
 
         assertEquals(19090, service.lastRuntime?.socksPort)
         assertEquals(listOf("8.8.8.8"), service.lastRuntime?.resolvers)
-        assertEquals(null, service.lastRuntime?.upstreamSocksUrl)
     }
 
     @Test

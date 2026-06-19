@@ -14,6 +14,7 @@ import org.junit.jupiter.api.io.TempDir
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Path
@@ -42,6 +43,36 @@ class MasterDnsClientServiceTest {
         val state = service.state.first { it is MasterDnsClientState.Running || it is MasterDnsClientState.Error }
         assertTrue(state is MasterDnsClientState.Error) { "got=$state" }
         assertEquals("masterdns exited: bad config", (state as MasterDnsClientState.Error).message)
+        service.stop()
+    }
+
+    @Test
+    fun `start with failed payload probe transitions to Error and kills process`(@TempDir tmp: Path) = runTest {
+        val process = FakeProcess(alive = true)
+        val workDir = File(tmp.toFile(), "masterdns")
+        val service = MasterDnsClientService(
+            workDirProvider = { workDir },
+            wrapperFactory = {
+                object : MasterDnsClientWrapperContract {
+                    override val binary: File = File("/tmp/libmdnsvpn.so")
+                    override fun startClient(
+                        configPath: String,
+                        resolversPath: String,
+                        logPath: String?,
+                    ): Process = process
+                }
+            },
+            writer = MasterDnsConfigWriter(workDir),
+            startupCheckMs = 1,
+            readinessProbe = { throw IOException("no socks") },
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+        )
+
+        service.start(runtime())
+
+        val state = service.state.first { it is MasterDnsClientState.Error }
+        assertEquals("masterdns payload probe failed: no socks", (state as MasterDnsClientState.Error).message)
+        assertTrue(process.destroyed)
         service.stop()
     }
 
@@ -110,7 +141,6 @@ class MasterDnsClientServiceTest {
                     configPath: String,
                     resolversPath: String,
                     logPath: String?,
-                    upstreamSocksUrl: String?,
                 ): Process =
                     throw java.io.IOException("binary missing")
             }
@@ -121,6 +151,7 @@ class MasterDnsClientServiceTest {
             wrapperFactory = wrapperFactory,
             writer = MasterDnsConfigWriter(workDir),
             startupCheckMs = 1,
+            readinessProbe = {},
             ioDispatcher = StandardTestDispatcher(testScheduler),
         )
         service.start(runtime())
@@ -151,7 +182,6 @@ class MasterDnsClientServiceTest {
                         configPath: String,
                         resolversPath: String,
                         logPath: String?,
-                        upstreamSocksUrl: String?,
                     ): Process = FakeProcess(alive = true)
                 }
             },
@@ -159,6 +189,7 @@ class MasterDnsClientServiceTest {
                 override fun write(runtime: MasterDnsRuntimeConfig): Files = throw UnknownMasterDnsWriterFailure()
             },
             startupCheckMs = 1,
+            readinessProbe = {},
             ioDispatcher = StandardTestDispatcher(testScheduler),
         )
 
@@ -184,13 +215,13 @@ class MasterDnsClientServiceTest {
                         configPath: String,
                         resolversPath: String,
                         logPath: String?,
-                        upstreamSocksUrl: String?,
                     ): Process =
                         processes.removeAt(0)
                 }
             },
             writer = MasterDnsConfigWriter(workDir),
             startupCheckMs = 1,
+            readinessProbe = {},
             ioDispatcher = StandardTestDispatcher(testScheduler),
         )
         service.start(runtime())
@@ -227,12 +258,12 @@ class MasterDnsClientServiceTest {
                         configPath: String,
                         resolversPath: String,
                         logPath: String?,
-                        upstreamSocksUrl: String?,
                     ): Process = process
                 }
             },
             writer = MasterDnsConfigWriter(workDir),
             startupCheckMs = startupCheckMs,
+            readinessProbe = {},
             ioDispatcher = dispatcher,
         )
     }
