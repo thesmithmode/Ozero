@@ -53,10 +53,10 @@ class MasterDnsClientService(
     override val state: StateFlow<MasterDnsClientState> = _state.asStateFlow()
 
     override fun start(runtime: MasterDnsRuntimeConfig) {
+        jobRef.getAndSet(null)?.cancel()
         cancelChildJobs()
-        jobRef.getAndSet(
-            scope.launch { runMutex.withLock { runClient(runtime) } },
-        )?.cancel()
+        killProcess()
+        jobRef.set(scope.launch { runMutex.withLock { runClient(runtime) } })
     }
 
     override fun stop() {

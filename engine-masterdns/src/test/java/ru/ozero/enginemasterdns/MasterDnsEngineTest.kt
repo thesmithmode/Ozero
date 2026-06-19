@@ -123,7 +123,7 @@ class MasterDnsEngineTest {
         )
         val config = masterDnsConfig().copy(
             configToml = "DOMAINS = [\"v.x\"]\n" +
-                "OZERO_READINESS_HOST = \"example.com\"\n" +
+                "OZERO_READINESS_HOST = \"probe-host\"\n" +
                 "OZERO_READINESS_PORT = 8443\n" +
                 "OZERO_READINESS_TIMEOUT_MS = 1200\n" +
                 "OZERO_READINESS_POLL_INTERVAL_MS = 50\n" +
@@ -132,7 +132,7 @@ class MasterDnsEngineTest {
 
         engine.start(config, Upstream.None)
 
-        assertEquals("example.com", service.lastRuntime?.readinessHost)
+        assertEquals("probe-host", service.lastRuntime?.readinessHost)
         assertEquals(8443, service.lastRuntime?.readinessPort)
         assertEquals(1200, service.lastRuntime?.readinessTimeoutMs)
         assertEquals(50, service.lastRuntime?.readinessPollIntervalMs)
