@@ -4,6 +4,10 @@ import android.content.pm.ApplicationInfo
 import android.os.Build
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.ZipFile
 
 class MasterDnsBinaryInstaller(
@@ -11,26 +15,37 @@ class MasterDnsBinaryInstaller(
     private val installDir: File,
 ) {
     fun resolve(): File {
-        val native = File(applicationInfo.nativeLibraryDir.orEmpty(), MasterDnsClientWrapper.BINARY_NAME)
-        if (native.isUsableExecutable()) return native
-        val installed = File(installDir, MasterDnsClientWrapper.BINARY_NAME)
-        if (installed.isUsableExecutable()) return installed
-        installDir.mkdirs()
-        extractFromApk(installed)
-        installed.setReadable(true, true)
-        installed.setExecutable(true, true)
-        if (installed.isUsableExecutable()) return installed
-        throw FileNotFoundException("masterdns_binary_not_executable")
+        nativeCandidate()?.takeIf { it.isUsableExecutable() }?.let { return it }
+        synchronized(lockFor(installDir)) {
+            val installed = File(installDir, MasterDnsClientWrapper.BINARY_NAME)
+            if (installed.isUsableExecutable()) return installed
+            ensureInstallDir()
+            extractFromApk(installed)
+            installed.setReadable(true, true)
+            installed.setExecutable(true, true)
+            if (installed.isUsableExecutable()) return installed
+            throw FileNotFoundException("masterdns_binary_not_executable")
+        }
+    }
+
+    private fun nativeCandidate(): File? = applicationInfo.nativeLibraryDir
+        ?.takeIf { it.isNotBlank() }
+        ?.let { File(it, MasterDnsClientWrapper.BINARY_NAME) }
+
+    private fun ensureInstallDir() {
+        if (!installDir.mkdirs() && !installDir.isDirectory) {
+            throw IOException("masterdns_binary_install_dir_unavailable")
+        }
     }
 
     private fun extractFromApk(target: File) {
-        val tmp = File(target.parentFile, "${target.name}.tmp")
-        tmp.delete()
         for (apk in apkFiles()) {
+            val tmp = File.createTempFile("${target.name}.", ".tmp", target.parentFile)
             if (extractFromApkFile(apk, tmp)) {
                 replaceTarget(tmp, target)
                 return
             }
+            tmp.delete()
         }
         throw FileNotFoundException("masterdns_binary_missing")
     }
@@ -46,9 +61,15 @@ class MasterDnsBinaryInstaller(
     }
 
     private fun replaceTarget(tmp: File, target: File) {
-        if (!tmp.renameTo(target)) {
-            tmp.copyTo(target, overwrite = true)
-            tmp.delete()
+        runCatching {
+            Files.move(
+                tmp.toPath(),
+                target.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        }.getOrElse {
+            Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
     }
 
@@ -62,10 +83,11 @@ class MasterDnsBinaryInstaller(
         .map { "lib/$it/${MasterDnsClientWrapper.BINARY_NAME}" }
         .ifEmpty { listOf("lib/arm64-v8a/${MasterDnsClientWrapper.BINARY_NAME}") }
 
-    private fun File.isUsableExecutable(): Boolean =
-        isFile && length() > MIN_BINARY_BYTES && canExecute()
+    private fun File.isUsableExecutable(): Boolean = isFile && canExecute()
 
     private companion object {
-        const val MIN_BINARY_BYTES = 1024L * 1024L
+        private val installLocks = ConcurrentHashMap<String, Any>()
+
+        fun lockFor(dir: File): Any = installLocks.getOrPut(dir.absolutePath) { Any() }
     }
 }

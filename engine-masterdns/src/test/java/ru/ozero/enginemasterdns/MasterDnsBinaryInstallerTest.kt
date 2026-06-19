@@ -18,7 +18,7 @@ class MasterDnsBinaryInstallerTest {
     fun `uses extracted native library when available`() {
         val nativeDir = File(tempDir, "native").also { it.mkdirs() }
         val binary = File(nativeDir, MasterDnsClientWrapper.BINARY_NAME)
-        binary.writeBytes(ByteArray(BINARY_SIZE) { 7 })
+        binary.writeBytes(byteArrayOf(7))
         binary.setExecutable(true, true)
         val appInfo = ApplicationInfo().apply { nativeLibraryDir = nativeDir.absolutePath }
 
@@ -41,7 +41,19 @@ class MasterDnsBinaryInstallerTest {
         assertEquals(MasterDnsClientWrapper.BINARY_NAME, resolved.name)
         assertTrue(resolved.isFile)
         assertTrue(resolved.canExecute())
-        assertTrue(resolved.length() >= BINARY_SIZE)
+    }
+
+    @Test
+    fun `extracts subprocess binary from apk when native library dir is null`() {
+        val apk = File(tempDir, "app-null-native.apk")
+        writeApk(apk, "lib/arm64-v8a/${MasterDnsClientWrapper.BINARY_NAME}")
+        val appInfo = ApplicationInfo().apply { sourceDir = apk.absolutePath }
+
+        val resolved = MasterDnsBinaryInstaller(appInfo, File(tempDir, "install-null-native")).resolve()
+
+        assertEquals(MasterDnsClientWrapper.BINARY_NAME, resolved.name)
+        assertTrue(resolved.isFile)
+        assertTrue(resolved.canExecute())
     }
 
     @Test
@@ -55,12 +67,8 @@ class MasterDnsBinaryInstallerTest {
     private fun writeApk(apk: File, entryName: String) {
         ZipOutputStream(apk.outputStream()).use { zip ->
             zip.putNextEntry(ZipEntry(entryName))
-            zip.write(ByteArray(BINARY_SIZE) { 3 })
+            zip.write(byteArrayOf(3))
             zip.closeEntry()
         }
-    }
-
-    private companion object {
-        const val BINARY_SIZE = 1024 * 1024 + 1
     }
 }
