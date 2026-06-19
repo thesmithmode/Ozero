@@ -4,6 +4,7 @@ import android.content.pm.ApplicationInfo
 import android.os.Build
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.IOException
 import java.util.zip.ZipFile
 
 class MasterDnsBinaryResolver(
@@ -24,8 +25,12 @@ class MasterDnsBinaryResolver(
         ?.let { File(it, MasterDnsClientWrapper.BINARY_NAME) }
 
     private fun hasPackagedBinary(): Boolean = apkFiles().any { apk ->
-        ZipFile(apk).use { zip ->
-            candidateEntries().any { zip.getEntry(it) != null }
+        try {
+            ZipFile(apk).use { zip ->
+                candidateEntries().any { zip.getEntry(it) != null }
+            }
+        } catch (e: IOException) {
+            false
         }
     }
 
