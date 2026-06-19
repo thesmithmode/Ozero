@@ -2,8 +2,10 @@ package ru.ozero.enginemasterdns
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.io.FileNotFoundException
 
 class MasterDnsClientWrapperArgsTest {
 
@@ -68,6 +70,17 @@ class MasterDnsClientWrapperArgsTest {
     fun `wrapper binary path resolved relative to nativeLibDir`() {
         val wrapper = MasterDnsClientWrapper("/data/app/native/arm64-v8a")
         assertEquals("/data/app/native/arm64-v8a/libmdnsvpn.so", wrapper.binary.path.replace('\\', '/'))
+    }
+
+    @Test
+    fun `wrapper binary throws clear error when nativeLibDir null and no provider supplied`() {
+        val wrapper = MasterDnsClientWrapper(null)
+
+        val error = assertThrows(FileNotFoundException::class.java) {
+            wrapper.binary
+        }
+
+        assertEquals("masterdns_native_library_dir_missing", error.message)
     }
 
     private fun List<String>.containsInOrder(flag: String, value: String): Boolean {
