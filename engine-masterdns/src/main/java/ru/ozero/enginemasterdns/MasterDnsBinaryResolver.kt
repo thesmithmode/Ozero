@@ -29,7 +29,7 @@ class MasterDnsBinaryResolver(
             ZipFile(apk).use { zip ->
                 candidateEntries().any { zip.getEntry(it) != null }
             }
-        } catch (e: IOException) {
+        } catch (_: IOException) {
             false
         }
     }
@@ -39,7 +39,7 @@ class MasterDnsBinaryResolver(
         applicationInfo.splitSourceDirs?.forEach { add(File(it)) }
     }.filter { it.isFile }
 
-    private fun candidateEntries(): List<String> = Build.SUPPORTED_ABIS
+    private fun candidateEntries(): List<String> = Build.SUPPORTED_ABIS.orEmpty()
         .filter { it.isNotBlank() }
         .map { "lib/$it/${MasterDnsClientWrapper.BINARY_NAME}" }
         .ifEmpty { listOf("lib/arm64-v8a/${MasterDnsClientWrapper.BINARY_NAME}") }
