@@ -2,14 +2,16 @@ package ru.ozero.enginemasterdns
 
 import android.content.pm.ApplicationInfo
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.io.FileNotFoundException
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-class MasterDnsBinaryInstallerTest {
+class MasterDnsBinaryResolverTest {
 
     @TempDir
     lateinit var tempDir: File
@@ -22,13 +24,13 @@ class MasterDnsBinaryInstallerTest {
         binary.setExecutable(true, true)
         val appInfo = ApplicationInfo().apply { nativeLibraryDir = nativeDir.absolutePath }
 
-        val resolved = MasterDnsBinaryInstaller(appInfo, File(tempDir, "install")).resolve()
+        val resolved = MasterDnsBinaryResolver(appInfo).resolve()
 
         assertEquals(binary.absolutePath, resolved.absolutePath)
     }
 
     @Test
-    fun `extracts subprocess binary from apk when native library dir is empty`() {
+    fun `does not return files dir fallback when packaged binary was not extracted`() {
         val apk = File(tempDir, "app.apk")
         writeApk(apk, "lib/arm64-v8a/${MasterDnsClientWrapper.BINARY_NAME}")
         val appInfo = ApplicationInfo().apply {
@@ -36,24 +38,24 @@ class MasterDnsBinaryInstallerTest {
             sourceDir = apk.absolutePath
         }
 
-        val resolved = MasterDnsBinaryInstaller(appInfo, File(tempDir, "install")).resolve()
+        val error = assertThrows(FileNotFoundException::class.java) {
+            MasterDnsBinaryResolver(appInfo).resolve()
+        }
 
-        assertEquals(MasterDnsClientWrapper.BINARY_NAME, resolved.name)
-        assertTrue(resolved.isFile)
-        assertTrue(resolved.canExecute())
+        assertEquals("masterdns_binary_not_extracted", error.message)
     }
 
     @Test
-    fun `extracts subprocess binary from apk when native library dir is null`() {
+    fun `native library dir null fails without relative lookup`() {
         val apk = File(tempDir, "app-null-native.apk")
         writeApk(apk, "lib/arm64-v8a/${MasterDnsClientWrapper.BINARY_NAME}")
         val appInfo = ApplicationInfo().apply { sourceDir = apk.absolutePath }
 
-        val resolved = MasterDnsBinaryInstaller(appInfo, File(tempDir, "install-null-native")).resolve()
+        val error = assertThrows(FileNotFoundException::class.java) {
+            MasterDnsBinaryResolver(appInfo).resolve()
+        }
 
-        assertEquals(MasterDnsClientWrapper.BINARY_NAME, resolved.name)
-        assertTrue(resolved.isFile)
-        assertTrue(resolved.canExecute())
+        assertEquals("masterdns_native_library_dir_missing", error.message)
     }
 
     @Test
@@ -70,5 +72,6 @@ class MasterDnsBinaryInstallerTest {
             zip.write(byteArrayOf(3))
             zip.closeEntry()
         }
+        assertTrue(apk.isFile)
     }
 }
