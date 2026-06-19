@@ -47,7 +47,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Ozero"
         android:usesCleartextTraffic="false"
-        android:enableOnBackInvokedCallback="true"><!-- Predictive Back на Android 14+ -->
+        android:enableOnBackInvokedCallback="true"
+        android:extractNativeLibs="true"><!-- Predictive Back на Android 14+ -->
 
         <activity
             android:name=".MainActivity"

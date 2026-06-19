@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import ru.ozero.enginemasterdns.DataStoreMasterDnsConfigStore
+import ru.ozero.enginemasterdns.MasterDnsBinaryInstaller
 import ru.ozero.enginemasterdns.MasterDnsClientService
 import ru.ozero.enginemasterdns.MasterDnsClientWrapper
 import ru.ozero.enginemasterdns.MasterDnsConfigStore
@@ -60,9 +61,18 @@ object MasterDnsModule {
         @ApplicationContext context: Context,
     ): MasterDnsClientService {
         val workDir = File(context.filesDir, "masterdns")
+        val binaryInstaller = MasterDnsBinaryInstaller(
+            applicationInfo = context.applicationInfo,
+            installDir = File(workDir, "bin"),
+        )
         return MasterDnsClientService(
             workDirProvider = { workDir },
-            wrapperFactory = { MasterDnsClientWrapper(context.applicationInfo.nativeLibraryDir) },
+            wrapperFactory = {
+                MasterDnsClientWrapper(
+                    nativeLibDir = context.applicationInfo.nativeLibraryDir,
+                    binaryProvider = { binaryInstaller.resolve() },
+                )
+            },
             writer = MasterDnsConfigWriter(workDir),
         )
     }

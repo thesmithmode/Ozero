@@ -19,6 +19,15 @@ class MtgExtractNativeLibsSentinelTest {
         )
     }
 
+    @Test
+    fun `app manifest requests native lib extraction`() {
+        val manifest = File(locateRepoRoot(), "app/src/main/AndroidManifest.xml").readText()
+        assertTrue(
+            manifest.contains("android:extractNativeLibs=\"true\""),
+            "AndroidManifest должен явно включать extractNativeLibs для subprocess native binary.",
+        )
+    }
+
     private fun locateConventionPlugin(): File {
         val repoRoot = locateRepoRoot()
         val file = File(repoRoot, "buildSrc/src/main/kotlin/ozero.android.application.gradle.kts")
