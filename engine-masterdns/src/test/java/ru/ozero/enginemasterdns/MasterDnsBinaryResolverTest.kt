@@ -46,6 +46,22 @@ class MasterDnsBinaryResolverTest {
     }
 
     @Test
+    fun `corrupt apk is treated as missing packaged binary`() {
+        val apk = File(tempDir, "corrupt.apk")
+        apk.writeText("not a zip")
+        val appInfo = ApplicationInfo().apply {
+            nativeLibraryDir = File(tempDir, "missing-native").absolutePath
+            sourceDir = apk.absolutePath
+        }
+
+        val error = assertThrows(FileNotFoundException::class.java) {
+            MasterDnsBinaryResolver(appInfo).resolve()
+        }
+
+        assertEquals("masterdns_binary_missing", error.message)
+    }
+
+    @Test
     fun `native library dir null fails without relative lookup`() {
         val apk = File(tempDir, "app-null-native.apk")
         writeApk(apk, "lib/arm64-v8a/${MasterDnsClientWrapper.BINARY_NAME}")
