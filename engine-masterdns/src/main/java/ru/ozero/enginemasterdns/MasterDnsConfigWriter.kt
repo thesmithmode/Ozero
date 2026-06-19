@@ -39,6 +39,15 @@ open class MasterDnsConfigWriter(private val workDir: File) {
     }
 
     private companion object {
-        val OVERRIDE_KEYS = listOf("LISTEN_IP", "LISTEN_PORT", "LOCAL_DNS_ENABLED")
+        val OVERRIDE_KEYS = listOf(
+            "LISTEN_IP",
+            "LISTEN_PORT",
+            "LOCAL_DNS_ENABLED",
+            "OZERO_READINESS_HOST",
+            "OZERO_READINESS_PORT",
+            "OZERO_READINESS_TIMEOUT_MS",
+            "OZERO_READINESS_POLL_INTERVAL_MS",
+            "OZERO_READINESS_CONNECT_TIMEOUT_MS",
+        )
     }
 }

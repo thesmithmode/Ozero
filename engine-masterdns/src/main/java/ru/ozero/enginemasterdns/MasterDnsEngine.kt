@@ -32,7 +32,7 @@ class MasterDnsEngine(
         supportsDoH = false,
         localOnly = false,
         requiresServer = true,
-        supportsUpstreamSocks = true,
+        supportsUpstreamSocks = false,
     )
 
     @Volatile
@@ -53,13 +53,21 @@ class MasterDnsEngine(
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         val md = config as? EngineConfig.MasterDns
             ?: return StartResult.Failure("expected EngineConfig.MasterDns, got ${config::class.simpleName}")
-        val port = portAllocator.allocate(md.socksPort)
-        val upstreamUrl = when (upstream) {
-            is Upstream.Socks5 -> "socks5://${upstream.host}:${upstream.port}"
-            is Upstream.Http -> "http://${upstream.host}:${upstream.port}"
-            is Upstream.None -> null
+        if (upstream !is Upstream.None) {
+            return StartResult.Failure("MasterDNS does not support upstream proxy chaining")
         }
-        val runtime = MasterDnsRuntimeConfig(md.configToml, md.resolvers, port, upstreamUrl)
+        val port = portAllocator.allocate(md.socksPort)
+        val readiness = parseReadinessConfig(md.configToml)
+        val runtime = MasterDnsRuntimeConfig(
+            configToml = md.configToml,
+            resolvers = md.resolvers,
+            socksPort = port,
+            readinessHost = readiness.host,
+            readinessPort = readiness.port,
+            readinessTimeoutMs = readiness.timeoutMs,
+            readinessPollIntervalMs = readiness.pollIntervalMs,
+            readinessConnectTimeoutMs = readiness.connectTimeoutMs,
+        )
         val activeService = serviceFactory().also { service = it }
         activeService.start(runtime)
         val terminal = withTimeoutOrNull(startTimeoutMs) {
@@ -106,5 +114,39 @@ class MasterDnsEngine(
 
     private companion object {
         const val START_TIMEOUT_MS = 10_000L
+        val READINESS_STRING_KEYS = setOf("OZERO_READINESS_HOST")
+        val READINESS_INT_KEYS = setOf("OZERO_READINESS_PORT", "OZERO_READINESS_CONNECT_TIMEOUT_MS")
+        val READINESS_LONG_KEYS = setOf("OZERO_READINESS_TIMEOUT_MS", "OZERO_READINESS_POLL_INTERVAL_MS")
+
+        fun parseReadinessConfig(toml: String): MasterDnsReadinessConfig {
+            val stringValues = mutableMapOf<String, String>()
+            val intValues = mutableMapOf<String, Int>()
+            val longValues = mutableMapOf<String, Long>()
+            toml.lines().forEach { line ->
+                val parts = line.substringBefore("#").split("=", limit = 2)
+                if (parts.size != 2) return@forEach
+                val key = parts[0].trim().uppercase()
+                val value = parts[1].trim()
+                if (key in READINESS_STRING_KEYS) stringValues[key] = value.trim('"').trim()
+                if (key in READINESS_INT_KEYS) value.toIntOrNull()?.let { intValues[key] = it }
+                if (key in READINESS_LONG_KEYS) value.toLongOrNull()?.let { longValues[key] = it }
+            }
+            val host = stringValues["OZERO_READINESS_HOST"]
+                ?.takeIf { it.isNotBlank() }
+                ?: MasterDnsRuntimeConfig.DEFAULT_READINESS_HOST
+            val port = intValues["OZERO_READINESS_PORT"]
+                ?.takeIf { it in 1..65535 }
+                ?: MasterDnsRuntimeConfig.DEFAULT_READINESS_PORT
+            val timeoutMs = longValues["OZERO_READINESS_TIMEOUT_MS"]
+                ?.takeIf { it > 0 }
+                ?: MasterDnsRuntimeConfig.DEFAULT_READINESS_TIMEOUT_MS
+            val pollIntervalMs = longValues["OZERO_READINESS_POLL_INTERVAL_MS"]
+                ?.takeIf { it > 0 }
+                ?: MasterDnsRuntimeConfig.DEFAULT_READINESS_POLL_INTERVAL_MS
+            val connectTimeoutMs = intValues["OZERO_READINESS_CONNECT_TIMEOUT_MS"]
+                ?.takeIf { it > 0 }
+                ?: MasterDnsRuntimeConfig.DEFAULT_READINESS_CONNECT_TIMEOUT_MS
+            return MasterDnsReadinessConfig(host, port, timeoutMs, pollIntervalMs, connectTimeoutMs)
+        }
     }
 }

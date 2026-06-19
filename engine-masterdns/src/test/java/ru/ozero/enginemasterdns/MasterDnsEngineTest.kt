@@ -34,7 +34,7 @@ class MasterDnsEngineTest {
         assertFalse(c.supportsDoH)
         assertFalse(c.localOnly)
         assertTrue(c.requiresServer)
-        assertTrue(c.supportsUpstreamSocks)
+        assertFalse(c.supportsUpstreamSocks)
     }
 
     @Test
@@ -58,29 +58,46 @@ class MasterDnsEngineTest {
     }
 
     @Test
-    fun `start passes socks upstream URL into runtime config`() = runTest {
+    fun `start rejects socks upstream because binary has no upstream CLI`() = runTest {
         val service = FakeService()
         val engine = MasterDnsEngine(
             serviceFactory = { service },
             portAllocator = StubAllocator(18000),
+        )
+
+        val result = engine.start(masterDnsConfig(), Upstream.Socks5("127.0.0.1", 1080))
+
+        assertTrue(result is StartResult.Failure)
+        assertEquals("MasterDNS does not support upstream proxy chaining", (result as StartResult.Failure).reason)
+        assertEquals(null, service.lastRuntime)
+    }
+
+    @Test
+    fun `start rejects http upstream because binary has no upstream CLI`() = runTest {
+        val service = FakeService()
+        val engine = MasterDnsEngine(
+            serviceFactory = { service },
+            portAllocator = StubAllocator(18000),
+        )
+
+        val result = engine.start(masterDnsConfig(), Upstream.Http("127.0.0.1", 8080))
+
+        assertTrue(result is StartResult.Failure)
+        assertEquals("MasterDNS does not support upstream proxy chaining", (result as StartResult.Failure).reason)
+        assertEquals(null, service.lastRuntime)
+    }
+
+    @Test
+    fun `start rejects upstream before allocating port`() = runTest {
+        val allocator = RecordingAllocator(18000)
+        val engine = MasterDnsEngine(
+            serviceFactory = { FakeService() },
+            portAllocator = allocator,
         )
 
         engine.start(masterDnsConfig(), Upstream.Socks5("127.0.0.1", 1080))
 
-        assertEquals("socks5://127.0.0.1:1080", service.lastRuntime?.upstreamSocksUrl)
-    }
-
-    @Test
-    fun `start passes http upstream URL into runtime config`() = runTest {
-        val service = FakeService()
-        val engine = MasterDnsEngine(
-            serviceFactory = { service },
-            portAllocator = StubAllocator(18000),
-        )
-
-        engine.start(masterDnsConfig(), Upstream.Http("127.0.0.1", 8080))
-
-        assertEquals("http://127.0.0.1:8080", service.lastRuntime?.upstreamSocksUrl)
+        assertEquals(null, allocator.lastDesired)
     }
 
     @Test
@@ -95,7 +112,31 @@ class MasterDnsEngineTest {
 
         assertEquals(19090, service.lastRuntime?.socksPort)
         assertEquals(listOf("8.8.8.8"), service.lastRuntime?.resolvers)
-        assertEquals(null, service.lastRuntime?.upstreamSocksUrl)
+    }
+
+    @Test
+    fun `start parses ozero readiness overrides into runtime config`() = runTest {
+        val service = FakeService()
+        val engine = MasterDnsEngine(
+            serviceFactory = { service },
+            portAllocator = StubAllocator(19090),
+        )
+        val config = masterDnsConfig().copy(
+            configToml = "DOMAINS = [\"v.x\"]\n" +
+                "OZERO_READINESS_HOST = \"example.com\"\n" +
+                "OZERO_READINESS_PORT = 8443\n" +
+                "OZERO_READINESS_TIMEOUT_MS = 1200\n" +
+                "OZERO_READINESS_POLL_INTERVAL_MS = 50\n" +
+                "OZERO_READINESS_CONNECT_TIMEOUT_MS = 700\n",
+        )
+
+        engine.start(config, Upstream.None)
+
+        assertEquals("example.com", service.lastRuntime?.readinessHost)
+        assertEquals(8443, service.lastRuntime?.readinessPort)
+        assertEquals(1200, service.lastRuntime?.readinessTimeoutMs)
+        assertEquals(50, service.lastRuntime?.readinessPollIntervalMs)
+        assertEquals(700, service.lastRuntime?.readinessConnectTimeoutMs)
     }
 
     @Test
