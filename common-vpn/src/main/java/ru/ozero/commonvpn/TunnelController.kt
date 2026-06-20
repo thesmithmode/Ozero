@@ -20,6 +20,8 @@ class TunnelController(
     val state: StateFlow<TunnelState> = _state.asStateFlow()
     private val _stats = MutableStateFlow<TunnelStats?>(null)
     val stats: StateFlow<TunnelStats?> = _stats.asStateFlow()
+    private val _rawStats = MutableStateFlow<TunnelStats?>(null)
+    val rawStats: StateFlow<TunnelStats?> = _rawStats.asStateFlow()
     private val _stagnant = MutableStateFlow(false)
     val stagnant: StateFlow<Boolean> = _stagnant.asStateFlow()
     private val _killswitchActive = MutableStateFlow(false)
@@ -105,6 +107,7 @@ class TunnelController(
 
     fun reset() {
         _stats.value = null
+        _rawStats.value = null
         _stagnant.value = false
         _killswitchActive.value = false
         sessionStartMs = 0L
@@ -137,6 +140,7 @@ class TunnelController(
             prevRxBytes = raw.rxBytes
             prevTimestampMs = raw.timestampMs
             val isConnected = _state.value is TunnelState.Connected
+            _rawStats.value = raw
             val normalized = if (isConnected) {
                 val baseline = sessionBaseline ?: raw.also { sessionBaseline = it }
                 raw.copy(

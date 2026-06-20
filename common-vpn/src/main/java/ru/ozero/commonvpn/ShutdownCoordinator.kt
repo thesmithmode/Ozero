@@ -117,7 +117,7 @@ class ShutdownCoordinator(
         val startMs = state.sessionStartMsRef.getAndSet(0L)
         val nowMs = System.currentTimeMillis()
         val durationMs = if (startMs > 0L) (nowMs - startMs).coerceAtLeast(0L) else 0L
-        val lastStats = deps.tunnelController.stats.value
+        val lastStats = deps.tunnelController.rawStats.value ?: deps.tunnelController.stats.value
         val rxBytes = lastStats?.rxBytes ?: 0L
         val txBytes = lastStats?.txBytes ?: 0L
         scope.launch {
