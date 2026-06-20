@@ -126,29 +126,30 @@ class EngineWatchdogCoordinator(
             try {
                 var consecutivePolls = 0
                 while (isActive) {
-                    delay(STAGNATION_POLL_MS)
                     if (tunnelController.stagnant.value) {
                         consecutivePolls++
-                        if (consecutivePolls * STAGNATION_POLL_MS < STAGNATION_RECOVER_THRESHOLD_MS) continue
-                        PersistentLoggers.warn(
-                            TAG,
-                            "stagnation watchdog: traffic flat ${STAGNATION_RECOVER_THRESHOLD_MS / 1000}s → recover",
-                        )
-                        val result = runCatching { plugin.recover() }.getOrElse { t ->
-                            EnginePlugin.RecoverResult.Failed("recover threw: ${t.message}")
-                        }
-                        when (result) {
-                            EnginePlugin.RecoverResult.Success -> consecutivePolls = 0
-                            EnginePlugin.RecoverResult.NotSupported -> return@launch
-                            is EnginePlugin.RecoverResult.Failed -> {
-                                PersistentLoggers.warn(TAG, "stagnation recover failed: ${result.reason}")
-                                consecutivePolls = 0
+                        if (consecutivePolls * STAGNATION_POLL_MS >= STAGNATION_RECOVER_THRESHOLD_MS) {
+                            PersistentLoggers.warn(
+                                TAG,
+                                "stagnation watchdog: traffic flat ${STAGNATION_RECOVER_THRESHOLD_MS / 1000}s → recover",
+                            )
+                            val result = runCatching { plugin.recover() }.getOrElse { t ->
+                                EnginePlugin.RecoverResult.Failed("recover threw: ${t.message}")
                             }
+                            when (result) {
+                                EnginePlugin.RecoverResult.Success -> consecutivePolls = 0
+                                EnginePlugin.RecoverResult.NotSupported -> return@launch
+                                is EnginePlugin.RecoverResult.Failed -> {
+                                    PersistentLoggers.warn(TAG, "stagnation recover failed: ${result.reason}")
+                                    consecutivePolls = 0
+                                }
+                            }
+                            delay(STAGNATION_RECOVER_GRACE_MS)
                         }
-                        delay(STAGNATION_RECOVER_GRACE_MS)
                     } else {
                         consecutivePolls = 0
                     }
+                    delay(STAGNATION_POLL_MS)
                 }
             } catch (ce: CancellationException) {
                 throw ce

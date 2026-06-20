@@ -65,7 +65,7 @@ class TunnelStatsLogger(
                     val effectiveBaseline = if (read.shouldRebaseFrom(baseline)) {
                         read.also { sessionBaseline = it }
                     } else {
-                        baseline
+                        requireNotNull(baseline)
                     }
                     val normalizedRxBytes = rxBytes - effectiveBaseline.rxBytes
                     val normalizedTxBytes = txBytes - effectiveBaseline.txBytes

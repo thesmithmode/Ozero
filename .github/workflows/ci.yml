@@ -172,7 +172,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Cache URnetwork AAR
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: aar-cache
         with:
           path: engine-urnetwork/libs
@@ -195,7 +195,7 @@ jobs:
           done
 
       - name: Cache Singbox libs
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: singbox-aar-cache
         with:
           path: |
@@ -361,7 +361,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Cache URnetwork AAR
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: aar-cache
         with:
           path: engine-urnetwork/libs
@@ -385,7 +385,7 @@ jobs:
           ls -la engine-urnetwork/libs/
 
       - name: Cache Singbox libs
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: singbox-aar-cache
         with:
           path: |
@@ -498,7 +498,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Cache URnetwork AAR
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: aar-cache
         with:
           path: engine-urnetwork/libs
@@ -521,7 +521,7 @@ jobs:
           done
 
       - name: Cache Singbox libs
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: singbox-aar-cache
         with:
           path: |
@@ -732,7 +732,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Cache URnetwork AAR
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: aar-cache
         with:
           path: engine-urnetwork/libs
@@ -953,7 +953,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Cache URnetwork AAR
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: aar-cache
         with:
           path: engine-urnetwork/libs
@@ -1105,7 +1105,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: Cache Singbox libs
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: singbox-aar-cache
         with:
           path: |
@@ -1193,7 +1193,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: Cache Singbox libs
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: singbox-aar-cache
         with:
           path: |
@@ -1281,7 +1281,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: Cache Singbox libs
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: singbox-aar-cache
         with:
           path: |
@@ -1369,7 +1369,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: Cache Singbox libs
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: singbox-aar-cache
         with:
           path: |
@@ -1457,7 +1457,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: Cache Singbox libs
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: singbox-aar-cache
         with:
           path: |
@@ -1545,7 +1545,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: Cache Singbox libs
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: singbox-aar-cache
         with:
           path: |
@@ -1633,7 +1633,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: Cache Singbox libs
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: singbox-aar-cache
         with:
           path: |
