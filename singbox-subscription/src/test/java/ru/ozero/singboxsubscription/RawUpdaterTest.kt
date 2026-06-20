@@ -22,6 +22,7 @@ import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 import ru.ozero.singboxsubscription.parser.RawShareLinksParser
 import java.util.Base64
+import java.security.cert.CertPathValidatorException
 import javax.net.ssl.SSLHandshakeException
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -277,30 +278,38 @@ class RawUpdaterTest {
     }
 
     @Test
-    fun `should normalize TLS chain validation failures`() = runBlocking {
-        rawUpdater = RawUpdater(
-            okHttpClient = OkHttpClient.Builder()
-                .addInterceptor { throw SSLHandshakeException("Chain validation failed: bad cert") }
-                .build(),
-            groupDao = groupDao,
-            profileDao = profileDao,
-        )
-        val g = group()
+    fun `should normalize TLS certificate validation failures`() = runBlocking {
+        listOf(
+            SSLHandshakeException("Chain validation failed: bad cert"),
+            SSLHandshakeException("Trust anchor for certification path not found"),
+            SSLHandshakeException("handshake").apply {
+                initCause(CertPathValidatorException("PKIX path building failed"))
+            },
+        ).forEachIndexed { index, failure ->
+            rawUpdater = RawUpdater(
+                okHttpClient = OkHttpClient.Builder()
+                    .addInterceptor { throw failure }
+                    .build(),
+                groupDao = groupDao,
+                profileDao = profileDao,
+            )
+            val g = group(index + 10L)
 
-        val result = rawUpdater.refresh(g)
+            val result = rawUpdater.refresh(g)
 
-        assertTrue(result.isFailure)
-        assertEquals(
-            "Subscription TLS certificate chain validation failed",
-            result.exceptionOrNull()?.message,
-        )
+            assertTrue(result.isFailure)
+            assertEquals(
+                "Subscription TLS certificate validation failed",
+                result.exceptionOrNull()?.message,
+            )
+        }
     }
 
     @Test
-    fun `should preserve non chain TLS failures`() = runBlocking {
+    fun `should preserve non certificate TLS failures`() = runBlocking {
         rawUpdater = RawUpdater(
             okHttpClient = OkHttpClient.Builder()
-                .addInterceptor { throw SSLHandshakeException("certificate expired") }
+                .addInterceptor { throw SSLHandshakeException("connection closed") }
                 .build(),
             groupDao = groupDao,
             profileDao = profileDao,
@@ -310,7 +319,7 @@ class RawUpdaterTest {
         val result = rawUpdater.refresh(g)
 
         assertTrue(result.isFailure)
-        assertEquals("certificate expired", result.exceptionOrNull()?.message)
+        assertEquals("connection closed", result.exceptionOrNull()?.message)
     }
 
     @Test

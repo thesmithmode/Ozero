@@ -5,7 +5,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.security.cert.CertPathValidatorException
+import java.security.cert.CertificateException
 import javax.net.ssl.SSLHandshakeException
+import javax.net.ssl.SSLPeerUnverifiedException
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
@@ -114,9 +117,30 @@ class RawUpdater(
         private const val MAX_PROFILES_PER_GROUP = 2_000
 
         private fun normalizeError(e: Throwable): Throwable = when {
-            e is SSLHandshakeException && e.message?.contains("Chain validation failed", ignoreCase = true) == true ->
-                SSLHandshakeException("Subscription TLS certificate chain validation failed")
+            e.isSubscriptionCertificateFailure() ->
+                SSLHandshakeException("Subscription TLS certificate validation failed").initCause(e)
             else -> e
+        }
+
+        private fun Throwable.isSubscriptionCertificateFailure(): Boolean {
+            if (this !is SSLHandshakeException && this !is SSLPeerUnverifiedException) return false
+            return causeChain().any { cause ->
+                cause is CertificateException ||
+                    cause is CertPathValidatorException ||
+                    cause.message.orEmpty().containsCertificateFailureText()
+            } ||
+                message.orEmpty().containsCertificateFailureText()
+        }
+
+        private fun Throwable.causeChain(): Sequence<Throwable> = generateSequence(this) { it.cause }
+
+        private fun String.containsCertificateFailureText(): Boolean {
+            val text = lowercase()
+            return text.contains("chain validation failed") ||
+                text.contains("trust anchor") ||
+                text.contains("pkix") ||
+                text.contains("certpath") ||
+                text.contains("certificate")
         }
 
         fun protocolTypeOf(bean: ru.ozero.singboxfmt.AbstractBean): Int = when (bean) {

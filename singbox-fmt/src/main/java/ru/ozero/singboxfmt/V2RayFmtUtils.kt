@@ -10,8 +10,8 @@ internal object V2RayFmtUtils {
         else -> raw
     }
 
-    fun parseSecurityParams(bean: StandardV2RayBean, parsed: UriCompat) {
-        bean.security = parsed.getQueryParameter("security") ?: "none"
+    fun parseSecurityParams(bean: StandardV2RayBean, parsed: UriCompat, defaultSecurity: String = "none") {
+        bean.security = parsed.getQueryParameter("security") ?: defaultSecurity
         bean.sni = parsed.firstQueryParameter("sni", "serverName", "servername", "server_name") ?: ""
         bean.alpn = parsed.getQueryParameter("alpn") ?: ""
         bean.utlsFingerprint = parsed.getQueryParameter("fp") ?: ""
