@@ -1,5 +1,6 @@
 package ru.ozero.singboxprocess
 
+import android.util.Base64
 import io.nekohasekai.libbox.CommandServer
 import io.nekohasekai.libbox.CommandServerHandler
 import io.nekohasekai.libbox.OverrideOptions
@@ -23,7 +24,6 @@ import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.PersistentLoggers
 import java.security.KeyStore
 import java.security.cert.X509Certificate
-import java.util.Base64
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 
@@ -228,7 +228,7 @@ internal object SingboxRuntime {
     }.getOrDefault(emptyList())
 
     private fun X509Certificate.toPem(): String {
-        val body = Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(encoded)
+        val body = Base64.encodeToString(encoded, Base64.NO_WRAP)
         return "-----BEGIN CERTIFICATE-----\n$body\n-----END CERTIFICATE-----"
     }
 

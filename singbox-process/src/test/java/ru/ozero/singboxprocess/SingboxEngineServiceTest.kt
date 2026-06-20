@@ -34,6 +34,8 @@ class SingboxEngineServiceTest {
 
         assertTrue(runtimeSource.contains("TrustManagerFactory.getDefaultAlgorithm()"))
         assertTrue(runtimeSource.contains("acceptedIssuers"))
+        assertTrue(runtimeSource.contains("android.util.Base64"))
+        assertFalse(runtimeSource.contains("java.util.Base64"))
         assertTrue(
             runtimeSource.contains("systemCertificates(): StringIterator = stringIterator(systemCertificatePem)"),
         )
