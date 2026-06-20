@@ -34,6 +34,12 @@ class SingboxHttp204RoutedProbeTest {
     }
 
     @Test
+    fun `default routed probe falls back to plain http after https endpoints`() {
+        assertTrue(SingboxHttp204RoutedProbe.PROBE_URL.startsWith("https://"))
+        assertTrue(SingboxHttp204RoutedProbe.FALLBACK_PROBE_URLS.any { it.startsWith("http://") })
+    }
+
+    @Test
     fun `routed probe succeeds after HTTP 204 through SOCKS`() = runTest {
         val ticks = 1_000L
         SocksHttpServer(statusCode = 204, reason = "No Content").use { socks ->
