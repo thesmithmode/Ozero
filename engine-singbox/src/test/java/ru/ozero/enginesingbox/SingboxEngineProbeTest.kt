@@ -374,6 +374,29 @@ class SingboxEngineProbeTest {
     }
 
     @Test
+    fun `awaitReady fast fails tun auto select routed probe failure`() = runTest {
+        val engine = buildEngine()
+        var calls = 0
+        engine.routedProbe = SingboxRoutedProbe {
+            calls++
+            SingboxHttp204RoutedProbe.LATENCY_FAILED
+        }
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.runtimeRunning() } returns true
+        engine.setPrivateField("proxy", process)
+        engine.setPrivateField("activeSocksPort", 49408)
+        engine.setPrivateField("activeTunAutoSelect", true)
+
+        val result = engine.awaitReady()
+
+        val timeout = assertIs<EnginePlugin.ReadyResult.Timeout>(result)
+        assertTrue(timeout.reason.contains("routed probe"))
+        assertEquals(1, calls)
+        assertEquals(0, engine.privateIntField("activeSocksPort"))
+        assertEquals(false, engine.privateField("activeTunAutoSelect"))
+    }
+
+    @Test
     fun `awaitReady retries transient routed probe failures without clearing active port`() = runTest {
         val engine = buildEngine()
         var calls = 0

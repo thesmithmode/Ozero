@@ -32,6 +32,7 @@ class TunnelController(
     private var prevTxBytes: Long = 0L
     private var prevRxBytes: Long = 0L
     private var prevTimestampMs: Long = 0L
+    private var sessionBaseline: TunnelStats? = null
     private var smoothedBpsIn: Double = 0.0
     private var smoothedBpsOut: Double = 0.0
 
@@ -48,6 +49,7 @@ class TunnelController(
         prevTxBytes = 0L
         prevRxBytes = 0L
         prevTimestampMs = 0L
+        sessionBaseline = null
         smoothedBpsIn = 0.0
         smoothedBpsOut = 0.0
         stagnationMonitor.reset()
@@ -109,6 +111,7 @@ class TunnelController(
         prevTxBytes = 0L
         prevRxBytes = 0L
         prevTimestampMs = 0L
+        sessionBaseline = null
         smoothedBpsIn = 0.0
         smoothedBpsOut = 0.0
         stagnationMonitor.reset()
@@ -133,13 +136,24 @@ class TunnelController(
             prevTxBytes = raw.txBytes
             prevRxBytes = raw.rxBytes
             prevTimestampMs = raw.timestampMs
-            _stats.value = raw.copy(
+            val isConnected = _state.value is TunnelState.Connected
+            val normalized = if (isConnected) {
+                val baseline = sessionBaseline ?: raw.also { sessionBaseline = it }
+                raw.copy(
+                    txPackets = (raw.txPackets - baseline.txPackets).coerceAtLeast(0L),
+                    txBytes = (raw.txBytes - baseline.txBytes).coerceAtLeast(0L),
+                    rxPackets = (raw.rxPackets - baseline.rxPackets).coerceAtLeast(0L),
+                    rxBytes = (raw.rxBytes - baseline.rxBytes).coerceAtLeast(0L),
+                )
+            } else {
+                raw
+            }
+            _stats.value = normalized.copy(
                 bpsIn = smoothedBpsIn,
                 bpsOut = smoothedBpsOut,
                 sessionStartMs = sessionStartMs,
             )
-            val isConnected = _state.value is TunnelState.Connected
-            val newlyStagnant = isConnected && stagnationMonitor.observe(raw.txBytes, raw.rxBytes)
+            val newlyStagnant = isConnected && stagnationMonitor.observe(normalized.txBytes, normalized.rxBytes)
             if (newlyStagnant != _stagnant.value) {
                 _stagnant.value = newlyStagnant
                 if (newlyStagnant) {

@@ -132,6 +132,12 @@ class SingboxEngine @Inject constructor(
     private var chainMode: Boolean = false
 
     @Volatile
+    private var pendingTunAutoSelect: Boolean = false
+
+    @Volatile
+    private var activeTunAutoSelect: Boolean = false
+
+    @Volatile
     private var activeSocksPort: Int = 0
 
     private val bindLock = Any()
@@ -162,6 +168,8 @@ class SingboxEngine @Inject constructor(
         }
 
         activeSocksPort = 0
+        activeTunAutoSelect = false
+        pendingTunAutoSelect = false
         pendingSocksPort = 0
         pendingConfig = null
         val probePort = allocateChainPort()
@@ -180,6 +188,7 @@ class SingboxEngine @Inject constructor(
 
         pendingConfig = json
         pendingSocksPort = probePort
+        pendingTunAutoSelect = config.autoSelectBeanBlobs.isNotEmpty()
         return StartResult.Success(socksPort = 0)
     }
 
@@ -231,6 +240,8 @@ class SingboxEngine @Inject constructor(
         upstream: ConfigBuilder.Upstream?,
     ): StartResult {
         activeSocksPort = 0
+        activeTunAutoSelect = false
+        pendingTunAutoSelect = false
         pendingSocksPort = 0
         pendingConfig = null
         val port = allocateChainPort()
@@ -326,6 +337,8 @@ class SingboxEngine @Inject constructor(
                 return TunAttachResult.Failure("sing-box runtime failed to start")
             }
             activeSocksPort = pendingSocksPort
+            activeTunAutoSelect = pendingTunAutoSelect
+            pendingTunAutoSelect = false
             pendingSocksPort = 0
             pendingConfig = null
             PersistentLoggers.debug(TAG, "startWithConfig sent over AIDL")
@@ -339,8 +352,10 @@ class SingboxEngine @Inject constructor(
 
     override suspend fun stop() {
         pendingConfig = null
+        pendingTunAutoSelect = false
         pendingSocksPort = 0
         chainMode = false
+        activeTunAutoSelect = false
         activeSocksPort = 0
         val p = proxy
         if (p != null) {
@@ -380,7 +395,10 @@ class SingboxEngine @Inject constructor(
                 "probe failed: routed probe returned $latency port=$port " +
                     "chainMode=$chainMode runtimeRunning=$runtimeRunning",
             )
-            if (clearOnRoutedFailure) activeSocksPort = 0
+            if (clearOnRoutedFailure) {
+                activeSocksPort = 0
+                activeTunAutoSelect = false
+            }
             ProbeResult.Failure("sing-box routed probe failed")
         }
     }
@@ -396,11 +414,17 @@ class SingboxEngine @Inject constructor(
                         TAG,
                         "awaitReady probe failed attempt=${attempt + 1}/$READY_PROBE_ATTEMPTS reason=${result.reason}",
                     )
+                    if (activeTunAutoSelect) {
+                        activeSocksPort = 0
+                        activeTunAutoSelect = false
+                        return EnginePlugin.ReadyResult.Timeout(result.reason)
+                    }
                     if (attempt != READY_PROBE_ATTEMPTS - 1) delay(READY_PROBE_RETRY_MS)
                 }
             }
         }
         activeSocksPort = 0
+        activeTunAutoSelect = false
         return EnginePlugin.ReadyResult.Timeout(lastFailure?.reason ?: "sing-box routed probe failed")
     }
 
@@ -618,7 +642,9 @@ class SingboxEngine @Inject constructor(
 
     private fun clearRuntimeState() {
         pendingConfig = null
+        pendingTunAutoSelect = false
         pendingSocksPort = 0
+        activeTunAutoSelect = false
         activeSocksPort = 0
     }
 
