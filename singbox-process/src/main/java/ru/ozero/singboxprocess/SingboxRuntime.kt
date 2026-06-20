@@ -21,6 +21,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.PersistentLoggers
+import java.security.KeyStore
+import java.security.cert.X509Certificate
+import java.util.Base64
+import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509TrustManager
 
 internal object SingboxRuntime {
     private const val TAG = "SingboxRuntime"
@@ -39,6 +44,8 @@ internal object SingboxRuntime {
 
     @Volatile
     private var basePath: String = ""
+
+    private val systemCertificatePem by lazy { loadSystemCertificatePem() }
 
     fun setup(basePath: String) {
         if (setupDone) return
@@ -201,15 +208,35 @@ internal object SingboxRuntime {
 
         override fun localDNSTransport(): LocalDNSTransport? = null
 
-        override fun systemCertificates(): StringIterator =
-            object : StringIterator {
-                override fun hasNext(): Boolean = false
-                override fun len(): Int = 0
-                override fun next(): String = error("empty iterator")
-            }
+        override fun systemCertificates(): StringIterator = stringIterator(systemCertificatePem)
 
         override fun clearDNSCache() {}
 
         override fun sendNotification(notification: Notification) {}
     }
+
+    private fun loadSystemCertificatePem(): List<String> = runCatching {
+        val factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+        factory.init(null as KeyStore?)
+        factory.trustManagers
+            .filterIsInstance<X509TrustManager>()
+            .flatMap { manager -> manager.acceptedIssuers.toList() }
+            .distinctBy { certificate -> certificate.encoded.contentHashCode() }
+            .map { certificate -> certificate.toPem() }
+    }.onFailure {
+        PersistentLoggers.warn(TAG, "systemCertificates load failed: ${it.message}")
+    }.getOrDefault(emptyList())
+
+    private fun X509Certificate.toPem(): String {
+        val body = Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(encoded)
+        return "-----BEGIN CERTIFICATE-----\n$body\n-----END CERTIFICATE-----"
+    }
+
+    private fun stringIterator(values: List<String>): StringIterator =
+        object : StringIterator {
+            private var index = 0
+            override fun hasNext(): Boolean = index < values.size
+            override fun len(): Int = values.size
+            override fun next(): String = values[index++]
+        }
 }
