@@ -76,6 +76,8 @@ class SingboxHttp204RoutedProbe(
             "https://www.gstatic.com/generate_204",
             "https://cp.cloudflare.com/generate_204",
             "https://www.cloudflare.com/cdn-cgi/trace",
+            "http://connectivitycheck.gstatic.com/generate_204",
+            "http://cp.cloudflare.com/generate_204",
         )
         const val LATENCY_FAILED = -1L
         private const val LOOPBACK = "127.0.0.1"
