@@ -2,6 +2,14 @@ package ru.ozero.singboxprocess
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import java.math.BigInteger
+import java.security.Principal
+import java.security.PublicKey
+import java.security.cert.X509Certificate
+import java.util.Date
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -27,21 +35,20 @@ class SingboxEngineServiceTest {
 
     @Test
     fun `runtime exposes Android trust anchors to libbox`() {
-        val runtimeSource = File(
-            locateRepoRoot(),
-            "singbox-process/src/main/java/ru/ozero/singboxprocess/SingboxRuntime.kt",
-        ).readText()
+        val first = FakeCertificate(byteArrayOf(1, 2, 3))
+        val duplicate = FakeCertificate(byteArrayOf(1, 2, 3))
+        val second = FakeCertificate(byteArrayOf(4, 5, 6))
+        val trustManagers = arrayOf<TrustManager>(FakeTrustManager(first, duplicate, second))
 
-        assertTrue(runtimeSource.contains("TrustManagerFactory.getDefaultAlgorithm()"))
-        assertTrue(runtimeSource.contains("acceptedIssuers"))
-        assertTrue(runtimeSource.contains("android.util.Base64"))
-        assertFalse(runtimeSource.contains("java.util.Base64"))
-        assertTrue(
-            runtimeSource.contains("systemCertificates(): StringIterator = stringIterator(systemCertificatePem)"),
+        val certificates = TrustAnchorPemReader { bytes -> bytes.joinToString("") }.read(trustManagers)
+
+        assertEquals(
+            listOf(
+                "-----BEGIN CERTIFICATE-----\n123\n-----END CERTIFICATE-----",
+                "-----BEGIN CERTIFICATE-----\n456\n-----END CERTIFICATE-----",
+            ),
+            certificates,
         )
-        val systemCertificatesBlock = runtimeSource.substringAfter("override fun systemCertificates()")
-            .substringBefore("override fun clearDNSCache()")
-        assertFalse(systemCertificatesBlock.contains("override fun hasNext(): Boolean = false"))
     }
 
     @Test
@@ -59,6 +66,45 @@ class SingboxEngineServiceTest {
             .substringBefore("companion object")
         assertTrue(destroyBlock.contains("binder.stopAndWait(DEFAULT_STOP_TIMEOUT_MS)"))
         assertTrue(destroyBlock.contains("serviceScope.cancel()"))
+    }
+
+    private class FakeTrustManager(
+        private vararg val certificates: X509Certificate,
+    ) : X509TrustManager {
+        override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf(*certificates)
+
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+    }
+
+    private class FakeCertificate(private val bytes: ByteArray) : X509Certificate() {
+        override fun getEncoded(): ByteArray = bytes.copyOf()
+        override fun verify(key: PublicKey) {}
+        override fun verify(key: PublicKey, sigProvider: String) {}
+        override fun toString(): String = bytes.contentToString()
+        override fun getPublicKey(): PublicKey? = null
+        override fun checkValidity() {}
+        override fun checkValidity(date: Date) {}
+        override fun getVersion(): Int = 3
+        override fun getSerialNumber(): BigInteger = BigInteger.ONE
+        override fun getIssuerDN(): Principal? = null
+        override fun getSubjectDN(): Principal? = null
+        override fun getNotBefore(): Date = Date(0)
+        override fun getNotAfter(): Date = Date(0)
+        override fun getTBSCertificate(): ByteArray = bytes.copyOf()
+        override fun getSignature(): ByteArray = byteArrayOf()
+        override fun getSigAlgName(): String = ""
+        override fun getSigAlgOID(): String = ""
+        override fun getSigAlgParams(): ByteArray? = null
+        override fun getIssuerUniqueID(): BooleanArray? = null
+        override fun getSubjectUniqueID(): BooleanArray? = null
+        override fun getKeyUsage(): BooleanArray? = null
+        override fun getBasicConstraints(): Int = -1
+        override fun getCriticalExtensionOIDs(): Set<String>? = null
+        override fun getNonCriticalExtensionOIDs(): Set<String>? = null
+        override fun getExtensionValue(oid: String): ByteArray? = null
+        override fun hasUnsupportedCriticalExtension(): Boolean = false
     }
 
     private fun locateRepoRoot(): File {

@@ -162,6 +162,19 @@ class LogsViewModelTest {
     }
 
     @Test
+    fun `logEntryLazyKey stays unique for repeated log lines`() {
+        val repeated = LogEntry(
+            timestampMs = 1_781_960_220_000L,
+            level = LogLevel.WARN,
+            tag = "SingboxRoutedProbe",
+            pid = 0,
+            message = "routed probe failed: SSLHandshakeException",
+        )
+
+        assertTrue(logEntryLazyKey(0, repeated) != logEntryLazyKey(1, repeated))
+    }
+
+    @Test
     fun `onTagFilter updates ui state tag filter`() = runTest(dispatcher) {
         val job = backgroundScope.launch(dispatcher) { vm.uiState.collect { } }
 
