@@ -71,7 +71,7 @@ class SingboxEngineServiceTest {
     private class FakeTrustManager(
         private vararg val certificates: X509Certificate,
     ) : X509TrustManager {
-        override fun getAcceptedIssuers(): Array<X509Certificate> = certificates.copyOf()
+        override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf(*certificates)
 
         override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
 
