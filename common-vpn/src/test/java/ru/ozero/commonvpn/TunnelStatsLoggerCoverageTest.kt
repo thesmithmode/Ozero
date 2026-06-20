@@ -43,9 +43,9 @@ class TunnelStatsLoggerCoverageTest {
         )
         mockkObject(TunInterfaceStats)
         mockkObject(UidTrafficStats)
-        every { TunInterfaceStats.readTunStats("tun9") } returns TunInterfaceStats.Snapshot(
-            rxBytes = 101,
-            txBytes = 202,
+        every { TunInterfaceStats.readTunStats("tun9") } returnsMany listOf(
+            TunInterfaceStats.Snapshot(rxBytes = 101, txBytes = 202),
+            TunInterfaceStats.Snapshot(rxBytes = 151, txBytes = 282),
         )
         every { UidTrafficStats.read() } returns UidTrafficStats.Snapshot(rxBytes = 1, txBytes = 2)
 
@@ -54,9 +54,14 @@ class TunnelStatsLoggerCoverageTest {
             advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
             runCurrent()
 
-            assertEquals(101, controller.stats.value?.rxBytes)
-            assertEquals(202, controller.stats.value?.txBytes)
-            verify(exactly = 1) { notification.notifyStats(any()) }
+            assertEquals(0, controller.stats.value?.rxBytes)
+            assertEquals(0, controller.stats.value?.txBytes)
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+
+            assertEquals(50, controller.stats.value?.rxBytes)
+            assertEquals(80, controller.stats.value?.txBytes)
+            verify(exactly = 2) { notification.notifyStats(any()) }
             verify(exactly = 0) { UidTrafficStats.read() }
         } finally {
             stopLogger(logger)
@@ -75,16 +80,24 @@ class TunnelStatsLoggerCoverageTest {
             iface = null,
         )
         mockkObject(UidTrafficStats)
-        every { UidTrafficStats.read() } returns UidTrafficStats.Snapshot(rxBytes = 303, txBytes = 404)
+        every { UidTrafficStats.read() } returnsMany listOf(
+            UidTrafficStats.Snapshot(rxBytes = 303, txBytes = 404),
+            UidTrafficStats.Snapshot(rxBytes = 333, txBytes = 464),
+        )
 
         try {
             logger.start()
             advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
             runCurrent()
 
-            assertEquals(303, controller.stats.value?.rxBytes)
-            assertEquals(404, controller.stats.value?.txBytes)
-            verify(exactly = 1) { notification.notifyStats(any()) }
+            assertEquals(0, controller.stats.value?.rxBytes)
+            assertEquals(0, controller.stats.value?.txBytes)
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+
+            assertEquals(30, controller.stats.value?.rxBytes)
+            assertEquals(60, controller.stats.value?.txBytes)
+            verify(exactly = 2) { notification.notifyStats(any()) }
         } finally {
             stopLogger(logger)
         }
@@ -104,18 +117,26 @@ class TunnelStatsLoggerCoverageTest {
         mockkObject(TunInterfaceStats)
         mockkObject(UidTrafficStats)
         every { TunInterfaceStats.readTunStats("tun0") } returns null
-        every { UidTrafficStats.read() } returns UidTrafficStats.Snapshot(rxBytes = 505, txBytes = 606)
+        every { UidTrafficStats.read() } returnsMany listOf(
+            UidTrafficStats.Snapshot(rxBytes = 505, txBytes = 606),
+            UidTrafficStats.Snapshot(rxBytes = 555, txBytes = 676),
+        )
 
         try {
             logger.start()
             advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
             runCurrent()
 
-            assertEquals(505, controller.stats.value?.rxBytes)
-            assertEquals(606, controller.stats.value?.txBytes)
-            verify(exactly = 1) { TunInterfaceStats.readTunStats("tun0") }
-            verify(exactly = 1) { UidTrafficStats.read() }
-            verify(exactly = 1) { notification.notifyStats(any()) }
+            assertEquals(0, controller.stats.value?.rxBytes)
+            assertEquals(0, controller.stats.value?.txBytes)
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+
+            assertEquals(50, controller.stats.value?.rxBytes)
+            assertEquals(70, controller.stats.value?.txBytes)
+            verify(exactly = 2) { TunInterfaceStats.readTunStats("tun0") }
+            verify(exactly = 2) { UidTrafficStats.read() }
+            verify(exactly = 2) { notification.notifyStats(any()) }
         } finally {
             stopLogger(logger)
         }
@@ -146,6 +167,78 @@ class TunnelStatsLoggerCoverageTest {
             verify(exactly = 2) { TunInterfaceStats.readTunStats("tun0") }
             verify(exactly = 2) { UidTrafficStats.read() }
             verify(exactly = 0) { notification.notifyStats(any()) }
+        } finally {
+            stopLogger(logger)
+        }
+    }
+
+    @Test
+    fun `start rebases session baseline when raw counters move backwards`() = runTest {
+        val scope = backgroundScope
+        val controller = connectedController()
+        val logger = logger(scope = scope, controller = controller, iface = "tun0")
+        mockkObject(TunInterfaceStats)
+        every { TunInterfaceStats.readTunStats("tun0") } returnsMany listOf(
+            TunInterfaceStats.Snapshot(rxBytes = 1_000, txBytes = 2_000),
+            TunInterfaceStats.Snapshot(rxBytes = 1_100, txBytes = 2_150),
+            TunInterfaceStats.Snapshot(rxBytes = 40, txBytes = 70),
+            TunInterfaceStats.Snapshot(rxBytes = 90, txBytes = 130),
+        )
+
+        try {
+            logger.start()
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+            assertEquals(0, controller.stats.value?.rxBytes)
+            assertEquals(0, controller.stats.value?.txBytes)
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+            assertEquals(100, controller.stats.value?.rxBytes)
+            assertEquals(150, controller.stats.value?.txBytes)
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+            assertEquals(0, controller.stats.value?.rxBytes)
+            assertEquals(0, controller.stats.value?.txBytes)
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+            assertEquals(50, controller.stats.value?.rxBytes)
+            assertEquals(60, controller.stats.value?.txBytes)
+        } finally {
+            stopLogger(logger)
+        }
+    }
+
+    @Test
+    fun `start rebases session baseline when stats source changes`() = runTest {
+        val scope = backgroundScope
+        val controller = connectedController()
+        val logger = logger(scope = scope, controller = controller, iface = "tun0")
+        mockkObject(TunInterfaceStats)
+        mockkObject(UidTrafficStats)
+        every { TunInterfaceStats.readTunStats("tun0") } returnsMany listOf(
+            TunInterfaceStats.Snapshot(rxBytes = 1_000, txBytes = 2_000),
+            null,
+            null,
+        )
+        every { UidTrafficStats.read() } returnsMany listOf(
+            UidTrafficStats.Snapshot(rxBytes = 20, txBytes = 30),
+            UidTrafficStats.Snapshot(rxBytes = 35, txBytes = 55),
+        )
+
+        try {
+            logger.start()
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+            assertEquals(0, controller.stats.value?.rxBytes)
+            assertEquals(0, controller.stats.value?.txBytes)
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+            assertEquals(0, controller.stats.value?.rxBytes)
+            assertEquals(0, controller.stats.value?.txBytes)
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+            assertEquals(15, controller.stats.value?.rxBytes)
+            assertEquals(25, controller.stats.value?.txBytes)
         } finally {
             stopLogger(logger)
         }

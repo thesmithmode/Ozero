@@ -10,7 +10,15 @@ import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-private data class TunnelStatsReadResult(val rxBytes: Long, val txBytes: Long, val source: String)
+private data class TunnelStatsReadResult(val rxBytes: Long, val txBytes: Long, val source: String) {
+    fun shouldRebaseFrom(baseline: TunnelStatsReadResult?): Boolean =
+        baseline == null || hasNewSource(baseline) || hasLowerCounterThan(baseline)
+
+    private fun hasNewSource(baseline: TunnelStatsReadResult): Boolean = source != baseline.source
+
+    private fun hasLowerCounterThan(baseline: TunnelStatsReadResult): Boolean =
+        rxBytes < baseline.rxBytes || txBytes < baseline.txBytes
+}
 
 class TunnelStatsLogger(
     private val scope: CoroutineScope,
@@ -28,6 +36,7 @@ class TunnelStatsLogger(
             var prevTx = 0L
             var prevRx = 0L
             var tickCount = 0
+            var sessionBaseline: TunnelStatsReadResult? = null
             try {
                 while (true) {
                     delay(STATS_SAMPLE_INTERVAL_MS)
@@ -52,11 +61,19 @@ class TunnelStatsLogger(
                     val rxBytes = read.rxBytes
                     val txBytes = read.txBytes
                     val source = read.source
+                    val baseline = sessionBaseline
+                    val effectiveBaseline = if (read.shouldRebaseFrom(baseline)) {
+                        read.also { sessionBaseline = it }
+                    } else {
+                        baseline
+                    }
+                    val normalizedRxBytes = rxBytes - effectiveBaseline.rxBytes
+                    val normalizedTxBytes = txBytes - effectiveBaseline.txBytes
                     val snapshot = TunnelStats(
                         txPackets = 0L,
-                        txBytes = txBytes,
+                        txBytes = normalizedTxBytes,
                         rxPackets = 0L,
-                        rxBytes = rxBytes,
+                        rxBytes = normalizedRxBytes,
                         timestampMs = System.currentTimeMillis(),
                     )
                     tunnelController.updateStats(snapshot)

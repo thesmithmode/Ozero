@@ -171,8 +171,7 @@ class SingboxEngine @Inject constructor(
         }
 
         activeSocksPort = 0
-        activeTunAutoSelect = false
-        pendingTunAutoSelect = false
+        activeAutoSelect = config.autoSelectBeanBlobs.isNotEmpty()
         pendingSocksPort = 0
         pendingConfig = null
         val probePort = allocateChainPort()
@@ -244,8 +243,7 @@ class SingboxEngine @Inject constructor(
         upstream: ConfigBuilder.Upstream?,
     ): StartResult {
         activeSocksPort = 0
-        activeTunAutoSelect = false
-        pendingTunAutoSelect = false
+        activeAutoSelect = false
         pendingSocksPort = 0
         pendingConfig = null
         val port = allocateChainPort()
@@ -359,7 +357,7 @@ class SingboxEngine @Inject constructor(
         pendingTunAutoSelect = false
         pendingSocksPort = 0
         chainMode = false
-        activeTunAutoSelect = false
+        activeAutoSelect = false
         activeSocksPort = 0
         val p = proxy
         if (p != null) {
@@ -668,7 +666,7 @@ class SingboxEngine @Inject constructor(
         pendingConfig = null
         pendingTunAutoSelect = false
         pendingSocksPort = 0
-        activeTunAutoSelect = false
+        activeAutoSelect = false
         activeSocksPort = 0
     }
 
