@@ -79,7 +79,7 @@ jobs:
           fi
 
       - name: Upload probe results
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: ru-probe-results
