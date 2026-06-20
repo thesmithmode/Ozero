@@ -3,8 +3,9 @@ package ru.ozero.singboxprocess
 import android.util.Base64
 import io.nekohasekai.libbox.CommandServer
 import io.nekohasekai.libbox.CommandServerHandler
-import io.nekohasekai.libbox.OverrideOptions
+import io.nekohasekai.libbox.ConnectionOwner
 import io.nekohasekai.libbox.InterfaceUpdateListener
+import io.nekohasekai.libbox.OverrideOptions
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.LocalDNSTransport
 import io.nekohasekai.libbox.NetworkInterfaceIterator
@@ -16,16 +17,13 @@ import io.nekohasekai.libbox.StringIterator
 import io.nekohasekai.libbox.SystemProxyStatus
 import io.nekohasekai.libbox.TunOptions
 import io.nekohasekai.libbox.WIFIState
-import io.nekohasekai.libbox.ConnectionOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.PersistentLoggers
 import java.security.KeyStore
-import java.security.cert.X509Certificate
 import javax.net.ssl.TrustManagerFactory
-import javax.net.ssl.X509TrustManager
 
 internal object SingboxRuntime {
     private const val TAG = "SingboxRuntime"
@@ -218,19 +216,11 @@ internal object SingboxRuntime {
     private fun loadSystemCertificatePem(): List<String> = runCatching {
         val factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
         factory.init(null as KeyStore?)
-        factory.trustManagers
-            .filterIsInstance<X509TrustManager>()
-            .flatMap { manager -> manager.acceptedIssuers.toList() }
-            .distinctBy { certificate -> certificate.encoded.contentHashCode() }
-            .map { certificate -> certificate.toPem() }
+        TrustAnchorPemReader { bytes -> Base64.encodeToString(bytes, Base64.NO_WRAP) }
+            .read(factory.trustManagers)
     }.onFailure {
         PersistentLoggers.warn(TAG, "systemCertificates load failed: ${it.message}")
     }.getOrDefault(emptyList())
-
-    private fun X509Certificate.toPem(): String {
-        val body = Base64.encodeToString(encoded, Base64.NO_WRAP)
-        return "-----BEGIN CERTIFICATE-----\n$body\n-----END CERTIFICATE-----"
-    }
 
     private fun stringIterator(values: List<String>): StringIterator =
         object : StringIterator {
