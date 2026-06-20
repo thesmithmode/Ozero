@@ -81,7 +81,7 @@ class SingboxHttp204RoutedProbeTest {
     }
 
     @Test
-    fun `routed probe accepts HTTP 200 response through SOCKS`() = runTest {
+    fun `routed probe rejects HTTP 200 generate 204 response through SOCKS`() = runTest {
         SocksHttpServer(statusCode = 200, reason = "OK").use { socks ->
             val probe = SingboxHttp204RoutedProbe(
                 probeUrl = URL("http://127.0.0.1/generate_204"),
@@ -91,8 +91,24 @@ class SingboxHttp204RoutedProbeTest {
 
             val latency = probe.probeLatencyMs(socks.port)
 
-            assertTrue(latency >= 1L)
+            assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
             assertTrue(socks.requestText.startsWith("GET /generate_204 "))
+        }
+    }
+
+    @Test
+    fun `routed probe accepts HTTP 200 content response through SOCKS`() = runTest {
+        SocksHttpServer(statusCode = 200, reason = "OK").use { socks ->
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("http://www.cloudflare.com/cdn-cgi/trace"),
+                fallbackProbeUrls = emptyList(),
+                timeoutMs = 1_000,
+            )
+
+            val latency = probe.probeLatencyMs(socks.port)
+
+            assertTrue(latency >= 1L)
+            assertTrue(socks.requestText.startsWith("GET /cdn-cgi/trace "))
         }
     }
 

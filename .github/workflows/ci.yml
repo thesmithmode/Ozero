@@ -241,7 +241,7 @@ jobs:
 
       - name: Upload coverage reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-coverage-gate
           path: |
@@ -252,7 +252,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-coverage-gate
           path: |
@@ -298,7 +298,7 @@ jobs:
 
       - name: Upload buildSrc test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-buildsrc
           path: buildSrc/build/reports/tests/**
@@ -306,7 +306,7 @@ jobs:
 
       - name: Upload buildSrc coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-buildsrc
           path: buildSrc/build/reports/jacoco/**
@@ -446,7 +446,7 @@ jobs:
 
       - name: Upload debug APK
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/*.apk
@@ -564,7 +564,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-app
           path: app/build/reports/jacoco/**
@@ -572,7 +572,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-app
           path: app/build/reports/tests/**
@@ -618,7 +618,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-common-vpn
           path: common-vpn/build/reports/jacoco/**
@@ -626,7 +626,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-common-vpn
           path: common-vpn/build/reports/tests/**
@@ -672,7 +672,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-engine-warp
           path: engine-warp/build/reports/jacoco/**
@@ -680,7 +680,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-engine-warp
           path: engine-warp/build/reports/tests/**
@@ -764,7 +764,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-engine-urnetwork
           path: engine-urnetwork/build/reports/jacoco/**
@@ -772,7 +772,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-engine-urnetwork
           path: engine-urnetwork/build/reports/tests/**
@@ -818,7 +818,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-engine-byedpi
           path: engine-byedpi/build/reports/jacoco/**
@@ -826,7 +826,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-engine-byedpi
           path: engine-byedpi/build/reports/tests/**
@@ -872,7 +872,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-engine-fptn
           path: engine-fptn/build/reports/jacoco/**
@@ -880,7 +880,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-engine-fptn
           path: engine-fptn/build/reports/tests/**
@@ -994,7 +994,7 @@ jobs:
 
       - name: Upload coverage reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-core-modules
           path: |
@@ -1008,7 +1008,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-core-modules
           path: |
@@ -1060,7 +1060,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-engine-masterdns
           path: engine-masterdns/build/reports/jacoco/**
@@ -1068,7 +1068,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-engine-masterdns
           path: engine-masterdns/build/reports/tests/**
@@ -1148,7 +1148,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-engine-singbox
           path: engine-singbox/build/reports/jacoco/**
@@ -1156,7 +1156,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-engine-singbox
           path: engine-singbox/build/reports/tests/**
@@ -1236,7 +1236,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-singbox-process
           path: singbox-process/build/reports/jacoco/**
@@ -1244,7 +1244,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-singbox-process
           path: singbox-process/build/reports/tests/**
@@ -1324,7 +1324,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-singbox-core
           path: singbox-core/build/reports/jacoco/**
@@ -1332,7 +1332,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-singbox-core
           path: singbox-core/build/reports/tests/**
@@ -1412,7 +1412,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-singbox-fmt
           path: singbox-fmt/build/reports/jacoco/**
@@ -1420,7 +1420,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-singbox-fmt
           path: singbox-fmt/build/reports/tests/**
@@ -1500,7 +1500,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-singbox-config
           path: singbox-config/build/reports/jacoco/**
@@ -1508,7 +1508,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-singbox-config
           path: singbox-config/build/reports/tests/**
@@ -1588,7 +1588,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-singbox-room
           path: singbox-room/build/reports/jacoco/**
@@ -1596,7 +1596,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-singbox-room
           path: singbox-room/build/reports/tests/**
@@ -1676,7 +1676,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-singbox-subscription
           path: singbox-subscription/build/reports/jacoco/**
@@ -1684,7 +1684,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-singbox-subscription
           path: singbox-subscription/build/reports/tests/**
@@ -1727,7 +1727,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jacoco-shared-warp-settings
           path: shared-warp-settings/build/reports/jacoco/**
@@ -1735,7 +1735,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-reports-shared-warp-settings
           path: shared-warp-settings/build/reports/tests/**
