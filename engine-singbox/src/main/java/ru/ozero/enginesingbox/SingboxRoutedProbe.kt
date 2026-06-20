@@ -46,7 +46,7 @@ class SingboxHttp204RoutedProbe(
                 connection.connectTimeout = timeoutMs
                 connection.readTimeout = timeoutMs
                 val code = connection.responseCode
-                if (code in SUCCESS_HTTP_CODES) {
+                if (isSuccessfulProbeResponse(url, code)) {
                     TimeUnit.NANOSECONDS.toMillis(nanoTime() - start).coerceAtLeast(1L)
                 } else {
                     PersistentLoggers.warn(
@@ -68,6 +68,14 @@ class SingboxHttp204RoutedProbe(
         }
     }
 
+    private fun isSuccessfulProbeResponse(url: URL, code: Int): Boolean {
+        return if (url.path.endsWith(GENERATE_204_PATH)) {
+            code == HttpURLConnection.HTTP_NO_CONTENT
+        } else {
+            code in SUCCESS_HTTP_CODES
+        }
+    }
+
     companion object {
         private const val TAG = "SingboxRoutedProbe"
         const val PROBE_URL = "http://connectivitycheck.gstatic.com/generate_204"
@@ -82,6 +90,7 @@ class SingboxHttp204RoutedProbe(
         const val LATENCY_FAILED = -1L
         private const val LOOPBACK = "127.0.0.1"
         private const val DEFAULT_TIMEOUT_MS = 3_000
+        private const val GENERATE_204_PATH = "/generate_204"
         private val SUCCESS_HTTP_CODES = 200..299
     }
 }
