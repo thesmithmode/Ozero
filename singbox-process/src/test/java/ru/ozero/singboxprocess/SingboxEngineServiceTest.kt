@@ -26,6 +26,25 @@ class SingboxEngineServiceTest {
     }
 
     @Test
+    fun `runtime exposes Android trust anchors to libbox`() {
+        val runtimeSource = File(
+            locateRepoRoot(),
+            "singbox-process/src/main/java/ru/ozero/singboxprocess/SingboxRuntime.kt",
+        ).readText()
+
+        assertTrue(runtimeSource.contains("TrustManagerFactory.getDefaultAlgorithm()"))
+        assertTrue(runtimeSource.contains("acceptedIssuers"))
+        assertTrue(runtimeSource.contains("android.util.Base64"))
+        assertFalse(runtimeSource.contains("java.util.Base64"))
+        assertTrue(
+            runtimeSource.contains("systemCertificates(): StringIterator = stringIterator(systemCertificatePem)"),
+        )
+        val systemCertificatesBlock = runtimeSource.substringAfter("override fun systemCertificates()")
+            .substringBefore("override fun clearDNSCache()")
+        assertFalse(systemCertificatesBlock.contains("override fun hasNext(): Boolean = false"))
+    }
+
+    @Test
     fun `stats do not fake active connections from runtime flag`() {
         val statsBlock = source.substringAfter("override fun getStats()")
             .substringBefore("override fun registerStatusCallback")
