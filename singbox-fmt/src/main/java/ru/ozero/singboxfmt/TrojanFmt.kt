@@ -15,12 +15,7 @@ object TrojanFmt {
         bean.name = parsed.fragment?.let {
             URLDecoder.decode(it, StandardCharsets.UTF_8.name())
         } ?: ""
-        bean.security = parsed.getQueryParameter("security") ?: "tls"
-        bean.sni = parsed.getQueryParameter("sni") ?: ""
-        bean.alpn = parsed.getQueryParameter("alpn") ?: ""
-        bean.utlsFingerprint = parsed.getQueryParameter("fp") ?: ""
-        bean.allowInsecure =
-            parsed.getQueryParameter("allowInsecure") == "1"
+        V2RayFmtUtils.parseSecurityParams(bean, parsed, defaultSecurity = "tls")
         V2RayFmtUtils.parseTransportParams(bean, parsed)
         bean.initializeDefaultValues()
         return bean
