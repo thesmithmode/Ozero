@@ -374,6 +374,23 @@ class SingboxEngineProbeTest {
     }
 
     @Test
+    fun `awaitReady keeps auto select runtime ready when routed probe is still warming up`() = runTest {
+        val engine = buildEngine()
+        engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.runtimeRunning() } returns true
+        engine.setPrivateField("proxy", process)
+        engine.setPrivateField("activeSocksPort", 49408)
+        engine.setPrivateField("activeAutoSelect", true)
+
+        val result = engine.awaitReady()
+
+        assertIs<EnginePlugin.ReadyResult.Ready>(result)
+        assertEquals(49408, engine.privateIntField("activeSocksPort"))
+        assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
+    }
+
+    @Test
     fun `awaitReady retries transient routed probe failures without clearing active port`() = runTest {
         val engine = buildEngine()
         var calls = 0
@@ -518,6 +535,12 @@ class SingboxEngineProbeTest {
         val field = javaClass.getDeclaredField(name)
         field.isAccessible = true
         return field.getInt(this)
+    }
+
+    private fun SingboxEngine.privateBooleanField(name: String): Boolean {
+        val field = javaClass.getDeclaredField(name)
+        field.isAccessible = true
+        return field.getBoolean(this)
     }
 
     private fun SingboxEngine.privateField(name: String): Any? {

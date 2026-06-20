@@ -74,6 +74,16 @@ class FmtBranchCoverageTest {
     }
 
     @Test
+    fun `trojan accepts shared tls insecure aliases`() {
+        listOf("allowInsecure=1", "allow-insecure=yes", "skip-cert-verify=true").forEach { query ->
+            val bean = V2RayFmt.parseTrojan("trojan://secret@example.com?$query")
+
+            assertEquals("tls", bean.security)
+            assertTrue(bean.allowInsecure, query)
+        }
+    }
+
+    @Test
     fun `shadowsocks parses plain userinfo ipv6 fallback port and base64 method only`() {
         val ipv6 = V2RayFmt.parseShadowsocks("ss://aes-128-gcm:pwd@[2001:db8::1]:bad?plugin=obfs-local#IPv6")
         assertEquals("aes-128-gcm", ipv6.method)
