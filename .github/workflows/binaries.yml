@@ -48,7 +48,7 @@ jobs:
     env:
       ARTIFACT: ${{ inputs.artifact || 'byedpi' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -440,7 +440,7 @@ jobs:
       TAG: ${{ needs.build.outputs.tag }}
       ARTIFACT: ${{ needs.build.outputs.artifact }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
