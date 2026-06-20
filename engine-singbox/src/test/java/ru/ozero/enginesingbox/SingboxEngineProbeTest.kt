@@ -543,6 +543,12 @@ class SingboxEngineProbeTest {
         return field.getInt(this)
     }
 
+    private fun SingboxEngine.privateBooleanField(name: String): Boolean {
+        val field = javaClass.getDeclaredField(name)
+        field.isAccessible = true
+        return field.getBoolean(this)
+    }
+
     private fun SingboxEngine.privateField(name: String): Any? {
         val field = javaClass.getDeclaredField(name)
         field.isAccessible = true

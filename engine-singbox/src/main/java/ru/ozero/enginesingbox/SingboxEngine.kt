@@ -140,6 +140,9 @@ class SingboxEngine @Inject constructor(
     @Volatile
     private var activeSocksPort: Int = 0
 
+    @Volatile
+    private var activeAutoSelect: Boolean = false
+
     private val bindLock = Any()
 
     private val localProtector = object : ISingboxProtector.Stub() {
@@ -174,6 +177,7 @@ class SingboxEngine @Inject constructor(
         pendingConfig = null
         val probePort = allocateChainPort()
         val json = buildPendingConfig(config, probePort) ?: run {
+            activeAutoSelect = false
             return StartResult.Failure("failed to build sing-box config")
         }
         PersistentLoggers.debug(
@@ -404,6 +408,26 @@ class SingboxEngine @Inject constructor(
     }
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
+        if (activeAutoSelect) {
+            val p = proxy ?: return EnginePlugin.ReadyResult.Timeout("sing-box process is not connected")
+            val port = activeSocksPort.takeIf { it > 0 }
+                ?: return EnginePlugin.ReadyResult.Timeout("sing-box SOCKS probe port is not active")
+            val runtimeRunning = runCatching { p.runtimeRunning() }.getOrElse {
+                clearRuntimeState()
+                return EnginePlugin.ReadyResult.Timeout("sing-box runtime health check failed: ${it.message}")
+            }
+            if (!runtimeRunning) {
+                clearRuntimeState()
+                return EnginePlugin.ReadyResult.Timeout("sing-box runtime is not running")
+            }
+            engineScope.launch {
+                val latency = routedProbe.probeLatencyMs(port)
+                if (latency < 0) {
+                    PersistentLoggers.warn(TAG, "auto-select warmup probe failed port=$port")
+                }
+            }
+            return EnginePlugin.ReadyResult.Ready
+        }
         var lastFailure: ProbeResult.Failure? = null
         repeat(READY_PROBE_ATTEMPTS) { attempt ->
             when (val result = probeInternal(clearOnRoutedFailure = false)) {
