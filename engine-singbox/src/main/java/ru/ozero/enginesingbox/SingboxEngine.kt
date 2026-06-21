@@ -339,8 +339,14 @@ class SingboxEngine @Inject constructor(
                 clearPendingStart()
                 return TunAttachResult.Failure("sing-box runtime failed to start")
             }
+            val routedProbeReady = awaitTunTrafficReady(pendingSocksPort, pendingTunAutoSelect)
+            if (!routedProbeReady) {
+                stopRuntimeAfterFailedTunReadiness(p)
+                clearPendingStart()
+                return TunAttachResult.Failure("sing-box started but routed probe failed")
+            }
             activeSocksPort = pendingSocksPort
-            activeTunAutoSelect = pendingTunAutoSelect
+            activeTunAutoSelect = false
             pendingTunAutoSelect = false
             pendingSocksPort = 0
             pendingConfig = null
@@ -351,6 +357,27 @@ class SingboxEngine @Inject constructor(
             PersistentLoggers.error(TAG, "startWithConfig AIDL call failed: ${it.message}", it)
             TunAttachResult.Failure("startWithConfig AIDL call failed: ${it.message}")
         }
+    }
+
+    private suspend fun awaitTunTrafficReady(socksPort: Int, autoSelect: Boolean): Boolean {
+        if (socksPort <= 0) return false
+        repeat(READY_PROBE_ATTEMPTS) { attempt ->
+            val latency = routedProbe.probeLatencyMs(socksPort)
+            if (latency >= 0) return true
+            PersistentLoggers.debug(
+                TAG,
+                "attachTun routed probe failed attempt=${attempt + 1}/$READY_PROBE_ATTEMPTS autoSelect=$autoSelect",
+            )
+            if (attempt != READY_PROBE_ATTEMPTS - 1) delay(READY_PROBE_RETRY_MS)
+        }
+        return false
+    }
+
+    private fun stopRuntimeAfterFailedTunReadiness(p: ISingboxEngineProcess) {
+        runCatching {
+            val stopped = p.stopAndWait(REMOTE_STOP_TIMEOUT_MS)
+            if (!stopped) PersistentLoggers.warn(TAG, "stop after routed probe failure timed out")
+        }.onFailure { PersistentLoggers.warn(TAG, "stop after routed probe failure failed: ${it.message}") }
     }
 
     override suspend fun stop() {
