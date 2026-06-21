@@ -22,8 +22,19 @@ class ConfigBuilderDnsTest {
         )
 
         assertContains(json, "\"server\":\"9.9.9.9\"")
-        assertContains(json, "\"server\":\"https://dns.example/dns-query\"")
+        assertContains(json, "\"server\":\"dns.example\"")
+        assertContains(json, "\"path\":\"/dns-query\"")
         assertContains(json, "\"type\":\"https\"")
+        assertFalse(json.contains("https://dns.example/dns-query"))
+    }
+
+    @Test
+    fun `tls DNS servers are emitted as host without URI scheme`() {
+        val json = ConfigBuilder.buildSingboxConfig(bean(), dnsServers = listOf("tls://dns.example"))
+
+        assertContains(json, "\"type\":\"tls\"")
+        assertContains(json, "\"server\":\"dns.example\"")
+        assertFalse(json.contains("tls://dns.example"))
     }
 
     @Test

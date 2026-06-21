@@ -260,22 +260,43 @@ object ConfigBuilder {
         ':' in this && all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it == ':' }
 
     private fun dnsServer(server: String, tag: String, detour: String?): String = buildString {
+        val endpoint = DnsEndpoint.from(server)
         append('{')
         append("\"tag\":${jsonString(tag)},")
         if (detour == null) {
-            append("\"type\":${jsonString(dnsServerType(server))},")
-            append("\"server\":${jsonString(server)}")
+            append("\"type\":${jsonString(endpoint.type)},")
+            append("\"server\":${jsonString(endpoint.server)}")
+            endpoint.path?.let { append(",\"path\":${jsonString(it)}") }
         } else {
-            append("\"address\":${jsonString(server)},")
+            append("\"address\":${jsonString(endpoint.server)},")
+            endpoint.path?.let { append("\"path\":${jsonString(it)},") }
             append("\"detour\":${jsonString(detour)}")
         }
         append('}')
     }
 
-    private fun dnsServerType(server: String): String = when {
-        server.startsWith("https://") -> "https"
-        server.startsWith("tls://") -> "tls"
-        else -> "udp"
+    private data class DnsEndpoint(val type: String, val server: String, val path: String?) {
+        companion object {
+            fun from(server: String): DnsEndpoint = when {
+                server.startsWith("https://") -> fromUri(server, "https")
+                server.startsWith("tls://") -> fromUri(server, "tls")
+                else -> DnsEndpoint("udp", server, null)
+            }
+
+            private fun fromUri(server: String, type: String): DnsEndpoint {
+                val withoutScheme = server.substringAfter("://")
+                val slashIndex = withoutScheme.indexOf('/')
+                val address = if (slashIndex >= 0) withoutScheme.substring(0, slashIndex) else withoutScheme
+                val path = if (type == "https") {
+                    withoutScheme
+                        .substring(slashIndex.takeIf { it >= 0 } ?: withoutScheme.length)
+                        .ifEmpty { "/dns-query" }
+                } else {
+                    null
+                }
+                return DnsEndpoint(type, address, path)
+            }
+        }
     }
 
     private fun tunInbound(): String {
