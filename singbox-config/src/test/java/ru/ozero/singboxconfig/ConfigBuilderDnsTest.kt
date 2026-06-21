@@ -57,8 +57,10 @@ class ConfigBuilderDnsTest {
     fun `chain DNS routes plain DNS through proxy detour`() {
         val json = ConfigBuilder.buildChainConfig(bean(), socksPort = 2080, dnsServers = listOf("8.8.8.8"))
 
-        assertContains(json, "\"address\":\"8.8.8.8\"")
+        assertContains(json, "\"type\":\"udp\"")
+        assertContains(json, "\"server\":\"8.8.8.8\"")
         assertContains(json, "\"detour\":\"proxy\"")
+        assertFalse(json.contains("\"address\""))
         assertFalse(json.contains("legacy DoH fallback"))
     }
 
@@ -77,8 +79,8 @@ class ConfigBuilderDnsTest {
             ipv6Enabled = true,
         )
 
-        assertContains(disabled, "\"address\":\"8.8.8.8\"")
+        assertContains(disabled, "\"server\":\"8.8.8.8\"")
         assertFalse(disabled.contains("2001:4860:4860::8888"))
-        assertContains(enabled, "\"address\":\"2001:4860:4860::8888\"")
+        assertContains(enabled, "\"server\":\"2001:4860:4860::8888\"")
     }
 }
