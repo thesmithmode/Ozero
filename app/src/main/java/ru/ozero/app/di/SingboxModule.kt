@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import dagger.Module
@@ -17,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
 import okhttp3.OkHttpClient
+import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.app.vpn.singboxRuntimeFingerprint
 import ru.ozero.commonvpn.RuntimeFailureRouter
 import ru.ozero.enginesingbox.SingboxEngine
@@ -75,8 +77,18 @@ object SingboxModule {
 
     @Provides
     @Singleton
-    fun provideGroupSeeder(groupDao: SubscriptionGroupDao): GroupSeeder =
-        GroupSeeder(groupDao)
+    fun provideGroupSeeder(
+        groupDao: SubscriptionGroupDao,
+        @SingboxPrefs dataStore: DataStore<Preferences>,
+    ): GroupSeeder = GroupSeeder(groupDao) { deletedProfileIds ->
+        dataStore.edit { prefs ->
+            val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
+            if (selectedProfileId != null && selectedProfileId in deletedProfileIds) {
+                prefs.remove(SingboxProbeService.SELECTED_PROFILE_KEY)
+                prefs.remove(SingboxProbeService.BEAN_KEY)
+            }
+        }
+    }
 
     @Provides
     @Singleton

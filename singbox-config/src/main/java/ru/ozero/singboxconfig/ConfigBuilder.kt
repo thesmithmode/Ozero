@@ -1,5 +1,6 @@
 package ru.ozero.singboxconfig
 
+import java.net.URI
 import java.util.Base64
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.WireGuardOutboundConfig
@@ -269,13 +270,14 @@ object ConfigBuilder {
         append("\"tag\":${jsonString(tag)},")
         append("\"type\":${jsonString(endpoint.type)},")
         append("\"server\":${jsonString(endpoint.server)}")
+        endpoint.serverPort?.let { append(",\"server_port\":$it") }
         endpoint.path?.let { append(",\"path\":${jsonString(it)}") }
         if (endpoint.needsDomainResolver()) append(",\"domain_resolver\":${jsonString(DNS_DOMAIN_RESOLVER_TAG)}")
         detour?.let { append(",\"detour\":${jsonString(it)}") }
         append('}')
     }
 
-    private data class DnsEndpoint(val type: String, val server: String, val path: String?) {
+    private data class DnsEndpoint(val type: String, val server: String, val serverPort: Int?, val path: String?) {
         fun needsDomainResolver(): Boolean =
             type in DNS_DOMAIN_RESOLVER_TYPES && server.isDnsHostname()
 
@@ -284,26 +286,21 @@ object ConfigBuilder {
                 "udp",
                 EngineConfig.Singbox.DEFAULT_DNS_SERVERS.first(),
                 null,
+                null,
             )
 
             fun from(server: String): DnsEndpoint = when {
                 server.startsWith("https://") -> fromUri(server, "https")
                 server.startsWith("tls://") -> fromUri(server, "tls")
-                else -> DnsEndpoint("udp", server, null)
+                else -> DnsEndpoint("udp", server, null, null)
             }
 
             private fun fromUri(server: String, type: String): DnsEndpoint {
-                val withoutScheme = server.substringAfter("://")
-                val slashIndex = withoutScheme.indexOf('/')
-                val address = if (slashIndex >= 0) withoutScheme.substring(0, slashIndex) else withoutScheme
-                val path = if (type == "https") {
-                    withoutScheme
-                        .substring(slashIndex.takeIf { it >= 0 } ?: withoutScheme.length)
-                        .ifEmpty { "/dns-query" }
-                } else {
-                    null
-                }
-                return DnsEndpoint(type, address, path)
+                val uri = URI(server)
+                val address = uri.host ?: server.substringAfter("://").substringBefore('/')
+                val port = uri.port.takeIf { it in MIN_PORT..MAX_PORT }
+                val path = if (type == "https") uri.rawPath.orEmpty().ifEmpty { "/dns-query" } else null
+                return DnsEndpoint(type, address, port, path)
             }
         }
     }

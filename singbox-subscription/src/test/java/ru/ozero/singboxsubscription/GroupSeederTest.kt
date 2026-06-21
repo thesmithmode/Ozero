@@ -173,6 +173,25 @@ class GroupSeederTest {
     }
 
     @Test
+    fun `should notify deleted stale builtin profile ids`() = runBlocking {
+        val deletedIds = mutableListOf<Long>()
+        seeder = GroupSeeder(fakeDao) { ids -> deletedIds += ids }
+        fakeDao.groups.add(
+            SubscriptionGroup(
+                id = 1L,
+                name = "Stale Builtin",
+                subscriptionUrl = "https://stale.example.com/sub",
+                isBuiltin = true,
+            ),
+        )
+        fakeDao.profileGroupIds.addAll(listOf(1L, 1L))
+
+        seeder.seedPresets(emptyList())
+
+        assertEquals(listOf(1L, 2L), deletedIds)
+    }
+
+    @Test
     fun `should handle empty preset list without errors`() = runBlocking {
         seeder.seedPresets(emptyList())
 

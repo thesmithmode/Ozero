@@ -35,6 +35,9 @@ class FakeSubscriptionGroupDao : SubscriptionGroupDao {
     override suspend fun getBuiltins(): List<SubscriptionGroup> =
         groups.filter { it.isBuiltin }
 
+    override suspend fun getProfileIdsByGroupId(groupId: Long): List<Long> =
+        profileGroupIds.mapIndexedNotNull { index, id -> (index + 1L).takeIf { id == groupId } }
+
     override suspend fun update(group: SubscriptionGroup) {
         val index = groups.indexOfFirst { it.id == group.id }
         if (index >= 0) groups[index] = group
