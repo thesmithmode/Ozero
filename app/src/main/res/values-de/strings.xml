@@ -57,7 +57,6 @@
     <string name="settings_manual_engine_title">Modul-Auswahl</string>
     <string name="settings_manual_engine_summary">Auto — Ozero wählt das beste</string>
     <string name="settings_manual_engine_auto">Auto</string>
-    <string name="engine_wip_badge">in Arbeit</string>
     <string name="settings_ipv6_title">IPv6</string>
     <string name="settings_ipv6_summary">IPv6 über VPN routen</string>
     <string name="settings_auto_start_title">Beim Boot starten</string>

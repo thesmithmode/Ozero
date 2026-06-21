@@ -103,8 +103,6 @@ class CoreModelCoverageTest {
         )
 
         assertEquals(EngineId.BYEDPI, EngineConfig.ByeDpi().engineId)
-        assertEquals(EngineId.TOR, EngineConfig.Tor().engineId)
-        assertEquals(EngineId.NAIVE, EngineConfig.Naive("https://proxy.example.com").engineId)
         assertEquals(EngineId.WARP, EngineConfig.WarpProxy().engineId)
         assertEquals(EngineId.FPTN, EngineConfig.Fptn(token = "secret").engineId)
         assertEquals(EngineId.URNETWORK, EngineConfig.Urnetwork(jwtToken = "jwt").engineId)

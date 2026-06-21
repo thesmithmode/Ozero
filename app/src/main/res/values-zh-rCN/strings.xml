@@ -57,7 +57,6 @@
     <string name="settings_manual_engine_title">引擎选择</string>
     <string name="settings_manual_engine_summary">自动 — Ozero 选择最佳引擎</string>
     <string name="settings_manual_engine_auto">自动</string>
-    <string name="engine_wip_badge">开发中</string>
     <string name="settings_ipv6_title">IPv6</string>
     <string name="settings_ipv6_summary">IPv6 流量走 VPN</string>
     <string name="settings_auto_start_title">开机自启</string>

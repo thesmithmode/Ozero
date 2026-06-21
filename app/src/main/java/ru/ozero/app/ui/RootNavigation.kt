@@ -36,7 +36,6 @@ private fun engineParamsTarget(engineId: EngineId?): TopScreen = when (engineId)
     EngineId.MASTERDNS -> TopScreen.MasterDnsSettings
     EngineId.FPTN -> TopScreen.FptnSettings
     EngineId.SINGBOX -> TopScreen.SingboxSettings
-    else -> TopScreen.Servers
 }
 
 @Composable

@@ -414,14 +414,8 @@ private fun EnginesSection(
         onClick = onOpenUrnetwork,
         enabled = true,
     )
-    val warpTitle = if (EngineId.WARP.isStub) {
-        stringResource(R.string.settings_warp_title) +
-            " (${stringResource(R.string.engine_wip_badge)})"
-    } else {
-        stringResource(R.string.settings_warp_title)
-    }
     NavRow(
-        title = warpTitle,
+        title = stringResource(R.string.settings_warp_title),
         summary = stringResource(R.string.settings_warp_summary),
         tag = "settings_warp_row",
         onClick = onOpenWarp,
@@ -500,14 +494,9 @@ private fun ConnectionSection(
         onClick = { onManualEngineSelect(null) },
     )
     EngineId.entries.forEach { engine ->
-        val label = if (engine.isStub) {
-            "${engine.displayName} (${stringResource(R.string.engine_wip_badge)})"
-        } else {
-            engine.displayName
-        }
         RadioRow(
             selected = manualEngine == engine,
-            label = label,
+            label = engine.displayName,
             tag = SettingsTestTags.MANUAL_ENGINE_PREFIX + engine.name,
             onClick = { onManualEngineSelect(engine) },
         )

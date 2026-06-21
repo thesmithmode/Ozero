@@ -47,17 +47,17 @@ class ChainOrchestratorActiveEnginesTest {
     @Test
     fun activeEngines_orderMatchesStartOrder() = runTest {
         val byedpi = plugin(EngineId.BYEDPI)
-        val xray = plugin(EngineId.XRAY)
-        val orch = ChainOrchestrator(setOf(byedpi, xray))
+        val fptn = plugin(EngineId.FPTN)
+        val orch = ChainOrchestrator(setOf(byedpi, fptn))
         orch.start(
             listOf(
                 ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080)),
-                ChainStep(EngineId.XRAY, EngineConfig.Xray(configJson = "{}", socksPort = 10808)),
+                ChainStep(EngineId.FPTN, EngineConfig.Fptn()),
             ),
         )
         val active = orch.activeEngines()
         assertEquals(EngineId.BYEDPI, active[0].id)
-        assertEquals(EngineId.XRAY, active[1].id)
+        assertEquals(EngineId.FPTN, active[1].id)
     }
 
     private fun plugin(engineId: EngineId): EnginePlugin = object : EnginePlugin {

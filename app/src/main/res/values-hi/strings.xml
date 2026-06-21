@@ -57,7 +57,6 @@
     <string name="settings_manual_engine_title">इंजन चुनें</string>
     <string name="settings_manual_engine_summary">ऑटो — Ozero सबसे अच्छा चुनेगा</string>
     <string name="settings_manual_engine_auto">ऑटो</string>
-    <string name="engine_wip_badge">विकासाधीन</string>
     <string name="settings_ipv6_title">IPv6</string>
     <string name="settings_ipv6_summary">IPv6 को VPN से रूट करें</string>
     <string name="settings_auto_start_title">बूट पर शुरू</string>

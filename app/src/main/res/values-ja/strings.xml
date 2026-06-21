@@ -57,7 +57,6 @@
     <string name="settings_manual_engine_title">エンジン選択</string>
     <string name="settings_manual_engine_summary">自動 — Ozero が最適を選びます</string>
     <string name="settings_manual_engine_auto">自動</string>
-    <string name="engine_wip_badge">開発中</string>
     <string name="settings_ipv6_title">IPv6</string>
     <string name="settings_ipv6_summary">IPv6 を VPN 経由</string>
     <string name="settings_auto_start_title">起動時に開始</string>
