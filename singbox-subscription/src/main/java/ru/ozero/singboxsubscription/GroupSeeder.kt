@@ -8,6 +8,11 @@ class GroupSeeder(private val dao: SubscriptionGroupDao) {
     data class PresetGroup(val name: String, val url: String)
 
     suspend fun seedPresets(presets: List<PresetGroup>) {
+        val activePresetUrls = presets.mapTo(mutableSetOf()) { it.url }
+        dao.getBuiltins()
+            .filterNot { group -> group.subscriptionUrl in activePresetUrls }
+            .forEach { group -> dao.deleteBuiltinGroupWithProfiles(group) }
+
         val seenUrls = mutableSetOf<String>()
         presets.forEachIndexed { index, preset ->
             if (!seenUrls.add(preset.url)) {

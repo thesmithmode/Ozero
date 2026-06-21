@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import ru.ozero.singboxroom.entity.SubscriptionGroup
@@ -34,6 +35,11 @@ interface SubscriptionGroupDao {
 
     @Delete
     suspend fun delete(group: SubscriptionGroup)
+
+    @Transaction
+    suspend fun deleteBuiltinGroupWithProfiles(group: SubscriptionGroup) {
+        if (group.isBuiltin) delete(group)
+    }
 
     @Query("SELECT COUNT(*) FROM subscription_groups")
     suspend fun count(): Int
