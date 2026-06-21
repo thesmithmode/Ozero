@@ -1,0 +1,65 @@
+package ru.ozero.singboxconfig
+
+import org.junit.jupiter.api.Test
+import ru.ozero.singboxfmt.VLESSBean
+import kotlin.test.assertContains
+import kotlin.test.assertFalse
+
+class ConfigBuilderDnsTest {
+    private fun bean() = VLESSBean().apply {
+        uuid = "12345678-1234-1234-1234-123456789abc"
+        serverAddress = "proxy.example.com"
+        serverPort = 443
+        type = "tcp"
+        security = "none"
+    }
+
+    @Test
+    fun `custom DNS servers are emitted into tun JSON`() {
+        val json = ConfigBuilder.buildSingboxConfig(
+            bean(),
+            dnsServers = listOf("9.9.9.9", "https://dns.example/dns-query"),
+        )
+
+        assertContains(json, "\"server\":\"9.9.9.9\"")
+        assertContains(json, "\"server\":\"https://dns.example/dns-query\"")
+        assertContains(json, "\"type\":\"https\"")
+    }
+
+    @Test
+    fun `empty DNS servers fall back to safe defaults`() {
+        val json = ConfigBuilder.buildSingboxConfig(bean(), dnsServers = emptyList())
+
+        assertContains(json, "\"server\":\"1.1.1.1\"")
+        assertContains(json, "\"server\":\"1.0.0.1\"")
+    }
+
+    @Test
+    fun `chain DNS routes plain DNS through proxy detour`() {
+        val json = ConfigBuilder.buildChainConfig(bean(), socksPort = 2080, dnsServers = listOf("8.8.8.8"))
+
+        assertContains(json, "\"address\":\"8.8.8.8\"")
+        assertContains(json, "\"detour\":\"proxy\"")
+        assertFalse(json.contains("https://1.1.1.1/dns-query"))
+    }
+
+    @Test
+    fun `IPv6 DNS is filtered when IPv6 is disabled and preserved when enabled`() {
+        val disabled = ConfigBuilder.buildChainConfig(
+            bean(),
+            socksPort = 2080,
+            dnsServers = listOf("8.8.8.8", "2001:4860:4860::8888"),
+            ipv6Enabled = false,
+        )
+        val enabled = ConfigBuilder.buildChainConfig(
+            bean(),
+            socksPort = 2080,
+            dnsServers = listOf("8.8.8.8", "2001:4860:4860::8888"),
+            ipv6Enabled = true,
+        )
+
+        assertContains(disabled, "\"address\":\"8.8.8.8\"")
+        assertFalse(disabled.contains("2001:4860:4860::8888"))
+        assertContains(enabled, "\"address\":\"2001:4860:4860::8888\"")
+    }
+}

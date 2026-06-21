@@ -19,9 +19,11 @@ class SingboxEngineExitIpProbeSentinelTest {
             "TUN mode must keep the probe SOCKS port pending until sing-box runtime accepts startWithConfig.",
         )
         assertTrue(
-            source.contains("ConfigBuilder.buildSingboxConfig(bean, probeSocksPort)") &&
-                source.contains("ConfigBuilder.buildSingboxAutoConfig(beans, probeSocksPort)") &&
-                source.contains("ConfigBuilder.buildProfileChainConfig(bean, wrappers, probeSocksPort)"),
+            source.contains("ConfigBuilder.buildSingboxConfig(bean, probeSocksPort, config.dnsServers)") &&
+                source.contains("ConfigBuilder.buildSingboxAutoConfig(beans, probeSocksPort, config.dnsServers)") &&
+                source.contains(
+                    "ConfigBuilder.buildProfileChainConfig(bean, wrappers, probeSocksPort, config.dnsServers)",
+                ),
             "All sing-box TUN configs must receive probeSocksPort so exit-IP probe uses the real outbound graph.",
         )
         assertTrue(
