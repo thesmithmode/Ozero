@@ -54,6 +54,7 @@ sealed class EngineConfig {
         val wireGuardConfig: WireGuardOutboundConfig? = null,
         val proxyMode: Boolean = false,
         val dnsServers: List<String> = DEFAULT_DNS_SERVERS,
+        val ipv6Enabled: Boolean = false,
     ) : EngineConfig() {
         override val engineId = EngineId.SINGBOX
         override fun toString(): String =
@@ -72,7 +73,8 @@ sealed class EngineConfig {
                 chainBeanBlobs.zip(other.chainBeanBlobs).all { (a, b) -> a.contentEquals(b) } &&
                 wireGuardConfig == other.wireGuardConfig &&
                 proxyMode == other.proxyMode &&
-                dnsServers == other.dnsServers
+                dnsServers == other.dnsServers &&
+                ipv6Enabled == other.ipv6Enabled
         }
 
         override fun hashCode(): Int {
@@ -82,11 +84,12 @@ sealed class EngineConfig {
             result = 31 * result + (wireGuardConfig?.hashCode() ?: 0)
             result = 31 * result + proxyMode.hashCode()
             result = 31 * result + dnsServers.hashCode()
+            result = 31 * result + ipv6Enabled.hashCode()
             return result
         }
 
         companion object {
-            val DEFAULT_DNS_SERVERS: List<String> = listOf("1.1.1.1", "1.0.0.1")
+            val DEFAULT_DNS_SERVERS: List<String> = listOf("9.9.9.9", "149.112.112.112")
         }
     }
 

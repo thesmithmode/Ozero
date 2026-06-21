@@ -30,8 +30,16 @@ class ConfigBuilderDnsTest {
     fun `empty DNS servers fall back to safe defaults`() {
         val json = ConfigBuilder.buildSingboxConfig(bean(), dnsServers = emptyList())
 
-        assertContains(json, "\"server\":\"1.1.1.1\"")
-        assertContains(json, "\"server\":\"1.0.0.1\"")
+        assertContains(json, "\"server\":\"9.9.9.9\"")
+        assertContains(json, "\"server\":\"149.112.112.112\"")
+    }
+
+    @Test
+    fun `invalid DNS servers fall back to safe defaults`() {
+        val json = ConfigBuilder.buildSingboxConfig(bean(), dnsServers = listOf("not a dns server"))
+
+        assertContains(json, "\"server\":\"9.9.9.9\"")
+        assertFalse(json.contains("not a dns server"))
     }
 
     @Test
@@ -40,7 +48,7 @@ class ConfigBuilderDnsTest {
 
         assertContains(json, "\"address\":\"8.8.8.8\"")
         assertContains(json, "\"detour\":\"proxy\"")
-        assertFalse(json.contains("https://1.1.1.1/dns-query"))
+        assertFalse(json.contains("legacy DoH fallback"))
     }
 
     @Test
