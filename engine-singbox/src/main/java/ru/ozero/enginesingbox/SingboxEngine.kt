@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.byteArrayPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -353,8 +354,10 @@ class SingboxEngine @Inject constructor(
         }
 
         val p = proxy ?: return StartResult.Failure("SingboxEngineService not connected for chain mode")
+        var runtimeStarted = false
         return runCatching {
             p.startProxyMode(json, localProtector)
+            runtimeStarted = true
             val runtimeRunning = runCatching { p.runtimeRunning() }.getOrDefault(false)
             PersistentLoggers.debug(
                 TAG,
@@ -362,6 +365,7 @@ class SingboxEngine @Inject constructor(
             )
             if (!runtimeRunning) {
                 activeSocksPort = 0
+                stopRuntimeAfterFailedReadiness(p)
                 return StartResult.Failure("sing-box proxy runtime failed to start")
             }
             val routedProbeReady = awaitTrafficReady(port, autoSelect = config.autoSelectBeanBlobs.isNotEmpty())
@@ -375,6 +379,8 @@ class SingboxEngine @Inject constructor(
             StartResult.Success(socksPort = port)
         }.getOrElse {
             activeSocksPort = 0
+            if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)
+            if (it is CancellationException) throw it
             PersistentLoggers.error(TAG, "startProxyMode AIDL call failed: ${it.message}", it)
             StartResult.Failure("startProxyMode failed: ${it.message}")
         }

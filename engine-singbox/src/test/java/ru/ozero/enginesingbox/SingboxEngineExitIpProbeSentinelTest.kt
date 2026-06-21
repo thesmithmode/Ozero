@@ -19,10 +19,27 @@ class SingboxEngineExitIpProbeSentinelTest {
             "TUN mode must keep the probe SOCKS port pending until sing-box runtime accepts startWithConfig.",
         )
         assertTrue(
-            source.contains("ConfigBuilder.buildSingboxConfig(bean, probeSocksPort, config.dnsServers)") &&
-                source.contains("ConfigBuilder.buildSingboxAutoConfig(beans, probeSocksPort, config.dnsServers)") &&
-                source.contains(
-                    "ConfigBuilder.buildProfileChainConfig(bean, wrappers, probeSocksPort, config.dnsServers)",
+            source.hasCallWithArgs(
+                "ConfigBuilder.buildSingboxConfig",
+                "bean",
+                "probeSocksPort",
+                "config.dnsServers",
+                "config.ipv6Enabled",
+            ) &&
+                source.hasCallWithArgs(
+                    "ConfigBuilder.buildSingboxAutoConfig",
+                    "beans",
+                    "probeSocksPort",
+                    "config.dnsServers",
+                    "config.ipv6Enabled",
+                ) &&
+                source.hasCallWithArgs(
+                    "ConfigBuilder.buildProfileChainConfig",
+                    "bean",
+                    "wrappers",
+                    "probeSocksPort",
+                    "config.dnsServers",
+                    "config.ipv6Enabled",
                 ),
             "All sing-box TUN configs must receive probeSocksPort so exit-IP probe uses the real outbound graph.",
         )
@@ -88,6 +105,24 @@ class SingboxEngineExitIpProbeSentinelTest {
     }
 
     @Test
+    fun `singbox stops proxy runtime when readiness exits before publication`() {
+        val source = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginesingbox/SingboxEngine.kt",
+        ).readText()
+
+        val startProxyBlock = source.substringAfter("private suspend fun startProxyMode")
+            .substringBefore("override suspend fun attachTun")
+        val startIdx = startProxyBlock.indexOf("p.startProxyMode(json, localProtector)")
+        val cleanupIdx = startProxyBlock.indexOf("if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)")
+        val cancelIdx = startProxyBlock.indexOf("if (it is CancellationException) throw it")
+        assertTrue(
+            startIdx >= 0 && cleanupIdx > startIdx && cancelIdx > cleanupIdx,
+            "proxy mode must stop remote runtime on readiness cancellation before propagating cancellation",
+        )
+    }
+
+    @Test
     fun `singbox stop waits for remote stop before close`() {
         val source = File(
             System.getProperty("user.dir") ?: ".",
@@ -107,4 +142,10 @@ class SingboxEngineExitIpProbeSentinelTest {
             "SingboxEngine stop timeout must exceed remote stopAndWait timeout so ChainOrchestrator does not cancel it early",
         )
     }
+}
+
+private fun String.hasCallWithArgs(call: String, vararg args: String): Boolean {
+    val compact = filterNot { it.isWhitespace() }
+    val expected = "$call(${args.joinToString(",")})".filterNot { it.isWhitespace() }
+    return compact.contains(expected)
 }
