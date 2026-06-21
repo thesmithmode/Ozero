@@ -197,12 +197,12 @@ class TunnelStatsLoggerCoverageTest {
             assertEquals(150, controller.stats.value?.txBytes)
             advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
             runCurrent()
-            assertEquals(0, controller.stats.value?.rxBytes)
-            assertEquals(0, controller.stats.value?.txBytes)
+            assertEquals(100, controller.stats.value?.rxBytes)
+            assertEquals(150, controller.stats.value?.txBytes)
             advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
             runCurrent()
-            assertEquals(50, controller.stats.value?.rxBytes)
-            assertEquals(60, controller.stats.value?.txBytes)
+            assertEquals(150, controller.stats.value?.rxBytes)
+            assertEquals(210, controller.stats.value?.txBytes)
         } finally {
             stopLogger(logger)
         }
@@ -217,6 +217,7 @@ class TunnelStatsLoggerCoverageTest {
         mockkObject(UidTrafficStats)
         every { TunInterfaceStats.readTunStats("tun0") } returnsMany listOf(
             TunInterfaceStats.Snapshot(rxBytes = 1_000, txBytes = 2_000),
+            TunInterfaceStats.Snapshot(rxBytes = 1_100, txBytes = 2_150),
             null,
             null,
         )
@@ -233,12 +234,16 @@ class TunnelStatsLoggerCoverageTest {
             assertEquals(0, controller.stats.value?.txBytes)
             advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
             runCurrent()
-            assertEquals(0, controller.stats.value?.rxBytes)
-            assertEquals(0, controller.stats.value?.txBytes)
+            assertEquals(100, controller.stats.value?.rxBytes)
+            assertEquals(150, controller.stats.value?.txBytes)
             advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
             runCurrent()
-            assertEquals(15, controller.stats.value?.rxBytes)
-            assertEquals(25, controller.stats.value?.txBytes)
+            assertEquals(100, controller.stats.value?.rxBytes)
+            assertEquals(150, controller.stats.value?.txBytes)
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+            assertEquals(115, controller.stats.value?.rxBytes)
+            assertEquals(175, controller.stats.value?.txBytes)
         } finally {
             stopLogger(logger)
         }

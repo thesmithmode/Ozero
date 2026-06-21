@@ -37,6 +37,8 @@ class TunnelStatsLogger(
             var prevRx = 0L
             var tickCount = 0
             var sessionBaseline: TunnelStatsReadResult? = null
+            var carriedRxBytes = 0L
+            var carriedTxBytes = 0L
             try {
                 while (true) {
                     delay(STATS_SAMPLE_INTERVAL_MS)
@@ -63,12 +65,15 @@ class TunnelStatsLogger(
                     val source = read.source
                     val baseline = sessionBaseline
                     val effectiveBaseline = if (read.shouldRebaseFrom(baseline)) {
+                        val currentStats = tunnelController.stats.value
+                        carriedRxBytes = currentStats?.rxBytes ?: 0L
+                        carriedTxBytes = currentStats?.txBytes ?: 0L
                         read.also { sessionBaseline = it }
                     } else {
                         requireNotNull(baseline)
                     }
-                    val normalizedRxBytes = rxBytes - effectiveBaseline.rxBytes
-                    val normalizedTxBytes = txBytes - effectiveBaseline.txBytes
+                    val normalizedRxBytes = carriedRxBytes + rxBytes - effectiveBaseline.rxBytes
+                    val normalizedTxBytes = carriedTxBytes + txBytes - effectiveBaseline.txBytes
                     val snapshot = TunnelStats(
                         txPackets = 0L,
                         txBytes = normalizedTxBytes,

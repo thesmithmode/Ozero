@@ -244,6 +244,7 @@ class SingboxEngine @Inject constructor(
     ): StartResult {
         activeSocksPort = 0
         activeAutoSelect = false
+        activeTunAutoSelect = false
         pendingSocksPort = 0
         pendingConfig = null
         val port = allocateChainPort()
@@ -358,6 +359,7 @@ class SingboxEngine @Inject constructor(
         pendingSocksPort = 0
         chainMode = false
         activeAutoSelect = false
+        activeTunAutoSelect = false
         activeSocksPort = 0
         val p = proxy
         if (p != null) {
@@ -667,6 +669,7 @@ class SingboxEngine @Inject constructor(
         pendingTunAutoSelect = false
         pendingSocksPort = 0
         activeAutoSelect = false
+        activeTunAutoSelect = false
         activeSocksPort = 0
     }
 
