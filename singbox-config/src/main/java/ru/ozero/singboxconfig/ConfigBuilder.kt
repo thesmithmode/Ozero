@@ -263,15 +263,10 @@ object ConfigBuilder {
         val endpoint = DnsEndpoint.from(server)
         append('{')
         append("\"tag\":${jsonString(tag)},")
-        if (detour == null) {
-            append("\"type\":${jsonString(endpoint.type)},")
-            append("\"server\":${jsonString(endpoint.server)}")
-            endpoint.path?.let { append(",\"path\":${jsonString(it)}") }
-        } else {
-            append("\"address\":${jsonString(endpoint.server)},")
-            endpoint.path?.let { append("\"path\":${jsonString(it)},") }
-            append("\"detour\":${jsonString(detour)}")
-        }
+        append("\"type\":${jsonString(endpoint.type)},")
+        append("\"server\":${jsonString(endpoint.server)}")
+        endpoint.path?.let { append(",\"path\":${jsonString(it)}") }
+        detour?.let { append(",\"detour\":${jsonString(it)}") }
         append('}')
     }
 

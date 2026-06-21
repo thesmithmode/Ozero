@@ -244,7 +244,7 @@ class SingboxEngine @Inject constructor(
                 bean,
                 probeSocksPort,
                 config.dnsServers,
-                config.ipv6Enabled,
+                config.ipv6Enabled
             )
         }
             .mapCatching {
@@ -254,7 +254,7 @@ class SingboxEngine @Inject constructor(
                         wrappers,
                         probeSocksPort,
                         config.dnsServers,
-                        config.ipv6Enabled,
+                        config.ipv6Enabled
                     )
                 } else {
                     it
@@ -396,6 +396,7 @@ class SingboxEngine @Inject constructor(
             clearPendingStart()
             return TunAttachResult.Failure("SingboxEngineService not connected")
         }
+        var runtimeStarted = false
         return runCatching {
             val pfd = ParcelFileDescriptor.fromFd(tunFd)
             try {
@@ -405,6 +406,7 @@ class SingboxEngine @Inject constructor(
                         "fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
                 )
                 p.startWithConfig(pfd, json, localProtector)
+                runtimeStarted = true
             } finally {
                 runCatching { pfd.close() }
             }
@@ -415,6 +417,7 @@ class SingboxEngine @Inject constructor(
                 "attachTun AIDL returned rawFd=$tunFd pendingPort=$pendingSocksPort runtimeRunning=$runtimeRunning",
             )
             if (!runtimeRunning) {
+                stopRuntimeAfterFailedReadiness(p)
                 clearPendingStart()
                 return TunAttachResult.Failure("sing-box runtime failed to start")
             }
@@ -432,7 +435,9 @@ class SingboxEngine @Inject constructor(
             PersistentLoggers.debug(TAG, "startWithConfig sent over AIDL")
             TunAttachResult.Success
         }.getOrElse {
+            if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)
             clearPendingStart()
+            if (it is CancellationException) throw it
             PersistentLoggers.error(TAG, "startWithConfig AIDL call failed: ${it.message}", it)
             TunAttachResult.Failure("startWithConfig AIDL call failed: ${it.message}")
         }
