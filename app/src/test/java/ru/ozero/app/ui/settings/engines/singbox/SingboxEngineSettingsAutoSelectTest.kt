@@ -66,6 +66,7 @@ class SingboxEngineSettingsAutoSelectTest {
             override suspend fun getById(id: Long): SubscriptionGroup? = groupsFlow.value.find { it.id == id }
             override suspend fun getByUrl(url: String): SubscriptionGroup? = null
             override suspend fun getBuiltins(): List<SubscriptionGroup> = emptyList()
+            override suspend fun getProfileIdsByGroupId(groupId: Long): List<Long> = emptyList()
             override suspend fun count(): Int = groupsFlow.value.size
             override suspend fun insert(group: SubscriptionGroup): Long = group.id
             override suspend fun update(group: SubscriptionGroup) {}
