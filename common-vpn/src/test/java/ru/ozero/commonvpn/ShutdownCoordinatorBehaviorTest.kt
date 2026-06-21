@@ -51,10 +51,19 @@ class ShutdownCoordinatorBehaviorTest {
         fixture.tunnelController.updateStats(
             TunnelStats(
                 txPackets = 0L,
-                txBytes = 120L,
+                txBytes = 1_000L,
                 rxPackets = 0L,
-                rxBytes = 340L,
+                rxBytes = 2_000L,
                 timestampMs = 2_000L,
+            ),
+        )
+        fixture.tunnelController.updateStats(
+            TunnelStats(
+                txPackets = 0L,
+                txBytes = 1_250L,
+                rxPackets = 0L,
+                rxBytes = 2_400L,
+                timestampMs = 3_000L,
             ),
         )
 
@@ -63,8 +72,8 @@ class ShutdownCoordinatorBehaviorTest {
 
         val ended = fixture.sessionRecorder.ended.single()
         assertEquals(7L, ended.id)
-        assertEquals(120L, ended.txBytes)
-        assertEquals(340L, ended.rxBytes)
+        assertEquals(250L, ended.txBytes)
+        assertEquals(400L, ended.rxBytes)
         assertEquals(SessionStatsRecorder.Status.DISCONNECTED, ended.status)
         assertTrue(ended.durationMs >= 0L)
     }
