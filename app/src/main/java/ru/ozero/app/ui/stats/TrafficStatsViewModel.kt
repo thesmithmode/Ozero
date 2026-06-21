@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import ru.ozero.corestorage.dao.SessionStatsDao
 import ru.ozero.corestorage.entity.SessionStatsEntity
 import javax.inject.Inject
@@ -138,6 +139,18 @@ class TrafficStatsViewModel @Inject constructor(
 
     fun setSessionSort(sort: SessionSort) {
         sessionSortRef.value = sort
+    }
+
+    fun deleteSession(id: Long) {
+        viewModelScope.launch {
+            dao.deleteById(id)
+        }
+    }
+
+    fun clearSessions() {
+        viewModelScope.launch {
+            dao.deleteCompleted()
+        }
     }
 
     private companion object {

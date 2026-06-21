@@ -403,6 +403,12 @@
     <string name="stats_history_period_day">Today</string>
     <string name="stats_history_period_week">Week</string>
     <string name="stats_history_period_month">Month</string>
+    <string name="stats_history_delete_cd">Delete session</string>
+    <string name="stats_history_clear_cd">Clear history</string>
+    <string name="stats_history_clear_title">Clear session history?</string>
+    <string name="stats_history_clear_message">All completed sessions will be removed from history.</string>
+    <string name="stats_history_clear_confirm">Clear</string>
+    <string name="stats_history_clear_cancel">Cancel</string>
     <string name="stats_history_filter_clear">Clear filters</string>
     <string name="engine_chip_auto">Auto</string>
 

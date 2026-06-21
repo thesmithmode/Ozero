@@ -370,6 +370,30 @@ class TrafficStatsViewModelTest {
         }
     }
 
+    @Test
+    fun `deleteSession removes session by id`() = runTest {
+        dao.flow.value = listOf(sample(1L), sample(2L))
+        val vm = vm()
+
+        vm.deleteSession(1L)
+        advanceUntilIdle()
+
+        assertEquals(listOf(1L), dao.deletedIds)
+        assertEquals(listOf(2L), vm.sessions.value.map { it.id })
+    }
+
+    @Test
+    fun `clearSessions removes completed history`() = runTest {
+        dao.flow.value = listOf(sample(1L), sample(2L))
+        val vm = vm()
+
+        vm.clearSessions()
+        advanceUntilIdle()
+
+        assertEquals(1, dao.clearCompletedCalls)
+        assertEquals(emptyList(), vm.sessions.value)
+    }
+
     @Nested
     inner class SessionSortTests {
 
@@ -491,6 +515,8 @@ class TrafficStatsViewModelTest {
         val flow = MutableStateFlow<List<SessionStatsEntity>>(emptyList())
         var lastObserveFromSince: Long = -1L
         var observeAllCalled: Boolean = false
+        val deletedIds = mutableListOf<Long>()
+        var clearCompletedCalls: Int = 0
 
         override fun observeRecent(limit: Int): Flow<List<SessionStatsEntity>> = flow
 
@@ -516,5 +542,18 @@ class TrafficStatsViewModelTest {
         ) = Unit
 
         override suspend fun deleteOlderThan(olderThan: Long): Int = 0
+
+        override suspend fun deleteById(id: Long): Int {
+            deletedIds += id
+            flow.value = flow.value.filterNot { it.id == id }
+            return 1
+        }
+
+        override suspend fun deleteCompleted(): Int {
+            clearCompletedCalls += 1
+            val count = flow.value.count { it.endedAt != null }
+            flow.value = flow.value.filter { it.endedAt == null }
+            return count
+        }
     }
 }
