@@ -11,12 +11,15 @@ internal object V2RayFmtUtils {
     }
 
     fun parseSecurityParams(bean: StandardV2RayBean, parsed: UriCompat, defaultSecurity: String = "none") {
-        bean.security = parsed.getQueryParameter("security") ?: defaultSecurity
+        val publicKey = parsed.getQueryParameter("pbk") ?: ""
+        val shortId = parsed.getQueryParameter("sid") ?: ""
+        val rawSecurity = parsed.getQueryParameter("security") ?: defaultSecurity
+        bean.security = if (publicKey.isNotBlank()) "reality" else rawSecurity.trim().lowercase()
         bean.sni = parsed.firstQueryParameter("sni", "serverName", "servername", "server_name") ?: ""
         bean.alpn = parsed.getQueryParameter("alpn") ?: ""
         bean.utlsFingerprint = parsed.getQueryParameter("fp") ?: ""
-        bean.realityPublicKey = parsed.getQueryParameter("pbk") ?: ""
-        bean.realityShortId = parsed.getQueryParameter("sid") ?: ""
+        bean.realityPublicKey = publicKey
+        bean.realityShortId = shortId
         bean.realityFingerprint = parsed.getQueryParameter("fp") ?: "chrome"
         bean.allowInsecure = listOf(
             "allowInsecure",

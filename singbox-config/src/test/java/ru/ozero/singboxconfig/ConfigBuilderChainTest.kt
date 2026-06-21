@@ -51,12 +51,12 @@ class ConfigBuilderChainTest {
     }
 
     @Test
-    fun `chain config uses plain DNS through proxy detour`() {
+    fun `chain config uses direct bootstrap DNS without proxy detour`() {
         val json = ConfigBuilder.buildChainConfig(makeBean(), socksPort = 49408)
 
         assertContains(json, "\"server\":\"9.9.9.9\"")
         assertContains(json, "\"type\":\"udp\"")
-        assertContains(json, "\"detour\":\"proxy\"")
+        assertFalse(json.contains("\"detour\":\"proxy\""), "bootstrap DNS must not loop through proxy outbound")
         assertContains(json, "\"action\":\"hijack-dns\"")
         assertFalse(json.contains("\"type\":\"dns\""), "chain config must not rely on legacy dns outbound")
     }
