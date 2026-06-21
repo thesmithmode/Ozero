@@ -54,7 +54,7 @@ class ConfigBuilderChainTest {
     fun `chain config uses plain DNS through proxy detour`() {
         val json = ConfigBuilder.buildChainConfig(makeBean(), socksPort = 49408)
 
-        assertContains(json, "\"address\":\"https://1.1.1.1/dns-query\"")
+        assertContains(json, "\"address\":\"9.9.9.9\"")
         assertContains(json, "\"detour\":\"proxy\"")
         assertContains(json, "\"action\":\"hijack-dns\"")
         assertFalse(json.contains("\"type\":\"dns\""), "chain config must not rely on legacy dns outbound")

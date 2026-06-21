@@ -24,16 +24,18 @@ object ConfigBuilder {
         bean: AbstractBean,
         probeSocksPort: Int? = null,
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
     ): String {
         require(isSupportedBean(bean)) { "Unsupported transport: ${(bean as? StandardV2RayBean)?.type}" }
         val outbound = beanOutbound(bean, "proxy")
-        return buildFullConfig(listOf(outbound), probeSocksPort, dnsServers)
+        return buildFullConfig(listOf(outbound), probeSocksPort, dnsServers, ipv6Enabled)
     }
 
     fun buildSingboxAutoConfig(
         beans: List<AbstractBean>,
         probeSocksPort: Int? = null,
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
     ): String {
         val supported = beans.filter { isSupportedBean(it) }
         require(supported.isNotEmpty()) { "no beans with supported transport types" }
@@ -45,7 +47,7 @@ object ConfigBuilder {
             append(""""interval":"3m","tolerance":50,""")
             append(""""interrupt_exist_connections":true,"idle_timeout":"30m"}""")
         }
-        return buildFullConfig(listOf(urltest) + proxyOutbounds, probeSocksPort, dnsServers)
+        return buildFullConfig(listOf(urltest) + proxyOutbounds, probeSocksPort, dnsServers, ipv6Enabled)
     }
 
     fun isSupportedBean(bean: AbstractBean): Boolean {
@@ -105,9 +107,10 @@ object ConfigBuilder {
         wrappers: List<AbstractBean>,
         probeSocksPort: Int? = null,
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
     ): String {
         val outbounds = profileChainOutbounds(selected, wrappers)
-        return buildFullConfig(outbounds, probeSocksPort, dnsServers)
+        return buildFullConfig(outbounds, probeSocksPort, dnsServers, ipv6Enabled)
     }
 
     fun buildProfileChainProxyConfig(
@@ -156,6 +159,7 @@ object ConfigBuilder {
         proxyOutbounds: List<String>,
         probeSocksPort: Int? = null,
         dnsServers: List<String>,
+        ipv6Enabled: Boolean,
     ): String {
         val sb = StringBuilder()
         sb.append('{')
@@ -175,7 +179,7 @@ object ConfigBuilder {
         sb.append(""",{"type":"direct","tag":"direct"}""")
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
-        sb.append(dnsConfig(dnsServers, detour = null, ipv6Enabled = true))
+        sb.append(dnsConfig(dnsServers, detour = null, ipv6Enabled = ipv6Enabled))
         sb.append(""""route":{""")
         sb.append(""""final":"proxy",""")
         sb.append(""""auto_detect_interface":true,""")
@@ -232,10 +236,28 @@ object ConfigBuilder {
         dnsServers
             .map { it.trim() }
             .filter { it.isNotEmpty() }
+            .filter { it.isValidDnsServer() }
             .filter { ipv6Enabled || !it.isPlainIpv6Dns() }
             .ifEmpty { EngineConfig.Singbox.DEFAULT_DNS_SERVERS }
 
     private fun String.isPlainIpv6Dns(): Boolean = ':' in this && !startsWith("https://") && !startsWith("tls://")
+
+    private fun String.isValidDnsServer(): Boolean {
+        if (startsWith("https://")) return length > "https://".length && !contains(' ')
+        if (startsWith("tls://")) return length > "tls://".length && !contains(' ')
+        return isValidIpv4Dns() || isValidPlainIpv6Dns()
+    }
+
+    private fun String.isValidIpv4Dns(): Boolean {
+        val parts = split('.')
+        return parts.size == 4 &&
+            parts.all { part ->
+                part.isNotEmpty() && part.all(Char::isDigit) && part.toIntOrNull() in 0..255
+            }
+    }
+
+    private fun String.isValidPlainIpv6Dns(): Boolean =
+        ':' in this && all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it == ':' }
 
     private fun dnsServer(server: String, tag: String, detour: String?): String = buildString {
         append('{')

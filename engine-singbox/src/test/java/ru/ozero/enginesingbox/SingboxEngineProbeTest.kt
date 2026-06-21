@@ -348,6 +348,55 @@ class SingboxEngineProbeTest {
     }
 
     @Test
+    fun `proxy mode returns failure and stops runtime when routed probes fail after runtime starts`() = runTest {
+        val engine = buildEngine()
+        engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.startProxyMode(any(), any()) } returns Unit
+        every { process.runtimeRunning() } returns true
+        every { process.stopAndWait(3_000L) } returns true
+        engine.setPrivateField("proxy", process)
+
+        val result = engine.start(
+            EngineConfig.Singbox(
+                beanBlob = makeVlessBlob(),
+                protocolType = SingboxEngine.PROTOCOL_VLESS,
+                proxyMode = true,
+            ),
+            Upstream.None,
+        )
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals("sing-box routed probe failed", failure.reason)
+        verify(exactly = 1) { process.stopAndWait(3_000L) }
+        assertEquals(0, engine.privateIntField("activeSocksPort"))
+    }
+
+    @Test
+    fun `proxy mode succeeds when routed probe succeeds after runtime starts`() = runTest {
+        val engine = buildEngine()
+        engine.routedProbe = SingboxRoutedProbe { 9L }
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.startProxyMode(any(), any()) } returns Unit
+        every { process.runtimeRunning() } returns true
+        engine.setPrivateField("proxy", process)
+
+        val result = engine.start(
+            EngineConfig.Singbox(
+                beanBlob = makeVlessBlob(),
+                protocolType = SingboxEngine.PROTOCOL_VLESS,
+                proxyMode = true,
+            ),
+            Upstream.None,
+        )
+
+        val success = assertIs<StartResult.Success>(result)
+        assertTrue(success.socksPort > 0)
+        assertEquals(success.socksPort, engine.privateIntField("activeSocksPort"))
+        verify(exactly = 0) { process.stopAndWait(any()) }
+    }
+
+    @Test
     fun `stats maps process counters to EngineStats`() = runTest {
         val engine = buildEngine()
         val process = mockk<ISingboxEngineProcess>()
