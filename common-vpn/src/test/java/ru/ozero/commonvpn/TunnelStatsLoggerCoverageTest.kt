@@ -209,6 +209,42 @@ class TunnelStatsLoggerCoverageTest {
     }
 
     @Test
+    fun `start rebases session baseline when raw counters reset below previous sample`() = runTest {
+        val scope = backgroundScope
+        val controller = connectedController()
+        val logger = logger(scope = scope, controller = controller, iface = "tun0")
+        mockkObject(TunInterfaceStats)
+        every { TunInterfaceStats.readTunStats("tun0") } returnsMany listOf(
+            TunInterfaceStats.Snapshot(rxBytes = 0, txBytes = 0),
+            TunInterfaceStats.Snapshot(rxBytes = 10_000_000, txBytes = 12_000_000),
+            TunInterfaceStats.Snapshot(rxBytes = 100, txBytes = 120),
+            TunInterfaceStats.Snapshot(rxBytes = 300, txBytes = 420),
+        )
+
+        try {
+            logger.start()
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+            assertEquals(0, controller.stats.value?.rxBytes)
+            assertEquals(0, controller.stats.value?.txBytes)
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+            assertEquals(10_000_000, controller.stats.value?.rxBytes)
+            assertEquals(12_000_000, controller.stats.value?.txBytes)
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+            assertEquals(10_000_000, controller.stats.value?.rxBytes)
+            assertEquals(12_000_000, controller.stats.value?.txBytes)
+            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
+            runCurrent()
+            assertEquals(10_000_200, controller.stats.value?.rxBytes)
+            assertEquals(12_000_300, controller.stats.value?.txBytes)
+        } finally {
+            stopLogger(logger)
+        }
+    }
+
+    @Test
     fun `start rebases session baseline when stats source changes`() = runTest {
         val scope = backgroundScope
         val controller = connectedController()
