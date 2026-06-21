@@ -82,6 +82,9 @@ class SingboxEngine @Inject constructor(
     @Volatile
     private var cachedDnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS
 
+    @Volatile
+    private var cachedIpv6Enabled: Boolean = false
+
     init {
         engineScope.launch {
             dataStore.data.collect { prefs ->
@@ -580,7 +583,7 @@ class SingboxEngine @Inject constructor(
         blocking = false,
         ipv4Address = "172.19.0.1",
         ipv4PrefixLength = 30,
-        dnsServers = cachedDnsServers.ifEmpty { EngineConfig.Singbox.DEFAULT_DNS_SERVERS },
+        dnsServers = effectiveDnsServers(),
         allowFamilyV4 = true,
         allowFamilyV6 = true,
         ipv6Address = "fdfe:dcba:9876::1",
@@ -588,6 +591,14 @@ class SingboxEngine @Inject constructor(
         routeAllV4 = true,
         routeAllV6 = true,
     )
+
+    private fun effectiveDnsServers(): List<String> =
+        cachedDnsServers
+            .ifEmpty { EngineConfig.Singbox.DEFAULT_DNS_SERVERS }
+            .filter { cachedIpv6Enabled || !it.isPlainIpv6Address() }
+
+    private fun String.isPlainIpv6Address(): Boolean =
+        ':' in this && !startsWith("https://") && !startsWith("tls://")
 
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
         val port = activeSocksPort.takeIf { it > 0 }
@@ -599,6 +610,8 @@ class SingboxEngine @Inject constructor(
     }
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
+        val ipv6Enabled = settings?.ipv6Enabled ?: false
+        cachedIpv6Enabled = ipv6Enabled
         if (cachedSelectedProfileId == SELECTED_AUTO) {
             val blobs = cachedAutoBlobs.ifEmpty {
                 runBlocking(Dispatchers.IO) {
@@ -612,7 +625,7 @@ class SingboxEngine @Inject constructor(
                 protocolType = PROTOCOL_AUTO_SELECT,
                 autoSelectBeanBlobs = blobs,
                 dnsServers = cachedDnsServers,
-                ipv6Enabled = settings?.ipv6Enabled ?: false,
+                ipv6Enabled = ipv6Enabled,
             )
         }
         val selectedProfile = cachedSelectedProfileId
@@ -629,7 +642,7 @@ class SingboxEngine @Inject constructor(
             protocolType = type,
             chainBeanBlobs = chainWrapperBlobs(cachedSelectedProfileId),
             dnsServers = cachedDnsServers,
-            ipv6Enabled = settings?.ipv6Enabled ?: false,
+            ipv6Enabled = ipv6Enabled,
         )
     }
 
