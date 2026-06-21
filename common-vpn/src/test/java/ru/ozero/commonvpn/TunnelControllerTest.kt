@@ -293,6 +293,74 @@ class TunnelControllerStatsTest : TunnelControllerTestBase() {
     }
 
     @Test
+    fun connectedStatsAreSessionRelativeWhenRawCountersAreCumulative() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.updateStats(
+            TunnelStats(
+                txPackets = 10, txBytes = 1_000, rxPackets = 20, rxBytes = 5_000,
+                timestampMs = 1000,
+            ),
+        )
+        controller.updateStats(
+            TunnelStats(
+                txPackets = 13, txBytes = 1_250, rxPackets = 27, rxBytes = 5_750,
+                timestampMs = 2000,
+            ),
+        )
+
+        val snapshot = controller.stats.value
+        assertNotNull(snapshot)
+        assertEquals(250L, snapshot.txBytes)
+        assertEquals(750L, snapshot.rxBytes)
+        assertEquals(3L, snapshot.txPackets)
+        assertEquals(7L, snapshot.rxPackets)
+    }
+
+    @Test
+    fun newConnectionResetsSessionTrafficBaseline() {
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.updateStats(
+            TunnelStats(
+                txPackets = 0, txBytes = 1_000, rxPackets = 0, rxBytes = 2_000,
+                timestampMs = 1000,
+            ),
+        )
+        controller.updateStats(
+            TunnelStats(
+                txPackets = 0, txBytes = 1_100, rxPackets = 0, rxBytes = 2_200,
+                timestampMs = 2000,
+            ),
+        )
+        controller.onDisconnecting()
+        controller.reset()
+
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+        controller.updateStats(
+            TunnelStats(
+                txPackets = 0, txBytes = 1_100, rxPackets = 0, rxBytes = 2_200,
+                timestampMs = 3000,
+            ),
+        )
+        controller.updateStats(
+            TunnelStats(
+                txPackets = 0, txBytes = 1_130, rxPackets = 0, rxBytes = 2_260,
+                timestampMs = 4000,
+            ),
+        )
+
+        val snapshot = controller.stats.value
+        assertNotNull(snapshot)
+        assertEquals(30L, snapshot.txBytes)
+        assertEquals(60L, snapshot.rxBytes)
+    }
+
+    @Test
     fun onEngineStartedSetsSessionStartMs() {
         controller.onProbing()
         controller.onConnecting(EngineId.BYEDPI)

@@ -20,6 +20,8 @@ class TunnelController(
     val state: StateFlow<TunnelState> = _state.asStateFlow()
     private val _stats = MutableStateFlow<TunnelStats?>(null)
     val stats: StateFlow<TunnelStats?> = _stats.asStateFlow()
+    private val _rawStats = MutableStateFlow<TunnelStats?>(null)
+    val rawStats: StateFlow<TunnelStats?> = _rawStats.asStateFlow()
     private val _stagnant = MutableStateFlow(false)
     val stagnant: StateFlow<Boolean> = _stagnant.asStateFlow()
     private val _killswitchActive = MutableStateFlow(false)
@@ -32,6 +34,7 @@ class TunnelController(
     private var prevTxBytes: Long = 0L
     private var prevRxBytes: Long = 0L
     private var prevTimestampMs: Long = 0L
+    private var sessionBaseline: TunnelStats? = null
     private var smoothedBpsIn: Double = 0.0
     private var smoothedBpsOut: Double = 0.0
 
@@ -48,6 +51,7 @@ class TunnelController(
         prevTxBytes = 0L
         prevRxBytes = 0L
         prevTimestampMs = 0L
+        sessionBaseline = null
         smoothedBpsIn = 0.0
         smoothedBpsOut = 0.0
         stagnationMonitor.reset()
@@ -103,12 +107,14 @@ class TunnelController(
 
     fun reset() {
         _stats.value = null
+        _rawStats.value = null
         _stagnant.value = false
         _killswitchActive.value = false
         sessionStartMs = 0L
         prevTxBytes = 0L
         prevRxBytes = 0L
         prevTimestampMs = 0L
+        sessionBaseline = null
         smoothedBpsIn = 0.0
         smoothedBpsOut = 0.0
         stagnationMonitor.reset()
@@ -133,13 +139,25 @@ class TunnelController(
             prevTxBytes = raw.txBytes
             prevRxBytes = raw.rxBytes
             prevTimestampMs = raw.timestampMs
-            _stats.value = raw.copy(
+            val isConnected = _state.value is TunnelState.Connected
+            _rawStats.value = raw
+            val normalized = if (isConnected) {
+                val baseline = sessionBaseline ?: raw.also { sessionBaseline = it }
+                raw.copy(
+                    txPackets = (raw.txPackets - baseline.txPackets).coerceAtLeast(0L),
+                    txBytes = (raw.txBytes - baseline.txBytes).coerceAtLeast(0L),
+                    rxPackets = (raw.rxPackets - baseline.rxPackets).coerceAtLeast(0L),
+                    rxBytes = (raw.rxBytes - baseline.rxBytes).coerceAtLeast(0L),
+                )
+            } else {
+                raw
+            }
+            _stats.value = normalized.copy(
                 bpsIn = smoothedBpsIn,
                 bpsOut = smoothedBpsOut,
                 sessionStartMs = sessionStartMs,
             )
-            val isConnected = _state.value is TunnelState.Connected
-            val newlyStagnant = isConnected && stagnationMonitor.observe(raw.txBytes, raw.rxBytes)
+            val newlyStagnant = isConnected && stagnationMonitor.observe(normalized.txBytes, normalized.rxBytes)
             if (newlyStagnant != _stagnant.value) {
                 _stagnant.value = newlyStagnant
                 if (newlyStagnant) {

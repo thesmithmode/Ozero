@@ -71,7 +71,7 @@ jobs:
 
       - name: Cache libhev-ozero-socks5-tunnel.so jniLibs
         id: libhev-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: common-vpn/src/main/jniLibs/arm64-v8a/libhev-ozero-socks5-tunnel.so
           key: libhev-ozero-2.7.0-ndk-r27c-platform-android-24-pkgname-hev-16kb-arm64-v1

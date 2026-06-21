@@ -10,7 +10,17 @@ import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-private data class TunnelStatsReadResult(val rxBytes: Long, val txBytes: Long, val source: String)
+private data class TunnelStatsReadResult(val rxBytes: Long, val txBytes: Long, val source: String) {
+    fun shouldRebaseFrom(
+        baseline: TunnelStatsReadResult?,
+        previousBySource: TunnelStatsReadResult?,
+    ): Boolean = baseline == null || hasNewSource(baseline) || hasLowerCounterThan(previousBySource)
+
+    private fun hasNewSource(baseline: TunnelStatsReadResult): Boolean = source != baseline.source
+
+    private fun hasLowerCounterThan(previousBySource: TunnelStatsReadResult?): Boolean =
+        previousBySource != null && (rxBytes < previousBySource.rxBytes || txBytes < previousBySource.txBytes)
+}
 
 class TunnelStatsLogger(
     private val scope: CoroutineScope,
@@ -28,6 +38,10 @@ class TunnelStatsLogger(
             var prevTx = 0L
             var prevRx = 0L
             var tickCount = 0
+            var sessionBaseline: TunnelStatsReadResult? = null
+            val previousReadsBySource = mutableMapOf<String, TunnelStatsReadResult>()
+            var carriedRxBytes = 0L
+            var carriedTxBytes = 0L
             try {
                 while (true) {
                     delay(STATS_SAMPLE_INTERVAL_MS)
@@ -52,14 +66,27 @@ class TunnelStatsLogger(
                     val rxBytes = read.rxBytes
                     val txBytes = read.txBytes
                     val source = read.source
+                    val previousBySource = previousReadsBySource[source]
+                    val baseline = sessionBaseline
+                    val effectiveBaseline = if (read.shouldRebaseFrom(baseline, previousBySource)) {
+                        val currentStats = tunnelController.stats.value
+                        carriedRxBytes = currentStats?.rxBytes ?: 0L
+                        carriedTxBytes = currentStats?.txBytes ?: 0L
+                        read.also { sessionBaseline = it }
+                    } else {
+                        requireNotNull(baseline)
+                    }
+                    val normalizedRxBytes = carriedRxBytes + rxBytes - effectiveBaseline.rxBytes
+                    val normalizedTxBytes = carriedTxBytes + txBytes - effectiveBaseline.txBytes
                     val snapshot = TunnelStats(
                         txPackets = 0L,
-                        txBytes = txBytes,
+                        txBytes = normalizedTxBytes,
                         rxPackets = 0L,
-                        rxBytes = rxBytes,
+                        rxBytes = normalizedRxBytes,
                         timestampMs = System.currentTimeMillis(),
                     )
                     tunnelController.updateStats(snapshot)
+                    previousReadsBySource[source] = read
                     tickCount++
                     if (tickCount % STATS_NOTIFY_EVERY == 0 && !stopSignal.get()) {
                         tunnelController.stats.value?.let { stats ->

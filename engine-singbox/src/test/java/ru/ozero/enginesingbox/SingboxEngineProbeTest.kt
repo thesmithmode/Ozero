@@ -165,6 +165,24 @@ class SingboxEngineProbeTest {
     }
 
     @Test
+    fun `start proxy mode clears stale tun auto select flag before awaitReady`() = runTest {
+        val engine = buildEngine()
+        engine.setPrivateField("activeTunAutoSelect", true)
+
+        val result = engine.start(
+            EngineConfig.Singbox(
+                beanBlob = makeVlessBlob(),
+                protocolType = SingboxEngine.PROTOCOL_VLESS,
+                proxyMode = true,
+            ),
+            Upstream.None,
+        )
+
+        assertIs<StartResult.Failure>(result)
+        assertEquals(false, engine.privateBooleanField("activeTunAutoSelect"))
+    }
+
+    @Test
     fun `start proxy mode fails before binding when selected blob is invalid`() = runTest {
         val engine = buildEngine()
 
@@ -191,6 +209,7 @@ class SingboxEngineProbeTest {
         engine.setPrivateField("pendingSocksPort", 49408)
         engine.setPrivateField("activeSocksPort", 49409)
         engine.setPrivateField("chainMode", true)
+        engine.setPrivateField("activeTunAutoSelect", true)
 
         engine.stop()
 
@@ -198,6 +217,7 @@ class SingboxEngineProbeTest {
         assertEquals(0, engine.privateIntField("activeSocksPort"))
         assertEquals(null, engine.privateField("pendingConfig"))
         assertEquals(false, engine.privateField("chainMode"))
+        assertEquals(false, engine.privateBooleanField("activeTunAutoSelect"))
         assertEquals(null, engine.privateField("proxy"))
     }
 
@@ -374,6 +394,23 @@ class SingboxEngineProbeTest {
     }
 
     @Test
+    fun `awaitReady keeps auto select runtime ready when routed probe is still warming up`() = runTest {
+        val engine = buildEngine()
+        engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.runtimeRunning() } returns true
+        engine.setPrivateField("proxy", process)
+        engine.setPrivateField("activeSocksPort", 49408)
+        engine.setPrivateField("activeAutoSelect", true)
+
+        val result = engine.awaitReady()
+
+        assertIs<EnginePlugin.ReadyResult.Ready>(result)
+        assertEquals(49408, engine.privateIntField("activeSocksPort"))
+        assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
+    }
+
+    @Test
     fun `awaitReady retries transient routed probe failures without clearing active port`() = runTest {
         val engine = buildEngine()
         var calls = 0
@@ -518,6 +555,12 @@ class SingboxEngineProbeTest {
         val field = javaClass.getDeclaredField(name)
         field.isAccessible = true
         return field.getInt(this)
+    }
+
+    private fun SingboxEngine.privateBooleanField(name: String): Boolean {
+        val field = javaClass.getDeclaredField(name)
+        field.isAccessible = true
+        return field.getBoolean(this)
     }
 
     private fun SingboxEngine.privateField(name: String): Any? {
