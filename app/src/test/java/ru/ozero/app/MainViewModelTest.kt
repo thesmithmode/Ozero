@@ -334,6 +334,26 @@ class MainViewModelTest {
     }
 
     @Test
+    fun speedHistoryRestoredAfterViewModelRecreatedDuringConnectedSession() = runTest {
+        val sample = TunnelStats(txPackets = 1, txBytes = 100, rxPackets = 2, rxBytes = 200, timestampMs = 1)
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        tunnelController.updateStats(sample)
+        advanceUntilIdle()
+        val historyBeforeRecreate = viewModel.speedHistory.value
+        assertTrue(historyBeforeRecreate.isNotEmpty())
+
+        val recreated = newViewModel()
+        advanceUntilIdle()
+
+        assertTrue(
+            recreated.speedHistory.value.containsAll(historyBeforeRecreate),
+            "speedHistory должна восстанавливаться при пересоздании MainViewModel во время активной сессии",
+        )
+    }
+
+    @Test
     fun speedHistoryClearedWhenNotSwitching() = runTest {
         val sample = TunnelStats(txPackets = 1, txBytes = 100, rxPackets = 2, rxBytes = 200, timestampMs = 1)
         tunnelController.onProbing()

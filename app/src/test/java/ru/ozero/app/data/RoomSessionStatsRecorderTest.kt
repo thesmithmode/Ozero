@@ -131,5 +131,9 @@ class RoomSessionStatsRecorderTest {
         override fun observeAll(): Flow<List<SessionStatsEntity>> = emptyFlow()
 
         override suspend fun deleteOlderThan(olderThan: Long): Int = 0
+
+        override suspend fun deleteById(id: Long): Int = 0
+
+        override suspend fun deleteCompleted(): Int = 0
     }
 }

@@ -59,4 +59,10 @@ interface SessionStatsDao {
 
     @Query("DELETE FROM session_stats WHERE startedAt < :olderThan")
     suspend fun deleteOlderThan(olderThan: Long): Int
+
+    @Query("DELETE FROM session_stats WHERE id = :id")
+    suspend fun deleteById(id: Long): Int
+
+    @Query("DELETE FROM session_stats WHERE endedAt IS NOT NULL")
+    suspend fun deleteCompleted(): Int
 }

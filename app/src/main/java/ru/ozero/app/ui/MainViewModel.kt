@@ -280,21 +280,17 @@ class MainViewModel @Inject constructor(
     )
 
     init {
+        restoreSpeedHistory()
         viewModelScope.launch {
-            var lastRecordMs = 0L
             tunnelController.stats.collect { s ->
                 if (s != null) {
                     val now = System.currentTimeMillis()
-                    if (now - lastRecordMs >= SPEED_SAMPLE_INTERVAL_MS) {
-                        lastRecordMs = now
-                        val prev = _speedHistory.value
-                        _speedHistory.value = (prev + SpeedSample(now, s.bpsIn.toFloat(), s.bpsOut.toFloat()))
-                            .takeLast(MAX_SPEED_HISTORY_POINTS)
-                    }
+                    appendSpeedSample(now, s.bpsIn.toFloat(), s.bpsOut.toFloat())
                 } else {
                     val switchingNow = tunnelController.switching.value != null
                     if (!switchingNow && _speedHistory.value.isNotEmpty()) {
                         _speedHistory.value = emptyList()
+                        cacheSpeedHistory(0L, emptyList())
                     }
                 }
             }
@@ -341,6 +337,38 @@ class MainViewModel @Inject constructor(
                 resolveOnce(engineId = null, socksPort = 0)
             }
         }
+    }
+
+    private fun restoreSpeedHistory() {
+        val stats = tunnelController.stats.value ?: return
+        if (stats.sessionStartMs <= 0L) return
+        val cached = synchronized(speedHistoryLock) {
+            if (cachedSpeedHistorySessionStartMs == stats.sessionStartMs) cachedSpeedHistory else emptyList()
+        }
+        val restored = cached.ifEmpty { buildSpeedHistoryFromSessionTotals(stats, System.currentTimeMillis()) }
+        if (restored.isNotEmpty()) {
+            _speedHistory.value = restored.takeLast(MAX_SPEED_HISTORY_POINTS)
+        }
+    }
+
+    private fun appendSpeedSample(now: Long, rxBps: Float, txBps: Float) {
+        val sessionStartMs = tunnelController.stats.value?.sessionStartMs ?: 0L
+        val prev = _speedHistory.value
+        val tail = prev.lastOrNull()
+        val gapFill = if (tail == null || now - tail.tsMs <= SPEED_SAMPLE_INTERVAL_MS) {
+            emptyList()
+        } else {
+            val oldestKeptTs = now -
+                (MAX_SPEED_HISTORY_POINTS - 1L) * SPEED_SAMPLE_INTERVAL_MS
+            val gapStart = maxOf(tail.tsMs + SPEED_SAMPLE_INTERVAL_MS, oldestKeptTs)
+            generateSequence(gapStart) { it + SPEED_SAMPLE_INTERVAL_MS }
+                .takeWhile { it < now }
+                .map { SpeedSample(it, tail.rxBps, tail.txBps) }
+                .toList()
+        }
+        val next = (prev + gapFill + SpeedSample(now, rxBps, txBps)).takeLast(MAX_SPEED_HISTORY_POINTS)
+        _speedHistory.value = next
+        cacheSpeedHistory(sessionStartMs, next)
     }
 
     private suspend fun resolveIpInfoWithRetry(engineId: EngineId, socksPort: Int): IpInfoState {
@@ -412,5 +440,30 @@ class MainViewModel @Inject constructor(
         const val IP_INFO_RETRY_DELAY_MS = 1_500L
         const val URNETWORK_LOCATION_POLL_MS = 4_000L
         val DEGRADATION_TRACKED_ENGINES = setOf(EngineId.WARP, EngineId.URNETWORK)
+        val speedHistoryLock = Any()
+        var cachedSpeedHistorySessionStartMs = 0L
+        var cachedSpeedHistory: List<SpeedSample> = emptyList()
+
+        fun cacheSpeedHistory(sessionStartMs: Long, history: List<SpeedSample>) {
+            synchronized(speedHistoryLock) {
+                cachedSpeedHistorySessionStartMs = sessionStartMs
+                cachedSpeedHistory = history
+            }
+        }
+
+        fun buildSpeedHistoryFromSessionTotals(stats: TunnelStats, now: Long): List<SpeedSample> {
+            val sessionStartMs = stats.sessionStartMs
+            if (sessionStartMs <= 0L || now <= sessionStartMs) return emptyList()
+            val durationMs = now - sessionStartMs
+            val pointCount = (durationMs / SPEED_SAMPLE_INTERVAL_MS)
+                .coerceIn(1L, MAX_SPEED_HISTORY_POINTS.toLong())
+                .toInt()
+            val firstTs = (now - (pointCount - 1L) * SPEED_SAMPLE_INTERVAL_MS).coerceAtLeast(sessionStartMs)
+            val rxBps = stats.rxBytes * 1000f / durationMs
+            val txBps = stats.txBytes * 1000f / durationMs
+            return List(pointCount) { i ->
+                SpeedSample(firstTs + i * SPEED_SAMPLE_INTERVAL_MS, rxBps, txBps)
+            }
+        }
     }
 }
