@@ -122,7 +122,7 @@ class FmtBranchCoverageTest {
         V2RayFmtUtils.parseSecurityParams(bean, parsed)
         V2RayFmtUtils.parseTransportParams(bean, parsed)
 
-        assertEquals("tls", bean.security)
+        assertEquals("reality", bean.security)
         assertEquals("sni", bean.sni)
         assertEquals("h2", bean.alpn)
         assertEquals("chrome", bean.utlsFingerprint)
