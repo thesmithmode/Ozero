@@ -21,8 +21,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -174,6 +177,8 @@ fun TrafficStatsScreen(
                     sort = sessionSort,
                     onToggle = { viewModel.setSessionsExpanded(!sessionsExpanded) },
                     onSortSelect = viewModel::setSessionSort,
+                    onDeleteSession = viewModel::deleteSession,
+                    onClearSessions = viewModel::clearSessions,
                 )
             }
             item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -454,7 +459,10 @@ private fun SessionsDrillDown(
     sort: SessionSort,
     onToggle: () -> Unit,
     onSortSelect: (SessionSort) -> Unit,
+    onDeleteSession: (Long) -> Unit,
+    onClearSessions: () -> Unit,
 ) {
+    var showClearConfirm by remember { mutableStateOf(false) }
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -479,16 +487,55 @@ private fun SessionsDrillDown(
                 )
             }
             if (expanded) {
-                SessionSortMenu(current = sort, onSelect = onSortSelect)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (sessions.isNotEmpty()) {
+                        IconButton(
+                            onClick = { showClearConfirm = true },
+                            modifier = Modifier.testTag("clear_sessions"),
+                        ) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = stringResource(R.string.stats_history_clear_cd),
+                            )
+                        }
+                    }
+                    SessionSortMenu(current = sort, onSelect = onSortSelect)
+                }
             }
         }
         AnimatedVisibility(visible = expanded) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 sessions.forEach { session ->
-                    SessionCard(session)
+                    SessionCard(
+                        session = session,
+                        onDelete = { onDeleteSession(session.id) },
+                    )
                 }
             }
         }
+    }
+    if (showClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirm = false },
+            title = { Text(stringResource(R.string.stats_history_clear_title)) },
+            text = { Text(stringResource(R.string.stats_history_clear_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearConfirm = false
+                        onClearSessions()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = OzeroPalette.StateDanger),
+                ) {
+                    Text(stringResource(R.string.stats_history_clear_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirm = false }) {
+                    Text(stringResource(R.string.stats_history_clear_cancel))
+                }
+            },
+        )
     }
 }
 
@@ -524,7 +571,10 @@ private fun SessionSortMenu(current: SessionSort, onSelect: (SessionSort) -> Uni
 }
 
 @Composable
-private fun SessionCard(session: SessionStatsEntity) {
+private fun SessionCard(
+    session: SessionStatsEntity,
+    onDelete: () -> Unit,
+) {
     val dateFormat = remember { SimpleDateFormat("dd.MM HH:mm", Locale.getDefault()) }
     val started = dateFormat.format(Date(session.startedAt))
     val durationStr = BytesFormatter.durationHms(session.durationMs)
@@ -536,18 +586,34 @@ private fun SessionCard(session: SessionStatsEntity) {
             .testTag("session_card"),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Column(
+        Row(
             modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "$started · ${session.engineId} · $durationStr",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = stringResource(R.string.stats_history_traffic, rxStr, txStr),
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = "$started · ${session.engineId} · $durationStr",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    text = stringResource(R.string.stats_history_traffic, rxStr, txStr),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.testTag("delete_session_${session.id}"),
+            ) {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = stringResource(R.string.stats_history_delete_cd),
+                    tint = OzeroPalette.StateDanger,
+                )
+            }
         }
     }
 }
