@@ -895,7 +895,7 @@ class EngineRuntimeConfigRestartObserverTest {
         val fingerprint = provider.changes.first()
 
         assertEquals(
-            listOf(1L, byteArrayOf(9).contentHashCode(), emptyList<Pair<Long, Int>>()),
+            listOf(1L, byteArrayOf(9).contentHashCode(), emptyList<Pair<Long, Int>>(), emptyList<String>()),
             fingerprint,
         )
     }

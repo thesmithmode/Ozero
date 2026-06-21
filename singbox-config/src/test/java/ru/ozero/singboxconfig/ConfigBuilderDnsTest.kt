@@ -67,14 +67,14 @@ class ConfigBuilderDnsTest {
     }
 
     @Test
-    fun `chain hostname secure DNS resolver keeps proxy detour`() {
+    fun `chain hostname secure DNS resolver uses direct bootstrap DNS`() {
         val json = ConfigBuilder.buildChainConfig(bean(), socksPort = 2080, dnsServers = listOf("tls://dns.example"))
 
         assertContains(json, "\"domain_resolver\":\"dns-domain-resolver\"")
         assertContains(json, "\"tag\":\"dns-domain-resolver\"")
         assertContains(json, "\"type\":\"udp\"")
         assertContains(json, "\"server\":\"9.9.9.9\"")
-        assertContains(json, "\"detour\":\"proxy\"")
+        assertFalse(json.contains("\"detour\":\"proxy\""))
     }
 
     @Test
@@ -94,12 +94,12 @@ class ConfigBuilderDnsTest {
     }
 
     @Test
-    fun `chain DNS routes plain DNS through proxy detour`() {
+    fun `chain DNS routes plain DNS directly for bootstrap`() {
         val json = ConfigBuilder.buildChainConfig(bean(), socksPort = 2080, dnsServers = listOf("8.8.8.8"))
 
         assertContains(json, "\"type\":\"udp\"")
         assertContains(json, "\"server\":\"8.8.8.8\"")
-        assertContains(json, "\"detour\":\"proxy\"")
+        assertFalse(json.contains("\"detour\":\"proxy\""))
         assertFalse(json.contains("\"address\""))
         assertFalse(json.contains("legacy DoH fallback"))
     }
