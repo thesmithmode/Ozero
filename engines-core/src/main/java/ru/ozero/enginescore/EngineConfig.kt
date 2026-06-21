@@ -14,34 +14,6 @@ sealed class EngineConfig {
         override val engineId = EngineId.BYEDPI
     }
 
-    data class Xray(
-        val configJson: String,
-        val socksPort: Int = 10808,
-    ) : EngineConfig() {
-        override val engineId = EngineId.XRAY
-    }
-
-    data class Hysteria2(
-        val configJson: String,
-        val socksPort: Int = 10809,
-    ) : EngineConfig() {
-        override val engineId = EngineId.HYSTERIA2
-    }
-
-    data class Tor(
-        val bridges: List<String> = emptyList(),
-        val socksPort: Int = 9050,
-    ) : EngineConfig() {
-        override val engineId = EngineId.TOR
-    }
-
-    data class Naive(
-        val proxyUrl: String,
-        val socksPort: Int = 1080,
-    ) : EngineConfig() {
-        override val engineId = EngineId.NAIVE
-    }
-
     data class Urnetwork(
         val jwtToken: String,
         val apiUrl: String = "https://api.urnetwork.com",

@@ -15,7 +15,7 @@ class ChainOrchestratorTimeoutAndCancellationTest {
     @Test
     fun `stop timeout keeps orchestrator usable for future starts`() = runTest {
         val slow = SlowStopPlugin(EngineId.BYEDPI)
-        val next = SimplePlugin(EngineId.XRAY)
+        val next = SimplePlugin(EngineId.FPTN)
         val orch = ChainOrchestrator(setOf(slow, next))
 
         assertIs<ChainResult.Success>(
@@ -23,7 +23,7 @@ class ChainOrchestratorTimeoutAndCancellationTest {
         )
         orch.stop()
         assertIs<ChainResult.Success>(
-            orch.start(listOf(ChainStep(EngineId.XRAY, EngineConfig.Xray(configJson = "{}", socksPort = 10808)))),
+            orch.start(listOf(ChainStep(EngineId.FPTN, EngineConfig.Fptn()))),
         )
         assertEquals(1, next.startCount)
         assertEquals(1, slow.stopCount)
@@ -43,14 +43,14 @@ class ChainOrchestratorTimeoutAndCancellationTest {
     @Test
     fun `cancellation during start rolls back already started engines`() = runTest {
         val started = SimplePlugin(EngineId.BYEDPI)
-        val cancelling = CancellingStartPlugin(EngineId.XRAY)
+        val cancelling = CancellingStartPlugin(EngineId.FPTN)
         val orch = ChainOrchestrator(setOf(started, cancelling))
 
         assertFailsWith<CancellationException> {
             orch.start(
                 listOf(
                     ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080)),
-                    ChainStep(EngineId.XRAY, EngineConfig.Xray(configJson = "{}", socksPort = 10808)),
+                    ChainStep(EngineId.FPTN, EngineConfig.Fptn()),
                 ),
             )
         }

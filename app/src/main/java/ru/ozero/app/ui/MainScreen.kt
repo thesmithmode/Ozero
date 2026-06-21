@@ -883,10 +883,6 @@ internal fun probingLabelRes(engineId: EngineId?, isReconnecting: Boolean): Int 
         EngineId.BYEDPI -> R.string.main_status_connecting
         EngineId.URNETWORK -> R.string.main_status_probing
         EngineId.MASTERDNS -> R.string.main_status_probing
-        EngineId.XRAY,
-        EngineId.HYSTERIA2,
-        EngineId.NAIVE,
-        EngineId.TOR -> R.string.main_status_connecting
         EngineId.FPTN -> R.string.main_status_probing
         EngineId.SINGBOX -> R.string.main_status_connecting
     }

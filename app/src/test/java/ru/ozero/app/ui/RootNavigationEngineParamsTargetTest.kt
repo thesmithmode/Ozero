@@ -19,14 +19,6 @@ class RootNavigationEngineParamsTargetTest {
         assertEquals(TopScreen.SingboxSettings, target(EngineId.SINGBOX))
     }
 
-    @Test
-    fun `engine params target keeps stub engines on servers screen`() {
-        val target = engineParamsTarget()
-
-        assertEquals(TopScreen.Servers, target(EngineId.XRAY))
-        assertEquals(TopScreen.Servers, target(EngineId.TOR))
-    }
-
     @Suppress("UNCHECKED_CAST")
     private fun engineParamsTarget(): (EngineId?) -> TopScreen {
         val method = Class.forName("ru.ozero.app.ui.RootNavigationKt")

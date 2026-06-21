@@ -31,18 +31,18 @@ class ChainOrchestratorTest {
     @Test
     fun start_twoSteps_secondReceivesUpstreamFromFirst() = runTest {
         val byedpi = FakePlugin(EngineId.BYEDPI, listOf(StartResult.Success(socksPort = 1080)))
-        val xray = FakePlugin(EngineId.XRAY, listOf(StartResult.Success(socksPort = 10808)))
-        val orch = ChainOrchestrator(setOf(byedpi, xray))
+        val fptn = FakePlugin(EngineId.FPTN, listOf(StartResult.Success(socksPort = 10808)))
+        val orch = ChainOrchestrator(setOf(byedpi, fptn))
         val r = orch.start(
             listOf(
                 ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080)),
-                ChainStep(EngineId.XRAY, EngineConfig.Xray(configJson = "{}", socksPort = 10808)),
+                ChainStep(EngineId.FPTN, EngineConfig.Fptn()),
             ),
         )
         assertIs<ChainResult.Success>(r)
         assertEquals(10808, r.finalSocksPort)
         assertEquals(Upstream.None, byedpi.startCalls[0].second)
-        assertEquals(Upstream.Socks5(host = "127.0.0.1", port = 1080), xray.startCalls[0].second)
+        assertEquals(Upstream.Socks5(host = "127.0.0.1", port = 1080), fptn.startCalls[0].second)
     }
 
     @Test
@@ -52,7 +52,7 @@ class ChainOrchestratorTest {
         val r = orch.start(
             listOf(
                 ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080)),
-                ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", socksPort = 10808)),
+                ChainStep(EngineId.FPTN, EngineConfig.Fptn()),
             ),
         )
         assertIs<ChainResult.Failure>(r)
@@ -64,35 +64,35 @@ class ChainOrchestratorTest {
     @Test
     fun start_secondStepFails_firstRolledBack() = runTest {
         val byedpi = FakePlugin(EngineId.BYEDPI, listOf(StartResult.Success(socksPort = 1080)))
-        val xray = FakePlugin(EngineId.XRAY, listOf(StartResult.Failure(reason = "xray no candidates")))
-        val orch = ChainOrchestrator(setOf(byedpi, xray))
+        val fptn = FakePlugin(EngineId.FPTN, listOf(StartResult.Failure(reason = "fptn no candidates")))
+        val orch = ChainOrchestrator(setOf(byedpi, fptn))
         val r = orch.start(
             listOf(
                 ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080)),
-                ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", socksPort = 10808)),
+                ChainStep(EngineId.FPTN, EngineConfig.Fptn()),
             ),
         )
         assertIs<ChainResult.Failure>(r)
         assertEquals(1, r.failedAtIndex)
-        assertEquals("xray no candidates", r.reason)
+        assertEquals("fptn no candidates", r.reason)
         assertEquals(1, byedpi.stopCalls)
-        assertEquals(0, xray.stopCalls)
+        assertEquals(0, fptn.stopCalls)
     }
 
     @Test
     fun start_engineThrows_returnsFailureWithMessage() = runTest {
         val a = FakePlugin(EngineId.BYEDPI, listOf(StartResult.Success(socksPort = 1080)))
-        val b = ThrowingPlugin(EngineId.XRAY, IllegalStateException("xray boom"))
+        val b = ThrowingPlugin(EngineId.FPTN, IllegalStateException("fptn boom"))
         val orch = ChainOrchestrator(setOf(a, b))
         val r = orch.start(
             listOf(
                 ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080)),
-                ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", socksPort = 10808)),
+                ChainStep(EngineId.FPTN, EngineConfig.Fptn()),
             ),
         )
         assertIs<ChainResult.Failure>(r)
         assertEquals(1, r.failedAtIndex)
-        assertTrue(r.reason.contains("xray boom"))
+        assertTrue(r.reason.contains("fptn boom"))
     }
 
     @Test
@@ -103,26 +103,26 @@ class ChainOrchestratorTest {
             listOf(StartResult.Success(socksPort = 1080)),
             onStop = { callOrder.add(EngineId.BYEDPI) },
         )
-        val xray = FakePlugin(
-            EngineId.XRAY,
+        val fptn = FakePlugin(
+            EngineId.FPTN,
             listOf(StartResult.Success(socksPort = 10808)),
-            onStop = { callOrder.add(EngineId.XRAY) },
+            onStop = { callOrder.add(EngineId.FPTN) },
         )
-        val orch = ChainOrchestrator(setOf(byedpi, xray))
+        val orch = ChainOrchestrator(setOf(byedpi, fptn))
         orch.start(
             listOf(
                 ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080)),
-                ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)),
+                ChainStep(EngineId.FPTN, EngineConfig.Fptn()),
             ),
         )
         orch.stop()
-        assertEquals(listOf(EngineId.XRAY, EngineId.BYEDPI), callOrder)
+        assertEquals(listOf(EngineId.FPTN, EngineId.BYEDPI), callOrder)
     }
 
     @Test
     fun start_secondStepNotSupportsUpstream_rejectedAndRolledBack() = runTest {
-        val xray = FakePlugin(
-            EngineId.XRAY,
+        val fptn = FakePlugin(
+            EngineId.FPTN,
             listOf(StartResult.Success(socksPort = 10808)),
             supportsUpstreamSocks = true,
         )
@@ -131,10 +131,10 @@ class ChainOrchestratorTest {
             listOf(StartResult.Success(socksPort = 1080)),
             supportsUpstreamSocks = false,
         )
-        val orch = ChainOrchestrator(setOf(xray, byedpi))
+        val orch = ChainOrchestrator(setOf(fptn, byedpi))
         val r = orch.start(
             listOf(
-                ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)),
+                ChainStep(EngineId.FPTN, EngineConfig.Fptn()),
                 ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080)),
             ),
         )
@@ -142,30 +142,30 @@ class ChainOrchestratorTest {
         assertEquals(1, r.failedAtIndex)
         assertTrue(r.reason.contains("terminal-only"))
         assertEquals(0, byedpi.startCalls.size)
-        assertEquals(1, xray.stopCalls)
+        assertEquals(1, fptn.stopCalls)
     }
 
     @Test
     fun start_supportsUpstreamSocks_secondStepAccepted() = runTest {
-        val xray1 = FakePlugin(
-            EngineId.XRAY,
+        val fptn1 = FakePlugin(
+            EngineId.FPTN,
             listOf(StartResult.Success(socksPort = 10808)),
             supportsUpstreamSocks = true,
         )
-        val xray2 = FakePlugin(
-            EngineId.HYSTERIA2,
+        val fptn2 = FakePlugin(
+            EngineId.SINGBOX,
             listOf(StartResult.Success(socksPort = 10809)),
             supportsUpstreamSocks = true,
         )
-        val orch = ChainOrchestrator(setOf(xray1, xray2))
+        val orch = ChainOrchestrator(setOf(fptn1, fptn2))
         val r = orch.start(
             listOf(
-                ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)),
-                ChainStep(EngineId.HYSTERIA2, EngineConfig.Hysteria2("{}", 10809)),
+                ChainStep(EngineId.FPTN, EngineConfig.Fptn()),
+                ChainStep(EngineId.SINGBOX, EngineConfig.Singbox(byteArrayOf(1), protocolType = 1)),
             ),
         )
         assertIs<ChainResult.Success>(r)
-        assertEquals(Upstream.Socks5("127.0.0.1", 10808), xray2.startCalls[0].second)
+        assertEquals(Upstream.Socks5("127.0.0.1", 10808), fptn2.startCalls[0].second)
     }
 
     @Test
@@ -175,17 +175,17 @@ class ChainOrchestratorTest {
             listOf(StartResult.Success(socksPort = 0)),
             supportsUpstreamSocks = false,
         )
-        val xray = FakePlugin(
-            EngineId.XRAY,
+        val fptn = FakePlugin(
+            EngineId.FPTN,
             listOf(StartResult.Success(socksPort = 10808)),
             supportsUpstreamSocks = true,
         )
-        val orch = ChainOrchestrator(setOf(warp, xray))
+        val orch = ChainOrchestrator(setOf(warp, fptn))
 
         val r = orch.start(
             listOf(
                 ChainStep(EngineId.WARP, EngineConfig.Warp),
-                ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)),
+                ChainStep(EngineId.FPTN, EngineConfig.Fptn()),
             ),
         )
 
@@ -193,7 +193,7 @@ class ChainOrchestratorTest {
         assertEquals(0, r.failedAtIndex)
         assertTrue(r.reason.contains("no local SOCKS port"))
         assertEquals(1, warp.stopCalls)
-        assertEquals(0, xray.startCalls.size)
+        assertEquals(0, fptn.startCalls.size)
     }
 
     @Test
@@ -204,17 +204,17 @@ class ChainOrchestratorTest {
             supportsUpstreamSocks = false,
             providesLocalSocks = false,
         )
-        val xray = FakePlugin(
-            EngineId.XRAY,
+        val fptn = FakePlugin(
+            EngineId.FPTN,
             listOf(StartResult.Success(socksPort = 10808)),
             supportsUpstreamSocks = true,
         )
-        val orch = ChainOrchestrator(setOf(warp, xray))
+        val orch = ChainOrchestrator(setOf(warp, fptn))
 
         val r = orch.start(
             listOf(
                 ChainStep(EngineId.WARP, EngineConfig.Warp),
-                ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)),
+                ChainStep(EngineId.FPTN, EngineConfig.Fptn()),
             ),
         )
 
@@ -223,7 +223,7 @@ class ChainOrchestratorTest {
         assertTrue(r.reason.contains("chain head"))
         assertEquals(0, warp.startCalls.size)
         assertEquals(0, warp.stopCalls)
-        assertEquals(0, xray.startCalls.size)
+        assertEquals(0, fptn.startCalls.size)
     }
 
     @Test
@@ -235,7 +235,7 @@ class ChainOrchestratorTest {
             providesLocalSocksWithoutUpstream = true,
         )
         val tail = FakePlugin(
-            EngineId.XRAY,
+            EngineId.FPTN,
             listOf(StartResult.Success(socksPort = 10808)),
             supportsUpstreamSocks = true,
         )
@@ -244,7 +244,7 @@ class ChainOrchestratorTest {
         val r = orch.start(
             listOf(
                 ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080)),
-                ChainStep(EngineId.XRAY, EngineConfig.Xray("{}", 10808)),
+                ChainStep(EngineId.FPTN, EngineConfig.Fptn()),
             ),
         )
 

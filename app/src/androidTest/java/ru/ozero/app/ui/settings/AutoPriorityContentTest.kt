@@ -1,6 +1,5 @@
 package ru.ozero.app.ui.settings
 
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -18,14 +17,14 @@ class AutoPriorityContentTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun filtersStubEnginesAndDisplaysRealEngines() {
+    fun displaysRealEngines() {
         composeRule.setContent {
             OzeroTheme {
                 AutoPriorityContent(
                     priority = listOf(
-                        EngineId.TOR,
+                        EngineId.FPTN,
                         EngineId.WARP,
-                        EngineId.XRAY,
+                        EngineId.SINGBOX,
                         EngineId.BYEDPI,
                         EngineId.URNETWORK,
                     ),
@@ -41,10 +40,10 @@ class AutoPriorityContentTest {
             .assertIsDisplayed()
         composeRule.onNodeWithTag(SettingsTestTags.AUTO_PRIORITY_ITEM_PREFIX + EngineId.URNETWORK.name)
             .assertIsDisplayed()
-        composeRule.onNodeWithTag(SettingsTestTags.AUTO_PRIORITY_ITEM_PREFIX + EngineId.TOR.name)
-            .assertDoesNotExist()
-        composeRule.onNodeWithTag(SettingsTestTags.AUTO_PRIORITY_ITEM_PREFIX + EngineId.XRAY.name)
-            .assertDoesNotExist()
+        composeRule.onNodeWithTag(SettingsTestTags.AUTO_PRIORITY_ITEM_PREFIX + EngineId.FPTN.name)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(SettingsTestTags.AUTO_PRIORITY_ITEM_PREFIX + EngineId.SINGBOX.name)
+            .assertIsDisplayed()
     }
 
     @Test
