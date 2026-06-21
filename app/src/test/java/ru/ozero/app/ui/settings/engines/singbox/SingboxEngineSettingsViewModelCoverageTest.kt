@@ -988,6 +988,8 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
                 override suspend fun getBuiltins(): List<SubscriptionGroup> = emptyList()
 
+                override suspend fun getProfileIdsByGroupId(groupId: Long): List<Long> = emptyList()
+
                 override suspend fun count(): Int = groupsFlow.value.size
 
                 override suspend fun insert(group: SubscriptionGroup): Long {
