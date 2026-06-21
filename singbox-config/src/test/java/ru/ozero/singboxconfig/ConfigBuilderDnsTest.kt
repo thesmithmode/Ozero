@@ -54,6 +54,19 @@ class ConfigBuilderDnsTest {
     }
 
     @Test
+    fun `secure DNS ports are emitted separately from server`() {
+        val json = ConfigBuilder.buildSingboxConfig(
+            bean(),
+            dnsServers = listOf("tls://1.1.1.1:853", "https://dns.example:8443/dns-query"),
+        )
+
+        assertContains(json, "\"server\":\"1.1.1.1\",\"server_port\":853")
+        assertContains(json, "\"server\":\"dns.example\",\"server_port\":8443")
+        assertFalse(json.contains("1.1.1.1:853"))
+        assertFalse(json.contains("dns.example:8443"))
+    }
+
+    @Test
     fun `chain hostname secure DNS resolver keeps proxy detour`() {
         val json = ConfigBuilder.buildChainConfig(bean(), socksPort = 2080, dnsServers = listOf("tls://dns.example"))
 

@@ -30,6 +30,9 @@ interface SubscriptionGroupDao {
     @Query("SELECT * FROM subscription_groups WHERE isBuiltin = 1 ORDER BY userOrder ASC, id ASC")
     suspend fun getBuiltins(): List<SubscriptionGroup>
 
+    @Query("SELECT id FROM proxy_profiles WHERE groupId = :groupId")
+    suspend fun getProfileIdsByGroupId(groupId: Long): List<Long>
+
     @Update
     suspend fun update(group: SubscriptionGroup)
 
