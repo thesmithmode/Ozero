@@ -127,7 +127,7 @@ class ConfigBuilderVLESSTest {
         val json = ConfigBuilder.buildSingboxConfig(makeBean())
 
         assertContains(json, "\"type\":\"udp\"")
-        assertContains(json, "\"server\":\"1.1.1.1\"")
+        assertContains(json, "\"server\":\"9.9.9.9\"")
     }
 
     @Test

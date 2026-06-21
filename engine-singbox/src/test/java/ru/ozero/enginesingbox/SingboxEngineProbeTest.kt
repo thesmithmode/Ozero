@@ -4,11 +4,15 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.ParcelFileDescriptor
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
+import io.mockk.verify
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -276,6 +280,120 @@ class SingboxEngineProbeTest {
         assertEquals(null, engine.privateField("pendingConfig"))
         assertEquals(0, engine.privateIntField("pendingSocksPort"))
         assertEquals(0, engine.privateIntField("activeSocksPort"))
+    }
+
+    @Test
+    fun `attachTun returns failure and stops runtime when probes fail after runtime starts`() = runTest {
+        mockkStatic(ParcelFileDescriptor::class)
+        try {
+            val engine = buildEngine()
+            engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
+            val process = mockk<ISingboxEngineProcess>()
+            val pfd = mockk<ParcelFileDescriptor>(relaxed = true)
+            every { ParcelFileDescriptor.fromFd(42) } returns pfd
+            every { process.startWithConfig(pfd, any(), any()) } returns Unit
+            every { process.runtimeRunning() } returns true
+            every { process.stopAndWait(3_000L) } returns true
+            engine.setPrivateField("proxy", process)
+            engine.setPrivateField("pendingConfig", "{}")
+            engine.setPrivateField("pendingSocksPort", 49408)
+            engine.setPrivateField("pendingTunAutoSelect", true)
+
+            val result = engine.attachTun(42)
+
+            val failure = assertIs<TunAttachResult.Failure>(result)
+            assertTrue(failure.reason.contains("sing-box started but routed probe failed"))
+            verify(exactly = 1) { process.stopAndWait(3_000L) }
+            assertEquals(null, engine.privateField("pendingConfig"))
+            assertEquals(0, engine.privateIntField("pendingSocksPort"))
+            assertEquals(0, engine.privateIntField("activeSocksPort"))
+            assertEquals(false, engine.privateBooleanField("activeTunAutoSelect"))
+        } finally {
+            unmockkStatic(ParcelFileDescriptor::class)
+        }
+    }
+
+    @Test
+    fun `attachTun succeeds when one routed probe succeeds after runtime starts`() = runTest {
+        mockkStatic(ParcelFileDescriptor::class)
+        try {
+            val engine = buildEngine()
+            var calls = 0
+            engine.routedProbe = SingboxRoutedProbe {
+                calls++
+                if (calls == 1) SingboxHttp204RoutedProbe.LATENCY_FAILED else 12L
+            }
+            val process = mockk<ISingboxEngineProcess>()
+            val pfd = mockk<ParcelFileDescriptor>(relaxed = true)
+            every { ParcelFileDescriptor.fromFd(42) } returns pfd
+            every { process.startWithConfig(pfd, any(), any()) } returns Unit
+            every { process.runtimeRunning() } returns true
+            engine.setPrivateField("proxy", process)
+            engine.setPrivateField("pendingConfig", "{}")
+            engine.setPrivateField("pendingSocksPort", 49408)
+            engine.setPrivateField("pendingTunAutoSelect", true)
+
+            val result = engine.attachTun(42)
+
+            assertIs<TunAttachResult.Success>(result)
+            assertEquals(2, calls)
+            assertEquals(49408, engine.privateIntField("activeSocksPort"))
+            assertEquals(null, engine.privateField("pendingConfig"))
+            assertEquals(0, engine.privateIntField("pendingSocksPort"))
+            assertEquals(false, engine.privateBooleanField("activeTunAutoSelect"))
+            verify(exactly = 0) { process.stopAndWait(any()) }
+        } finally {
+            unmockkStatic(ParcelFileDescriptor::class)
+        }
+    }
+
+    @Test
+    fun `proxy mode returns failure and stops runtime when routed probes fail after runtime starts`() = runTest {
+        val engine = buildEngine()
+        engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.startProxyMode(any(), any()) } returns Unit
+        every { process.runtimeRunning() } returns true
+        every { process.stopAndWait(3_000L) } returns true
+        engine.setPrivateField("proxy", process)
+
+        val result = engine.start(
+            EngineConfig.Singbox(
+                beanBlob = makeVlessBlob(),
+                protocolType = SingboxEngine.PROTOCOL_VLESS,
+                proxyMode = true,
+            ),
+            Upstream.None,
+        )
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals("sing-box routed probe failed", failure.reason)
+        verify(exactly = 1) { process.stopAndWait(3_000L) }
+        assertEquals(0, engine.privateIntField("activeSocksPort"))
+    }
+
+    @Test
+    fun `proxy mode succeeds when routed probe succeeds after runtime starts`() = runTest {
+        val engine = buildEngine()
+        engine.routedProbe = SingboxRoutedProbe { 9L }
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.startProxyMode(any(), any()) } returns Unit
+        every { process.runtimeRunning() } returns true
+        engine.setPrivateField("proxy", process)
+
+        val result = engine.start(
+            EngineConfig.Singbox(
+                beanBlob = makeVlessBlob(),
+                protocolType = SingboxEngine.PROTOCOL_VLESS,
+                proxyMode = true,
+            ),
+            Upstream.None,
+        )
+
+        val success = assertIs<StartResult.Success>(result)
+        assertTrue(success.socksPort > 0)
+        assertEquals(success.socksPort, engine.privateIntField("activeSocksPort"))
+        verify(exactly = 0) { process.stopAndWait(any()) }
     }
 
     @Test

@@ -1,6 +1,7 @@
 package ru.ozero.app.vpn
 
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.prioritizeSingboxAutoProfiles
@@ -16,6 +17,7 @@ internal fun singboxRuntimeFingerprint(
     chainSteps: List<ProxyChainStep>,
 ): Any {
     val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
+    val dnsFingerprint = prefs[SINGBOX_DNS_SERVERS_KEY]?.toList()?.sorted().orEmpty()
     if (selectedProfileId == SingboxEngine.SELECTED_AUTO) {
         val supportedProfiles = profiles
             .asSequence()
@@ -29,7 +31,7 @@ internal fun singboxRuntimeFingerprint(
             .asSequence()
             .map { profile -> profile.id to profile.beanBlob.contentHashCode() }
             .toList()
-        return listOf(selectedProfileId, profileBlobHashes)
+        return listOf(selectedProfileId, profileBlobHashes, dnsFingerprint)
     }
     val profilesById = profiles.associateBy { it.id }
     val selectedBlobHash = when {
@@ -41,8 +43,10 @@ internal fun singboxRuntimeFingerprint(
         .map { it.profileId }
         .filter { it != selectedProfileId }
         .mapNotNull { id -> profilesById[id]?.let { id to it.beanBlob.contentHashCode() } }
-    return listOf(selectedProfileId, selectedBlobHash, activeProfileBlobHashes)
+    return listOf(selectedProfileId, selectedBlobHash, activeProfileBlobHashes, dnsFingerprint)
 }
+
+private val SINGBOX_DNS_SERVERS_KEY = stringSetPreferencesKey("singbox_dns_servers")
 
 private const val MAX_AUTO_SELECT_FINGERPRINT_SCAN = 2_000
 private const val MAX_AUTO_SELECT_FINGERPRINT_PROFILES = 50

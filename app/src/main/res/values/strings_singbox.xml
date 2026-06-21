@@ -32,6 +32,8 @@
     <string name="singbox_sort_section">Сортировка</string>
     <string name="singbox_sort_by_latency">По задержке</string>
     <string name="singbox_sort_by_name">По имени</string>
+    <string name="singbox_dns_section">DNS</string>
+    <string name="singbox_dns_summary">DNS-серверы для sing-box. Выбор хранится отдельно от WARP.</string>
     <string name="singbox_actions_section">Действия</string>
     <string name="singbox_subscriptions_section">Подписки</string>
     <string name="singbox_restore_defaults_button">Восстановить по умолчанию</string>

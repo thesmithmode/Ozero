@@ -10,7 +10,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -49,7 +51,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LargeClass")
 class SingboxEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     @SingboxPrefs private val dataStore: DataStore<Preferences>,
@@ -77,11 +79,19 @@ class SingboxEngine @Inject constructor(
     @Volatile
     private var cachedChainProfileIds: List<Long> = emptyList()
 
+    @Volatile
+    private var cachedDnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS
+
+    @Volatile
+    private var cachedIpv6Enabled: Boolean = false
+
     init {
         engineScope.launch {
             dataStore.data.collect { prefs ->
                 cachedBlob = prefs[BEAN_KEY]
                 cachedSelectedProfileId = prefs[SELECTED_PROFILE_KEY]
+                cachedDnsServers = prefs[SINGBOX_DNS_SERVERS_KEY]?.toList()?.ifEmpty { null }
+                    ?: EngineConfig.Singbox.DEFAULT_DNS_SERVERS
             }
         }
         engineScope.launch {
@@ -202,7 +212,9 @@ class SingboxEngine @Inject constructor(
                 PersistentLoggers.warn(TAG, "auto-select: all ${config.autoSelectBeanBlobs.size} beans failed")
                 return null
             }
-            return runCatching { ConfigBuilder.buildSingboxAutoConfig(beans, probeSocksPort) }
+            return runCatching {
+                ConfigBuilder.buildSingboxAutoConfig(beans, probeSocksPort, config.dnsServers, config.ipv6Enabled)
+            }
                 .onFailure { PersistentLoggers.warn(TAG, "buildSingboxAutoConfig: ${it.message}") }
                 .getOrNull()
         }
@@ -216,14 +228,34 @@ class SingboxEngine @Inject constructor(
                 PersistentLoggers.warn(TAG, "selected bean unsupported and no supported fallback profiles")
                 return null
             }
-            return runCatching { ConfigBuilder.buildSingboxAutoConfig(fallbackBeans, probeSocksPort) }
+            return runCatching {
+                ConfigBuilder.buildSingboxAutoConfig(
+                    fallbackBeans,
+                    probeSocksPort,
+                    config.dnsServers,
+                    config.ipv6Enabled,
+                )
+            }
                 .onFailure { PersistentLoggers.warn(TAG, "build fallback auto config: ${it.message}") }
                 .getOrNull()
         }
-        return runCatching { ConfigBuilder.buildSingboxConfig(bean, probeSocksPort) }
+        return runCatching {
+            ConfigBuilder.buildSingboxConfig(
+                bean,
+                probeSocksPort,
+                config.dnsServers,
+                config.ipv6Enabled
+            )
+        }
             .mapCatching {
                 if (wrappers.isNotEmpty()) {
-                    ConfigBuilder.buildProfileChainConfig(bean, wrappers, probeSocksPort)
+                    ConfigBuilder.buildProfileChainConfig(
+                        bean,
+                        wrappers,
+                        probeSocksPort,
+                        config.dnsServers,
+                        config.ipv6Enabled
+                    )
                 } else {
                     it
                 }
@@ -251,11 +283,27 @@ class SingboxEngine @Inject constructor(
         val json = if (config.autoSelectBeanBlobs.isNotEmpty()) {
             val beans = supportedBeans(config.autoSelectBeanBlobs.take(MAX_AUTO_SELECT_OUTBOUNDS))
             if (beans.isEmpty()) return StartResult.Failure("chain auto-select: no valid beans")
-            runCatching { ConfigBuilder.buildAutoChainConfig(beans, port, upstream) }
+            runCatching {
+                ConfigBuilder.buildAutoChainConfig(
+                    beans,
+                    port,
+                    upstream,
+                    config.dnsServers,
+                    config.ipv6Enabled,
+                )
+            }
                 .getOrElse { return StartResult.Failure("chain auto config: ${it.message}") }
         } else if (config.wireGuardConfig != null) {
             val wgConfig = requireNotNull(config.wireGuardConfig)
-            runCatching { ConfigBuilder.buildWireGuardChainConfig(wgConfig, port, upstream) }
+            runCatching {
+                ConfigBuilder.buildWireGuardChainConfig(
+                    wgConfig,
+                    port,
+                    upstream,
+                    config.dnsServers,
+                    config.ipv6Enabled,
+                )
+            }
                 .getOrElse { return StartResult.Failure("chain WG config: ${it.message}") }
         } else {
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
@@ -263,15 +311,35 @@ class SingboxEngine @Inject constructor(
             if (!ConfigBuilder.isSupportedBean(bean) || !bean.hasRoutableServerAddress()) {
                 val fallbackBeans = supportedBeans(cachedAutoBlobs).take(MAX_AUTO_SELECT_OUTBOUNDS)
                 if (fallbackBeans.isEmpty()) return StartResult.Failure("chain selected transport unsupported")
-                runCatching { ConfigBuilder.buildAutoChainConfig(fallbackBeans, port, upstream) }
+                runCatching {
+                    ConfigBuilder.buildAutoChainConfig(
+                        fallbackBeans,
+                        port,
+                        upstream,
+                        config.dnsServers,
+                        config.ipv6Enabled,
+                    )
+                }
                     .getOrElse { return StartResult.Failure("chain fallback auto config: ${it.message}") }
             } else {
                 val wrappers = if (upstream == null) chainWrapperBeans(config) else emptyList()
                 runCatching {
                     if (wrappers.isNotEmpty()) {
-                        ConfigBuilder.buildProfileChainProxyConfig(bean, wrappers, port)
+                        ConfigBuilder.buildProfileChainProxyConfig(
+                            bean,
+                            wrappers,
+                            port,
+                            config.dnsServers,
+                            config.ipv6Enabled,
+                        )
                     } else {
-                        ConfigBuilder.buildChainConfig(bean, port, upstream)
+                        ConfigBuilder.buildChainConfig(
+                            bean,
+                            port,
+                            upstream,
+                            config.dnsServers,
+                            config.ipv6Enabled,
+                        )
                     }
                 }
                     .getOrElse { return StartResult.Failure("chain config: ${it.message}") }
@@ -289,8 +357,10 @@ class SingboxEngine @Inject constructor(
         }
 
         val p = proxy ?: return StartResult.Failure("SingboxEngineService not connected for chain mode")
+        var runtimeStarted = false
         return runCatching {
             p.startProxyMode(json, localProtector)
+            runtimeStarted = true
             val runtimeRunning = runCatching { p.runtimeRunning() }.getOrDefault(false)
             PersistentLoggers.debug(
                 TAG,
@@ -298,13 +368,22 @@ class SingboxEngine @Inject constructor(
             )
             if (!runtimeRunning) {
                 activeSocksPort = 0
+                stopRuntimeAfterFailedReadiness(p)
                 return StartResult.Failure("sing-box proxy runtime failed to start")
+            }
+            val routedProbeReady = awaitTrafficReady(port, autoSelect = config.autoSelectBeanBlobs.isNotEmpty())
+            if (!routedProbeReady) {
+                activeSocksPort = 0
+                stopRuntimeAfterFailedReadiness(p)
+                return StartResult.Failure("sing-box routed probe failed")
             }
             activeSocksPort = port
             PersistentLoggers.info(TAG, "startProxyMode sent over AIDL port=$port")
             StartResult.Success(socksPort = port)
         }.getOrElse {
             activeSocksPort = 0
+            if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)
+            if (it is CancellationException) throw it
             PersistentLoggers.error(TAG, "startProxyMode AIDL call failed: ${it.message}", it)
             StartResult.Failure("startProxyMode failed: ${it.message}")
         }
@@ -317,6 +396,7 @@ class SingboxEngine @Inject constructor(
             clearPendingStart()
             return TunAttachResult.Failure("SingboxEngineService not connected")
         }
+        var runtimeStarted = false
         return runCatching {
             val pfd = ParcelFileDescriptor.fromFd(tunFd)
             try {
@@ -326,6 +406,7 @@ class SingboxEngine @Inject constructor(
                         "fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
                 )
                 p.startWithConfig(pfd, json, localProtector)
+                runtimeStarted = true
             } finally {
                 runCatching { pfd.close() }
             }
@@ -336,21 +417,51 @@ class SingboxEngine @Inject constructor(
                 "attachTun AIDL returned rawFd=$tunFd pendingPort=$pendingSocksPort runtimeRunning=$runtimeRunning",
             )
             if (!runtimeRunning) {
+                stopRuntimeAfterFailedReadiness(p)
                 clearPendingStart()
                 return TunAttachResult.Failure("sing-box runtime failed to start")
             }
+            val routedProbeReady = awaitTrafficReady(pendingSocksPort, pendingTunAutoSelect)
+            if (!routedProbeReady) {
+                stopRuntimeAfterFailedReadiness(p)
+                clearPendingStart()
+                return TunAttachResult.Failure("sing-box started but routed probe failed")
+            }
             activeSocksPort = pendingSocksPort
-            activeTunAutoSelect = pendingTunAutoSelect
+            activeTunAutoSelect = false
             pendingTunAutoSelect = false
             pendingSocksPort = 0
             pendingConfig = null
             PersistentLoggers.debug(TAG, "startWithConfig sent over AIDL")
             TunAttachResult.Success
         }.getOrElse {
+            if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)
             clearPendingStart()
+            if (it is CancellationException) throw it
             PersistentLoggers.error(TAG, "startWithConfig AIDL call failed: ${it.message}", it)
             TunAttachResult.Failure("startWithConfig AIDL call failed: ${it.message}")
         }
+    }
+
+    private suspend fun awaitTrafficReady(socksPort: Int, autoSelect: Boolean): Boolean {
+        if (socksPort <= 0) return false
+        repeat(READY_PROBE_ATTEMPTS) { attempt ->
+            val latency = routedProbe.probeLatencyMs(socksPort)
+            if (latency >= 0) return true
+            PersistentLoggers.debug(
+                TAG,
+                "routed probe failed attempt=${attempt + 1}/$READY_PROBE_ATTEMPTS autoSelect=$autoSelect",
+            )
+            if (attempt != READY_PROBE_ATTEMPTS - 1) delay(READY_PROBE_RETRY_MS)
+        }
+        return false
+    }
+
+    private fun stopRuntimeAfterFailedReadiness(p: ISingboxEngineProcess) {
+        runCatching {
+            val stopped = p.stopAndWait(REMOTE_STOP_TIMEOUT_MS)
+            if (!stopped) PersistentLoggers.warn(TAG, "stop after routed probe failure timed out")
+        }.onFailure { PersistentLoggers.warn(TAG, "stop after routed probe failure failed: ${it.message}") }
     }
 
     override suspend fun stop() {
@@ -477,7 +588,7 @@ class SingboxEngine @Inject constructor(
         blocking = false,
         ipv4Address = "172.19.0.1",
         ipv4PrefixLength = 30,
-        dnsServers = listOf("1.1.1.1"),
+        dnsServers = effectiveDnsServers(),
         allowFamilyV4 = true,
         allowFamilyV6 = true,
         ipv6Address = "fdfe:dcba:9876::1",
@@ -485,6 +596,14 @@ class SingboxEngine @Inject constructor(
         routeAllV4 = true,
         routeAllV6 = true,
     )
+
+    private fun effectiveDnsServers(): List<String> =
+        cachedDnsServers
+            .ifEmpty { EngineConfig.Singbox.DEFAULT_DNS_SERVERS }
+            .filter { cachedIpv6Enabled || !it.isPlainIpv6Address() }
+
+    private fun String.isPlainIpv6Address(): Boolean =
+        ':' in this && !startsWith("https://") && !startsWith("tls://")
 
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
         val port = activeSocksPort.takeIf { it > 0 }
@@ -496,6 +615,8 @@ class SingboxEngine @Inject constructor(
     }
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
+        val ipv6Enabled = settings?.ipv6Enabled ?: false
+        cachedIpv6Enabled = ipv6Enabled
         if (cachedSelectedProfileId == SELECTED_AUTO) {
             val blobs = cachedAutoBlobs.ifEmpty {
                 runBlocking(Dispatchers.IO) {
@@ -508,6 +629,8 @@ class SingboxEngine @Inject constructor(
                 beanBlob = ByteArray(0),
                 protocolType = PROTOCOL_AUTO_SELECT,
                 autoSelectBeanBlobs = blobs,
+                dnsServers = cachedDnsServers,
+                ipv6Enabled = ipv6Enabled,
             )
         }
         val selectedProfile = cachedSelectedProfileId
@@ -523,6 +646,8 @@ class SingboxEngine @Inject constructor(
             beanBlob = blob,
             protocolType = type,
             chainBeanBlobs = chainWrapperBlobs(cachedSelectedProfileId),
+            dnsServers = cachedDnsServers,
+            ipv6Enabled = ipv6Enabled,
         )
     }
 
@@ -685,7 +810,9 @@ class SingboxEngine @Inject constructor(
     private fun unlinkDeath() {
         val b = engineBinder
         val r = deathRecipient
-        if (b != null && r != null) runCatching { b.unlinkToDeath(r, 0) }
+        if (b != null && r != null) {
+            runCatching { b.unlinkToDeath(r, 0) }
+        }
         engineBinder = null
         deathRecipient = null
     }
@@ -710,6 +837,7 @@ class SingboxEngine @Inject constructor(
         private val chainPortCounter = java.util.concurrent.atomic.AtomicInteger(0)
         private val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")
         private val SELECTED_PROFILE_KEY = longPreferencesKey("singbox_selected_profile_id")
+        val SINGBOX_DNS_SERVERS_KEY = stringSetPreferencesKey("singbox_dns_servers")
         const val SELECTED_AUTO = -1L
         const val PROTOCOL_AUTO_SELECT = -1
         const val PROTOCOL_VLESS = 0

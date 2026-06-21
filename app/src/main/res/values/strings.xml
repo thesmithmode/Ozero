@@ -93,7 +93,6 @@
     <string name="settings_auto_mode_open_summary">Порядок попыток подключения движков</string>
     <string name="auto_mode_screen_title">Auto-режим</string>
     <string name="auto_mode_inactive_warning">Сейчас выбран движок вручную. Auto-режим неактивен — изменения сохранятся, но применятся при возврате в Авто.</string>
-    <string name="engine_wip_badge">в разработке</string>
     <string name="settings_ipv6_title">IPv6</string>
     <string name="settings_ipv6_summary">Маршрутизировать IPv6 через VPN</string>
     <string name="settings_auto_start_title">Автозапуск при загрузке</string>

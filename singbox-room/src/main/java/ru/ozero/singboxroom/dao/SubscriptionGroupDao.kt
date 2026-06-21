@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import ru.ozero.singboxroom.entity.SubscriptionGroup
@@ -29,11 +30,19 @@ interface SubscriptionGroupDao {
     @Query("SELECT * FROM subscription_groups WHERE isBuiltin = 1 ORDER BY userOrder ASC, id ASC")
     suspend fun getBuiltins(): List<SubscriptionGroup>
 
+    @Query("SELECT id FROM proxy_profiles WHERE groupId = :groupId")
+    suspend fun getProfileIdsByGroupId(groupId: Long): List<Long>
+
     @Update
     suspend fun update(group: SubscriptionGroup)
 
     @Delete
     suspend fun delete(group: SubscriptionGroup)
+
+    @Transaction
+    suspend fun deleteBuiltinGroupWithProfiles(group: SubscriptionGroup) {
+        if (group.isBuiltin) delete(group)
+    }
 
     @Query("SELECT COUNT(*) FROM subscription_groups")
     suspend fun count(): Int

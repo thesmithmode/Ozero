@@ -1,6 +1,8 @@
 package ru.ozero.singboxconfig
 
+import java.net.URI
 import java.util.Base64
+import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.WireGuardOutboundConfig
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.ShadowsocksBean
@@ -11,6 +13,8 @@ import ru.ozero.singboxfmt.VMessBean
 
 private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
 private const val REALITY_PUBLIC_KEY_BYTES = 32
+private const val DNS_DOMAIN_RESOLVER_TAG = "dns-domain-resolver"
+private val DNS_DOMAIN_RESOLVER_TYPES = setOf("https", "tls")
 
 @Suppress("TooManyFunctions")
 object ConfigBuilder {
@@ -19,13 +23,23 @@ object ConfigBuilder {
     private const val MIN_PORT = 1
     private const val MAX_PORT = 65_535
 
-    fun buildSingboxConfig(bean: AbstractBean, probeSocksPort: Int? = null): String {
+    fun buildSingboxConfig(
+        bean: AbstractBean,
+        probeSocksPort: Int? = null,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
+    ): String {
         require(isSupportedBean(bean)) { "Unsupported transport: ${(bean as? StandardV2RayBean)?.type}" }
         val outbound = beanOutbound(bean, "proxy")
-        return buildFullConfig(listOf(outbound), probeSocksPort)
+        return buildFullConfig(listOf(outbound), probeSocksPort, dnsServers, ipv6Enabled)
     }
 
-    fun buildSingboxAutoConfig(beans: List<AbstractBean>, probeSocksPort: Int? = null): String {
+    fun buildSingboxAutoConfig(
+        beans: List<AbstractBean>,
+        probeSocksPort: Int? = null,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
+    ): String {
         val supported = beans.filter { isSupportedBean(it) }
         require(supported.isNotEmpty()) { "no beans with supported transport types" }
         val proxyOutbounds = supported.mapIndexed { index, bean -> beanOutbound(bean, "proxy-$index") }
@@ -36,7 +50,7 @@ object ConfigBuilder {
             append(""""interval":"3m","tolerance":50,""")
             append(""""interrupt_exist_connections":true,"idle_timeout":"30m"}""")
         }
-        return buildFullConfig(listOf(urltest) + proxyOutbounds, probeSocksPort)
+        return buildFullConfig(listOf(urltest) + proxyOutbounds, probeSocksPort, dnsServers, ipv6Enabled)
     }
 
     fun isSupportedBean(bean: AbstractBean): Boolean {
@@ -45,12 +59,24 @@ object ConfigBuilder {
         return bean.type in SUPPORTED_TRANSPORTS && bean.hasSupportedSecurity()
     }
 
-    fun buildChainConfig(bean: AbstractBean, socksPort: Int, upstream: Upstream? = null): String {
+    fun buildChainConfig(
+        bean: AbstractBean,
+        socksPort: Int,
+        upstream: Upstream? = null,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
+    ): String {
         val outbound = beanOutbound(bean, "proxy", detour = upstream?.let { "upstream" })
-        return buildChainFullConfig(socksPort, listOf(outbound), upstream)
+        return buildChainFullConfig(socksPort, listOf(outbound), upstream, dnsServers, ipv6Enabled)
     }
 
-    fun buildAutoChainConfig(beans: List<AbstractBean>, socksPort: Int, upstream: Upstream? = null): String {
+    fun buildAutoChainConfig(
+        beans: List<AbstractBean>,
+        socksPort: Int,
+        upstream: Upstream? = null,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
+    ): String {
         require(beans.isNotEmpty()) { "beans must not be empty for auto-select chain config" }
         val supported = beans.filter { isSupportedBean(it) }
         require(supported.isNotEmpty()) { "no beans with supported transport types" }
@@ -65,30 +91,46 @@ object ConfigBuilder {
             append(""""interval":"3m","tolerance":50,""")
             append(""""interrupt_exist_connections":false,"idle_timeout":"30m"}""")
         }
-        return buildChainFullConfig(socksPort, listOf(urltest) + proxyOutbounds, upstream)
+        return buildChainFullConfig(socksPort, listOf(urltest) + proxyOutbounds, upstream, dnsServers, ipv6Enabled)
     }
 
-    fun buildWireGuardChainConfig(wg: WireGuardOutboundConfig, socksPort: Int, upstream: Upstream? = null): String {
+    fun buildWireGuardChainConfig(
+        wg: WireGuardOutboundConfig,
+        socksPort: Int,
+        upstream: Upstream? = null,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
+    ): String {
         val outbound = wireGuardOutbound(wg, "proxy", detour = upstream?.let { "upstream" })
-        return buildChainFullConfig(socksPort, listOf(outbound), upstream)
+        return buildChainFullConfig(socksPort, listOf(outbound), upstream, dnsServers, ipv6Enabled)
     }
 
     fun buildProfileChainConfig(
         selected: AbstractBean,
         wrappers: List<AbstractBean>,
         probeSocksPort: Int? = null,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
     ): String {
         val outbounds = profileChainOutbounds(selected, wrappers)
-        return buildFullConfig(outbounds, probeSocksPort)
+        return buildFullConfig(outbounds, probeSocksPort, dnsServers, ipv6Enabled)
     }
 
     fun buildProfileChainProxyConfig(
         selected: AbstractBean,
         wrappers: List<AbstractBean>,
         socksPort: Int,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
     ): String {
         val outbounds = profileChainOutbounds(selected, wrappers)
-        return buildChainFullConfig(socksPort, outbounds, upstream = null)
+        return buildChainFullConfig(
+            socksPort = socksPort,
+            proxyOutbounds = outbounds,
+            upstream = null,
+            dnsServers = dnsServers,
+            ipv6Enabled = ipv6Enabled,
+        )
     }
 
     data class Upstream(val host: String, val port: Int)
@@ -116,7 +158,12 @@ object ConfigBuilder {
         else -> error("Unsupported bean type: ${bean::class.simpleName}")
     }
 
-    private fun buildFullConfig(proxyOutbounds: List<String>, probeSocksPort: Int? = null): String {
+    private fun buildFullConfig(
+        proxyOutbounds: List<String>,
+        probeSocksPort: Int? = null,
+        dnsServers: List<String>,
+        ipv6Enabled: Boolean,
+    ): String {
         val sb = StringBuilder()
         sb.append('{')
         sb.append(""""log":{"level":"warn","timestamp":true},""")
@@ -135,7 +182,7 @@ object ConfigBuilder {
         sb.append(""",{"type":"direct","tag":"direct"}""")
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
-        sb.append(""""dns":{"servers":[{"type":"udp","tag":"dns-direct","server":"1.1.1.1"}]},""")
+        sb.append(dnsConfig(dnsServers, detour = null, ipv6Enabled = ipv6Enabled))
         sb.append(""""route":{""")
         sb.append(""""final":"proxy",""")
         sb.append(""""auto_detect_interface":true,""")
@@ -149,6 +196,8 @@ object ConfigBuilder {
         socksPort: Int,
         proxyOutbounds: List<String>,
         upstream: Upstream?,
+        dnsServers: List<String>,
+        ipv6Enabled: Boolean,
     ): String {
         val sb = StringBuilder()
         sb.append('{')
@@ -168,8 +217,7 @@ object ConfigBuilder {
         sb.append(""",{"type":"direct","tag":"direct"}""")
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
-        sb.append(""""dns":{"servers":[{"tag":"dns-remote",""")
-        sb.append(""""address":"https://1.1.1.1/dns-query","detour":"proxy"}]},""")
+        sb.append(dnsConfig(dnsServers, detour = "proxy", ipv6Enabled = ipv6Enabled))
         sb.append(""""route":{""")
         sb.append(""""final":"proxy",""")
         sb.append(""""auto_detect_interface":true,""")
@@ -178,6 +226,86 @@ object ConfigBuilder {
         sb.append('}')
         return sb.toString()
     }
+
+    private fun dnsConfig(dnsServers: List<String>, detour: String?, ipv6Enabled: Boolean): String {
+        val normalized = normalizeDnsServers(dnsServers, ipv6Enabled)
+        val endpoints = normalized.map(DnsEndpoint::from)
+        val needsDomainResolver = endpoints.any(DnsEndpoint::needsDomainResolver)
+        val servers = buildList {
+            endpoints.mapIndexedTo(this) { index, endpoint -> dnsServer(endpoint, "dns-$index", detour) }
+            if (needsDomainResolver) add(dnsServer(DnsEndpoint.domainResolver(), DNS_DOMAIN_RESOLVER_TAG, detour))
+        }.joinToString(",")
+        return "\"dns\":{\"servers\":[$servers]},"
+    }
+
+    private fun normalizeDnsServers(dnsServers: List<String>, ipv6Enabled: Boolean): List<String> =
+        dnsServers
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .filter { it.isValidDnsServer() }
+            .filter { ipv6Enabled || !it.isPlainIpv6Dns() }
+            .ifEmpty { EngineConfig.Singbox.DEFAULT_DNS_SERVERS }
+
+    private fun String.isPlainIpv6Dns(): Boolean = ':' in this && !startsWith("https://") && !startsWith("tls://")
+
+    private fun String.isValidDnsServer(): Boolean {
+        if (startsWith("https://")) return length > "https://".length && !contains(' ')
+        if (startsWith("tls://")) return length > "tls://".length && !contains(' ')
+        return isValidIpv4Dns() || isValidPlainIpv6Dns()
+    }
+
+    private fun String.isValidIpv4Dns(): Boolean {
+        val parts = split('.')
+        return parts.size == 4 &&
+            parts.all { part ->
+                part.isNotEmpty() && part.all(Char::isDigit) && part.toIntOrNull() in 0..255
+            }
+    }
+
+    private fun String.isValidPlainIpv6Dns(): Boolean =
+        ':' in this && all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it == ':' }
+
+    private fun dnsServer(endpoint: DnsEndpoint, tag: String, detour: String?): String = buildString {
+        append('{')
+        append("\"tag\":${jsonString(tag)},")
+        append("\"type\":${jsonString(endpoint.type)},")
+        append("\"server\":${jsonString(endpoint.server)}")
+        endpoint.serverPort?.let { append(",\"server_port\":$it") }
+        endpoint.path?.let { append(",\"path\":${jsonString(it)}") }
+        if (endpoint.needsDomainResolver()) append(",\"domain_resolver\":${jsonString(DNS_DOMAIN_RESOLVER_TAG)}")
+        detour?.let { append(",\"detour\":${jsonString(it)}") }
+        append('}')
+    }
+
+    private data class DnsEndpoint(val type: String, val server: String, val serverPort: Int?, val path: String?) {
+        fun needsDomainResolver(): Boolean =
+            type in DNS_DOMAIN_RESOLVER_TYPES && server.isDnsHostname()
+
+        companion object {
+            fun domainResolver(): DnsEndpoint = DnsEndpoint(
+                "udp",
+                EngineConfig.Singbox.DEFAULT_DNS_SERVERS.first(),
+                null,
+                null,
+            )
+
+            fun from(server: String): DnsEndpoint = when {
+                server.startsWith("https://") -> fromUri(server, "https")
+                server.startsWith("tls://") -> fromUri(server, "tls")
+                else -> DnsEndpoint("udp", server, null, null)
+            }
+
+            private fun fromUri(server: String, type: String): DnsEndpoint {
+                val uri = URI(server)
+                val address = uri.host ?: server.substringAfter("://").substringBefore('/')
+                val port = uri.port.takeIf { it in MIN_PORT..MAX_PORT }
+                val path = if (type == "https") uri.rawPath.orEmpty().ifEmpty { "/dns-query" } else null
+                return DnsEndpoint(type, address, port, path)
+            }
+        }
+    }
+
+    private fun String.isDnsHostname(): Boolean = !isValidIpv4Dns() && !isValidPlainIpv6Dns()
 
     private fun tunInbound(): String {
         val sb = StringBuilder()

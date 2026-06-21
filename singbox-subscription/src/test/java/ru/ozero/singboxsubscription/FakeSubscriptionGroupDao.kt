@@ -7,6 +7,7 @@ import ru.ozero.singboxroom.entity.SubscriptionGroup
 
 class FakeSubscriptionGroupDao : SubscriptionGroupDao {
     val groups = mutableListOf<SubscriptionGroup>()
+    val profileGroupIds = mutableListOf<Long>()
     private var nextId = 1L
 
     override suspend fun insert(group: SubscriptionGroup): Long {
@@ -34,6 +35,9 @@ class FakeSubscriptionGroupDao : SubscriptionGroupDao {
     override suspend fun getBuiltins(): List<SubscriptionGroup> =
         groups.filter { it.isBuiltin }
 
+    override suspend fun getProfileIdsByGroupId(groupId: Long): List<Long> =
+        profileGroupIds.mapIndexedNotNull { index, id -> (index + 1L).takeIf { id == groupId } }
+
     override suspend fun update(group: SubscriptionGroup) {
         val index = groups.indexOfFirst { it.id == group.id }
         if (index >= 0) groups[index] = group
@@ -41,6 +45,12 @@ class FakeSubscriptionGroupDao : SubscriptionGroupDao {
 
     override suspend fun delete(group: SubscriptionGroup) {
         groups.removeAll { it.id == group.id }
+    }
+
+    override suspend fun deleteBuiltinGroupWithProfiles(group: SubscriptionGroup) {
+        if (!group.isBuiltin) return
+        delete(group)
+        profileGroupIds.removeAll { it == group.id }
     }
 
     override suspend fun count(): Int = groups.size

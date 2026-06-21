@@ -5,11 +5,13 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
@@ -28,6 +30,7 @@ class SingboxEngineAutoSelectTest {
 
     private val beanKey = byteArrayPreferencesKey("singbox_vless_bean")
     private val selectedProfileKey = longPreferencesKey("singbox_selected_profile_id")
+    private val dnsServersKey = stringSetPreferencesKey("singbox_dns_servers")
 
     private fun makeVlessBlob(host: String = "proxy.example.com", port: Int = 443): ByteArray {
         val bean = VLESSBean().apply {
@@ -170,6 +173,44 @@ class SingboxEngineAutoSelectTest {
     )
 
     private fun awaitInit() = Thread.sleep(300)
+
+    @Test
+    fun `buildManualConfig passes singbox DNS settings`() {
+        val blob = makeVlessBlob()
+        val prefs = mutablePreferencesOf(
+            beanKey to blob,
+            selectedProfileKey to 42L,
+            dnsServersKey to setOf("9.9.9.9", "149.112.112.112"),
+        )
+        val engine = buildEngine(prefs = prefs)
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNotNull(result)
+        assertTrue(result is EngineConfig.Singbox)
+        assertEquals(setOf("9.9.9.9", "149.112.112.112"), result.dnsServers.toSet())
+    }
+
+    @Test
+    fun `tunSpec filters cached IPv6 DNS after IPv6 disabled config build`() = kotlinx.coroutines.test.runTest {
+        val blob = makeVlessBlob()
+        val prefs = mutablePreferencesOf(
+            beanKey to blob,
+            selectedProfileKey to 42L,
+            dnsServersKey to setOf("8.8.8.8", "2001:4860:4860::8888"),
+        )
+        val engine = buildEngine(prefs = prefs)
+        awaitInit()
+
+        engine.buildManualConfig(SettingsModel(ipv6Enabled = false))
+        val disabled = engine.tunSpec()
+        engine.buildManualConfig(SettingsModel(ipv6Enabled = true))
+        val enabled = engine.tunSpec()
+
+        assertEquals(listOf("8.8.8.8"), disabled.dnsServers)
+        assertEquals(setOf("8.8.8.8", "2001:4860:4860::8888"), enabled.dnsServers.toSet())
+    }
 
     @Test
     fun `should return null when auto mode active and cache empty`() {

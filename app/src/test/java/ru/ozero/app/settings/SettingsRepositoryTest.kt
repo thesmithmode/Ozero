@@ -126,8 +126,8 @@ class SettingsRepositoryTest {
 
     @Test
     fun `setManualEngine stores engine id and null clears it`() = runTest {
-        repository.setManualEngine(EngineId.XRAY)
-        assertEquals(EngineId.XRAY, repository.settings.first().manualEngine)
+        repository.setManualEngine(EngineId.FPTN)
+        assertEquals(EngineId.FPTN, repository.settings.first().manualEngine)
 
         repository.setManualEngine(null)
         assertNull(repository.settings.first().manualEngine)
@@ -185,17 +185,16 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `setEngineAutoPriority дедуплицирует stub движки и reconcile добавляет недостающие`() = runTest {
+    fun `setEngineAutoPriority дедуплицирует и reconcile добавляет недостающие`() = runTest {
         repository.setEngineAutoPriority(
             listOf(
-                EngineId.BYEDPI, EngineId.XRAY, EngineId.BYEDPI,
-                EngineId.WARP, EngineId.TOR,
+                EngineId.BYEDPI, EngineId.FPTN, EngineId.BYEDPI, EngineId.WARP,
             ),
         )
         assertEquals(
             listOf(
-                EngineId.BYEDPI, EngineId.WARP, EngineId.URNETWORK,
-                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+                EngineId.BYEDPI, EngineId.FPTN, EngineId.WARP,
+                EngineId.URNETWORK, EngineId.MASTERDNS, EngineId.SINGBOX,
             ),
             repository.settings.first().engineAutoPriority,
         )

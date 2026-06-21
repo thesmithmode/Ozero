@@ -86,7 +86,6 @@
     <string name="settings_auto_priority_summary">Ozero tries engines in this order. First working — active.</string>
     <string name="settings_auto_priority_move_up">Move up</string>
     <string name="settings_auto_priority_move_down">Move down</string>
-    <string name="engine_wip_badge">WIP</string>
     <string name="settings_ipv6_title">IPv6</string>
     <string name="settings_ipv6_summary">Route IPv6 through VPN</string>
     <string name="settings_auto_start_title">Start on boot</string>

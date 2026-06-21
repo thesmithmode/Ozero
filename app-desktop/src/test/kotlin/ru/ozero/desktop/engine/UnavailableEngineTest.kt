@@ -4,7 +4,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -70,8 +69,8 @@ class DesktopEngineRegistryTest {
     }
 
     @Test
-    fun `should return null for unknown engine`() {
-        assertNull(DesktopEngineRegistry.get(EngineId.XRAY))
+    fun `should return unavailable engine for fptn`() {
+        assertNotNull(DesktopEngineRegistry.get(EngineId.FPTN))
     }
 
     @Test

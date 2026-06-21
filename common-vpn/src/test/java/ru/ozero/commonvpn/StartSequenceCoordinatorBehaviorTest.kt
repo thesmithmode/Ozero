@@ -1305,10 +1305,6 @@ class StartSequenceCoordinatorBehaviorTest {
                 proxyMode = true,
             )
             EngineId.FPTN -> EngineConfig.Fptn(token = "test")
-            EngineId.XRAY -> EngineConfig.Xray(configJson = "{}", socksPort = socksPort)
-            EngineId.HYSTERIA2 -> EngineConfig.Hysteria2(configJson = "{}", socksPort = socksPort)
-            EngineId.NAIVE -> EngineConfig.Naive(proxyUrl = "https://example.invalid", socksPort = socksPort)
-            EngineId.TOR -> EngineConfig.Tor(socksPort = socksPort)
         }
     }
 

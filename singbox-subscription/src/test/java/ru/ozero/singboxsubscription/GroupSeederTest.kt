@@ -141,6 +141,57 @@ class GroupSeederTest {
     }
 
     @Test
+    fun `should remove stale builtin with profiles while preserving user and active builtin`() = runBlocking {
+        fakeDao.groups.addAll(
+            listOf(
+                SubscriptionGroup(
+                    id = 1L,
+                    name = "Stale Builtin",
+                    subscriptionUrl = "https://stale.example.com/sub",
+                    isBuiltin = true,
+                ),
+                SubscriptionGroup(
+                    id = 2L,
+                    name = "User Group",
+                    subscriptionUrl = "https://stale.example.com/sub",
+                    isBuiltin = false,
+                ),
+                SubscriptionGroup(
+                    id = 3L,
+                    name = "Active Builtin",
+                    subscriptionUrl = "https://active.example.com/sub",
+                    isBuiltin = true,
+                ),
+            ),
+        )
+        fakeDao.profileGroupIds.addAll(listOf(1L, 2L, 3L))
+
+        seeder.seedPresets(listOf(GroupSeeder.PresetGroup("Active Builtin", "https://active.example.com/sub")))
+
+        assertEquals(listOf(2L, 3L), fakeDao.groups.sortedBy { it.id }.map { it.id })
+        assertEquals(listOf(2L, 3L), fakeDao.profileGroupIds.sorted())
+    }
+
+    @Test
+    fun `should notify deleted stale builtin profile ids`() = runBlocking {
+        val deletedIds = mutableListOf<Long>()
+        seeder = GroupSeeder(fakeDao) { ids -> deletedIds += ids }
+        fakeDao.groups.add(
+            SubscriptionGroup(
+                id = 1L,
+                name = "Stale Builtin",
+                subscriptionUrl = "https://stale.example.com/sub",
+                isBuiltin = true,
+            ),
+        )
+        fakeDao.profileGroupIds.addAll(listOf(1L, 1L))
+
+        seeder.seedPresets(emptyList())
+
+        assertEquals(listOf(1L, 2L), deletedIds)
+    }
+
+    @Test
     fun `should handle empty preset list without errors`() = runBlocking {
         seeder.seedPresets(emptyList())
 

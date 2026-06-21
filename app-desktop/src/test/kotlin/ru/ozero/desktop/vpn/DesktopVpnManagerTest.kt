@@ -84,8 +84,8 @@ class DesktopVpnManagerTest {
         }
 
         @Test
-        fun `should set state to Failed for unknown engine`() = testScope.runTest {
-            manager.connect(EngineId.XRAY, VpnMode.PROXY)
+        fun `should set state to Failed for unavailable engine`() = testScope.runTest {
+            manager.connect(EngineId.URNETWORK, VpnMode.PROXY)
             advanceUntilIdle()
 
             val state = manager.state.value
@@ -94,7 +94,7 @@ class DesktopVpnManagerTest {
 
         @Test
         fun `should set powerDisc to Off on failure`() = testScope.runTest {
-            manager.connect(EngineId.XRAY, VpnMode.PROXY)
+            manager.connect(EngineId.URNETWORK, VpnMode.PROXY)
             advanceUntilIdle()
 
             assertEquals(PowerDiscState.Off, manager.powerDiscState.value)

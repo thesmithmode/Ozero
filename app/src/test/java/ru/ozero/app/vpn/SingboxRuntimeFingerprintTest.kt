@@ -1,6 +1,8 @@
 package ru.ozero.app.vpn
 
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.mutablePreferencesOf
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import org.junit.jupiter.api.Test
 import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.enginesingbox.SingboxEngine
@@ -30,6 +32,7 @@ class SingboxRuntimeFingerprintTest {
             listOf(
                 SingboxEngine.SELECTED_AUTO,
                 expected,
+                emptyList<String>(),
             ),
             fingerprint,
         )
@@ -54,6 +57,7 @@ class SingboxRuntimeFingerprintTest {
                 10L,
                 byteArrayOf(9, 9).contentHashCode(),
                 listOf(20L to byteArrayOf(7, 7).contentHashCode()),
+                emptyList<String>(),
             ),
             fingerprint,
         )
@@ -67,7 +71,7 @@ class SingboxRuntimeFingerprintTest {
         val fingerprint = singboxRuntimeFingerprint(prefs, profiles, emptyList())
 
         assertEquals(
-            listOf(10L, 0, emptyList<Pair<Long, Int>>()),
+            listOf(10L, 0, emptyList<Pair<Long, Int>>(), emptyList<String>()),
             fingerprint,
         )
     }
@@ -86,7 +90,12 @@ class SingboxRuntimeFingerprintTest {
             )
 
             assertEquals(
-                listOf(10L, byteArrayOf(9, 9).contentHashCode(), emptyList<Pair<Long, Int>>()),
+                listOf(
+                    10L,
+                    byteArrayOf(9, 9).contentHashCode(),
+                    emptyList<Pair<Long, Int>>(),
+                    emptyList<String>(),
+                ),
                 fingerprint,
             )
         }
@@ -113,6 +122,7 @@ class SingboxRuntimeFingerprintTest {
                     10L,
                     byteArrayOf(1, 1).contentHashCode(),
                     listOf(30L to byteArrayOf(3, 3).contentHashCode()),
+                    emptyList<String>(),
                 ),
                 fingerprint,
             )
@@ -132,21 +142,43 @@ class SingboxRuntimeFingerprintTest {
             )
 
             assertEquals(
-                listOf(10L, 0, emptyList<Pair<Long, Int>>()),
+                listOf(10L, 0, emptyList<Pair<Long, Int>>(), emptyList<String>()),
                 fingerprint,
             )
         }
 
+    @Test
+    fun `fingerprint includes singbox dns servers`() {
+        val prefs = prefs(selected = 10L, dnsServers = setOf("8.8.8.8", "1.1.1.1"))
+        val profiles = listOf(profile(10, byteArrayOf(9, 9)))
+
+        val fingerprint = singboxRuntimeFingerprint(prefs, profiles, emptyList())
+
+        assertEquals(
+            listOf(
+                10L,
+                byteArrayOf(9, 9).contentHashCode(),
+                emptyList<Pair<Long, Int>>(),
+                listOf("1.1.1.1", "8.8.8.8"),
+            ),
+            fingerprint,
+        )
+    }
+
     private fun prefs(
         selected: Long? = null,
         bean: ByteArray? = null,
+        dnsServers: Set<String>? = null,
     ): Preferences {
-        val preferences = androidx.datastore.preferences.core.mutablePreferencesOf()
+        val preferences = mutablePreferencesOf()
         if (selected != null) {
             preferences[SingboxProbeService.SELECTED_PROFILE_KEY] = selected
         }
         if (bean != null) {
             preferences[SingboxProbeService.BEAN_KEY] = bean
+        }
+        if (dnsServers != null) {
+            preferences[stringSetPreferencesKey("singbox_dns_servers")] = dnsServers
         }
         return preferences
     }

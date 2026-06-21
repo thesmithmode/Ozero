@@ -1,7 +1,6 @@
 package ru.ozero.desktop.model
 
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -20,21 +19,8 @@ class EngineIdTest {
     }
 
     @Test
-    fun `core engines should not be stubs`() {
-        assertFalse(EngineId.BYEDPI.isStub)
-        assertFalse(EngineId.URNETWORK.isStub)
-        assertFalse(EngineId.WARP.isStub)
-        assertFalse(EngineId.MASTERDNS.isStub)
-        assertFalse(EngineId.SINGBOX.isStub)
-        assertFalse(EngineId.FPTN.isStub)
-    }
-
-    @Test
-    fun `future engines should be stubs`() {
-        assertTrue(EngineId.XRAY.isStub)
-        assertTrue(EngineId.HYSTERIA2.isStub)
-        assertTrue(EngineId.NAIVE.isStub)
-        assertTrue(EngineId.TOR.isStub)
+    fun `engines should not be stubs`() {
+        EngineId.entries.forEach { id -> assertTrue(!id.isStub) }
     }
 
     @ParameterizedTest

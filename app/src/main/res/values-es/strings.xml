@@ -61,7 +61,6 @@
     <string name="settings_manual_engine_title">Selección de motor</string>
     <string name="settings_manual_engine_summary">Auto — Ozero elige el mejor</string>
     <string name="settings_manual_engine_auto">Auto</string>
-    <string name="engine_wip_badge">en desarrollo</string>
     <string name="settings_ipv6_title">IPv6</string>
     <string name="settings_ipv6_summary">Enrutar IPv6 por la VPN</string>
     <string name="settings_auto_start_title">Iniciar al arrancar</string>

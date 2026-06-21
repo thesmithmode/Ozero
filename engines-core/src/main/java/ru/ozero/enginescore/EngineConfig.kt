@@ -14,34 +14,6 @@ sealed class EngineConfig {
         override val engineId = EngineId.BYEDPI
     }
 
-    data class Xray(
-        val configJson: String,
-        val socksPort: Int = 10808,
-    ) : EngineConfig() {
-        override val engineId = EngineId.XRAY
-    }
-
-    data class Hysteria2(
-        val configJson: String,
-        val socksPort: Int = 10809,
-    ) : EngineConfig() {
-        override val engineId = EngineId.HYSTERIA2
-    }
-
-    data class Tor(
-        val bridges: List<String> = emptyList(),
-        val socksPort: Int = 9050,
-    ) : EngineConfig() {
-        override val engineId = EngineId.TOR
-    }
-
-    data class Naive(
-        val proxyUrl: String,
-        val socksPort: Int = 1080,
-    ) : EngineConfig() {
-        override val engineId = EngineId.NAIVE
-    }
-
     data class Urnetwork(
         val jwtToken: String,
         val apiUrl: String = "https://api.urnetwork.com",
@@ -81,6 +53,8 @@ sealed class EngineConfig {
         val chainBeanBlobs: List<ByteArray> = emptyList(),
         val wireGuardConfig: WireGuardOutboundConfig? = null,
         val proxyMode: Boolean = false,
+        val dnsServers: List<String> = DEFAULT_DNS_SERVERS,
+        val ipv6Enabled: Boolean = false,
     ) : EngineConfig() {
         override val engineId = EngineId.SINGBOX
         override fun toString(): String =
@@ -98,7 +72,9 @@ sealed class EngineConfig {
                 chainBeanBlobs.size == other.chainBeanBlobs.size &&
                 chainBeanBlobs.zip(other.chainBeanBlobs).all { (a, b) -> a.contentEquals(b) } &&
                 wireGuardConfig == other.wireGuardConfig &&
-                proxyMode == other.proxyMode
+                proxyMode == other.proxyMode &&
+                dnsServers == other.dnsServers &&
+                ipv6Enabled == other.ipv6Enabled
         }
 
         override fun hashCode(): Int {
@@ -107,7 +83,13 @@ sealed class EngineConfig {
             for (blob in chainBeanBlobs) result = 31 * result + blob.contentHashCode()
             result = 31 * result + (wireGuardConfig?.hashCode() ?: 0)
             result = 31 * result + proxyMode.hashCode()
+            result = 31 * result + dnsServers.hashCode()
+            result = 31 * result + ipv6Enabled.hashCode()
             return result
+        }
+
+        companion object {
+            val DEFAULT_DNS_SERVERS: List<String> = listOf("9.9.9.9", "149.112.112.112")
         }
     }
 
