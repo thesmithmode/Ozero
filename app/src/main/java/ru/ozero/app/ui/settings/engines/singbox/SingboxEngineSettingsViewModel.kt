@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,6 +21,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import ru.ozero.enginewarp.DnsPresets
+import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.enginesingbox.prioritizeSingboxAutoProfiles
 import ru.ozero.singboxfmt.AbstractBean
@@ -65,6 +68,8 @@ data class SingboxSettingsUiState(
     val groupRefreshErrors: Map<Long, String> = emptyMap(),
     val sortOrder: SortOrder = SortOrder.BY_LATENCY,
     val isRestoringDefaults: Boolean = false,
+    val dnsPresetId: String = DnsPresets.ALL.first().id,
+    val dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
     val restoreError: String? = null,
     val showAddGroupDialog: Boolean = false,
     val addGroupName: String = "",
@@ -103,6 +108,10 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         _uiState,
     ) { groups, profiles, chainSteps, prefs, ui ->
         val sort = SortOrder.fromOrdinal(prefs[SORT_ORDER_KEY] ?: 0)
+        val dnsServers = prefs[SINGBOX_DNS_SERVERS_KEY]?.toList()?.ifEmpty { null }
+            ?: EngineConfig.Singbox.DEFAULT_DNS_SERVERS
+        val dnsPresetId = DnsPresets.ALL.firstOrNull { it.servers.toSet() == dnsServers.toSet() }?.id
+            ?: DnsPresets.ALL.first().id
         val sortedProfiles = ui.groupProfiles.mapValues { (_, profiles) ->
             when (sort) {
                 SortOrder.BY_LATENCY -> profiles.sortedWith(
@@ -119,6 +128,8 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             chainProfileIds = chainSteps.map { it.profileId },
             groupProfiles = sortedProfiles,
             sortOrder = sort,
+            dnsPresetId = dnsPresetId,
+            dnsServers = dnsServers,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SingboxSettingsUiState())
 
@@ -441,6 +452,13 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
+    fun onDnsPresetChanged(presetId: String) {
+        val preset = DnsPresets.ALL.firstOrNull { it.id == presetId } ?: return
+        viewModelScope.launch {
+            dataStore.edit { prefs -> prefs[SINGBOX_DNS_SERVERS_KEY] = preset.servers.toSet() }
+        }
+    }
+
     fun onRestoreDefaults() {
         viewModelScope.launch {
             _uiState.update { it.copy(isRestoringDefaults = true, restoreError = null) }
@@ -465,6 +483,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
 
     companion object {
         private val SORT_ORDER_KEY = intPreferencesKey("singbox_sort_order")
+        private val SINGBOX_DNS_SERVERS_KEY = stringSetPreferencesKey("singbox_dns_servers")
         private const val MAX_IMPORT_PROFILES = 2_000
         private const val MAX_PROFILE_SCAN = 2_000
         private const val MAX_VISIBLE_PROFILES = 500

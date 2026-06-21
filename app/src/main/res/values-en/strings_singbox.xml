@@ -32,6 +32,8 @@
     <string name="singbox_sort_section">Sort order</string>
     <string name="singbox_sort_by_latency">By latency</string>
     <string name="singbox_sort_by_name">By name</string>
+    <string name="singbox_dns_section">DNS</string>
+    <string name="singbox_dns_summary">DNS servers for sing-box. The selection is stored separately from WARP.</string>
     <string name="singbox_actions_section">Actions</string>
     <string name="singbox_subscriptions_section">Subscriptions</string>
     <string name="singbox_restore_defaults_button">Restore defaults</string>

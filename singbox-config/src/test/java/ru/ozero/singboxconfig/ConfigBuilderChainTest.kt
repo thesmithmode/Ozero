@@ -51,7 +51,7 @@ class ConfigBuilderChainTest {
     }
 
     @Test
-    fun `chain config uses DoH DNS through proxy`() {
+    fun `chain config uses plain DNS through proxy detour`() {
         val json = ConfigBuilder.buildChainConfig(makeBean(), socksPort = 49408)
 
         assertContains(json, "\"address\":\"https://1.1.1.1/dns-query\"")

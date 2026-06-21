@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
+import ru.ozero.enginewarp.DnsPresets
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,6 +123,15 @@ fun SingboxAdvancedSettingsScreen(
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
 
+            DnsSection(
+                selectedPresetId = state.dnsPresetId,
+                onPresetClick = viewModel::onDnsPresetChanged,
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
+
             Text(
                 text = stringResource(R.string.singbox_actions_section),
                 style = MaterialTheme.typography.labelLarge,
@@ -159,6 +169,31 @@ fun SingboxAdvancedSettingsScreen(
 
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+private fun DnsSection(
+    selectedPresetId: String,
+    onPresetClick: (String) -> Unit,
+) {
+    Text(
+        text = stringResource(R.string.singbox_dns_section),
+        style = MaterialTheme.typography.labelLarge,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text = stringResource(R.string.singbox_dns_summary),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(4.dp))
+    DnsPresets.ALL.forEach { preset ->
+        SortOrderItem(
+            label = preset.name,
+            selected = preset.id == selectedPresetId,
+            onClick = { onPresetClick(preset.id) },
+        )
     }
 }
 

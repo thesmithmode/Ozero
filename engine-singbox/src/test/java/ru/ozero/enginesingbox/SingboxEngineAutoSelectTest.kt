@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +29,7 @@ class SingboxEngineAutoSelectTest {
 
     private val beanKey = byteArrayPreferencesKey("singbox_vless_bean")
     private val selectedProfileKey = longPreferencesKey("singbox_selected_profile_id")
+    private val dnsServersKey = stringSetPreferencesKey("singbox_dns_servers")
 
     private fun makeVlessBlob(host: String = "proxy.example.com", port: Int = 443): ByteArray {
         val bean = VLESSBean().apply {
@@ -170,6 +172,24 @@ class SingboxEngineAutoSelectTest {
     )
 
     private fun awaitInit() = Thread.sleep(300)
+
+    @Test
+    fun `buildManualConfig passes singbox DNS settings`() {
+        val blob = makeVlessBlob()
+        val prefs = mutablePreferencesOf(
+            beanKey to blob,
+            selectedProfileKey to 42L,
+            dnsServersKey to setOf("9.9.9.9", "149.112.112.112"),
+        )
+        val engine = buildEngine(prefs = prefs)
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNotNull(result)
+        assertTrue(result is EngineConfig.Singbox)
+        assertEquals(setOf("9.9.9.9", "149.112.112.112"), result.dnsServers.toSet())
+    }
 
     @Test
     fun `should return null when auto mode active and cache empty`() {
