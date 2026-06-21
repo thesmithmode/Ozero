@@ -217,7 +217,7 @@ object ConfigBuilder {
         sb.append(""",{"type":"direct","tag":"direct"}""")
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
-        sb.append(dnsConfig(dnsServers, detour = "proxy", ipv6Enabled = ipv6Enabled))
+        sb.append(dnsConfig(dnsServers, detour = null, ipv6Enabled = ipv6Enabled))
         sb.append(""""route":{""")
         sb.append(""""final":"proxy",""")
         sb.append(""""auto_detect_interface":true,""")
