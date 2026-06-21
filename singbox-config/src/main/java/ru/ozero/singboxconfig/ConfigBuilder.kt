@@ -12,6 +12,8 @@ import ru.ozero.singboxfmt.VMessBean
 
 private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
 private const val REALITY_PUBLIC_KEY_BYTES = 32
+private const val DNS_DOMAIN_RESOLVER_TAG = "dns-domain-resolver"
+private val DNS_DOMAIN_RESOLVER_TYPES = setOf("https", "tls")
 
 @Suppress("TooManyFunctions")
 object ConfigBuilder {
@@ -226,9 +228,12 @@ object ConfigBuilder {
 
     private fun dnsConfig(dnsServers: List<String>, detour: String?, ipv6Enabled: Boolean): String {
         val normalized = normalizeDnsServers(dnsServers, ipv6Enabled)
-        val servers = normalized
-            .mapIndexed { index, server -> dnsServer(server, "dns-$index", detour) }
-            .joinToString(",")
+        val endpoints = normalized.map(DnsEndpoint::from)
+        val needsDomainResolver = endpoints.any(DnsEndpoint::needsDomainResolver)
+        val servers = buildList {
+            endpoints.mapIndexedTo(this) { index, endpoint -> dnsServer(endpoint, "dns-$index", detour) }
+            if (needsDomainResolver) add(dnsServer(DnsEndpoint.domainResolver(), DNS_DOMAIN_RESOLVER_TAG, detour))
+        }.joinToString(",")
         return "\"dns\":{\"servers\":[$servers]},"
     }
 
@@ -259,24 +264,28 @@ object ConfigBuilder {
     private fun String.isValidPlainIpv6Dns(): Boolean =
         ':' in this && all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it == ':' }
 
-    private fun dnsServer(server: String, tag: String, detour: String?): String = buildString {
-        val endpoint = DnsEndpoint.from(server)
+    private fun dnsServer(endpoint: DnsEndpoint, tag: String, detour: String?): String = buildString {
         append('{')
         append("\"tag\":${jsonString(tag)},")
-        if (detour == null) {
-            append("\"type\":${jsonString(endpoint.type)},")
-            append("\"server\":${jsonString(endpoint.server)}")
-            endpoint.path?.let { append(",\"path\":${jsonString(it)}") }
-        } else {
-            append("\"address\":${jsonString(endpoint.server)},")
-            endpoint.path?.let { append("\"path\":${jsonString(it)},") }
-            append("\"detour\":${jsonString(detour)}")
-        }
+        append("\"type\":${jsonString(endpoint.type)},")
+        append("\"server\":${jsonString(endpoint.server)}")
+        endpoint.path?.let { append(",\"path\":${jsonString(it)}") }
+        if (endpoint.needsDomainResolver()) append(",\"domain_resolver\":${jsonString(DNS_DOMAIN_RESOLVER_TAG)}")
+        detour?.let { append(",\"detour\":${jsonString(it)}") }
         append('}')
     }
 
     private data class DnsEndpoint(val type: String, val server: String, val path: String?) {
+        fun needsDomainResolver(): Boolean =
+            type in DNS_DOMAIN_RESOLVER_TYPES && server.isDnsHostname()
+
         companion object {
+            fun domainResolver(): DnsEndpoint = DnsEndpoint(
+                "udp",
+                EngineConfig.Singbox.DEFAULT_DNS_SERVERS.first(),
+                null,
+            )
+
             fun from(server: String): DnsEndpoint = when {
                 server.startsWith("https://") -> fromUri(server, "https")
                 server.startsWith("tls://") -> fromUri(server, "tls")
@@ -298,6 +307,8 @@ object ConfigBuilder {
             }
         }
     }
+
+    private fun String.isDnsHostname(): Boolean = !isValidIpv4Dns() && !isValidPlainIpv6Dns()
 
     private fun tunInbound(): String {
         val sb = StringBuilder()
