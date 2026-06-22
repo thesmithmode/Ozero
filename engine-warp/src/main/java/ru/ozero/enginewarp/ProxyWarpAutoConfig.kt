@@ -102,7 +102,7 @@ class ProxyWarpAutoConfig(
             try {
                 val tag = mirrorTag(url)
                 val httpResult = withTimeoutOrNull(PER_MIRROR_TIMEOUT_MS) {
-                    httpClient.postJson(url, REQUEST_BODY, userAgent)
+                    httpClient.postJson(url, requestBodyFor(url), userAgent)
                 } ?: run {
                     ranker.recordFailure(url)
                     return@async Result.failure(IOException("mirror timeout [$tag]"))
@@ -255,6 +255,13 @@ class ProxyWarpAutoConfig(
         const val REQUEST_BODY =
             "{\"selectedServices\":[],\"siteMode\":\"all\"," +
                 "\"deviceType\":\"computer\",\"endpoint\":\"162.159.195.1:500\"}"
+        const val GENERATOR_REQUEST_BODY =
+            "{\"selectedServices\":[],\"siteMode\":\"all\"," +
+                "\"deviceType\":\"awg15\",\"endpoint\":\"162.159.195.1:500\"," +
+                "\"configFormat\":\"wireguard\",\"ipv6\":true}"
+
+        fun requestBodyFor(url: String): String =
+            if (url.endsWith("/api/generate")) GENERATOR_REQUEST_BODY else REQUEST_BODY
 
         val DEFAULT_MIRRORS: List<String> = listOf(
             "https://portawg11.netlify.app/api/warp",
@@ -337,6 +344,10 @@ class ProxyWarpAutoConfig(
             "https://portal-vless.netlify.app/api/warp",
             "https://warp-porta.netlify.app/api/warp",
             "https://warpgen.netlify.app/api/warp",
+            "https://warp3.llimonix.pw/api/generate",
+            "https://warply2.vercel.app/api/generate",
+            "https://getwarp2.netlify.app/api/generate",
+            "https://warp.llimonix.workers.dev/api/generate",
         )
     }
 }
