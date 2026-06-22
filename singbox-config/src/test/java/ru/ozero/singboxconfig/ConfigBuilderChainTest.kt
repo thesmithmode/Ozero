@@ -62,6 +62,24 @@ class ConfigBuilderChainTest {
     }
 
     @Test
+    fun `chain config with upstream detours DNS through upstream`() {
+        val upstream = ConfigBuilder.Upstream("127.0.0.1", 49152)
+        val json = ConfigBuilder.buildChainConfig(
+            makeBean(),
+            socksPort = 49408,
+            upstream = upstream,
+            dnsServers = listOf("tls://dns.example"),
+        )
+
+        assertContains(json, "\"server\":\"dns.example\"")
+        assertContains(json, "\"tag\":\"dns-domain-resolver\"")
+        val detourCount = "\"detour\":\"upstream\"".toRegex().findAll(json).count()
+        assertTrue(detourCount >= 3, "proxy DNS and resolver should use upstream detour, found $detourCount")
+        assertFalse(json.contains("\"detour\":\"direct\""))
+        assertFalse(json.contains("\"detour\":\"proxy\""))
+    }
+
+    @Test
     fun `auto chain config with multiple beans produces urltest`() {
         val beans = listOf(
             makeBean(uuid = "aaaa-1", host = "s1.com"),

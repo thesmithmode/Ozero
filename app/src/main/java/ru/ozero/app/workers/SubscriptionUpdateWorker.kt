@@ -45,7 +45,7 @@ class SubscriptionUpdateWorker @AssistedInject constructor(
 
     private suspend fun probeGroup(groupId: Long) {
         val profiles = prioritizeSingboxAutoProfiles(
-            profileDao.getAutoCandidatesByGroupId(groupId, MAX_BACKGROUND_PROBE_PROFILES),
+            profileDao.getAutoCandidatesByGroupId(groupId, MAX_BACKGROUND_PROBE_WINDOW),
             MAX_BACKGROUND_PROBE_PROFILES,
         )
         if (profiles.isEmpty()) return
@@ -60,6 +60,7 @@ class SubscriptionUpdateWorker @AssistedInject constructor(
         private const val INTERVAL_HOURS = 24L
         private const val MIN_UPDATE_INTERVAL_MS = 23L * 60 * 60 * 1000
         private const val MAX_BACKGROUND_PROBE_PROFILES = 20
+        private const val MAX_BACKGROUND_PROBE_WINDOW = 2_000
 
         fun schedule(workManager: WorkManager) {
             val constraints = Constraints.Builder()
