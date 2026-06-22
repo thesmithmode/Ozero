@@ -523,10 +523,13 @@ private fun buildTls(bean: StandardV2RayBean): String? {
 private fun tlsServerName(bean: StandardV2RayBean): String {
     if (bean.sni.isNotEmpty()) return bean.sni.trim()
     val host = bean.host.trim()
-    if (bean.security == "reality" && host.isDomainNameForSni()) return host
     val server = bean.serverAddress.trim().trim('[', ']')
+    if (host.isDomainNameForSni() && (bean.security == "reality" || server.isIpAddressForSni())) return host
     return if (server.isDomainNameForSni()) server else ""
 }
+
+private fun String.isIpAddressForSni(): Boolean =
+    isNotEmpty() && (all { it.isDigit() || it == '.' } || ":" in this)
 
 private fun String.isDomainNameForSni(): Boolean {
     if (isEmpty() || length > 253 || ":" in this) return false
