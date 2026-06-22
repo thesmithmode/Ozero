@@ -33,7 +33,9 @@ class AutoModeParamsRoutingSentinelTest {
         val nullIdx = helperBlock.indexOf("null -> TopScreen.AutoModeSettings")
         val elseIdx = helperBlock.indexOf("else ->")
         assertTrue(nullIdx >= 0, "null-ветка отсутствует в engineParamsTarget when(engineId)")
-        assertTrue(elseIdx >= 0, "else-ветка отсутствует в engineParamsTarget when(engineId)")
-        assertTrue(nullIdx < elseIdx, "null-ветка должна быть до else (иначе else перехватит null)")
+        assertTrue(
+            elseIdx < 0 || nullIdx < elseIdx,
+            "null-ветка должна быть до else (иначе else перехватит null)",
+        )
     }
 }

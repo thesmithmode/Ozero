@@ -63,6 +63,7 @@ class SingboxProbeService internal constructor(
     suspend fun probeAndAutoSelect(
         profiles: List<ProxyProfile>,
         onProfileTestingChanged: (Long, Boolean) -> Unit = { _, _ -> },
+        updateManualSelection: Boolean = true,
     ) {
         val probeCandidates = profiles.mapNotNull { profile ->
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(profile.beanBlob) }.getOrNull()
@@ -105,6 +106,7 @@ class SingboxProbeService internal constructor(
             )
             ?.profile
             ?: return
+        if (!updateManualSelection) return
         dataStore.edit { prefs ->
             if (prefs[SELECTED_PROFILE_KEY] == SingboxEngine.SELECTED_AUTO) return@edit
             prefs[SELECTED_PROFILE_KEY] = best.id

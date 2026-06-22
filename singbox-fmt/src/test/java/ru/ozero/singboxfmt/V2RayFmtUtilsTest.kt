@@ -56,6 +56,19 @@ class V2RayFmtUtilsTest {
     }
 
     @Test
+    fun `parseSecurityParams treats pbk as reality even when security says tls`() {
+        val bean = V2RayFmt.parseVLESS(
+            "vless://12345678-1234-1234-1234-123456789abc@203.0.113.10:443" +
+                "?type=tcp&security=tls&sni=front.example.com&pbk=public&sid=01&fp=chrome",
+        )
+
+        assertEquals("reality", bean.security)
+        assertEquals("public", bean.realityPublicKey)
+        assertEquals("01", bean.realityShortId)
+        assertEquals("front.example.com", bean.sni)
+    }
+
+    @Test
     fun `parseSecurityParams uses safe defaults`() {
         val bean = VLESSBean()
 

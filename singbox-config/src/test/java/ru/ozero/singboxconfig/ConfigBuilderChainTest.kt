@@ -51,14 +51,32 @@ class ConfigBuilderChainTest {
     }
 
     @Test
-    fun `chain config uses plain DNS through proxy detour`() {
+    fun `chain config uses direct bootstrap DNS without proxy detour`() {
         val json = ConfigBuilder.buildChainConfig(makeBean(), socksPort = 49408)
 
         assertContains(json, "\"server\":\"9.9.9.9\"")
         assertContains(json, "\"type\":\"udp\"")
-        assertContains(json, "\"detour\":\"proxy\"")
+        assertFalse(json.contains("\"detour\":\"proxy\""), "bootstrap DNS must not loop through proxy outbound")
         assertContains(json, "\"action\":\"hijack-dns\"")
         assertFalse(json.contains("\"type\":\"dns\""), "chain config must not rely on legacy dns outbound")
+    }
+
+    @Test
+    fun `chain config with upstream detours DNS through upstream`() {
+        val upstream = ConfigBuilder.Upstream("127.0.0.1", 49152)
+        val json = ConfigBuilder.buildChainConfig(
+            makeBean(),
+            socksPort = 49408,
+            upstream = upstream,
+            dnsServers = listOf("tls://dns.example"),
+        )
+
+        assertContains(json, "\"server\":\"dns.example\"")
+        assertContains(json, "\"tag\":\"dns-domain-resolver\"")
+        val detourCount = "\"detour\":\"upstream\"".toRegex().findAll(json).count()
+        assertTrue(detourCount >= 3, "proxy DNS and resolver should use upstream detour, found $detourCount")
+        assertFalse(json.contains("\"detour\":\"direct\""))
+        assertFalse(json.contains("\"detour\":\"proxy\""))
     }
 
     @Test
