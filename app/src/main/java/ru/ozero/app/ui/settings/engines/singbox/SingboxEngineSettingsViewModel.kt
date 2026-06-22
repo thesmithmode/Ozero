@@ -80,6 +80,7 @@ data class SingboxSettingsUiState(
     val manualLinksInput: String = "",
     val manualLinksGroupName: String = "",
     val manualLinksError: String? = null,
+    val probeTimeoutSeconds: Int = SingboxProbeService.DEFAULT_PROBE_TIMEOUT_MS / 1_000,
 )
 
 @Suppress("TooManyFunctions")
@@ -130,6 +131,10 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             sortOrder = sort,
             dnsPresetId = dnsPresetId,
             dnsServers = dnsServers,
+            probeTimeoutSeconds = (
+                prefs[SingboxProbeService.PROBE_TIMEOUT_MS_KEY]
+                    ?: SingboxProbeService.DEFAULT_PROBE_TIMEOUT_MS
+                ) / 1_000,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SingboxSettingsUiState())
 
@@ -186,6 +191,18 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                 current.removeAt(from)
                 current.add(to, profileId)
                 proxyChainDao.replace(current)
+            }
+        }
+    }
+
+    fun onProbeTimeoutSecondsChange(value: String) {
+        val seconds = value.toIntOrNull()?.coerceIn(
+            SingboxProbeService.MIN_PROBE_TIMEOUT_MS / 1_000,
+            SingboxProbeService.MAX_PROBE_TIMEOUT_MS / 1_000,
+        ) ?: return
+        viewModelScope.launch {
+            dataStore.edit { prefs ->
+                prefs[SingboxProbeService.PROBE_TIMEOUT_MS_KEY] = seconds * 1_000
             }
         }
     }

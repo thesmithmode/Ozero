@@ -166,10 +166,27 @@ class SingboxProbeServiceTest {
             })
 
         assertEquals(profiles.map { it.id }.toSet(), testedIds)
-        assertTrue(
-            maxTestingNow.get() <= SingboxProbeService.MAX_CONCURRENT_PROFILE_PROBES,
-            "profile testing UI state must never show more than 10 active probes",
+        assertEquals(
+            SingboxProbeService.MAX_CONCURRENT_PROFILE_PROBES,
+            maxTestingNow.get(),
+            "profile testing UI state must match the single service-backed probe slot",
         )
+    }
+
+    @Test
+    fun `probeAndAutoSelect passes configured timeout to profile probe`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(
+            mutablePreferencesOf(SingboxProbeService.PROBE_TIMEOUT_MS_KEY to 7_000),
+        )
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val probe = TimeoutRecordingProfileProbe()
+        val profile = makeProfile(id = 10L, host = "timeout.example", port = 443)
+
+        SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(listOf(profile))
+
+        assertEquals(listOf(7_000), probe.timeouts)
+        assertEquals(12, dao.latencies[10L])
     }
 
     @Test
@@ -181,7 +198,7 @@ class SingboxProbeServiceTest {
         val second = makeProfile(id = 2L, host = "second.example", port = 443)
 
         val probe = object : SingboxProfileProbe {
-            override suspend fun probeLatencyMs(bean: AbstractBean): Int {
+            override suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int {
                 when (bean.serverAddress) {
                     "first.example" -> delay(50)
                     "second.example" -> delay(0)
@@ -369,12 +386,20 @@ class SingboxProbeServiceTest {
     private class FakeProfileProbe(
         private val latenciesByAddress: Map<String, Int>,
     ) : SingboxProfileProbe {
-        override suspend fun probeLatencyMs(bean: AbstractBean): Int =
+        override suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int =
             latenciesByAddress[bean.displayAddress()] ?: SingboxProbeService.LATENCY_FAILED
     }
 
+    private class TimeoutRecordingProfileProbe : SingboxProfileProbe {
+        val timeouts = mutableListOf<Int>()
+        override suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int {
+            timeouts += timeoutMs
+            return 12
+        }
+    }
+
     private class TrackingProfileProbe : SingboxProfileProbe {
-        override suspend fun probeLatencyMs(bean: AbstractBean): Int {
+        override suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int {
             delay(10)
             return 1
         }
@@ -382,7 +407,7 @@ class SingboxProbeServiceTest {
 
     private class CountingProfileProbe : SingboxProfileProbe {
         val calls = AtomicInteger(0)
-        override suspend fun probeLatencyMs(bean: AbstractBean): Int {
+        override suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int {
             calls.incrementAndGet()
             return 1
         }

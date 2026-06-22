@@ -355,18 +355,12 @@ class MainViewModel @Inject constructor(
         val sessionStartMs = tunnelController.stats.value?.sessionStartMs ?: 0L
         val prev = _speedHistory.value
         val tail = prev.lastOrNull()
-        val gapFill = if (tail == null || now - tail.tsMs <= SPEED_SAMPLE_INTERVAL_MS) {
-            emptyList()
+        val nextBase = if (tail == null || now - tail.tsMs <= SPEED_SAMPLE_INTERVAL_MS) {
+            prev
         } else {
-            val oldestKeptTs = now -
-                (MAX_SPEED_HISTORY_POINTS - 1L) * SPEED_SAMPLE_INTERVAL_MS
-            val gapStart = maxOf(tail.tsMs + SPEED_SAMPLE_INTERVAL_MS, oldestKeptTs)
-            generateSequence(gapStart) { it + SPEED_SAMPLE_INTERVAL_MS }
-                .takeWhile { it < now }
-                .map { SpeedSample(it, tail.rxBps, tail.txBps) }
-                .toList()
+            emptyList()
         }
-        val next = (prev + gapFill + SpeedSample(now, rxBps, txBps)).takeLast(MAX_SPEED_HISTORY_POINTS)
+        val next = (nextBase + SpeedSample(now, rxBps, txBps)).takeLast(MAX_SPEED_HISTORY_POINTS)
         _speedHistory.value = next
         cacheSpeedHistory(sessionStartMs, next)
     }

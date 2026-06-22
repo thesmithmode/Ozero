@@ -371,12 +371,7 @@ class SingboxEngine @Inject constructor(
                 stopRuntimeAfterFailedReadiness(p)
                 return StartResult.Failure("sing-box proxy runtime failed to start")
             }
-            val routedProbeReady = awaitTrafficReady(port, autoSelect = config.autoSelectBeanBlobs.isNotEmpty())
-            if (!routedProbeReady) {
-                activeSocksPort = 0
-                stopRuntimeAfterFailedReadiness(p)
-                return StartResult.Failure("sing-box routed probe failed")
-            }
+            warmTrafficProbe(port, autoSelect = config.autoSelectBeanBlobs.isNotEmpty())
             activeSocksPort = port
             PersistentLoggers.info(TAG, "startProxyMode sent over AIDL port=$port")
             StartResult.Success(socksPort = port)
@@ -421,12 +416,7 @@ class SingboxEngine @Inject constructor(
                 clearPendingStart()
                 return TunAttachResult.Failure("sing-box runtime failed to start")
             }
-            val routedProbeReady = awaitTrafficReady(pendingSocksPort, pendingTunAutoSelect)
-            if (!routedProbeReady) {
-                stopRuntimeAfterFailedReadiness(p)
-                clearPendingStart()
-                return TunAttachResult.Failure("sing-box started but routed probe failed")
-            }
+            warmTrafficProbe(pendingSocksPort, pendingTunAutoSelect)
             activeSocksPort = pendingSocksPort
             activeTunAutoSelect = false
             pendingTunAutoSelect = false
@@ -443,18 +433,18 @@ class SingboxEngine @Inject constructor(
         }
     }
 
-    private suspend fun awaitTrafficReady(socksPort: Int, autoSelect: Boolean): Boolean {
-        if (socksPort <= 0) return false
+    private suspend fun warmTrafficProbe(socksPort: Int, autoSelect: Boolean) {
+        if (socksPort <= 0) return
         repeat(READY_PROBE_ATTEMPTS) { attempt ->
             val latency = routedProbe.probeLatencyMs(socksPort)
-            if (latency >= 0) return true
+            if (latency >= 0) return
             PersistentLoggers.debug(
                 TAG,
-                "routed probe failed attempt=${attempt + 1}/$READY_PROBE_ATTEMPTS autoSelect=$autoSelect",
+                "routed probe warmup failed attempt=${attempt + 1}/$READY_PROBE_ATTEMPTS autoSelect=$autoSelect",
             )
             if (attempt != READY_PROBE_ATTEMPTS - 1) delay(READY_PROBE_RETRY_MS)
         }
-        return false
+        PersistentLoggers.warn(TAG, "routed probe warmup failed port=$socksPort autoSelect=$autoSelect")
     }
 
     private fun stopRuntimeAfterFailedReadiness(p: ISingboxEngineProcess) {

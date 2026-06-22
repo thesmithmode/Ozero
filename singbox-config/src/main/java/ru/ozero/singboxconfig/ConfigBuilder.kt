@@ -490,7 +490,8 @@ private fun buildTls(bean: StandardV2RayBean): String? {
 
     val sb = StringBuilder()
     sb.append("""{"enabled":true,""")
-    sb.append(""""server_name":${jsonString(tlsServerName(bean))},""")
+    val serverName = tlsServerName(bean)
+    if (serverName.isNotEmpty()) sb.append(""""server_name":${jsonString(serverName)},""")
 
     if (bean.alpn.isNotEmpty()) {
         val alpns = bean.alpn.split(",").joinToString(",") { jsonString(it.trim()) }
@@ -520,9 +521,23 @@ private fun buildTls(bean: StandardV2RayBean): String? {
 }
 
 private fun tlsServerName(bean: StandardV2RayBean): String {
-    if (bean.sni.isNotEmpty()) return bean.sni
+    if (bean.sni.isNotEmpty()) return bean.sni.trim()
     val host = bean.host.trim()
-    return if (host.isNotEmpty() && "," !in host && ";" !in host) host else bean.serverAddress
+    if (bean.security == "reality" && host.isDomainNameForSni()) return host
+    val server = bean.serverAddress.trim().trim('[', ']')
+    return if (server.isDomainNameForSni()) server else ""
+}
+
+private fun String.isDomainNameForSni(): Boolean {
+    if (isEmpty() || length > 253 || ":" in this) return false
+    if (all { it.isDigit() || it == '.' }) return false
+    return split('.').all { label ->
+        label.isNotEmpty() &&
+            label.length <= 63 &&
+            label.first().isLetterOrDigit() &&
+            label.last().isLetterOrDigit() &&
+            label.all { it.isLetterOrDigit() || it == '-' }
+    }
 }
 
 private fun buildMap(vararg pairs: Pair<String, String>): String {
