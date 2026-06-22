@@ -600,8 +600,12 @@ class WarpAutoConfigTest {
             "api.cloudflareclient.com блокируется ТСПУ в РФ — НЕ должен быть в списке зеркал",
         )
         assertTrue(
-            urls.all { it.endsWith("/api/warp") },
-            "Все зеркала используют /api/warp endpoint",
+            urls.all { it.endsWith("/api/warp") || it.endsWith("/api/generate") },
+            "Все зеркала используют поддерживаемые endpoints",
+        )
+        assertTrue(
+            urls.any { it.endsWith("/api/generate") },
+            "Список включает публичные generator mirrors из справочных сайтов",
         )
         assertTrue(
             urls.any { it.contains("netlify.app") },
@@ -624,6 +628,11 @@ class WarpAutoConfigTest {
         assertTrue(body.contains("\"siteMode\":\"all\""))
         assertTrue(body.contains("\"deviceType\":\"computer\""))
         assertTrue(body.contains("\"endpoint\":\"162.159.195.1:500\""))
+        val generatorBody = ProxyWarpAutoConfig.GENERATOR_REQUEST_BODY
+        assertTrue(generatorBody.contains("\"deviceType\":\"awg15\""))
+        assertTrue(generatorBody.contains("\"configFormat\":\"wireguard\""))
+        assertEquals(generatorBody, ProxyWarpAutoConfig.requestBodyFor("https://example.com/api/generate"))
+        assertEquals(body, ProxyWarpAutoConfig.requestBodyFor("https://example.com/api/warp"))
         assertTrue(
             !body.contains("\"key\""),
             "Поле \"key\" клиентского pubkey запрещено — proxy-зеркала генерируют ключ сервером",
