@@ -283,7 +283,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `attachTun returns failure and stops runtime when probes fail after runtime starts`() = runTest {
+    fun `attachTun succeeds and keeps runtime when warmup probes fail after runtime starts`() = runTest {
         mockkStatic(ParcelFileDescriptor::class)
         try {
             val engine = buildEngine()
@@ -301,12 +301,11 @@ class SingboxEngineProbeTest {
 
             val result = engine.attachTun(42)
 
-            val failure = assertIs<TunAttachResult.Failure>(result)
-            assertTrue(failure.reason.contains("sing-box started but routed probe failed"))
-            verify(exactly = 1) { process.stopAndWait(3_000L) }
+            assertIs<TunAttachResult.Success>(result)
+            verify(exactly = 0) { process.stopAndWait(3_000L) }
             assertEquals(null, engine.privateField("pendingConfig"))
             assertEquals(0, engine.privateIntField("pendingSocksPort"))
-            assertEquals(0, engine.privateIntField("activeSocksPort"))
+            assertEquals(49408, engine.privateIntField("activeSocksPort"))
             assertEquals(false, engine.privateBooleanField("activeTunAutoSelect"))
         } finally {
             unmockkStatic(ParcelFileDescriptor::class)
@@ -348,7 +347,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `proxy mode returns failure and stops runtime when routed probes fail after runtime starts`() = runTest {
+    fun `proxy mode keeps runtime when warmup routed probes fail after runtime starts`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
         val process = mockk<ISingboxEngineProcess>()
@@ -366,10 +365,10 @@ class SingboxEngineProbeTest {
             Upstream.None,
         )
 
-        val failure = assertIs<StartResult.Failure>(result)
-        assertEquals("sing-box routed probe failed", failure.reason)
-        verify(exactly = 1) { process.stopAndWait(3_000L) }
-        assertEquals(0, engine.privateIntField("activeSocksPort"))
+        val success = assertIs<StartResult.Success>(result)
+        assertTrue(success.socksPort > 0)
+        verify(exactly = 0) { process.stopAndWait(3_000L) }
+        assertEquals(success.socksPort, engine.privateIntField("activeSocksPort"))
     }
 
     @Test

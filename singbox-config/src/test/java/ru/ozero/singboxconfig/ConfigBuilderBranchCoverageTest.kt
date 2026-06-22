@@ -29,16 +29,46 @@ class ConfigBuilderBranchCoverageTest {
     fun `tls block covers insecure certificate and server name fallbacks`() {
         val bean = vless().apply {
             security = "tls"
-            host = "front.example.com,other.example.com"
+            serverAddress = "203.0.113.10"
+            host = "front.example.com"
             allowInsecure = true
             certificates = "-----BEGIN CERTIFICATE-----"
         }
 
         val json = ConfigBuilder.buildSingboxConfig(bean)
 
-        assertContains(json, "\"server_name\":\"server.example.com\"")
+        assertFalse(json.contains("\"server_name\""))
         assertContains(json, "\"insecure\":true")
         assertContains(json, "\"certificate\":\"-----BEGIN CERTIFICATE-----\"")
+    }
+
+    @Test
+    fun `tls block uses explicit sni before server and never transport host`() {
+        val json = ConfigBuilder.buildSingboxConfig(
+            vless().apply {
+                security = "tls"
+                serverAddress = "server.example.com"
+                host = "front.example.com"
+                sni = "sni.example.com"
+            },
+        )
+
+        assertContains(json, "\"server_name\":\"sni.example.com\"")
+        assertFalse(json.contains("\"server_name\":\"front.example.com\""))
+    }
+
+    @Test
+    fun `tls block falls back to domain server address not websocket host`() {
+        val json = ConfigBuilder.buildSingboxConfig(
+            vless().apply {
+                security = "tls"
+                serverAddress = "server.example.com"
+                host = "front.example.com"
+            },
+        )
+
+        assertContains(json, "\"server_name\":\"server.example.com\"")
+        assertFalse(json.contains("\"server_name\":\"front.example.com\""))
     }
 
     @Test
@@ -223,7 +253,8 @@ class ConfigBuilderBranchCoverageTest {
     fun `tls branch escapes special characters and emits optional knobs`() {
         val bean = vless().apply {
             security = "tls"
-            serverAddress = "srv\n\"quoted\"\\\u0001.example.com"
+            serverAddress = "srv.example.com"
+            sni = "srv\n\"quoted\"\\\u0001.example.com"
             host = "front.example.com,other.example.com"
             alpn = "h2, http/1.1"
             utlsFingerprint = "firefox"
