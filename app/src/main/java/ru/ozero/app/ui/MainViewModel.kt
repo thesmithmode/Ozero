@@ -355,7 +355,7 @@ class MainViewModel @Inject constructor(
         val sessionStartMs = tunnelController.stats.value?.sessionStartMs ?: 0L
         val prev = _speedHistory.value
         val tail = prev.lastOrNull()
-        val nextBase = if (tail == null || now - tail.tsMs <= SPEED_SAMPLE_INTERVAL_MS) {
+        val nextBase = if (tail == null || now - tail.tsMs <= SPEED_HISTORY_RESET_GAP_MS) {
             prev
         } else {
             emptyList()
@@ -425,6 +425,7 @@ class MainViewModel @Inject constructor(
         const val IP_TAG = "MainViewModel.ip"
         const val MAX_SPEED_HISTORY_POINTS = 3_600
         const val SPEED_SAMPLE_INTERVAL_MS = 1_000L
+        const val SPEED_HISTORY_RESET_GAP_MS = 5_000L
         const val URNETWORK_PEER_POLL_MS = 2_000L
         const val URNETWORK_PEER_POLL_KEEP_MS = 5_000L
         const val URNETWORK_SEARCH_TICK_MS = 1_000L

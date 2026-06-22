@@ -416,7 +416,12 @@ class SingboxEngine @Inject constructor(
                 clearPendingStart()
                 return TunAttachResult.Failure("sing-box runtime failed to start")
             }
-            warmTrafficProbe(pendingSocksPort, pendingTunAutoSelect)
+            val trafficReady = warmTrafficProbe(pendingSocksPort, pendingTunAutoSelect)
+            if (pendingTunAutoSelect && !trafficReady) {
+                stopRuntimeAfterFailedReadiness(p)
+                clearPendingStart()
+                return TunAttachResult.Failure("sing-box auto-select routed probe failed")
+            }
             activeSocksPort = pendingSocksPort
             activeTunAutoSelect = false
             pendingTunAutoSelect = false
@@ -433,8 +438,8 @@ class SingboxEngine @Inject constructor(
         }
     }
 
-    private suspend fun warmTrafficProbe(socksPort: Int, autoSelect: Boolean) {
-        if (socksPort <= 0) return
+    private suspend fun warmTrafficProbe(socksPort: Int, autoSelect: Boolean): Boolean {
+        if (socksPort <= 0) return false
         repeat(READY_PROBE_ATTEMPTS) { attempt ->
             val latency = routedProbe.probeLatencyMs(socksPort)
             if (latency >= 0) return
@@ -445,6 +450,7 @@ class SingboxEngine @Inject constructor(
             if (attempt != READY_PROBE_ATTEMPTS - 1) delay(READY_PROBE_RETRY_MS)
         }
         PersistentLoggers.warn(TAG, "routed probe warmup failed port=$socksPort autoSelect=$autoSelect")
+        return false
     }
 
     private fun stopRuntimeAfterFailedReadiness(p: ISingboxEngineProcess) {
@@ -510,25 +516,12 @@ class SingboxEngine @Inject constructor(
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
         if (activeAutoSelect) {
-            val p = proxy ?: return EnginePlugin.ReadyResult.Timeout("sing-box process is not connected")
-            val port = activeSocksPort.takeIf { it > 0 }
-                ?: return EnginePlugin.ReadyResult.Timeout("sing-box SOCKS probe port is not active")
-            val runtimeRunning = runCatching { p.runtimeRunning() }.getOrElse {
-                clearRuntimeState()
-                return EnginePlugin.ReadyResult.Timeout("sing-box runtime health check failed: ${it.message}")
-            }
-            if (!runtimeRunning) {
-                clearRuntimeState()
-                return EnginePlugin.ReadyResult.Timeout("sing-box runtime is not running")
-            }
-            engineScope.launch {
-                val latency = routedProbe.probeLatencyMs(port)
-                if (latency < 0) {
-                    PersistentLoggers.warn(TAG, "auto-select warmup probe failed port=$port")
-                }
-            }
-            return EnginePlugin.ReadyResult.Ready
+            return awaitRoutedReady(clearAutoSelect = true)
         }
+        return awaitRoutedReady(clearAutoSelect = false)
+    }
+
+    private suspend fun awaitRoutedReady(clearAutoSelect: Boolean): EnginePlugin.ReadyResult {
         var lastFailure: ProbeResult.Failure? = null
         repeat(READY_PROBE_ATTEMPTS) { attempt ->
             when (val result = probeInternal(clearOnRoutedFailure = false)) {
@@ -542,6 +535,7 @@ class SingboxEngine @Inject constructor(
                     if (activeTunAutoSelect) {
                         activeSocksPort = 0
                         activeTunAutoSelect = false
+                        if (clearAutoSelect) activeAutoSelect = false
                         return EnginePlugin.ReadyResult.Timeout(result.reason)
                     }
                     if (attempt != READY_PROBE_ATTEMPTS - 1) delay(READY_PROBE_RETRY_MS)
@@ -550,6 +544,7 @@ class SingboxEngine @Inject constructor(
         }
         activeSocksPort = 0
         activeTunAutoSelect = false
+        if (clearAutoSelect) activeAutoSelect = false
         return EnginePlugin.ReadyResult.Timeout(lastFailure?.reason ?: "sing-box routed probe failed")
     }
 
