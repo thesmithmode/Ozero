@@ -3,8 +3,6 @@
     Network Security Config.
 
     Запрещает cleartext HTTP трафик, кроме routed connectivity probes.
-    User-installed CA certificates are trusted so private subscription endpoints
-    can use an owner-managed CA installed explicitly by the device user.
 -->
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">
@@ -14,7 +12,6 @@
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
         </trust-anchors>
     </base-config>
 </network-security-config>

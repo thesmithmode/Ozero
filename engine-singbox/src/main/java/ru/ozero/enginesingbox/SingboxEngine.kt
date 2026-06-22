@@ -442,7 +442,7 @@ class SingboxEngine @Inject constructor(
         if (socksPort <= 0) return false
         repeat(READY_PROBE_ATTEMPTS) { attempt ->
             val latency = routedProbe.probeLatencyMs(socksPort)
-            if (latency >= 0) return
+            if (latency >= 0) return true
             PersistentLoggers.debug(
                 TAG,
                 "routed probe warmup failed attempt=${attempt + 1}/$READY_PROBE_ATTEMPTS autoSelect=$autoSelect",
