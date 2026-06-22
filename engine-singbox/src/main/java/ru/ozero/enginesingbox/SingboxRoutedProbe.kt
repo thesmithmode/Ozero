@@ -27,7 +27,7 @@ class SingboxHttp204RoutedProbe(
             return@withContext LATENCY_FAILED
         }
         val urls = listOf(probeUrl) + fallbackProbeUrls
-        for (url in urls.distinctBy { it.toString() }) {
+        for (url in urls.distinctBy { it.toString() }.take(MAX_PROBE_URLS)) {
             val latency = probeSingleUrl(url, socksPort)
             if (latency >= 0) return@withContext latency
         }
@@ -81,15 +81,11 @@ class SingboxHttp204RoutedProbe(
         const val PROBE_URL = "http://connectivitycheck.gstatic.com/generate_204"
         val FALLBACK_PROBE_URLS = listOf(
             "http://cp.cloudflare.com/generate_204",
-            "https://www.gstatic.com/generate_204",
-            "https://cp.cloudflare.com/generate_204",
-            "https://www.cloudflare.com/cdn-cgi/trace",
-            "http://connectivitycheck.gstatic.com/generate_204",
-            "http://cp.cloudflare.com/generate_204",
         )
         const val LATENCY_FAILED = -1L
         private const val LOOPBACK = "127.0.0.1"
         private const val DEFAULT_TIMEOUT_MS = 3_000
+        private const val MAX_PROBE_URLS = 2
         private const val GENERATE_204_PATH = "/generate_204"
         private val SUCCESS_HTTP_CODES = 200..299
     }

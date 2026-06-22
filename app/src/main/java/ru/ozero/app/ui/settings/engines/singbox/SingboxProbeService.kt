@@ -9,6 +9,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
@@ -17,6 +18,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -26,7 +28,6 @@ import ru.ozero.enginesingbox.ISingboxProtector
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.SingboxHttp204RoutedProbe
 import ru.ozero.enginesingbox.SingboxPrefs
-import ru.ozero.enginesingbox.SingboxRoutedProbe
 import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
@@ -65,6 +66,7 @@ class SingboxProbeService internal constructor(
         onProfileTestingChanged: (Long, Boolean) -> Unit = { _, _ -> },
         updateManualSelection: Boolean = true,
     ) {
+        val timeoutMs = dataStore.data.first()[PROBE_TIMEOUT_MS_KEY].normalizedSingboxProbeTimeoutMs()
         val probeCandidates = profiles.mapNotNull { profile ->
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(profile.beanBlob) }.getOrNull()
             if (bean == null || !ConfigBuilder.isSupportedBean(bean) || !bean.hasRoutableServerAddress()) {
@@ -86,7 +88,7 @@ class SingboxProbeService internal constructor(
                         val (profile, bean) = probeCandidates[index]
                         onProfileTestingChanged(profile.id, true)
                         try {
-                            val latency = probeLatencyMs(bean)
+                            val latency = probeLatencyMs(bean, timeoutMs)
                             if (latency == LATENCY_SKIPPED_ACTIVE_RUNTIME) continue
                             val storedLatency = if (latency >= 0) latency else LATENCY_FAILED
                             profileDao.updateLatency(profile.id, storedLatency)
@@ -114,7 +116,8 @@ class SingboxProbeService internal constructor(
         }
     }
 
-    private suspend fun probeLatencyMs(bean: AbstractBean): Int = profileProbe.probeLatencyMs(bean)
+    private suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int =
+        profileProbe.probeLatencyMs(bean, timeoutMs)
 
     private data class ProbeResult(
         val index: Int,
@@ -127,19 +130,27 @@ class SingboxProbeService internal constructor(
         val SELECTED_PROFILE_KEY = longPreferencesKey("singbox_selected_profile_id")
         const val LATENCY_UNTESTED = -1
         const val LATENCY_FAILED = -2
-        const val MAX_CONCURRENT_PROFILE_PROBES = 10
+        const val MAX_CONCURRENT_PROFILE_PROBES = 1
+        const val DEFAULT_PROBE_TIMEOUT_MS = 3_000
+        const val MIN_PROBE_TIMEOUT_MS = 1_000
+        const val MAX_PROBE_TIMEOUT_MS = 30_000
+        val PROBE_TIMEOUT_MS_KEY = intPreferencesKey("singbox_probe_timeout_ms")
     }
 }
 
 internal fun interface SingboxProfileProbe {
-    suspend fun probeLatencyMs(bean: AbstractBean): Int
+    suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int
 }
 
 internal const val LATENCY_SKIPPED_ACTIVE_RUNTIME = Int.MIN_VALUE
+internal fun Int?.normalizedSingboxProbeTimeoutMs(): Int =
+    (this ?: SingboxProbeService.DEFAULT_PROBE_TIMEOUT_MS).coerceIn(
+        SingboxProbeService.MIN_PROBE_TIMEOUT_MS,
+        SingboxProbeService.MAX_PROBE_TIMEOUT_MS,
+    )
 
 private class SingboxServiceProfileProbe(
     private val context: Context,
-    private val routedProbe: SingboxRoutedProbe = SingboxHttp204RoutedProbe(),
 ) : SingboxProfileProbe {
     private val mutex = Mutex()
 
@@ -147,7 +158,7 @@ private class SingboxServiceProfileProbe(
         override fun protect(fd: Int): Boolean = VpnSocketProtectorHolder.protect(fd)
     }
 
-    override suspend fun probeLatencyMs(bean: AbstractBean): Int = mutex.withLock {
+    override suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int = mutex.withLock {
         withContext(Dispatchers.IO) {
             val port = allocateProbePort()
             if (!bean.hasRoutableServerAddress()) return@withContext SingboxProbeService.LATENCY_FAILED
@@ -166,7 +177,7 @@ private class SingboxServiceProfileProbe(
                 delay(PROBE_START_DELAY_MS)
                 val running = runCatching { process.runtimeRunning() }.getOrDefault(false)
                 if (!running) return@withContext SingboxProbeService.LATENCY_FAILED
-                val latency = probeRoutedWithRetry(port)
+                val latency = probeRoutedWithRetry(port, timeoutMs)
                 if (latency >= 0) {
                     latency.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
                 } else {
@@ -179,9 +190,10 @@ private class SingboxServiceProfileProbe(
         }
     }
 
-    private suspend fun probeRoutedWithRetry(port: Int): Long {
+    private suspend fun probeRoutedWithRetry(port: Int, timeoutMs: Int): Long {
+        val probe = SingboxHttp204RoutedProbe(timeoutMs = timeoutMs.normalizedSingboxProbeTimeoutMs())
         repeat(PROBE_ATTEMPTS) { attempt ->
-            val latency = routedProbe.probeLatencyMs(port)
+            val latency = probe.probeLatencyMs(port)
             if (latency >= 0) return latency
             if (attempt < PROBE_ATTEMPTS - 1) delay(PROBE_RETRY_DELAY_MS)
         }

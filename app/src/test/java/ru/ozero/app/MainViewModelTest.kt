@@ -354,6 +354,47 @@ class MainViewModelTest {
     }
 
     @Test
+    fun speedHistoryKeepsSamplesAfterNormalJitter() = runTest {
+        val first = TunnelStats(txPackets = 1, txBytes = 100, rxPackets = 2, rxBytes = 200, timestampMs = 1)
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        tunnelController.updateStats(first)
+        advanceUntilIdle()
+        val beforeGap = viewModel.speedHistory.value.last()
+
+        Thread.sleep(1_100)
+        val second = TunnelStats(txPackets = 2, txBytes = 150, rxPackets = 3, rxBytes = 260, timestampMs = 2)
+        tunnelController.updateStats(second)
+        advanceUntilIdle()
+
+        val historyAfterGap = viewModel.speedHistory.value
+        assertEquals(2, historyAfterGap.size)
+        assertEquals(beforeGap, historyAfterGap.first())
+        assertTrue(historyAfterGap.last().tsMs > beforeGap.tsMs)
+    }
+
+    @Test
+    fun speedHistoryGapAfterBackgroundStartsFreshSeries() = runTest {
+        val first = TunnelStats(txPackets = 1, txBytes = 100, rxPackets = 2, rxBytes = 200, timestampMs = 1)
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        tunnelController.updateStats(first)
+        advanceUntilIdle()
+        val beforeGap = viewModel.speedHistory.value.last()
+
+        Thread.sleep(5_100)
+        val second = TunnelStats(txPackets = 2, txBytes = 150, rxPackets = 3, rxBytes = 260, timestampMs = 2)
+        tunnelController.updateStats(second)
+        advanceUntilIdle()
+
+        val historyAfterGap = viewModel.speedHistory.value
+        assertEquals(1, historyAfterGap.size)
+        assertTrue(historyAfterGap.single().tsMs > beforeGap.tsMs)
+    }
+
+    @Test
     fun speedHistoryClearedWhenNotSwitching() = runTest {
         val sample = TunnelStats(txPackets = 1, txBytes = 100, rxPackets = 2, rxBytes = 200, timestampMs = 1)
         tunnelController.onProbing()

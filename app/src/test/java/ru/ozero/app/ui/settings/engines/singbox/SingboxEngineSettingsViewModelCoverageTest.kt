@@ -115,6 +115,19 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
+    fun `onProbeTimeoutSecondsChange clamps and persists milliseconds`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+
+        harness.viewModel.onProbeTimeoutSecondsChange("45")
+        advanceUntilIdle()
+
+        assertEquals(30_000, harness.prefsFlow.value[SingboxProbeService.PROBE_TIMEOUT_MS_KEY])
+        assertEquals(30, harness.viewModel.state.value.probeTimeoutSeconds)
+    }
+
+    @Test
     fun `add group dialog show and hide preserve then reset fields`() = runTest {
         val harness = Harness()
         harness.startStateCollection(backgroundScope)
@@ -1171,7 +1184,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     private class RecordingProfileProbe(
         private val calls: ConcurrentLinkedQueue<String>,
     ) : SingboxProfileProbe {
-        override suspend fun probeLatencyMs(bean: AbstractBean): Int {
+        override suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int {
             calls += bean.serverAddress
             return 1
         }
