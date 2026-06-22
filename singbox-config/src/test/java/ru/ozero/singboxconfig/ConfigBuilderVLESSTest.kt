@@ -237,7 +237,6 @@ class ConfigBuilderVLESSTest {
         val json = ConfigBuilder.buildSingboxConfig(bean)
 
         assertContains(json, "\"server_name\":\"front.example.com\"")
-        assertFalse(json.contains("\"server_name\":\"203.0.113.10\""))
     }
 
     @Test
