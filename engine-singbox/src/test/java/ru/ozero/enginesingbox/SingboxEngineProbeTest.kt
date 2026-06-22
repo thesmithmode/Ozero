@@ -306,7 +306,7 @@ class SingboxEngineProbeTest {
             verify(exactly = 1) { process.stopAndWait(3_000L) }
             assertEquals(null, engine.privateField("pendingConfig"))
             assertEquals(0, engine.privateIntField("pendingSocksPort"))
-            assertEquals(0, engine.privateIntField("activeSocksPort"))
+            assertEquals(49408, engine.privateIntField("activeSocksPort"))
             assertEquals(false, engine.privateBooleanField("activeTunAutoSelect"))
         } finally {
             unmockkStatic(ParcelFileDescriptor::class)
