@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
+import okhttp3.OkHttpClient
 import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.app.vpn.singboxRuntimeFingerprint
 import ru.ozero.commonvpn.RuntimeFailureRouter
@@ -95,9 +96,10 @@ object SingboxModule {
         profileDao: ProxyProfileDao,
     ): RawUpdater =
         RawUpdater(
-            okHttpClient = SubscriptionTrustClientFactory.create(),
+            okHttpClient = OkHttpClient(),
             groupDao = groupDao,
             profileDao = profileDao,
+            userCaOkHttpClient = SubscriptionTrustClientFactory.create(),
         )
 
     @Provides

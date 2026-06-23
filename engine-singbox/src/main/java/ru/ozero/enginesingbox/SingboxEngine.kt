@@ -371,7 +371,6 @@ class SingboxEngine @Inject constructor(
                 stopRuntimeAfterFailedReadiness(p)
                 return StartResult.Failure("sing-box proxy runtime failed to start")
             }
-            warmTrafficProbe(port, autoSelect = config.autoSelectBeanBlobs.isNotEmpty())
             activeSocksPort = port
             PersistentLoggers.info(TAG, "startProxyMode sent over AIDL port=$port")
             StartResult.Success(socksPort = port)
