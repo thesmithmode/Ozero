@@ -378,7 +378,35 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `proxy mode keeps runtime when warmup routed probes fail after runtime starts`() = runTest {
+    fun `proxy mode publishes socks port without warmup routed probe`() = runTest {
+        val engine = buildEngine()
+        var probeCalls = 0
+        engine.routedProbe = SingboxRoutedProbe {
+            probeCalls++
+            SingboxHttp204RoutedProbe.LATENCY_FAILED
+        }
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.startProxyMode(any(), any()) } returns Unit
+        every { process.runtimeRunning() } returns true
+        engine.setPrivateField("proxy", process)
+
+        val result = engine.start(
+            EngineConfig.Singbox(
+                beanBlob = makeVlessBlob(),
+                protocolType = SingboxEngine.PROTOCOL_VLESS,
+                proxyMode = true,
+            ),
+            Upstream.None,
+        )
+
+        val success = assertIs<StartResult.Success>(result)
+        assertTrue(success.socksPort > 0)
+        assertEquals(0, probeCalls)
+        assertEquals(success.socksPort, engine.privateIntField("activeSocksPort"))
+    }
+
+    @Test
+    fun `proxy mode keeps runtime when routed probes are unavailable after runtime starts`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
         val process = mockk<ISingboxEngineProcess>()

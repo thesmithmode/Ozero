@@ -21,8 +21,9 @@ import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 import ru.ozero.singboxsubscription.parser.RawShareLinksParser
-import java.util.Base64
 import java.security.cert.CertPathValidatorException
+import java.util.Base64
+import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.SSLHandshakeException
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -263,6 +264,66 @@ class RawUpdaterTest {
         val result = rawUpdater.refresh(g)
 
         assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `should keep builtin subscriptions on default trust client`() = runBlocking {
+        val defaultCalls = AtomicInteger(0)
+        val userCaCalls = AtomicInteger(0)
+        rawUpdater = RawUpdater(
+            okHttpClient = OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    defaultCalls.incrementAndGet()
+                    chain.proceed(chain.request())
+                }
+                .build(),
+            groupDao = groupDao,
+            profileDao = profileDao,
+            userCaOkHttpClient = OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    userCaCalls.incrementAndGet()
+                    chain.proceed(chain.request())
+                }
+                .build(),
+        )
+        server.enqueue(MockResponse().setBody(vless1))
+        val g = group().copy(isBuiltin = true)
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isSuccess, "Expected success but got ${result.exceptionOrNull()}")
+        assertEquals(1, defaultCalls.get())
+        assertEquals(0, userCaCalls.get())
+    }
+
+    @Test
+    fun `should allow user trust client only for custom subscriptions`() = runBlocking {
+        val defaultCalls = AtomicInteger(0)
+        val userCaCalls = AtomicInteger(0)
+        rawUpdater = RawUpdater(
+            okHttpClient = OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    defaultCalls.incrementAndGet()
+                    chain.proceed(chain.request())
+                }
+                .build(),
+            groupDao = groupDao,
+            profileDao = profileDao,
+            userCaOkHttpClient = OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    userCaCalls.incrementAndGet()
+                    chain.proceed(chain.request())
+                }
+                .build(),
+        )
+        server.enqueue(MockResponse().setBody(vless1))
+        val g = group().copy(isBuiltin = false)
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isSuccess, "Expected success but got ${result.exceptionOrNull()}")
+        assertEquals(0, defaultCalls.get())
+        assertEquals(1, userCaCalls.get())
     }
 
     @Test
