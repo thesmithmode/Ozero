@@ -80,6 +80,7 @@ class SingboxHttp204RoutedProbe(
         private const val TAG = "SingboxRoutedProbe"
         const val PROBE_URL = "http://connectivitycheck.gstatic.com/generate_204"
         val FALLBACK_PROBE_URLS = listOf(
+            "https://www.gstatic.com/generate_204",
             "http://cp.cloudflare.com/generate_204",
         )
         const val LATENCY_FAILED = -1L
