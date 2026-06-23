@@ -34,11 +34,17 @@ class SingboxHttp204RoutedProbeTest {
     }
 
     @Test
-    fun `default routed probe uses bounded plain http endpoints`() {
+    fun `default routed probe keeps HTTPS fallback inside capped endpoints`() {
+        val cappedUrls = (
+            listOf(SingboxHttp204RoutedProbe.PROBE_URL) +
+                SingboxHttp204RoutedProbe.FALLBACK_PROBE_URLS
+            )
+            .distinct()
+            .take(2)
+
         assertTrue(SingboxHttp204RoutedProbe.PROBE_URL.startsWith("http://"))
-        assertTrue(SingboxHttp204RoutedProbe.FALLBACK_PROBE_URLS.first().startsWith("http://"))
-        assertTrue(SingboxHttp204RoutedProbe.FALLBACK_PROBE_URLS.all { it.startsWith("http://") })
-        assertTrue(SingboxHttp204RoutedProbe.FALLBACK_PROBE_URLS.size <= 1)
+        assertTrue(cappedUrls.any { it.startsWith("https://") })
+        assertEquals(2, cappedUrls.size)
     }
 
     @Test

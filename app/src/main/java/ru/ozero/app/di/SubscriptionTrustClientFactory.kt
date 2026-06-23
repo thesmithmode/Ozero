@@ -8,17 +8,21 @@ import javax.net.ssl.X509TrustManager
 import okhttp3.OkHttpClient
 
 object SubscriptionTrustClientFactory {
+    fun createSystem(): OkHttpClient = timeoutBuilder().build()
+
     fun create(): OkHttpClient {
         val trustManager = subscriptionTrustManager()
         val sslContext = SSLContext.getInstance("TLS")
         sslContext.init(null, arrayOf(trustManager), null)
-        return OkHttpClient.Builder()
+        return timeoutBuilder()
             .sslSocketFactory(sslContext.socketFactory, trustManager)
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .callTimeout(30, TimeUnit.SECONDS)
             .build()
     }
+
+    private fun timeoutBuilder(): OkHttpClient.Builder = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(30, TimeUnit.SECONDS)
 
     private fun subscriptionTrustManager(): X509TrustManager {
         val store = KeyStore.getInstance("AndroidCAStore").apply { load(null) }
