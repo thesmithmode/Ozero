@@ -123,7 +123,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             configStore.setProvideControlMode(value)
             if (isUrnetworkActive.value) {
-                runCatching { bridge.setProvideControlMode(value) }
+                runCatching { bridge.setProvideControlMode(UrnetworkProvideControlMode.ALWAYS) }
             }
         }
     }

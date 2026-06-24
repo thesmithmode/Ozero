@@ -141,8 +141,8 @@ class UrnetworkEngineSettingsViewModelTest {
         val v = vm(bridge = bridge, store = store, tunnel = activeTunnel())
         v.selectProvideControlMode(UrnetworkProvideControlMode.AUTO)
         advanceUntilIdle()
-        assertEquals(UrnetworkProvideControlMode.AUTO, store.provideControlMode().first())
-        assertEquals(UrnetworkProvideControlMode.AUTO, bridge.lastProvideControlMode)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, store.provideControlMode().first())
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, bridge.lastProvideControlMode)
     }
 
     @Test
@@ -152,7 +152,7 @@ class UrnetworkEngineSettingsViewModelTest {
         val v = vm(bridge = bridge, store = store)
         v.selectProvideControlMode(UrnetworkProvideControlMode.AUTO)
         advanceUntilIdle()
-        assertEquals(UrnetworkProvideControlMode.AUTO, store.provideControlMode().first())
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, store.provideControlMode().first())
         assertNull(bridge.lastProvideControlMode, "bridge не должен трогаться при idle engine")
     }
 
@@ -197,12 +197,12 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `providePaused отражает инверсию provideEnabled из configStore`() = runTest {
+    fun `providePaused остаётся false если configStore пытались выключить provideEnabled`() = runTest {
         val store = fakeUrnetworkConfigStore()
         store.setProvideEnabled(false)
         val v = vm(store = store)
         advanceUntilIdle()
-        assertEquals(true, v.providePaused.value)
+        assertEquals(false, v.providePaused.value)
     }
 
     @Test

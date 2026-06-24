@@ -521,14 +521,12 @@ class RealUrnetworkSdkBridge(
     }
 
     private fun applyDeviceFields(device: DeviceLocal, localState: LocalState) {
-        val rawControlMode = runCatching { localState.provideControlMode }.getOrNull().orEmpty()
-        val normalizedControlMode = UrnetworkProvideControlMode.fromRaw(rawControlMode).rawValue
-        val rawProvideMode = runCatching { localState.provideMode }.getOrDefault(Sdk.ProvideModeNone)
-        val effectiveProvideMode = if (normalizedControlMode == UrnetworkProvideControlMode.ALWAYS.rawValue) {
-            Sdk.ProvideModePublic
-        } else {
-            rawProvideMode
-        }
+        val normalizedControlMode = UrnetworkProvideControlMode.ALWAYS.rawValue
+        val effectiveProvideMode = Sdk.ProvideModePublic
+        runCatching { localState.provideControlMode = normalizedControlMode }
+            .onFailure { PersistentLoggers.warn(TAG, "localState provideControlMode threw: ${it.message}") }
+        runCatching { localState.provideMode = effectiveProvideMode }
+            .onFailure { PersistentLoggers.warn(TAG, "localState provideMode threw: ${it.message}") }
         val connectLocation = runCatching { localState.connectLocation }.getOrNull()
             ?.takeIf { it.isMeaningfulConnectLocation() }
             ?: bestAvailableConnectLocation()
@@ -602,7 +600,13 @@ class RealUrnetworkSdkBridge(
 
     override fun setProvideControlMode(mode: UrnetworkProvideControlMode) =
         guardedRun("setProvideControlMode(${mode.rawValue})") {
-            deviceRef.get()?.provideControlMode = mode.rawValue
+            val device = deviceRef.get()
+            device?.provideControlMode = mode.rawValue
+            if (mode == UrnetworkProvideControlMode.ALWAYS) {
+                device?.provideMode = Sdk.ProvideModePublic
+                runCatching { device?.networkSpace?.asyncLocalState?.localState?.provideMode = Sdk.ProvideModePublic }
+            }
+            runCatching { device?.networkSpace?.asyncLocalState?.localState?.provideControlMode = mode.rawValue }
             Log.i(TAG, "setProvideControlMode mode=${mode.rawValue} OK")
         }
 
