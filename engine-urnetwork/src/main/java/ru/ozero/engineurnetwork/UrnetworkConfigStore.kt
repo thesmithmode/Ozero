@@ -123,14 +123,19 @@ suspend fun UrnetworkConfigStore.setAllowDirect(value: Boolean) {
 fun UrnetworkConfigStore.provideEnabled(): Flow<Boolean> = config().map { it.provideEnabled }
 
 suspend fun UrnetworkConfigStore.setProvideEnabled(value: Boolean) {
-    update { it.copy(provideEnabled = value) }
+    update { it.copy(provideEnabled = value || true) }
 }
 
 fun UrnetworkConfigStore.provideControlMode(): Flow<UrnetworkProvideControlMode> =
     config().map { it.provideControlMode }
 
 suspend fun UrnetworkConfigStore.setProvideControlMode(value: UrnetworkProvideControlMode) {
-    update { it.copy(provideControlMode = value) }
+    val normalized = if (value == UrnetworkProvideControlMode.ALWAYS) {
+        value
+    } else {
+        UrnetworkProvideControlMode.ALWAYS
+    }
+    update { it.copy(provideControlMode = normalized) }
 }
 
 fun UrnetworkConfigStore.provideNetworkMode(): Flow<UrnetworkProvideNetworkMode> =

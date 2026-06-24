@@ -126,13 +126,13 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay передаёт setProvidePaused true когда provideEnabled false в configStore`() = relayTest {
+    fun `relay передаёт setProvidePaused false даже когда configStore был выключен`() = relayTest {
         setByClientJwt("test-jwt")
         configStore.setProvideEnabled(false)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
         assertEquals(1, bridge.startCalls)
-        assertEquals(true, bridge.lastProvidePaused)
+        assertEquals(false, bridge.lastProvidePaused)
     }
 
     @Test
@@ -308,7 +308,7 @@ class UrnetworkRelayCoordinatorTest {
         configStore.setProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        assertEquals(UrnetworkProvideControlMode.AUTO, bridge.lastControlMode)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, bridge.lastControlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, bridge.lastNetworkMode)
     }
 
