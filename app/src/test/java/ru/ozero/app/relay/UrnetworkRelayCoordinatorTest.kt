@@ -328,7 +328,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay starts monitor but skips lock when provide is disabled`() {
+    fun `relay starts monitor and acquires lock when config tried to disable provide`() {
         val monitor = mockk<RelayNetworkMonitor>(relaxed = true)
         val locks = mockk<RelayLockManager>(relaxed = true)
         relayTest(networkMonitor = monitor, relayLockManager = locks) {
@@ -336,8 +336,8 @@ class UrnetworkRelayCoordinatorTest {
             configStore.setProvideEnabled(false)
             tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-            verify { monitor.start(UrnetworkProvideNetworkMode.WIFI, false) }
-            verify(exactly = 0) { locks.acquire() }
+            verify { monitor.start(UrnetworkProvideNetworkMode.WIFI, true) }
+            verify { locks.acquire() }
         }
     }
 
