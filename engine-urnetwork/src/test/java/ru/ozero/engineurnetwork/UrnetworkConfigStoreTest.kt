@@ -169,10 +169,10 @@ class UrnetworkConfigStoreTest {
     }
 
     @Test
-    fun `setProvideEnabled(false) персистирует и provideEnabled возвращает false`() = runTest {
+    fun `setProvideEnabled false нормализуется в true`() = runTest {
         val (store, _) = newStore()
         store.setProvideEnabled(false)
-        assertEquals(false, store.provideEnabled().first())
+        assertEquals(true, store.provideEnabled().first())
     }
 
     @Test
@@ -282,8 +282,8 @@ class UrnetworkConfigStoreTest {
         assertEquals(UrnetworkWindowType.SPEED, snap.windowType)
         assertEquals(true, snap.fixedIpSize)
         assertEquals(false, snap.allowDirect)
-        assertEquals(false, snap.provideEnabled)
-        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(true, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, snap.provideNetworkMode)
     }
 
@@ -435,8 +435,8 @@ class UrnetworkConfigStoreTest {
         assertEquals(UrnetworkWindowType.QUALITY, snap.windowType)
         assertEquals(true, snap.fixedIpSize)
         assertEquals(false, snap.allowDirect)
-        assertEquals(false, snap.provideEnabled)
-        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(true, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, snap.provideNetworkMode)
     }
 
@@ -492,8 +492,8 @@ class UrnetworkConfigStoreTest {
         assertEquals(UrnetworkWindowType.SPEED, snap.windowType)
         assertEquals(true, snap.fixedIpSize)
         assertEquals(false, snap.allowDirect)
-        assertEquals(false, snap.provideEnabled)
-        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(true, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, snap.provideNetworkMode)
         assertEquals(UrnetworkLocationSelection("DE", "Bavaria", "Munich"), snap.selectedLocation)
     }

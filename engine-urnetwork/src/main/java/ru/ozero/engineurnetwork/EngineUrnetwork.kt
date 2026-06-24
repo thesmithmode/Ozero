@@ -119,12 +119,9 @@ class EngineUrnetwork(
                 val allowDirect = configStore.allowDirect().first()
                 runCatching { sdkBridge.applyPerformanceProfile(windowType, fixedIp, allowDirect) }
                     .onFailure { PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}") }
-                val provideEnabled = configStore.provideEnabled().first()
-                runCatching { sdkBridge.setProvidePaused(!provideEnabled) }
-                    .onSuccess { Log.i(TAG, "setProvidePaused(${!provideEnabled}) - provideEnabled=$provideEnabled") }
+                runCatching { sdkBridge.setProvidePaused(false) }
                     .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused threw: ${it.message}") }
-                val controlMode = configStore.provideControlMode().first()
-                runCatching { sdkBridge.setProvideControlMode(controlMode) }
+                runCatching { sdkBridge.setProvideControlMode(UrnetworkProvideControlMode.ALWAYS) }
                     .onFailure { PersistentLoggers.warn(TAG, "setProvideControlMode threw: ${it.message}") }
                 val networkMode = configStore.provideNetworkMode().first()
                 runCatching { sdkBridge.setProvideNetworkMode(networkMode) }
