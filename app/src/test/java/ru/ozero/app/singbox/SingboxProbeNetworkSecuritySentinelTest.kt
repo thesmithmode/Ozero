@@ -25,7 +25,12 @@ class SingboxProbeNetworkSecuritySentinelTest {
             .map { domain -> domain.textContent.trim() to domain.getAttribute("includeSubdomains") }
             .toSet()
 
+        val baseAnchors = baseConfig.elements("trust-anchors").single().elements("certificates")
+            .map { it.getAttribute("src") }
+            .toSet()
+
         assertEquals("false", baseConfig.getAttribute("cleartextTrafficPermitted"))
+        assertEquals(setOf("system"), baseAnchors)
         assertEquals(
             setOf(
                 "connectivitycheck.gstatic.com" to "false",

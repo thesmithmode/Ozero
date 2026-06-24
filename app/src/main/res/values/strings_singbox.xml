@@ -40,4 +40,6 @@
     <string name="singbox_restore_defaults_title">Восстановить подписки</string>
     <string name="singbox_restore_defaults_confirm">Удалённые стандартные подписки будут восстановлены. Ваши подписки останутся без изменений.</string>
     <string name="singbox_restore_defaults_hint">Восстанавливает удалённые стандартные подписки, не затрагивая добавленные вами</string>
+    <string name="singbox_probe_timeout_label">Таймаут проверки, сек</string>
+    <string name="singbox_probe_timeout_hint">По умолчанию 3 сек. Допустимо 1–30 сек.</string>
 </resources>

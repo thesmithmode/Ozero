@@ -40,4 +40,6 @@
     <string name="singbox_restore_defaults_title">Restore subscriptions</string>
     <string name="singbox_restore_defaults_confirm">Deleted default subscriptions will be restored. Your custom subscriptions will not be affected.</string>
     <string name="singbox_restore_defaults_hint">Restores deleted default subscriptions without affecting your custom ones</string>
+    <string name="singbox_probe_timeout_label">Probe timeout, sec</string>
+    <string name="singbox_probe_timeout_hint">Default is 3 sec. Allowed range: 1–30 sec.</string>
 </resources>
