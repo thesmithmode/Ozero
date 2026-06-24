@@ -34,17 +34,36 @@ class SingboxHttp204RoutedProbeTest {
     }
 
     @Test
-    fun `default routed probe keeps HTTPS fallback inside capped endpoints`() {
-        val cappedUrls = (
+    fun `default routed probe includes every fallback endpoint`() {
+        val urls = (
             listOf(SingboxHttp204RoutedProbe.PROBE_URL) +
                 SingboxHttp204RoutedProbe.FALLBACK_PROBE_URLS
             )
             .distinct()
-            .take(2)
 
         assertTrue(SingboxHttp204RoutedProbe.PROBE_URL.startsWith("http://"))
-        assertTrue(cappedUrls.any { it.startsWith("https://") })
-        assertEquals(2, cappedUrls.size)
+        assertTrue(urls.any { it.startsWith("https://") })
+        assertTrue(urls.any { it.contains("cloudflare") })
+        assertEquals(3, urls.size)
+    }
+
+    @Test
+    fun `routed probe tries later fallback when earlier endpoints fail`() = runTest {
+        SocksHttpServer(statusCode = 204, reason = "No Content", failuresBeforeResponse = 2).use { socks ->
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("http://first.example/generate_204"),
+                fallbackProbeUrls = listOf(
+                    URL("http://second.example/generate_204"),
+                    URL("http://third.example/generate_204"),
+                ),
+                timeoutMs = 100,
+            )
+
+            val latency = probe.probeLatencyMs(socks.port)
+
+            assertTrue(latency >= 1L)
+            assertTrue(socks.requestText.startsWith("GET /generate_204 "))
+        }
     }
 
     @Test
@@ -199,12 +218,16 @@ class SingboxHttp204RoutedProbeTest {
     private class SocksHttpServer(
         private val statusCode: Int,
         private val reason: String,
+        failuresBeforeResponse: Int = 0,
     ) : AutoCloseable {
         private val server = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
+        private val attemptsBeforeSuccess = failuresBeforeResponse + 1
         private val worker = thread(start = true, isDaemon = true) {
-            runCatching {
-                server.accept().use { socket ->
-                    handle(socket)
+            repeat(attemptsBeforeSuccess) { attempt ->
+                runCatching {
+                    server.accept().use { socket ->
+                        handle(socket, shouldRespond = attempt >= failuresBeforeResponse)
+                    }
                 }
             }
         }
@@ -214,7 +237,7 @@ class SingboxHttp204RoutedProbeTest {
 
         val port: Int = server.localPort
 
-        private fun handle(socket: Socket) {
+        private fun handle(socket: Socket, shouldRespond: Boolean) {
             val input = DataInputStream(socket.getInputStream())
             val output = socket.getOutputStream()
             assertEquals(5, input.readUnsignedByte())
@@ -235,6 +258,7 @@ class SingboxHttp204RoutedProbeTest {
             input.skipNBytesCompat(2)
             output.write(byteArrayOf(5, 0, 0, 1, 127, 0, 0, 1, 0, 0))
             output.flush()
+            if (!shouldRespond) return
 
             requestText = input.readHttpHeaders()
             output.write(
