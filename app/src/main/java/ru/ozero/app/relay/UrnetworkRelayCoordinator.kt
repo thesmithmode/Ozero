@@ -20,8 +20,6 @@ import ru.ozero.engineurnetwork.UrnetworkJwtBootstrapper
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.byClientJwt
-import ru.ozero.engineurnetwork.provideControlMode
-import ru.ozero.engineurnetwork.provideEnabled
 import ru.ozero.engineurnetwork.provideNetworkMode
 import ru.ozero.engineurnetwork.walletAddress
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
@@ -103,11 +101,10 @@ class UrnetworkRelayCoordinator(
         if (result is UrnetworkSdkBridge.StartResult.Success) {
             relayOwned.set(true)
             attachDummyIoLoop()
-            val provideEnabled = runCatching { configStore.provideEnabled().first() }.getOrDefault(true)
-            runCatching { bridge.setProvidePaused(!provideEnabled) }
+            val provideEnabled = true
+            val controlMode = UrnetworkProvideControlMode.ALWAYS
+            runCatching { bridge.setProvidePaused(false) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: worker pause toggle threw: ${it.message}") }
-            val controlMode = runCatching { configStore.provideControlMode().first() }
-                .getOrDefault(UrnetworkProvideControlMode.ALWAYS)
             runCatching { bridge.setProvideControlMode(controlMode) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: setProvideControlMode threw: ${it.message}") }
             val networkMode = runCatching { configStore.provideNetworkMode().first() }
