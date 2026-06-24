@@ -21,6 +21,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -132,6 +133,15 @@ fun SingboxAdvancedSettingsScreen(
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
 
+            ProbeTimeoutSection(
+                probeTimeoutSeconds = state.probeTimeoutSeconds,
+                onProbeTimeoutSecondsChange = viewModel::onProbeTimeoutSecondsChange,
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
+
             Text(
                 text = stringResource(R.string.singbox_actions_section),
                 style = MaterialTheme.typography.labelLarge,
@@ -170,6 +180,21 @@ fun SingboxAdvancedSettingsScreen(
             Spacer(Modifier.height(24.dp))
         }
     }
+}
+
+@Composable
+private fun ProbeTimeoutSection(
+    probeTimeoutSeconds: Int,
+    onProbeTimeoutSecondsChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = probeTimeoutSeconds.toString(),
+        onValueChange = onProbeTimeoutSecondsChange,
+        label = { Text(stringResource(R.string.singbox_probe_timeout_label)) },
+        supportingText = { Text(stringResource(R.string.singbox_probe_timeout_hint)) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+    )
 }
 
 @Composable
