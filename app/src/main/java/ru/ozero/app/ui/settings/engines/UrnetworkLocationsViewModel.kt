@@ -33,7 +33,6 @@ import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkLocationSelection
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.byClientJwt
-import ru.ozero.engineurnetwork.setProvideEnabled
 import ru.ozero.engineurnetwork.setCachedLocations
 import ru.ozero.engineurnetwork.setSelectedLocation
 import ru.ozero.engineurnetwork.walletAddress
@@ -316,7 +315,6 @@ class UrnetworkLocationsViewModel @Inject constructor(
         if (isUrnetworkActive.value) {
             bridge.setProvidePaused(paused)
         }
-        viewModelScope.launch { configStore.setProvideEnabled(!paused) }
         _uiState.update { current ->
             when (current) {
                 is UrnetworkSettingsUiState.Ready -> current.copy(providePaused = paused)

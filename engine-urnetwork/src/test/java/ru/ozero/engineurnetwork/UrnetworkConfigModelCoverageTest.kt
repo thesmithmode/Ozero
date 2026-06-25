@@ -59,15 +59,20 @@ class UrnetworkConfigModelCoverageTest {
         store.setWindowType(UrnetworkWindowType.QUALITY)
         store.setFixedIpSize(true)
         store.setAllowDirect(false)
-        store.setProvideEnabled(false)
-        store.setProvideControlMode(UrnetworkProvideControlMode.AUTO)
+        store.update {
+            it.copy(
+                provideEnabled = false,
+                provideControlMode = UrnetworkProvideControlMode.AUTO,
+            )
+        }
         store.setProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
 
         assertEquals(UrnetworkWindowType.QUALITY, store.windowType().first())
         assertTrue(store.fixedIpSize().first())
         assertFalse(store.allowDirect().first())
-        assertTrue(store.provideEnabled().first())
-        assertEquals(UrnetworkProvideControlMode.ALWAYS, store.provideControlMode().first())
+        val snap = store.config().first()
+        assertTrue(snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, store.provideNetworkMode().first())
     }
 

@@ -101,16 +101,15 @@ class UrnetworkRelayCoordinator(
         if (result is UrnetworkSdkBridge.StartResult.Success) {
             relayOwned.set(true)
             attachDummyIoLoop()
-            val controlMode = UrnetworkProvideControlMode.ALWAYS
             runCatching { bridge.setProvidePaused(false) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: worker pause toggle threw: ${it.message}") }
-            runCatching { bridge.setProvideControlMode(controlMode) }
+            runCatching { bridge.setProvideControlMode(UrnetworkProvideControlMode.ALWAYS) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: setProvideControlMode threw: ${it.message}") }
             val networkMode = runCatching { configStore.provideNetworkMode().first() }
                 .getOrDefault(UrnetworkProvideNetworkMode.WIFI)
             runCatching { bridge.setProvideNetworkMode(networkMode) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: setProvideNetworkMode threw: ${it.message}") }
-            runCatching { networkMonitor?.start(networkMode, true) }
+            runCatching { networkMonitor?.start(networkMode) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: networkMonitor threw: ${it.message}") }
             runCatching { relayLockManager?.acquire() }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: lockManager threw: ${it.message}") }

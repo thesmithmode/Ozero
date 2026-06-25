@@ -87,6 +87,23 @@ class SingboxHttp204RoutedProbeTest {
     }
 
     @Test
+    fun `routed probe with zero max urls returns failed without opening connection`() = runTest {
+        SocksHttpServer(statusCode = 204, reason = "No Content").use { socks ->
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("http://127.0.0.1/generate_204"),
+                fallbackProbeUrls = emptyList(),
+                timeoutMs = 1_000,
+                maxProbeUrls = 0,
+            )
+
+            val latency = probe.probeLatencyMs(socks.port)
+
+            assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
+            assertEquals("", socks.requestText)
+        }
+    }
+
+    @Test
     fun `routed probe succeeds after HTTP 204 through SOCKS`() = runTest {
         val ticks = 1_000L
         SocksHttpServer(statusCode = 204, reason = "No Content").use { socks ->

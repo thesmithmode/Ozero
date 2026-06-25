@@ -23,8 +23,6 @@ import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.setByClientJwt
-import ru.ozero.engineurnetwork.setProvideControlMode
-import ru.ozero.engineurnetwork.setProvideEnabled
 import ru.ozero.engineurnetwork.setProvideNetworkMode
 import ru.ozero.enginescore.EngineId
 import kotlin.test.assertEquals
@@ -118,7 +116,7 @@ class UrnetworkRelayCoordinatorTest {
     @Test
     fun `relay передаёт setProvidePaused false когда provideEnabled true в configStore`() = relayTest {
         setByClientJwt("test-jwt")
-        configStore.setProvideEnabled(true)
+        configStore.update { it.copy(provideEnabled = true) }
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
         assertEquals(1, bridge.startCalls)
@@ -128,7 +126,7 @@ class UrnetworkRelayCoordinatorTest {
     @Test
     fun `relay передаёт setProvidePaused false даже когда configStore был выключен`() = relayTest {
         setByClientJwt("test-jwt")
-        configStore.setProvideEnabled(false)
+        configStore.update { it.copy(provideEnabled = false) }
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
         assertEquals(1, bridge.startCalls)
@@ -304,7 +302,7 @@ class UrnetworkRelayCoordinatorTest {
     @Test
     fun `relay applies provide control and network modes from config`() = relayTest {
         setByClientJwt("test-jwt")
-        configStore.setProvideControlMode(UrnetworkProvideControlMode.AUTO)
+        configStore.update { it.copy(provideControlMode = UrnetworkProvideControlMode.AUTO) }
         configStore.setProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
@@ -313,16 +311,16 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay starts monitor and acquires lock only when provide is enabled`() {
+    fun `relay starts monitor and acquires lock with always-on provide`() {
         val monitor = mockk<RelayNetworkMonitor>(relaxed = true)
         val locks = mockk<RelayLockManager>(relaxed = true)
         relayTest(networkMonitor = monitor, relayLockManager = locks) {
             setByClientJwt("test-jwt")
-            configStore.setProvideEnabled(true)
+            configStore.update { it.copy(provideEnabled = true) }
             configStore.setProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
             tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-            verify { monitor.start(UrnetworkProvideNetworkMode.ALL, true) }
+            verify { monitor.start(UrnetworkProvideNetworkMode.ALL) }
             verify { locks.acquire() }
         }
     }
@@ -333,10 +331,10 @@ class UrnetworkRelayCoordinatorTest {
         val locks = mockk<RelayLockManager>(relaxed = true)
         relayTest(networkMonitor = monitor, relayLockManager = locks) {
             setByClientJwt("test-jwt")
-            configStore.setProvideEnabled(false)
+            configStore.update { it.copy(provideEnabled = false) }
             tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-            verify { monitor.start(UrnetworkProvideNetworkMode.WIFI, true) }
+            verify { monitor.start(UrnetworkProvideNetworkMode.WIFI) }
             verify { locks.acquire() }
         }
     }
