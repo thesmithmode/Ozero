@@ -240,6 +240,25 @@ class ConfigBuilderVLESSTest {
     }
 
     @Test
+    fun `reality subscription config stays on reality tls path`() {
+        val bean = V2RayFmt.parseVLESS(
+            "vless://12345678-1234-1234-1234-123456789abc@203.0.113.10:443" +
+                "?type=tcp&security=reality&sni=front.example.com&fp=chrome" +
+                "&pbk=$validRealityPublicKey&sid=ab12&flow=xtls-rprx-vision#Reality",
+        )
+
+        val json = ConfigBuilder.buildSingboxConfig(bean)
+
+        assertContains(json, "\"tls\":")
+        assertContains(json, "\"server_name\":\"front.example.com\"")
+        assertContains(json, "\"reality\":{\"enabled\":true")
+        assertContains(json, "\"public_key\":\"$validRealityPublicKey\"")
+        assertContains(json, "\"short_id\":\"ab12\"")
+        assertContains(json, "\"utls\":{\"enabled\":true,\"fingerprint\":\"chrome\"}")
+        assertFalse(json.contains("\"insecure\":true"))
+    }
+
+    @Test
     fun `should include gRPC transport for grpc type`() {
         val bean = makeBean(type = "grpc").apply {
             grpcServiceName = "myservice"

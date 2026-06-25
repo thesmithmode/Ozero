@@ -191,7 +191,7 @@ class RealUrnetworkSdkBridge(
             }.onFailure {
                 PersistentLoggers.warn(TAG, "node start: credential refresh listener threw: ${it.message}")
             }
-            applyDeviceFields(d, localState)
+            applyDeviceFields(d, localState, unpauseProvide = true)
             PersistentLoggers.debug(TAG, "node start: instance created - fields applied")
             deviceRef.set(d)
             d
@@ -514,13 +514,17 @@ class RealUrnetworkSdkBridge(
                 }
             }
         }.onFailure { PersistentLoggers.warn(TAG, "ensureDevice: addJwtRefreshListener threw: ${it.message}") }
-        applyDeviceFields(device, localState)
+        applyDeviceFields(device, localState, unpauseProvide = false)
         deviceRef.set(device)
         Log.i(TAG, "initDeviceForLocations: device ready for location browse - applyDeviceFields done")
         return true
     }
 
-    private fun applyDeviceFields(device: DeviceLocal, localState: LocalState) {
+    private fun applyDeviceFields(
+        device: DeviceLocal,
+        localState: LocalState,
+        unpauseProvide: Boolean,
+    ) {
         val normalizedControlMode = UrnetworkProvideControlMode.ALWAYS.rawValue
         val effectiveProvideMode = Sdk.ProvideModePublic
         runCatching { localState.provideControlMode = normalizedControlMode }
@@ -534,8 +538,10 @@ class RealUrnetworkSdkBridge(
         val effectiveProvideNetworkMode = UrnetworkProvideNetworkMode.fromRaw(localState.provideNetworkMode).rawValue
         runCatching { localState.provideNetworkMode = effectiveProvideNetworkMode }
             .onFailure { PersistentLoggers.warn(TAG, "localState provideNetworkMode threw: ${it.message}") }
-        runCatching { device.providePaused = false }
-            .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
+        if (unpauseProvide) {
+            runCatching { device.providePaused = false }
+                .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
+        }
         runCatching { device.routeLocal = localState.routeLocal }
         runCatching { device.provideMode = effectiveProvideMode }
         runCatching { localState.connectLocation = connectLocation }
