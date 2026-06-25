@@ -144,26 +144,40 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `applyDeviceFields override на ProvideModePublic при ALWAYS — root cause regions cities скрытых`() {
+    fun `applyDeviceFields мигрирует provider mode до открытия SDK controllers`() {
         val block = source.substringAfter("private fun applyDeviceFields(")
             .substringBefore("private inline fun guardedRun")
         assertTrue(
-            block.contains("Sdk.ProvideModePublic"),
-            "applyDeviceFields обязан override provideMode на Sdk.ProvideModePublic когда " +
-                "provideControlMode == ALWAYS — паритет с upstream DeviceManager.kt:105. " +
-                "Без override свежий юзер имеет localState.provideMode = ProvideModeNone (0), " +
-                "и SDK скрывает regions/cities в LocationsViewController (только countries).",
+            block.contains("val normalizedControlMode = UrnetworkProvideControlMode.ALWAYS.rawValue"),
+            "applyDeviceFields обязан принудительно мигрировать localState.provideControlMode в ALWAYS " +
+                "до открытия controllers — старый persisted auto оставляет SDK в non-provider mode.",
         )
         assertTrue(
-            block.contains("UrnetworkProvideControlMode.fromRaw"),
-            "applyDeviceFields обязан нормализовать provideControlMode через fromRaw — " +
-                "raw localState.provideControlMode может быть '' или невалидный, SDK тогда " +
-                "не активирует location hierarchy.",
+            block.contains("val effectiveProvideMode = Sdk.ProvideModePublic"),
+            "applyDeviceFields обязан принудительно выставлять ProvideModePublic — иначе старый " +
+                "localState.provideMode=None переживает DataStore migration.",
         )
         assertTrue(
-            block.contains("UrnetworkProvideControlMode.ALWAYS.rawValue"),
-            "Override branch обязан сравнивать с UrnetworkProvideControlMode.ALWAYS.rawValue — " +
-                "иначе магическая строка \"always\" разъедется с enum при rename.",
+            block.contains("localState.provideControlMode = normalizedControlMode"),
+            "applyDeviceFields обязан сохранять migrated provideControlMode обратно в SDK localState.",
+        )
+        assertTrue(
+            block.contains("localState.provideMode = effectiveProvideMode"),
+            "applyDeviceFields обязан сохранять migrated provideMode обратно в SDK localState.",
+        )
+    }
+
+    @Test
+    fun `setProvideControlMode ALWAYS also applies ProvideModePublic`() {
+        val block = source.substringAfter("override fun setProvideControlMode(")
+            .substringBefore("override fun setProvideNetworkMode")
+        assertTrue(
+            block.contains("device?.provideMode = Sdk.ProvideModePublic"),
+            "Runtime ALWAYS setter обязан менять provideMode, не только provideControlMode.",
+        )
+        assertTrue(
+            block.contains("localState?.provideMode = Sdk.ProvideModePublic"),
+            "Runtime ALWAYS setter обязан сохранять provideMode migration в SDK localState.",
         )
     }
 
