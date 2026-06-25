@@ -25,7 +25,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.VpnSocketProtectorHolder
-import ru.ozero.enginescore.settings.SettingsKeys
+import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginesingbox.ISingboxEngineProcess
 import ru.ozero.enginesingbox.ISingboxProtector
 import ru.ozero.enginesingbox.SingboxEngine
@@ -50,6 +51,7 @@ class SingboxProbeService internal constructor(
     private val profileDao: ProxyProfileDao,
     @SingboxPrefs private val dataStore: DataStore<Preferences>,
     private val profileProbe: SingboxProfileProbe,
+    private val settingsRepository: SettingsRepository? = null,
     private val probeDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
@@ -58,10 +60,12 @@ class SingboxProbeService internal constructor(
         profileDao: ProxyProfileDao,
         @SingboxPrefs dataStore: DataStore<Preferences>,
         @ApplicationContext context: Context,
+        settingsRepository: SettingsRepository,
     ) : this(
         profileDao = profileDao,
         dataStore = dataStore,
         profileProbe = SingboxServiceProfileProbe(context),
+        settingsRepository = settingsRepository,
     )
 
     suspend fun probeAndAutoSelect(
@@ -70,11 +74,12 @@ class SingboxProbeService internal constructor(
         updateManualSelection: Boolean = true,
     ) {
         val prefs = dataStore.data.first()
+        val settings = settingsRepository?.settings?.first() ?: SettingsModel.DEFAULT
         val probeSettings = SingboxProfileProbeSettings(
             timeoutMs = prefs[PROBE_TIMEOUT_MS_KEY].normalizedSingboxProbeTimeoutMs(),
-            dnsServers = prefs[SINGBOX_DNS_SERVERS_KEY]?.toList()?.ifEmpty { null }
+            dnsServers = prefs[SINGBOX_DNS_SERVERS_KEY]?.sorted()?.ifEmpty { null }
                 ?: EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
-            ipv6Enabled = prefs[SettingsKeys.IPV6_ENABLED] ?: false,
+            ipv6Enabled = settings.ipv6Enabled,
         )
         val probeCandidates = profiles.mapNotNull { profile ->
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(profile.beanBlob) }.getOrNull()

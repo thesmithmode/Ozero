@@ -10,9 +10,18 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginesingbox.SingboxEngine
+import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.AppMode
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
+import ru.ozero.enginescore.settings.HostsMode
+import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginescore.settings.SplitTunnelMode
+import ru.ozero.enginescore.settings.TrafficMode
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.VLESSBean
@@ -31,7 +40,6 @@ class SingboxProbeServiceTest {
     private val selectedProfileKey = longPreferencesKey("singbox_selected_profile_id")
     private val beanKey = byteArrayPreferencesKey("singbox_vless_bean")
     private val dnsServersKey = stringSetPreferencesKey("singbox_dns_servers")
-    private val ipv6EnabledKey = booleanPreferencesKey("ipv6_enabled")
 
     @Test
     fun `probeAndAutoSelect preserves auto-select mode while updating latency`() = runTest {
@@ -194,21 +202,21 @@ class SingboxProbeServiceTest {
     }
 
     @Test
-    fun `probeAndAutoSelect passes configured DNS and IPv6 to profile probe`() = runTest {
+    fun `probeAndAutoSelect passes sorted DNS and global IPv6 to profile probe`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(
             mutablePreferencesOf(
-                dnsServersKey to setOf("9.9.9.9", "149.112.112.112"),
-                ipv6EnabledKey to true,
+                dnsServersKey to setOf("9.9.9.9", "149.112.112.112", "1.1.1.1"),
             ),
         )
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
         val probe = SettingsRecordingProfileProbe()
         val profile = makeProfile(id = 11L, host = "dns.example", port = 443)
+        val settingsRepository = StaticSettingsRepository(SettingsModel(ipv6Enabled = true))
 
-        SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(listOf(profile))
+        SingboxProbeService(dao, dataStore, probe, settingsRepository).probeAndAutoSelect(listOf(profile))
 
-        assertEquals(setOf("9.9.9.9", "149.112.112.112"), probe.settings.single().dnsServers.toSet())
+        assertEquals(listOf("1.1.1.1", "149.112.112.112", "9.9.9.9"), probe.settings.single().dnsServers)
         assertTrue(probe.settings.single().ipv6Enabled)
         assertEquals(19, dao.latencies[11L])
     }
@@ -443,5 +451,28 @@ class SingboxProbeServiceTest {
             calls.incrementAndGet()
             return 1
         }
+    }
+
+    private class StaticSettingsRepository(model: SettingsModel) : SettingsRepository {
+        override val settings: Flow<SettingsModel> = flowOf(model)
+        override suspend fun setSplitMode(mode: SplitTunnelMode) = Unit
+        override suspend fun setIpv6Enabled(enabled: Boolean) = Unit
+        override suspend fun setAutoStart(enabled: Boolean) = Unit
+        override suspend fun setManualEngine(engine: EngineId?) = Unit
+        override suspend fun setUrnetworkEnabled(enabled: Boolean) = Unit
+        override suspend fun setUrnetworkJwt(jwt: String?) = Unit
+        override suspend fun setUrnetworkCountryCode(code: String?) = Unit
+        override suspend fun setByedpiWinningArgs(args: String?) = Unit
+        override suspend fun setByedpiDefaultAccepted(accepted: Boolean) = Unit
+        override suspend fun setByedpiUseUiMode(enabled: Boolean) = Unit
+        override suspend fun setByedpiUiSettings(settings: ByeDpiUiSettings) = Unit
+        override suspend fun setCustomDnsServers(servers: List<String>) = Unit
+        override suspend fun setHostsMode(mode: HostsMode) = Unit
+        override suspend fun setHosts(hosts: List<String>) = Unit
+        override suspend fun setUiLocaleTag(tag: String?) = Unit
+        override suspend fun setAppMode(mode: AppMode) = Unit
+        override suspend fun setKillswitchEnabled(enabled: Boolean) = Unit
+        override suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean) = Unit
+        override suspend fun setTrafficMode(mode: TrafficMode) = Unit
     }
 }

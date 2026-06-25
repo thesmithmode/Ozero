@@ -48,6 +48,26 @@ class SingboxHttp204RoutedProbeTest {
     }
 
     @Test
+    fun `routed probe caps configured fallback endpoints`() = runTest {
+        SocksHttpServer(statusCode = 204, reason = "No Content", failuresBeforeResponse = 2).use { socks ->
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("http://first.example/generate_204"),
+                fallbackProbeUrls = listOf(
+                    URL("http://second.example/generate_204"),
+                    URL("http://third.example/generate_204"),
+                ),
+                timeoutMs = 100,
+                maxProbeUrls = 1,
+            )
+
+            val latency = probe.probeLatencyMs(socks.port)
+
+            assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
+            assertEquals("", socks.requestText)
+        }
+    }
+
+    @Test
     fun `routed probe tries later fallback when earlier endpoints fail`() = runTest {
         SocksHttpServer(statusCode = 204, reason = "No Content", failuresBeforeResponse = 2).use { socks ->
             val probe = SingboxHttp204RoutedProbe(
