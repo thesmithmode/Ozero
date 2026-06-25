@@ -14,11 +14,13 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -97,6 +99,7 @@ class SingboxProbeService internal constructor(
             List(workerCount) {
                 async(probeDispatcher) {
                     while (true) {
+                        coroutineContext.ensureActive()
                         val index = nextIndex.getAndIncrement()
                         if (index >= probeCandidates.size) break
                         val (profile, bean) = probeCandidates[index]
@@ -184,6 +187,7 @@ private class SingboxServiceProfileProbe(
         settings: SingboxProfileProbeSettings,
     ): Int = mutex.withLock {
         withContext(Dispatchers.IO) {
+            coroutineContext.ensureActive()
             val port = allocateProbePort()
             if (!bean.hasRoutableServerAddress()) return@withContext SingboxProbeService.LATENCY_FAILED
             val config = runCatching {
@@ -203,12 +207,15 @@ private class SingboxServiceProfileProbe(
                 val process = binding.process
                 val alreadyRunning = runCatching { process.runtimeRunning() }.getOrDefault(false)
                 if (alreadyRunning) return@withContext LATENCY_SKIPPED_ACTIVE_RUNTIME
+                coroutineContext.ensureActive()
                 shouldStop = true
                 runCatching { process.startProxyMode(config, localProtector) }
                     .getOrElse { return@withContext SingboxProbeService.LATENCY_FAILED }
+                coroutineContext.ensureActive()
                 delay(PROBE_START_DELAY_MS)
                 val running = runCatching { process.runtimeRunning() }.getOrDefault(false)
                 if (!running) return@withContext SingboxProbeService.LATENCY_FAILED
+                coroutineContext.ensureActive()
                 val latency = probeRoutedWithRetry(port, settings.timeoutMs)
                 if (latency >= 0) {
                     latency.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
@@ -216,7 +223,11 @@ private class SingboxServiceProfileProbe(
                     SingboxProbeService.LATENCY_FAILED
                 }
             } finally {
-                if (shouldStop) runCatching { binding.process.stopAndWait(REMOTE_STOP_TIMEOUT_MS) }
+                if (shouldStop) {
+                    withContext(NonCancellable) {
+                        runCatching { binding.process.stopAndWait(REMOTE_STOP_TIMEOUT_MS) }
+                    }
+                }
                 runCatching { context.unbindService(binding.connection) }
             }
         }
@@ -225,6 +236,7 @@ private class SingboxServiceProfileProbe(
     private suspend fun probeRoutedWithRetry(port: Int, timeoutMs: Int): Long {
         val probe = SingboxHttp204RoutedProbe(timeoutMs = timeoutMs.normalizedSingboxProbeTimeoutMs())
         repeat(PROBE_ATTEMPTS) { attempt ->
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
             val latency = probe.probeLatencyMs(port)
             if (latency >= 0) return latency
             if (attempt < PROBE_ATTEMPTS - 1) delay(PROBE_RETRY_DELAY_MS)

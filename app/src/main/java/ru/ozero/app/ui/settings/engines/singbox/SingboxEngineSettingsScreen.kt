@@ -142,16 +142,6 @@ private fun SingboxSettingsContent(
     ) {
         Spacer(Modifier.height(8.dp))
 
-        OutlinedTextField(
-            value = state.probeTimeoutSeconds.toString(),
-            onValueChange = viewModel::onProbeTimeoutSecondsChange,
-            label = { Text(stringResource(R.string.singbox_probe_timeout_label)) },
-            supportingText = { Text(stringResource(R.string.singbox_probe_timeout_hint)) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-        )
-        Spacer(Modifier.height(8.dp))
-
         if (state.groups.isNotEmpty()) {
             AutoSelectModeItem(
                 isSelected = state.isAutoSelectMode,
@@ -189,6 +179,7 @@ private fun SingboxSettingsContent(
                 onToggle = { viewModel.onGroupExpand(group.id) },
                 onRefresh = { viewModel.onRefresh(group.id) },
                 onPing = { viewModel.onPing(group.id) },
+                onCancel = { viewModel.onCancel(ping = true, refresh = true) },
                 onDelete = { viewModel.onDeleteGroup(group) },
                 onProfileSelect = { viewModel.onProfileSelect(it) },
             )
@@ -378,6 +369,7 @@ private fun SubscriptionGroupItem(
     onToggle: () -> Unit,
     onRefresh: () -> Unit,
     onPing: () -> Unit,
+    onCancel: () -> Unit,
     onDelete: () -> Unit,
     onProfileSelect: (ProxyProfile) -> Unit,
 ) {
@@ -400,8 +392,16 @@ private fun SubscriptionGroupItem(
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
             )
-            if (isRefreshing || isPinging) {
+            if (isRefreshing) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                IconButton(onClick = onCancel, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = null)
+                }
+            } else if (isPinging) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                IconButton(onClick = onCancel, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = null)
+                }
             } else {
                 TextButton(onClick = onPing, enabled = profiles.isNotEmpty()) {
                     Text(

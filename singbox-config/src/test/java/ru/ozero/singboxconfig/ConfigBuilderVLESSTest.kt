@@ -217,13 +217,24 @@ class ConfigBuilderVLESSTest {
     }
 
     @Test
-    fun `tls server name falls back to websocket host over ip server address`() {
+    fun `tls server name does not fall back to websocket host over ip server address`() {
         val bean = makeBean(host = "203.0.113.10", type = "ws", security = "tls").apply {
             this.host = "front.example.com"
         }
         val json = ConfigBuilder.buildSingboxConfig(bean)
 
-        assertContains(json, "\"server_name\":\"front.example.com\"")
+        assertFalse(json.contains("\"server_name\":\"front.example.com\""))
+        assertContains(json, "\"Host\":\"front.example.com\"")
+    }
+
+    @Test
+    fun `tls server name falls back to server address when server address is domain`() {
+        val bean = makeBean(host = "proxy.example.com", type = "ws", security = "tls").apply {
+            this.host = "front.example.com"
+        }
+        val json = ConfigBuilder.buildSingboxConfig(bean)
+
+        assertContains(json, "\"server_name\":\"proxy.example.com\"")
         assertContains(json, "\"Host\":\"front.example.com\"")
     }
 

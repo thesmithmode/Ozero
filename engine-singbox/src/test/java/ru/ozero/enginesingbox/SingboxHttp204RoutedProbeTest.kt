@@ -42,9 +42,9 @@ class SingboxHttp204RoutedProbeTest {
             .distinct()
 
         assertTrue(SingboxHttp204RoutedProbe.PROBE_URL.startsWith("http://"))
-        assertTrue(urls.any { it.startsWith("https://") })
+        assertTrue(urls.all { it.startsWith("http://") })
         assertTrue(urls.any { it.contains("cloudflare") })
-        assertEquals(3, urls.size)
+        assertEquals(2, urls.size)
     }
 
     @Test
@@ -260,10 +260,10 @@ class SingboxHttp204RoutedProbeTest {
         private val server = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
         private val attemptsBeforeSuccess = failuresBeforeResponse + 1
         private val worker = thread(start = true, isDaemon = true) {
-            repeat(attemptsBeforeSuccess) { attempt ->
+            repeat(attemptsBeforeSuccess + 1) { attempt ->
                 runCatching {
                     server.accept().use { socket ->
-                        handle(socket, shouldRespond = attempt >= failuresBeforeResponse)
+                        handle(socket, shouldRespond = attempt > failuresBeforeResponse)
                     }
                 }
             }

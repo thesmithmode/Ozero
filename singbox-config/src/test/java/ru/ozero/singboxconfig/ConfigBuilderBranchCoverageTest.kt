@@ -26,7 +26,7 @@ class ConfigBuilderBranchCoverageTest {
     }
 
     @Test
-    fun `tls block covers insecure certificate and ip backed server name fallback`() {
+    fun `tls block covers insecure certificate without host backed server name fallback`() {
         val bean = vless().apply {
             security = "tls"
             serverAddress = "203.0.113.10"
@@ -37,7 +37,7 @@ class ConfigBuilderBranchCoverageTest {
 
         val json = ConfigBuilder.buildSingboxConfig(bean)
 
-        assertContains(json, "\"server_name\":\"front.example.com\"")
+        assertFalse(json.contains("\"server_name\":\"front.example.com\""))
         assertContains(json, "\"insecure\":true")
         assertContains(json, "\"certificate\":\"-----BEGIN CERTIFICATE-----\"")
     }
