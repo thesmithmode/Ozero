@@ -23,6 +23,7 @@ import ru.ozero.enginewarp.DoHProvider
 import ru.ozero.enginewarp.WarpAutoConfig
 import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigDuplicateException
+import ru.ozero.enginewarp.WarpConfigSlot
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import ru.ozero.enginewarp.WarpEditDraft
 import ru.ozero.enginewarp.WarpFileImporter
@@ -153,12 +154,12 @@ class WarpEngineSettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(isRegistering = false)
     }
 
-    fun onImportFile(stream: InputStream) {
+    fun onImportFile(stream: InputStream, displayName: String? = null) {
         viewModelScope.launch {
             val result = fileImporter.import(stream)
             result.fold(
                 onSuccess = { imported ->
-                    val name = buildNextWarpSlotName(store.slots().first())
+                    val name = importedSlotName(displayName, store.slots().first())
                     runCatching { store.addSlot(name, imported.config, imported.rawIni) }
                         .onSuccess { id ->
                             store.setActive(id)
@@ -191,6 +192,9 @@ class WarpEngineSettingsViewModel @Inject constructor(
             )
         }
     }
+
+    private fun importedSlotName(displayName: String?, existing: List<WarpConfigSlot>): String =
+        displayName?.trim()?.takeIf { it.isNotBlank() } ?: buildNextWarpSlotName(existing)
 
     fun onClashYamlRejected() {
         _uiState.update { it.copy(errorMessage = "Формат Clash не поддерживается") }

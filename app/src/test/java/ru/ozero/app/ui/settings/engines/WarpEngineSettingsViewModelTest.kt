@@ -225,20 +225,20 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onImportFile success называет слот Ozero-1`() = runTest {
+    fun `onImportFile success uses exact display name`() = runTest {
         importer.setConfig(SAMPLE)
-        vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
+        vm.onImportFile(ByteArrayInputStream(ByteArray(0)), "WARPv2_83.conf")
         advanceUntilIdle()
-        assertEquals("Ozero-1", vm.uiState.value.slots.first().name)
+        assertEquals("WARPv2_83.conf", vm.uiState.value.slots.first().name)
     }
 
     @Test
-    fun `onImportFile второй слот называется Ozero-2`() = runTest {
+    fun `onImportFile blank display name falls back to generated slot names`() = runTest {
         importer.setConfig(SAMPLE)
-        vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
+        vm.onImportFile(ByteArrayInputStream(ByteArray(0)), " ")
         advanceUntilIdle()
         importer.setConfig(SAMPLE.copy(privateKey = "second-private-key"))
-        vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
+        vm.onImportFile(ByteArrayInputStream(ByteArray(0)), null)
         advanceUntilIdle()
         val names = vm.uiState.value.slots.map { it.name }.sorted()
         assertEquals(listOf("Ozero-1", "Ozero-2"), names)

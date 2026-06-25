@@ -36,10 +36,21 @@ class WarpPresetsTest {
     }
 
     @Test
-    fun `AwgPresets содержит I1 пресеты`() {
+    fun `AwgPresets ALL keeps I1 presets for internal config support`() {
         val ids = AwgPresets.ALL.map { it.id }.toSet()
         listOf("i1_v1", "i1_v2", "i1_v3", "i1_v4", "i1_off").forEach { id ->
             assertTrue(id in ids, "Отсутствует I1 preset '$id'")
+        }
+    }
+
+    @Test
+    fun `AwgPresets CLICKABLE contains only unique editable presets`() {
+        val ids = AwgPresets.CLICKABLE.map { it.id }.toSet()
+        listOf("default_warp", "off", "light", "tspu", "aggressive").forEach { id ->
+            assertTrue(id in ids, "Отсутствует clickable AWG preset '$id'")
+        }
+        listOf("i1_v1", "i1_v2", "i1_v3", "i1_v4", "i1_off").forEach { id ->
+            assertTrue(id !in ids, "I1 preset не должен быть кликабельным дублем: $id")
         }
     }
 
