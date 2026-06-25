@@ -46,7 +46,7 @@ object ConfigBuilder {
         val tagList = proxyOutbounds.indices.joinToString(",") { jsonString("proxy-$it") }
         val urltest = buildString {
             append("""{"type":"urltest","tag":"proxy","outbounds":[$tagList],""")
-            append(""""url":"https://www.gstatic.com/generate_204",""")
+            append(""""url":"http://connectivitycheck.gstatic.com/generate_204",""")
             append(""""interval":"3m","tolerance":50,""")
             append(""""interrupt_exist_connections":true,"idle_timeout":"30m"}""")
         }
@@ -87,7 +87,7 @@ object ConfigBuilder {
         val tagList = proxyOutbounds.indices.joinToString(",") { jsonString("proxy-$it") }
         val urltest = buildString {
             append("""{"type":"urltest","tag":"proxy","outbounds":[$tagList],""")
-            append(""""url":"https://www.gstatic.com/generate_204",""")
+            append(""""url":"http://connectivitycheck.gstatic.com/generate_204",""")
             append(""""interval":"3m","tolerance":50,""")
             append(""""interrupt_exist_connections":false,"idle_timeout":"30m"}""")
         }
@@ -524,7 +524,7 @@ private fun tlsServerName(bean: StandardV2RayBean): String {
     if (bean.sni.isNotEmpty()) return bean.sni.trim()
     val host = bean.host.trim()
     val server = bean.serverAddress.trim().trim('[', ']')
-    if (host.isDomainNameForSni() && (bean.security == "reality" || server.isIpAddressForSni())) return host
+    if (bean.security == "reality" && host.isDomainNameForSni() && server.isIpAddressForSni()) return host
     return if (server.isDomainNameForSni()) server else ""
 }
 
