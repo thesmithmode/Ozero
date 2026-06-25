@@ -3,7 +3,6 @@ package ru.ozero.engineurnetwork
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
@@ -31,8 +30,8 @@ class DataStoreUrnetworkConfigStore(
         windowType = UrnetworkWindowType.fromRaw(prefs[KEY_WINDOW_TYPE]),
         fixedIpSize = prefs[KEY_FIXED_IP_SIZE] == true,
         allowDirect = prefs[KEY_ALLOW_DIRECT] != false,
-        provideEnabled = prefs[KEY_PROVIDE_ENABLED] != false,
-        provideControlMode = UrnetworkProvideControlMode.fromRaw(prefs[KEY_PROVIDE_CONTROL_MODE]),
+        provideEnabled = true,
+        provideControlMode = UrnetworkProvideControlMode.ALWAYS,
         provideNetworkMode = UrnetworkProvideNetworkMode.fromRaw(prefs[KEY_PROVIDE_NETWORK_MODE]),
         selectedLocation = UrnetworkLocationSelection(
             countryCode = prefs[KEY_SELECTED_COUNTRY_CODE]?.takeIf { it.isNotBlank() },
@@ -54,8 +53,6 @@ class DataStoreUrnetworkConfigStore(
         prefs[KEY_WINDOW_TYPE] = cfg.windowType.rawValue
         prefs[KEY_FIXED_IP_SIZE] = cfg.fixedIpSize
         prefs[KEY_ALLOW_DIRECT] = cfg.allowDirect
-        prefs[KEY_PROVIDE_ENABLED] = cfg.provideEnabled
-        prefs[KEY_PROVIDE_CONTROL_MODE] = cfg.provideControlMode.rawValue
         prefs[KEY_PROVIDE_NETWORK_MODE] = cfg.provideNetworkMode.rawValue
         prefs.writeOrRemove(KEY_SELECTED_COUNTRY_CODE, cfg.selectedLocation.countryCode)
         prefs.writeOrRemove(KEY_SELECTED_REGION, cfg.selectedLocation.region)
@@ -134,8 +131,6 @@ class DataStoreUrnetworkConfigStore(
         val KEY_WINDOW_TYPE = stringPreferencesKey("urnetwork_window_type")
         val KEY_FIXED_IP_SIZE = booleanPreferencesKey("urnetwork_fixed_ip_size")
         val KEY_ALLOW_DIRECT = booleanPreferencesKey("urnetwork_allow_direct")
-        val KEY_PROVIDE_ENABLED = booleanPreferencesKey("urnetwork_provide_enabled")
-        val KEY_PROVIDE_CONTROL_MODE = stringPreferencesKey("urnetwork_provide_control_mode")
         val KEY_PROVIDE_NETWORK_MODE = stringPreferencesKey("urnetwork_provide_network_mode")
         val KEY_SELECTED_COUNTRY_CODE = stringPreferencesKey("urnetwork_selected_country_code")
         val KEY_SELECTED_REGION = stringPreferencesKey("urnetwork_selected_region")

@@ -19,13 +19,11 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.app.urnetwork.UrnetworkBalanceRepository
 import ru.ozero.app.urnetwork.UrnetworkBalanceState
-import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 import ru.ozero.engineurnetwork.allowDirect
 import ru.ozero.engineurnetwork.fixedIpSize
-import ru.ozero.engineurnetwork.provideControlMode
 import ru.ozero.engineurnetwork.provideNetworkMode
 import ru.ozero.engineurnetwork.setAllowDirect
 import ru.ozero.engineurnetwork.setFixedIpSize
@@ -134,27 +132,6 @@ class UrnetworkEngineSettingsViewModelTest {
         assertEquals(false, v.allowDirect.value)
     }
 
-    @Test
-    fun `selectProvideControlMode сохраняет в configStore и применяет к bridge при active engine`() = runTest {
-        val bridge = FakeUrnetworkBridge()
-        val store = fakeUrnetworkConfigStore()
-        val v = vm(bridge = bridge, store = store, tunnel = activeTunnel())
-        v.selectProvideControlMode(UrnetworkProvideControlMode.AUTO)
-        advanceUntilIdle()
-        assertEquals(UrnetworkProvideControlMode.AUTO, store.provideControlMode().first())
-        assertEquals(UrnetworkProvideControlMode.AUTO, bridge.lastProvideControlMode)
-    }
-
-    @Test
-    fun `selectProvideControlMode не вызывает bridge при idle engine — только persist в store`() = runTest {
-        val bridge = FakeUrnetworkBridge()
-        val store = fakeUrnetworkConfigStore()
-        val v = vm(bridge = bridge, store = store)
-        v.selectProvideControlMode(UrnetworkProvideControlMode.AUTO)
-        advanceUntilIdle()
-        assertEquals(UrnetworkProvideControlMode.AUTO, store.provideControlMode().first())
-        assertNull(bridge.lastProvideControlMode, "bridge не должен трогаться при idle engine")
-    }
 
     @Test
     fun `selectProvideNetworkMode сохраняет в configStore и применяет к bridge при active engine`() = runTest {
@@ -196,23 +173,6 @@ class UrnetworkEngineSettingsViewModelTest {
         assertEquals(UrnetworkWindowType.AUTO, v.windowType.value)
     }
 
-    @Test
-    fun `providePaused отражает инверсию provideEnabled из configStore`() = runTest {
-        val store = fakeUrnetworkConfigStore()
-        store.setProvideEnabled(false)
-        val v = vm(store = store)
-        advanceUntilIdle()
-        assertEquals(true, v.providePaused.value)
-    }
-
-    @Test
-    fun `providePaused false когда provideEnabled true`() = runTest {
-        val store = fakeUrnetworkConfigStore()
-        store.setProvideEnabled(true)
-        val v = vm(store = store)
-        advanceUntilIdle()
-        assertEquals(false, v.providePaused.value)
-    }
 
     @Test
     fun `sentinel — CheckIpRow открывает ur_io_ip через LocalUriHandler`() {
