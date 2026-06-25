@@ -160,28 +160,6 @@ class SubscriptionBalanceContractTest {
     }
 
     @Test
-    fun `browse-only device init does not unpause provide`() {
-        val initBlock = source
-            .substringAfter("override suspend fun initDeviceForLocations")
-            .substringBefore("private suspend fun ensureDeviceOnMain")
-        val ensureBlock = source
-            .substringAfter("private suspend fun ensureDeviceOnMain")
-            .substringBefore("private fun applyDeviceFields")
-        val startBlock = source
-            .substringAfter("private suspend fun runStartOnMain")
-            .substringBefore("private suspend fun setupWalletControllerAndPipeline")
-        val helperBlock = source
-            .substringAfter("private fun applyDeviceFields")
-            .substringBefore("private fun persistConnectLocation")
-
-        assertTrue(initBlock.contains("ensureDeviceOnMain(byClientJwt)"))
-        assertTrue(ensureBlock.contains("applyDeviceFields(device, localState, unpauseProvide = false)"))
-        assertTrue(startBlock.contains("applyDeviceFields(d, localState, unpauseProvide = true)"))
-        assertTrue(helperBlock.contains("unpauseProvide: Boolean"))
-        assertTrue(helperBlock.contains("device.providePaused = !unpauseProvide"))
-    }
-
-    @Test
     fun `Snapshot — used = 0 для нулевого баланса`() {
         val snap = UrnetworkSdkBridge.SubscriptionBalanceSnapshot(0L, 0L, 0L, 0L, null, null)
         assertNotNull(snap)

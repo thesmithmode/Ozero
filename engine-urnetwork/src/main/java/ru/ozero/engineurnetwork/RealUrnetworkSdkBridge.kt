@@ -44,6 +44,11 @@ class SdkLocationToken(val sdk: ConnectLocation) : UrnetworkSdkBridge.LocationTo
         runCatching { sdk.connectLocationId?.bestAvailable == true }.getOrDefault(false)
 }
 
+internal enum class DeviceInitMode(val providePaused: Boolean) {
+    FULL_START(providePaused = false),
+    LOCATION_BROWSE(providePaused = true),
+}
+
 @Suppress("TooManyFunctions", "LargeClass")
 class RealUrnetworkSdkBridge(
     private val app: Application,
@@ -191,7 +196,7 @@ class RealUrnetworkSdkBridge(
             }.onFailure {
                 PersistentLoggers.warn(TAG, "node start: credential refresh listener threw: ${it.message}")
             }
-            applyDeviceFields(d, localState, unpauseProvide = true)
+            applyDeviceFields(d, localState, DeviceInitMode.FULL_START)
             PersistentLoggers.debug(TAG, "node start: instance created - fields applied")
             deviceRef.set(d)
             d
@@ -514,7 +519,7 @@ class RealUrnetworkSdkBridge(
                 }
             }
         }.onFailure { PersistentLoggers.warn(TAG, "ensureDevice: addJwtRefreshListener threw: ${it.message}") }
-        applyDeviceFields(device, localState, unpauseProvide = false)
+        applyDeviceFields(device, localState, DeviceInitMode.LOCATION_BROWSE)
         deviceRef.set(device)
         Log.i(TAG, "initDeviceForLocations: device ready for location browse - applyDeviceFields done")
         return true
@@ -523,7 +528,7 @@ class RealUrnetworkSdkBridge(
     private fun applyDeviceFields(
         device: DeviceLocal,
         localState: LocalState,
-        unpauseProvide: Boolean,
+        deviceInitMode: DeviceInitMode,
     ) {
         val normalizedControlMode = UrnetworkProvideControlMode.ALWAYS.rawValue
         val effectiveProvideMode = Sdk.ProvideModePublic
@@ -538,7 +543,7 @@ class RealUrnetworkSdkBridge(
         val effectiveProvideNetworkMode = UrnetworkProvideNetworkMode.fromRaw(localState.provideNetworkMode).rawValue
         runCatching { localState.provideNetworkMode = effectiveProvideNetworkMode }
             .onFailure { PersistentLoggers.warn(TAG, "localState provideNetworkMode threw: ${it.message}") }
-        runCatching { device.providePaused = !unpauseProvide }
+        runCatching { device.providePaused = deviceInitMode.providePaused }
             .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
         runCatching { device.routeLocal = localState.routeLocal }
         runCatching { device.provideMode = effectiveProvideMode }
