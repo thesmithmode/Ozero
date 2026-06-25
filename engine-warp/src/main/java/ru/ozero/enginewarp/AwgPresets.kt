@@ -150,7 +150,12 @@ object AwgPresets {
         ),
     )
 
+    val CLICKABLE: List<AwgPreset> = listOf(
+        DEFAULT_WARP, NO_OBFUSCATION, LIGHT, TSPU, AGGRESSIVE,
+    )
+
     val ALL: List<AwgPreset> = listOf(
-        DEFAULT_WARP, NO_OBFUSCATION, LIGHT, TSPU, AGGRESSIVE, I1_V1, I1_V2, I1_V3, I1_V4, I1_OFF,
+        DEFAULT_WARP, NO_OBFUSCATION, LIGHT, TSPU, AGGRESSIVE,
+        I1_V1, I1_V2, I1_V3, I1_V4, I1_OFF,
     )
 }

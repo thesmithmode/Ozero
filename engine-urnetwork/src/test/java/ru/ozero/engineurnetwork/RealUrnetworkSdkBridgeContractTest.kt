@@ -2,6 +2,7 @@ package ru.ozero.engineurnetwork
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 @Suppress("LargeClass")
@@ -131,39 +132,117 @@ class RealUrnetworkSdkBridgeContractTest {
         val ensureBlock = source.substringAfter("private suspend fun ensureDeviceOnMain")
             .substringBefore("private fun applyDeviceFields")
         assertTrue(
-            startBlock.contains("applyDeviceFields(d, localState)"),
+            startBlock.contains("applyDeviceFields(d, localState, DeviceInitMode.FULL_START)"),
             "runStartOnMain обязан делегировать применение 13 device-полей в applyDeviceFields — " +
                 "иначе разъезжается с ensureDeviceOnMain (как в v0.1.7) → SDK скрывает regions/cities " +
                 "при engine.start без открытия settings.",
         )
         assertTrue(
-            ensureBlock.contains("applyDeviceFields(device, localState)"),
+            ensureBlock.contains("applyDeviceFields(device, localState, DeviceInitMode.LOCATION_BROWSE)"),
             "ensureDeviceOnMain обязан делегировать в applyDeviceFields — " +
                 "иначе разъезжается с runStartOnMain.",
         )
     }
 
     @Test
-    fun `applyDeviceFields override на ProvideModePublic при ALWAYS — root cause regions cities скрытых`() {
+    fun `runStartOnMain reapplies full start mode when reusing browse-created device`() {
+        val reuseBlock = source.substringAfter("if (existingDevice != null)")
+            .substringBefore("val space = try")
+
+        assertTrue(reuseBlock.contains("existingDevice.networkSpace?.asyncLocalState?.localState"))
+        assertTrue(reuseBlock.contains("applyDeviceFields(existingDevice, localState, DeviceInitMode.FULL_START)"))
+        assertTrue(reuseBlock.contains("existingDevice.providePaused = DeviceInitMode.FULL_START.providePaused"))
+    }
+
+    @Test
+    fun `browse-only init explicitly keeps provide paused`() {
+        assertEquals(false, DeviceInitMode.FULL_START.providePaused)
+        assertEquals(true, DeviceInitMode.LOCATION_BROWSE.providePaused)
+    }
+
+    @Test
+    fun `applyDeviceFields мигрирует provider mode до открытия SDK controllers`() {
         val block = source.substringAfter("private fun applyDeviceFields(")
             .substringBefore("private inline fun guardedRun")
         assertTrue(
-            block.contains("Sdk.ProvideModePublic"),
-            "applyDeviceFields обязан override provideMode на Sdk.ProvideModePublic когда " +
-                "provideControlMode == ALWAYS — паритет с upstream DeviceManager.kt:105. " +
-                "Без override свежий юзер имеет localState.provideMode = ProvideModeNone (0), " +
-                "и SDK скрывает regions/cities в LocationsViewController (только countries).",
+            block.contains("val normalizedControlMode = UrnetworkProvideControlMode.ALWAYS.rawValue"),
+            "applyDeviceFields обязан принудительно мигрировать localState.provideControlMode в ALWAYS " +
+                "до открытия controllers — старый persisted auto оставляет SDK в non-provider mode.",
         )
         assertTrue(
-            block.contains("UrnetworkProvideControlMode.fromRaw"),
-            "applyDeviceFields обязан нормализовать provideControlMode через fromRaw — " +
-                "raw localState.provideControlMode может быть '' или невалидный, SDK тогда " +
-                "не активирует location hierarchy.",
+            block.contains("val effectiveProvideMode = Sdk.ProvideModePublic"),
+            "applyDeviceFields обязан принудительно выставлять ProvideModePublic — иначе старый " +
+                "localState.provideMode=None переживает DataStore migration.",
         )
         assertTrue(
-            block.contains("UrnetworkProvideControlMode.ALWAYS.rawValue"),
-            "Override branch обязан сравнивать с UrnetworkProvideControlMode.ALWAYS.rawValue — " +
-                "иначе магическая строка \"always\" разъедется с enum при rename.",
+            block.contains("localState.provideControlMode = normalizedControlMode"),
+            "applyDeviceFields обязан сохранять migrated provideControlMode обратно в SDK localState.",
+        )
+        assertTrue(
+            block.contains("localState.provideMode = effectiveProvideMode"),
+            "applyDeviceFields обязан сохранять migrated provideMode обратно в SDK localState.",
+        )
+    }
+
+    @Test
+    fun `setProvideControlMode ALWAYS also applies ProvideModePublic`() {
+        val block = source.substringAfter("override fun setProvideControlMode(")
+            .substringBefore("override fun setProvideNetworkMode")
+        assertTrue(
+            block.contains("device?.provideMode = Sdk.ProvideModePublic"),
+            "Runtime ALWAYS setter обязан менять provideMode, не только provideControlMode.",
+        )
+        assertTrue(
+            block.contains("localState?.provideMode = Sdk.ProvideModePublic"),
+            "Runtime ALWAYS setter обязан сохранять provideMode migration в SDK localState.",
+        )
+    }
+
+    @Test
+    fun `applyDeviceFields keeps provide always active and clamps networks to wifi or all`() {
+        val bytecode = compiledMethodBytecode("applyDeviceFields")
+        assertTrue(
+            bytecode.contains("UrnetworkProvideNetworkMode\$Companion.fromRaw"),
+            "applyDeviceFields обязан нормализовать legacy provideNetworkMode в WIFI/ALL, " +
+                "чтобы старые значения не отключали provider.",
+        )
+        assertTrue(
+            bytecode.contains("com/bringyour/sdk/LocalState.setProvideNetworkMode"),
+            "Нормализованный provideNetworkMode обязан сохраняться в SDK localState.",
+        )
+        assertTrue(
+            bytecode.contains("com/bringyour/sdk/DeviceLocal.setProvidePaused"),
+            "applyDeviceFields не должен отключать раздачу: URnetwork provider всегда активен.",
+        )
+        assertTrue(
+            bytecode.contains("com/bringyour/sdk/DeviceLocal.setProvideNetworkMode"),
+            "applyDeviceFields обязан применять нормализованный network scope в SDK device.",
+        )
+    }
+
+    @Test
+    fun `setProvideNetworkMode persists only network scope without pausing provider`() {
+        val bytecode = compiledMethodBytecode("setProvideNetworkMode")
+        assertTrue(
+            bytecode.contains("com/bringyour/sdk/DeviceLocal.setProvideNetworkMode"),
+            "Runtime смена Wi-Fi/Wi-Fi+cellular должна обновлять SDK device.",
+        )
+        assertTrue(
+            bytecode.contains("com/bringyour/sdk/LocalState.setProvideNetworkMode"),
+            "Runtime смена Wi-Fi/Wi-Fi+cellular должна сохраняться в SDK localState.",
+        )
+        assertTrue(
+            !bytecode.contains("setProvidePaused"),
+            "Смена сети раздачи не должна уметь выключать раздачу полностью.",
+        )
+    }
+
+    @Test
+    fun `setProvideNetworkMode logs missing device instead of success`() {
+        val bytecode = compiledClassBytecode(verbose = true)
+        assertTrue(
+            bytecode.contains("skipped - device=null"),
+            "setProvideNetworkMode не должен логировать OK, если deviceRef пустой и обновлять нечего.",
         )
     }
 
@@ -763,5 +842,39 @@ class RealUrnetworkSdkBridgeContractTest {
             "Listener обязан закрывать Sub после первого вызова — иначе listener остаётся attached " +
                 "и может перезаписывать localState.provideSecretKeys при будущих regeneration.",
         )
+    }
+
+    private fun compiledMethodBytecode(methodName: String): String {
+        val output = compiledClassBytecode()
+        val marker = Regex("""(?m)^  .* ${Regex.escape(methodName)}\(""").find(output)
+        assertTrue(marker != null, "method $methodName not found in javap output")
+        val methodOutput = output.substring(marker.range.first)
+        val nextMarker = Regex("""(?m)^  (public|private|protected).*\);""").find(methodOutput, 1)
+        return if (nextMarker == null) {
+            methodOutput
+        } else {
+            methodOutput.substring(0, nextMarker.range.first)
+        }
+    }
+
+    private fun compiledClassBytecode(verbose: Boolean = false): String {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val classDir = File(moduleRoot, "build/tmp/kotlin-classes/debug")
+        val args = mutableListOf(
+            "javap",
+            "-classpath",
+            classDir.absolutePath,
+            "-c",
+            "-p",
+        )
+        if (verbose) args += "-v"
+        args += "ru.ozero.engineurnetwork.RealUrnetworkSdkBridge"
+        val process = ProcessBuilder(args)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().readText()
+        val exit = process.waitFor()
+        assertTrue(exit == 0, "javap failed with exit=$exit output=$output")
+        return output
     }
 }

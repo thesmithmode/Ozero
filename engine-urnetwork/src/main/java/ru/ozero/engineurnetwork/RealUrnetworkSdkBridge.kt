@@ -44,6 +44,11 @@ class SdkLocationToken(val sdk: ConnectLocation) : UrnetworkSdkBridge.LocationTo
         runCatching { sdk.connectLocationId?.bestAvailable == true }.getOrDefault(false)
 }
 
+internal enum class DeviceInitMode(val providePaused: Boolean) {
+    FULL_START(providePaused = false),
+    LOCATION_BROWSE(providePaused = true),
+}
+
 @Suppress("TooManyFunctions", "LargeClass")
 class RealUrnetworkSdkBridge(
     private val app: Application,
@@ -115,6 +120,13 @@ class RealUrnetworkSdkBridge(
         val existingDevice = deviceRef.get()
         val device: DeviceLocal = if (existingDevice != null) {
             PersistentLoggers.debug(TAG, "node start: reusing existing node from prior session")
+            val localState = runCatching { existingDevice.networkSpace?.asyncLocalState?.localState }.getOrNull()
+            if (localState != null) {
+                applyDeviceFields(existingDevice, localState, DeviceInitMode.FULL_START)
+            } else {
+                runCatching { existingDevice.providePaused = DeviceInitMode.FULL_START.providePaused }
+                    .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
+            }
             existingDevice
         } else {
             val space = try {
@@ -191,7 +203,7 @@ class RealUrnetworkSdkBridge(
             }.onFailure {
                 PersistentLoggers.warn(TAG, "node start: credential refresh listener threw: ${it.message}")
             }
-            applyDeviceFields(d, localState)
+            applyDeviceFields(d, localState, DeviceInitMode.FULL_START)
             PersistentLoggers.debug(TAG, "node start: instance created - fields applied")
             deviceRef.set(d)
             d
@@ -514,26 +526,31 @@ class RealUrnetworkSdkBridge(
                 }
             }
         }.onFailure { PersistentLoggers.warn(TAG, "ensureDevice: addJwtRefreshListener threw: ${it.message}") }
-        applyDeviceFields(device, localState)
+        applyDeviceFields(device, localState, DeviceInitMode.LOCATION_BROWSE)
         deviceRef.set(device)
         Log.i(TAG, "initDeviceForLocations: device ready for location browse - applyDeviceFields done")
         return true
     }
 
-    private fun applyDeviceFields(device: DeviceLocal, localState: LocalState) {
-        val rawControlMode = runCatching { localState.provideControlMode }.getOrNull().orEmpty()
-        val normalizedControlMode = UrnetworkProvideControlMode.fromRaw(rawControlMode).rawValue
-        val rawProvideMode = runCatching { localState.provideMode }.getOrDefault(Sdk.ProvideModeNone)
-        val effectiveProvideMode = if (normalizedControlMode == UrnetworkProvideControlMode.ALWAYS.rawValue) {
-            Sdk.ProvideModePublic
-        } else {
-            rawProvideMode
-        }
+    private fun applyDeviceFields(
+        device: DeviceLocal,
+        localState: LocalState,
+        deviceInitMode: DeviceInitMode,
+    ) {
+        val normalizedControlMode = UrnetworkProvideControlMode.ALWAYS.rawValue
+        val effectiveProvideMode = Sdk.ProvideModePublic
+        runCatching { localState.provideControlMode = normalizedControlMode }
+            .onFailure { PersistentLoggers.warn(TAG, "localState provideControlMode threw: ${it.message}") }
+        runCatching { localState.provideMode = effectiveProvideMode }
+            .onFailure { PersistentLoggers.warn(TAG, "localState provideMode threw: ${it.message}") }
         val connectLocation = runCatching { localState.connectLocation }.getOrNull()
             ?.takeIf { it.isMeaningfulConnectLocation() }
             ?: bestAvailableConnectLocation()
         val defaultLocation = runCatching { localState.defaultLocation }.getOrNull() ?: connectLocation
-        runCatching { device.providePaused = true }
+        val effectiveProvideNetworkMode = UrnetworkProvideNetworkMode.fromRaw(localState.provideNetworkMode).rawValue
+        runCatching { localState.provideNetworkMode = effectiveProvideNetworkMode }
+            .onFailure { PersistentLoggers.warn(TAG, "localState provideNetworkMode threw: ${it.message}") }
+        runCatching { device.providePaused = deviceInitMode.providePaused }
             .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
         runCatching { device.routeLocal = localState.routeLocal }
         runCatching { device.provideMode = effectiveProvideMode }
@@ -546,7 +563,7 @@ class RealUrnetworkSdkBridge(
         runCatching { device.vpnInterfaceWhileOffline = localState.vpnInterfaceWhileOffline }
         runCatching { device.canRefer = localState.canRefer }
         runCatching { device.allowForeground = localState.allowForeground }
-        runCatching { device.provideNetworkMode = localState.provideNetworkMode }
+        runCatching { device.provideNetworkMode = effectiveProvideNetworkMode }
         runCatching { device.canPromptIntroFunnel = localState.canPromptIntroFunnel }
         runCatching { device.performanceProfile = localState.performanceProfile }
     }
@@ -602,13 +619,25 @@ class RealUrnetworkSdkBridge(
 
     override fun setProvideControlMode(mode: UrnetworkProvideControlMode) =
         guardedRun("setProvideControlMode(${mode.rawValue})") {
-            deviceRef.get()?.provideControlMode = mode.rawValue
+            val device = deviceRef.get()
+            device?.provideControlMode = mode.rawValue
+            if (mode == UrnetworkProvideControlMode.ALWAYS) {
+                device?.provideMode = Sdk.ProvideModePublic
+                runCatching { device?.networkSpace?.asyncLocalState?.localState?.provideMode = Sdk.ProvideModePublic }
+            }
+            runCatching { device?.networkSpace?.asyncLocalState?.localState?.provideControlMode = mode.rawValue }
             Log.i(TAG, "setProvideControlMode mode=${mode.rawValue} OK")
         }
 
     override fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) =
         guardedRun("setProvideNetworkMode(${mode.rawValue})") {
-            deviceRef.get()?.provideNetworkMode = mode.rawValue
+            val device = deviceRef.get()
+            if (device == null) {
+                Log.i(TAG, "setProvideNetworkMode mode=${mode.rawValue} skipped - device=null")
+                return@guardedRun
+            }
+            device.provideNetworkMode = mode.rawValue
+            runCatching { device.networkSpace?.asyncLocalState?.localState?.provideNetworkMode = mode.rawValue }
             Log.i(TAG, "setProvideNetworkMode mode=${mode.rawValue} OK")
         }
 
