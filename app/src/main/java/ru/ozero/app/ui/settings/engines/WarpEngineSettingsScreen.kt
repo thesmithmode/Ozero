@@ -124,7 +124,7 @@ fun WarpEngineSettingsScreen(
         if (displayName.endsWith(".yaml", ignoreCase = true) || displayName.endsWith(".yml", ignoreCase = true)) {
             viewModel.onClashYamlRejected()
         } else {
-            viewModel.onImportFile(ByteArrayInputStream(bytes))
+            viewModel.onImportFile(ByteArrayInputStream(bytes), displayName)
         }
     }
     Scaffold(
@@ -939,7 +939,7 @@ private fun WarpTweaksAwgSection(draft: WarpEditDraft, onDraftChange: (WarpEditD
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
-            AwgPresets.ALL.forEach { preset ->
+            AwgPresets.CLICKABLE.forEach { preset ->
                 val p = preset.params
                 val isSelected = draft.jc == p.junkPacketCount.toString() &&
                     draft.jmin == p.junkPacketMinSize.toString() &&
