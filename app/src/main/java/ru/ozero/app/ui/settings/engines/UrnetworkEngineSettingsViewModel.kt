@@ -24,18 +24,14 @@ import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
-import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 import ru.ozero.engineurnetwork.allowDirect
 import ru.ozero.engineurnetwork.fixedIpSize
-import ru.ozero.engineurnetwork.provideControlMode
-import ru.ozero.engineurnetwork.provideEnabled
 import ru.ozero.engineurnetwork.provideNetworkMode
 import ru.ozero.engineurnetwork.setAllowDirect
 import ru.ozero.engineurnetwork.setFixedIpSize
-import ru.ozero.engineurnetwork.setProvideControlMode
 import ru.ozero.engineurnetwork.setProvideNetworkMode
 import ru.ozero.engineurnetwork.setWindowType
 import ru.ozero.engineurnetwork.windowType
@@ -70,16 +66,8 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     val allowDirect: StateFlow<Boolean> = configStore.allowDirect()
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
-    val provideControlMode: StateFlow<UrnetworkProvideControlMode> = configStore.provideControlMode()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, UrnetworkProvideControlMode.ALWAYS)
-
     val provideNetworkMode: StateFlow<UrnetworkProvideNetworkMode> = configStore.provideNetworkMode()
         .stateIn(viewModelScope, SharingStarted.Eagerly, UrnetworkProvideNetworkMode.WIFI)
-
-    val providePaused: StateFlow<Boolean> = configStore.provideEnabled()
-        .map { !it }
-        .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val insufficientBalance: StateFlow<Boolean> = bridge.contractStatus()
         .map { it.insufficientBalance && !it.premium }
@@ -118,15 +106,6 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS),
             initialValue = balanceRepository.state.value,
         )
-
-    fun selectProvideControlMode(value: UrnetworkProvideControlMode) {
-        viewModelScope.launch {
-            configStore.setProvideControlMode(value)
-            if (isUrnetworkActive.value) {
-                runCatching { bridge.setProvideControlMode(value) }
-            }
-        }
-    }
 
     fun selectProvideNetworkMode(value: UrnetworkProvideNetworkMode) {
         viewModelScope.launch {

@@ -66,8 +66,8 @@ class UrnetworkConfigModelCoverageTest {
         assertEquals(UrnetworkWindowType.QUALITY, store.windowType().first())
         assertTrue(store.fixedIpSize().first())
         assertFalse(store.allowDirect().first())
-        assertFalse(store.provideEnabled().first())
-        assertEquals(UrnetworkProvideControlMode.AUTO, store.provideControlMode().first())
+        assertTrue(store.provideEnabled().first())
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, store.provideControlMode().first())
         assertEquals(UrnetworkProvideNetworkMode.ALL, store.provideNetworkMode().first())
     }
 
