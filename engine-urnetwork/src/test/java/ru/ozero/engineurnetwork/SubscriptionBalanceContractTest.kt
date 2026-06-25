@@ -178,7 +178,7 @@ class SubscriptionBalanceContractTest {
         assertTrue(ensureBlock.contains("applyDeviceFields(device, localState, unpauseProvide = false)"))
         assertTrue(startBlock.contains("applyDeviceFields(d, localState, unpauseProvide = true)"))
         assertTrue(helperBlock.contains("unpauseProvide: Boolean"))
-        assertTrue(helperBlock.contains("if (unpauseProvide)"))
+        assertTrue(helperBlock.contains("device.providePaused = !unpauseProvide"))
     }
 
     @Test

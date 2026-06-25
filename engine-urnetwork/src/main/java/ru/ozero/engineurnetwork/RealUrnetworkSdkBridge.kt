@@ -538,10 +538,8 @@ class RealUrnetworkSdkBridge(
         val effectiveProvideNetworkMode = UrnetworkProvideNetworkMode.fromRaw(localState.provideNetworkMode).rawValue
         runCatching { localState.provideNetworkMode = effectiveProvideNetworkMode }
             .onFailure { PersistentLoggers.warn(TAG, "localState provideNetworkMode threw: ${it.message}") }
-        if (unpauseProvide) {
-            runCatching { device.providePaused = false }
-                .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
-        }
+        runCatching { device.providePaused = !unpauseProvide }
+            .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
         runCatching { device.routeLocal = localState.routeLocal }
         runCatching { device.provideMode = effectiveProvideMode }
         runCatching { localState.connectLocation = connectLocation }
