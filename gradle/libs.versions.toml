@@ -64,6 +64,8 @@ jacoco = "0.8.12"
 
 # Robolectric (для runtime Room migration tests — JVM SQLite)
 robolectric = "4.13"
+robolectricAndroidAllInstrumented = "13-robolectric-9030017-i6"
+robolectricAndroidAllInstrumented35 = "14-robolectric-10818077-i6"
 
 [libraries]
 # AndroidX
@@ -161,6 +163,8 @@ room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
 
 # Robolectric (JVM SQLite для Room MigrationTestHelper)
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+robolectric-android-all-instrumented = { module = "org.robolectric:android-all-instrumented", version.ref = "robolectricAndroidAllInstrumented" }
+robolectric-android-all-instrumented35 = { module = "org.robolectric:android-all-instrumented", version.ref = "robolectricAndroidAllInstrumented35" }
 
 # JUnit 4 + Vintage engine для Room MigrationTestHelper (он @Rule = JUnit 4)
 junit4 = { module = "junit:junit", version = "4.13.2" }
