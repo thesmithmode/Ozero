@@ -9,7 +9,6 @@ interface UrnetworkConfigStore {
     suspend fun update(transform: (UrnetworkConfig) -> UrnetworkConfig)
 }
 
-/** Relay provide is always on with ALWAYS control so every active non-URnetwork tunnel can seed the mesh. */
 data class UrnetworkConfig(
     val walletOverride: String? = null,
     val byJwt: String? = null,
