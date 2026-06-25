@@ -120,6 +120,13 @@ class RealUrnetworkSdkBridge(
         val existingDevice = deviceRef.get()
         val device: DeviceLocal = if (existingDevice != null) {
             PersistentLoggers.debug(TAG, "node start: reusing existing node from prior session")
+            val localState = runCatching { existingDevice.networkSpace?.asyncLocalState?.localState }.getOrNull()
+            if (localState != null) {
+                applyDeviceFields(existingDevice, localState, DeviceInitMode.FULL_START)
+            } else {
+                runCatching { existingDevice.providePaused = DeviceInitMode.FULL_START.providePaused }
+                    .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
+            }
             existingDevice
         } else {
             val space = try {

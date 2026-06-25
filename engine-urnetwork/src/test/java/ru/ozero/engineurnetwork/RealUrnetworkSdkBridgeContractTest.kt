@@ -145,6 +145,16 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `runStartOnMain reapplies full start mode when reusing browse-created device`() {
+        val reuseBlock = source.substringAfter("if (existingDevice != null)")
+            .substringBefore("val space = try")
+
+        assertTrue(reuseBlock.contains("existingDevice.networkSpace?.asyncLocalState?.localState"))
+        assertTrue(reuseBlock.contains("applyDeviceFields(existingDevice, localState, DeviceInitMode.FULL_START)"))
+        assertTrue(reuseBlock.contains("existingDevice.providePaused = DeviceInitMode.FULL_START.providePaused"))
+    }
+
+    @Test
     fun `browse-only init explicitly keeps provide paused`() {
         assertEquals(false, DeviceInitMode.FULL_START.providePaused)
         assertEquals(true, DeviceInitMode.LOCATION_BROWSE.providePaused)
