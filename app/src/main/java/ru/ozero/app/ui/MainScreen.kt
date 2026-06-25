@@ -9,6 +9,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -318,91 +319,102 @@ internal fun ExpertMainContent(
     val onOpenEngineParams = callbacks.onOpenEngineParams
     val onOpenSplitTunnel = callbacks.onOpenSplitTunnel
     val onOpenSettings = callbacks.onOpenSettings
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Spacer(modifier = Modifier.height(16.dp))
-
-        AnimatedContent(
-            targetState = switching to tunnelState,
-            transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
-            label = "status",
-        ) { (sw, s) ->
-            StatusLabel(s, sw, urnetworkPeerCount, isReconnecting)
-        }
-
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center,
-        ) {
-            PowerDisc(
-                state = powerState,
-                onClick = onConnectClick,
-                modifier = Modifier.semantics {
-                    contentDescription = if (isConnected) "disconnect" else "connect"
-                },
-            )
-        }
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val fontScale = LocalDensity.current.fontScale
+        val compactVertical = maxHeight < 720.dp || fontScale >= 1.3f
+        val topSpacer = if (compactVertical) 8.dp else 16.dp
+        val bottomSpacer = if (compactVertical) 4.dp else 8.dp
+        val sectionGap = if (compactVertical) 4.dp else 8.dp
+        val discDiameter = if (compactVertical) 204 else 256
 
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            val visualConnected = isConnected ||
-                switching != null ||
-                tunnelState is TunnelState.Probing ||
-                tunnelState is TunnelState.Connecting
-            ExpertStatusBadges(
-                visualConnected = visualConnected,
-                killswitchActive = killswitchActive,
-                manualEngine = manualEngine,
-                tunnelState = tunnelState,
-                switching = switching,
-                urnetworkPeerCount = urnetworkPeerCount,
-                urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
-                ipInfo = ipInfo,
-                stats = stats,
-                speedHistory = speedHistory,
-                stagnant = stagnant,
-                healthStatus = healthStatus,
-                onRefreshIpInfo = onRefreshIpInfo,
-            )
+            Spacer(modifier = Modifier.height(topSpacer))
 
-            EngineChipsRow(
-                selectedEngine = resolveUiSelectedEngine(
+            AnimatedContent(
+                targetState = switching to tunnelState,
+                transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
+                label = "status",
+            ) { (sw, s) ->
+                StatusLabel(s, sw, urnetworkPeerCount, isReconnecting)
+            }
+
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                PowerDisc(
+                    state = powerState,
+                    onClick = onConnectClick,
+                    modifier = Modifier.semantics {
+                        contentDescription = if (isConnected) "disconnect" else "connect"
+                    },
+                    diameterDp = discDiameter,
+                )
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(sectionGap),
+            ) {
+                val visualConnected = isConnected ||
+                    switching != null ||
+                    tunnelState is TunnelState.Probing ||
+                    tunnelState is TunnelState.Connecting
+                ExpertStatusBadges(
+                    visualConnected = visualConnected,
+                    killswitchActive = killswitchActive,
+                    manualEngine = manualEngine,
                     tunnelState = tunnelState,
                     switching = switching,
-                    manualEngine = manualEngine,
-                ),
-                engineOrder = engineAutoPriority,
-                onSelect = onManualEngineSelect,
-                modifier = Modifier.fillMaxWidth(),
-            )
+                    urnetworkPeerCount = urnetworkPeerCount,
+                    urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                    ipInfo = ipInfo,
+                    stats = stats,
+                    speedHistory = speedHistory,
+                    stagnant = stagnant,
+                    healthStatus = healthStatus,
+                    compactVertical = compactVertical,
+                    onRefreshIpInfo = onRefreshIpInfo,
+                )
 
-            BottomDock(
-                tabs = expertDockTabs(),
-                activeTabId = DOCK_TAB_HOME,
-                onTabSelected = { id ->
-                    when (id) {
-                        DOCK_TAB_SERVERS -> onOpenEngineParams(
-                            resolveUiSelectedEngine(
-                                tunnelState = tunnelState,
-                                switching = switching,
-                                manualEngine = manualEngine,
-                            ),
-                        )
-                        DOCK_TAB_SPLIT_TUNNEL -> onOpenSplitTunnel()
-                        DOCK_TAB_SETTINGS -> onOpenSettings()
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+                EngineChipsRow(
+                    selectedEngine = resolveUiSelectedEngine(
+                        tunnelState = tunnelState,
+                        switching = switching,
+                        manualEngine = manualEngine,
+                    ),
+                    engineOrder = engineAutoPriority,
+                    onSelect = onManualEngineSelect,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                BottomDock(
+                    tabs = expertDockTabs(),
+                    activeTabId = DOCK_TAB_HOME,
+                    onTabSelected = { id ->
+                        when (id) {
+                            DOCK_TAB_SERVERS -> onOpenEngineParams(
+                                resolveUiSelectedEngine(
+                                    tunnelState = tunnelState,
+                                    switching = switching,
+                                    manualEngine = manualEngine,
+                                ),
+                            )
+                            DOCK_TAB_SPLIT_TUNNEL -> onOpenSplitTunnel()
+                            DOCK_TAB_SETTINGS -> onOpenSettings()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                )
+                Spacer(modifier = Modifier.height(bottomSpacer))
+            }
         }
     }
 }
@@ -422,6 +434,7 @@ private fun ExpertStatusBadges(
     speedHistory: List<SpeedSample>,
     stagnant: Boolean,
     healthStatus: HealthMonitor.Status,
+    compactVertical: Boolean = false,
     onRefreshIpInfo: () -> Unit,
 ) {
     if (killswitchActive) {
@@ -449,6 +462,7 @@ private fun ExpertStatusBadges(
     TrafficStatsCard(
         stats = stats,
         speedHistory = speedHistory,
+        compactVertical = compactVertical,
         modifier = Modifier.padding(horizontal = 16.dp),
     )
     if (visualConnected && stagnant) {
@@ -680,6 +694,7 @@ private fun IpCardExitNodeValue(state: IpInfoState) {
 private fun TrafficStatsCard(
     stats: TunnelStats?,
     speedHistory: List<SpeedSample> = emptyList(),
+    compactVertical: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val sessionStartMs = stats?.sessionStartMs ?: 0L
@@ -739,7 +754,7 @@ private fun TrafficStatsCard(
                 selectedTf = selectedTf,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(96.dp),
+                    .height(if (compactVertical) 64.dp else 96.dp),
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
