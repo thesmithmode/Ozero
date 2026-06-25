@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -31,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.min
 import ru.ozero.app.ui.theme.OzeroPalette
 
 data class DockTab(
@@ -89,6 +91,12 @@ private fun DockButton(
 ) {
     val tint = if (isActive) MaterialTheme.colorScheme.onSurface else OzeroPalette.Text2
     val background = if (isActive) Color.White.copy(alpha = 0.10f) else Color.Transparent
+    val density = LocalDensity.current
+    val verticalScale = min(1f, 1.3f / density.fontScale)
+    val iconSize = (DOCK_ICON_SIZE_DP * verticalScale).dp
+    val verticalPadding = (DOCK_BUTTON_VERTICAL_PADDING_DP * verticalScale).dp
+    val labelSize = (DOCK_LABEL_SIZE_SP * verticalScale).sp
+    val labelLineHeight = (DOCK_LABEL_LINE_HEIGHT_SP * verticalScale).sp
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(DOCK_BUTTON_RADIUS_DP.dp))
@@ -98,7 +106,7 @@ private fun DockButton(
                 role = Role.Tab
                 selected = isActive
             }
-            .padding(vertical = DOCK_BUTTON_VERTICAL_PADDING_DP.dp, horizontal = 4.dp),
+            .padding(vertical = verticalPadding, horizontal = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -109,13 +117,14 @@ private fun DockButton(
                 imageVector = tab.icon,
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(DOCK_ICON_SIZE_DP.dp),
+                modifier = Modifier.size(iconSize),
             )
             Text(
                 text = tab.label,
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 10.5.sp,
+                    fontSize = labelSize,
+                    lineHeight = labelLineHeight,
                 ),
                 color = tint,
                 maxLines = 1,
@@ -132,6 +141,8 @@ private const val DOCK_PADDING_VERTICAL_DP: Int = 6
 private const val DOCK_GAP_DP: Int = 2
 private const val DOCK_ICON_SIZE_DP: Int = 21
 private const val DOCK_BUTTON_VERTICAL_PADDING_DP: Int = 8
+private const val DOCK_LABEL_SIZE_SP: Float = 10.5f
+private const val DOCK_LABEL_LINE_HEIGHT_SP: Float = 16f
 
 const val BOTTOM_DOCK_TEST_TAG: String = "bottom_dock"
 const val BOTTOM_DOCK_TAB_TEST_TAG_PREFIX: String = "bottom_dock_tab_"
