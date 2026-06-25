@@ -531,7 +531,10 @@ class RealUrnetworkSdkBridge(
             ?.takeIf { it.isMeaningfulConnectLocation() }
             ?: bestAvailableConnectLocation()
         val defaultLocation = runCatching { localState.defaultLocation }.getOrNull() ?: connectLocation
-        runCatching { device.providePaused = true }
+        val effectiveProvideNetworkMode = UrnetworkProvideNetworkMode.fromRaw(localState.provideNetworkMode).rawValue
+        runCatching { localState.provideNetworkMode = effectiveProvideNetworkMode }
+            .onFailure { PersistentLoggers.warn(TAG, "localState provideNetworkMode threw: ${it.message}") }
+        runCatching { device.providePaused = false }
             .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
         runCatching { device.routeLocal = localState.routeLocal }
         runCatching { device.provideMode = effectiveProvideMode }
@@ -544,7 +547,7 @@ class RealUrnetworkSdkBridge(
         runCatching { device.vpnInterfaceWhileOffline = localState.vpnInterfaceWhileOffline }
         runCatching { device.canRefer = localState.canRefer }
         runCatching { device.allowForeground = localState.allowForeground }
-        runCatching { device.provideNetworkMode = localState.provideNetworkMode }
+        runCatching { device.provideNetworkMode = effectiveProvideNetworkMode }
         runCatching { device.canPromptIntroFunnel = localState.canPromptIntroFunnel }
         runCatching { device.performanceProfile = localState.performanceProfile }
     }
@@ -612,7 +615,9 @@ class RealUrnetworkSdkBridge(
 
     override fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) =
         guardedRun("setProvideNetworkMode(${mode.rawValue})") {
-            deviceRef.get()?.provideNetworkMode = mode.rawValue
+            val device = deviceRef.get()
+            device?.provideNetworkMode = mode.rawValue
+            runCatching { device?.networkSpace?.asyncLocalState?.localState?.provideNetworkMode = mode.rawValue }
             Log.i(TAG, "setProvideNetworkMode mode=${mode.rawValue} OK")
         }
 

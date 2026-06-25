@@ -1184,7 +1184,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     private class RecordingProfileProbe(
         private val calls: ConcurrentLinkedQueue<String>,
     ) : SingboxProfileProbe {
-        override suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int {
+        override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
             calls += bean.serverAddress
             return 1
         }

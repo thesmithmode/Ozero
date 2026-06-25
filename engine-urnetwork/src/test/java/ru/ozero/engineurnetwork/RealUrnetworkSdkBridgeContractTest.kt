@@ -182,6 +182,40 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `applyDeviceFields keeps provide always active and clamps networks to wifi or all`() {
+        val block = source.substringAfter("private fun applyDeviceFields(")
+            .substringBefore("private fun persistConnectLocation")
+        assertTrue(
+            block.contains("device.providePaused = false"),
+            "applyDeviceFields не должен отключать раздачу: URnetwork provider всегда активен, " +
+                "а выбор пользователя ограничивает только Wi-Fi vs Wi-Fi+cellular.",
+        )
+        assertTrue(
+            block.contains("UrnetworkProvideNetworkMode.fromRaw(localState.provideNetworkMode).rawValue"),
+            "applyDeviceFields обязан нормализовать legacy provideNetworkMode в WIFI/ALL, " +
+                "чтобы старые значения не отключали provider.",
+        )
+        assertTrue(
+            block.contains("localState.provideNetworkMode = effectiveProvideNetworkMode"),
+            "Нормализованный provideNetworkMode обязан сохраняться в SDK localState.",
+        )
+    }
+
+    @Test
+    fun `setProvideNetworkMode persists only network scope without pausing provider`() {
+        val block = source.substringAfter("override fun setProvideNetworkMode(")
+            .substringBefore("override fun relayDiagnostics")
+        assertTrue(
+            block.contains("localState?.provideNetworkMode = mode.rawValue"),
+            "Runtime смена Wi-Fi/Wi-Fi+cellular должна сохраняться в SDK localState.",
+        )
+        assertTrue(
+            !block.contains("providePaused"),
+            "Смена сети раздачи не должна уметь выключать раздачу полностью.",
+        )
+    }
+
+    @Test
     fun `bridge использует UrnetworkRuntime ensure (один manager на процесс)`() {
         assertTrue(
             source.contains("UrnetworkRuntime.ensure(app)"),
