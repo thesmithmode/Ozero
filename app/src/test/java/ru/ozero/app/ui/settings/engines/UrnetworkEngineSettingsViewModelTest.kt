@@ -27,7 +27,6 @@ import ru.ozero.engineurnetwork.fixedIpSize
 import ru.ozero.engineurnetwork.provideNetworkMode
 import ru.ozero.engineurnetwork.setAllowDirect
 import ru.ozero.engineurnetwork.setFixedIpSize
-import ru.ozero.engineurnetwork.setProvideEnabled
 import ru.ozero.engineurnetwork.windowType
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
@@ -132,7 +131,6 @@ class UrnetworkEngineSettingsViewModelTest {
         assertEquals(false, v.allowDirect.value)
     }
 
-
     @Test
     fun `selectProvideNetworkMode сохраняет в configStore и применяет к bridge при active engine`() = runTest {
         val bridge = FakeUrnetworkBridge()
@@ -172,7 +170,6 @@ class UrnetworkEngineSettingsViewModelTest {
         advanceUntilIdle()
         assertEquals(UrnetworkWindowType.AUTO, v.windowType.value)
     }
-
 
     @Test
     fun `sentinel — CheckIpRow открывает ur_io_ip через LocalUriHandler`() {

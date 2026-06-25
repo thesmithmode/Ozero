@@ -107,7 +107,6 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             initialValue = balanceRepository.state.value,
         )
 
-
     fun selectProvideNetworkMode(value: UrnetworkProvideNetworkMode) {
         viewModelScope.launch {
             configStore.setProvideNetworkMode(value)
