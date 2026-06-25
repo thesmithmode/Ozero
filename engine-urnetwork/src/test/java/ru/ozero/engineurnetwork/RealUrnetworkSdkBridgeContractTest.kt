@@ -2,6 +2,7 @@ package ru.ozero.engineurnetwork
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 @Suppress("LargeClass")
@@ -131,16 +132,32 @@ class RealUrnetworkSdkBridgeContractTest {
         val ensureBlock = source.substringAfter("private suspend fun ensureDeviceOnMain")
             .substringBefore("private fun applyDeviceFields")
         assertTrue(
-            startBlock.contains("applyDeviceFields(d, localState)"),
+            startBlock.contains("applyDeviceFields(d, localState, DeviceInitMode.FULL_START)"),
             "runStartOnMain обязан делегировать применение 13 device-полей в applyDeviceFields — " +
                 "иначе разъезжается с ensureDeviceOnMain (как в v0.1.7) → SDK скрывает regions/cities " +
                 "при engine.start без открытия settings.",
         )
         assertTrue(
-            ensureBlock.contains("applyDeviceFields(device, localState)"),
+            ensureBlock.contains("applyDeviceFields(device, localState, DeviceInitMode.LOCATION_BROWSE)"),
             "ensureDeviceOnMain обязан делегировать в applyDeviceFields — " +
                 "иначе разъезжается с runStartOnMain.",
         )
+    }
+
+    @Test
+    fun `runStartOnMain reapplies full start mode when reusing browse-created device`() {
+        val reuseBlock = source.substringAfter("if (existingDevice != null)")
+            .substringBefore("val space = try")
+
+        assertTrue(reuseBlock.contains("existingDevice.networkSpace?.asyncLocalState?.localState"))
+        assertTrue(reuseBlock.contains("applyDeviceFields(existingDevice, localState, DeviceInitMode.FULL_START)"))
+        assertTrue(reuseBlock.contains("existingDevice.providePaused = DeviceInitMode.FULL_START.providePaused"))
+    }
+
+    @Test
+    fun `browse-only init explicitly keeps provide paused`() {
+        assertEquals(false, DeviceInitMode.FULL_START.providePaused)
+        assertEquals(true, DeviceInitMode.LOCATION_BROWSE.providePaused)
     }
 
     @Test
