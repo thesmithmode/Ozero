@@ -37,7 +37,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -140,16 +139,6 @@ private fun SingboxSettingsContent(
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState()),
     ) {
-        Spacer(Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = state.probeTimeoutSeconds.toString(),
-            onValueChange = viewModel::onProbeTimeoutSecondsChange,
-            label = { Text(stringResource(R.string.singbox_probe_timeout_label)) },
-            supportingText = { Text(stringResource(R.string.singbox_probe_timeout_hint)) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-        )
         Spacer(Modifier.height(8.dp))
 
         if (state.groups.isNotEmpty()) {

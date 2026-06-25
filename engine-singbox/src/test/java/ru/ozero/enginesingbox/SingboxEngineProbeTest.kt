@@ -283,7 +283,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `attachTun fails auto select when routed probes fail after runtime starts`() = runTest {
+    fun `attachTun keeps auto select runtime when routed probes fail after runtime starts`() = runTest {
         mockkStatic(ParcelFileDescriptor::class)
         try {
             val engine = buildEngine()
@@ -293,7 +293,6 @@ class SingboxEngineProbeTest {
             every { ParcelFileDescriptor.fromFd(42) } returns pfd
             every { process.startWithConfig(pfd, any(), any()) } returns Unit
             every { process.runtimeRunning() } returns true
-            every { process.stopAndWait(3_000L) } returns true
             engine.setPrivateField("proxy", process)
             engine.setPrivateField("pendingConfig", "{}")
             engine.setPrivateField("pendingSocksPort", 49408)
@@ -301,13 +300,12 @@ class SingboxEngineProbeTest {
 
             val result = engine.attachTun(42)
 
-            val failure = assertIs<TunAttachResult.Failure>(result)
-            assertTrue(failure.reason.contains("auto-select routed probe"))
-            verify(exactly = 1) { process.stopAndWait(3_000L) }
+            assertIs<TunAttachResult.Success>(result)
+            verify(exactly = 0) { process.stopAndWait(3_000L) }
             assertEquals(null, engine.privateField("pendingConfig"))
             assertEquals(0, engine.privateIntField("pendingSocksPort"))
-            assertEquals(0, engine.privateIntField("activeSocksPort"))
-            assertEquals(false, engine.privateBooleanField("activeTunAutoSelect"))
+            assertEquals(49408, engine.privateIntField("activeSocksPort"))
+            assertEquals(true, engine.privateBooleanField("activeTunAutoSelect"))
         } finally {
             unmockkStatic(ParcelFileDescriptor::class)
         }
@@ -584,6 +582,24 @@ class SingboxEngineProbeTest {
         assertIs<EnginePlugin.ReadyResult.Timeout>(result)
         assertEquals(0, engine.privateIntField("activeSocksPort"))
         assertEquals(false, engine.privateBooleanField("activeAutoSelect"))
+    }
+
+    @Test
+    fun `awaitReady keeps tun auto select runtime after non fatal warmup miss`() = runTest {
+        val engine = buildEngine()
+        engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
+        val process = mockk<ISingboxEngineProcess>()
+        engine.setPrivateField("proxy", process)
+        engine.setPrivateField("activeSocksPort", 49408)
+        engine.setPrivateField("activeAutoSelect", true)
+        engine.setPrivateField("activeTunAutoSelect", true)
+
+        val result = engine.awaitReady()
+
+        assertIs<EnginePlugin.ReadyResult.Ready>(result)
+        assertEquals(49408, engine.privateIntField("activeSocksPort"))
+        assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
+        assertEquals(true, engine.privateBooleanField("activeTunAutoSelect"))
     }
 
     @Test

@@ -3,14 +3,25 @@ package ru.ozero.app.ui.settings.engines.singbox
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginesingbox.SingboxEngine
+import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.AppMode
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
+import ru.ozero.enginescore.settings.HostsMode
+import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginescore.settings.SplitTunnelMode
+import ru.ozero.enginescore.settings.TrafficMode
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.VLESSBean
@@ -28,6 +39,7 @@ class SingboxProbeServiceTest {
 
     private val selectedProfileKey = longPreferencesKey("singbox_selected_profile_id")
     private val beanKey = byteArrayPreferencesKey("singbox_vless_bean")
+    private val dnsServersKey = stringSetPreferencesKey("singbox_dns_servers")
 
     @Test
     fun `probeAndAutoSelect preserves auto-select mode while updating latency`() = runTest {
@@ -190,6 +202,26 @@ class SingboxProbeServiceTest {
     }
 
     @Test
+    fun `probeAndAutoSelect passes sorted DNS and global IPv6 to profile probe`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(
+            mutablePreferencesOf(
+                dnsServersKey to setOf("9.9.9.9", "149.112.112.112", "1.1.1.1"),
+            ),
+        )
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val probe = SettingsRecordingProfileProbe()
+        val profile = makeProfile(id = 11L, host = "dns.example", port = 443)
+        val settingsRepository = StaticSettingsRepository(SettingsModel(ipv6Enabled = true))
+
+        SingboxProbeService(dao, dataStore, probe, settingsRepository).probeAndAutoSelect(listOf(profile))
+
+        assertEquals(listOf("1.1.1.1", "149.112.112.112", "9.9.9.9"), probe.settings.single().dnsServers)
+        assertTrue(probe.settings.single().ipv6Enabled)
+        assertEquals(19, dao.latencies[11L])
+    }
+
+    @Test
     fun `probeAndAutoSelect breaks equal latency ties by input order not completion order`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
@@ -198,7 +230,7 @@ class SingboxProbeServiceTest {
         val second = makeProfile(id = 2L, host = "second.example", port = 443)
 
         val probe = object : SingboxProfileProbe {
-            override suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int {
+            override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
                 when (bean.serverAddress) {
                     "first.example" -> delay(50)
                     "second.example" -> delay(0)
@@ -386,20 +418,28 @@ class SingboxProbeServiceTest {
     private class FakeProfileProbe(
         private val latenciesByAddress: Map<String, Int>,
     ) : SingboxProfileProbe {
-        override suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int =
+        override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int =
             latenciesByAddress[bean.displayAddress()] ?: SingboxProbeService.LATENCY_FAILED
     }
 
     private class TimeoutRecordingProfileProbe : SingboxProfileProbe {
         val timeouts = mutableListOf<Int>()
-        override suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int {
-            timeouts += timeoutMs
+        override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
+            timeouts += settings.timeoutMs
             return 12
         }
     }
 
+    private class SettingsRecordingProfileProbe : SingboxProfileProbe {
+        val settings = mutableListOf<SingboxProfileProbeSettings>()
+        override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
+            this.settings += settings
+            return 19
+        }
+    }
+
     private class TrackingProfileProbe : SingboxProfileProbe {
-        override suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int {
+        override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
             delay(10)
             return 1
         }
@@ -407,9 +447,32 @@ class SingboxProbeServiceTest {
 
     private class CountingProfileProbe : SingboxProfileProbe {
         val calls = AtomicInteger(0)
-        override suspend fun probeLatencyMs(bean: AbstractBean, timeoutMs: Int): Int {
+        override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
             calls.incrementAndGet()
             return 1
         }
+    }
+
+    private class StaticSettingsRepository(model: SettingsModel) : SettingsRepository {
+        override val settings: Flow<SettingsModel> = flowOf(model)
+        override suspend fun setSplitMode(mode: SplitTunnelMode) = Unit
+        override suspend fun setIpv6Enabled(enabled: Boolean) = Unit
+        override suspend fun setAutoStart(enabled: Boolean) = Unit
+        override suspend fun setManualEngine(engine: EngineId?) = Unit
+        override suspend fun setUrnetworkEnabled(enabled: Boolean) = Unit
+        override suspend fun setUrnetworkJwt(jwt: String?) = Unit
+        override suspend fun setUrnetworkCountryCode(code: String?) = Unit
+        override suspend fun setByedpiWinningArgs(args: String?) = Unit
+        override suspend fun setByedpiDefaultAccepted(accepted: Boolean) = Unit
+        override suspend fun setByedpiUseUiMode(enabled: Boolean) = Unit
+        override suspend fun setByedpiUiSettings(settings: ByeDpiUiSettings) = Unit
+        override suspend fun setCustomDnsServers(servers: List<String>) = Unit
+        override suspend fun setHostsMode(mode: HostsMode) = Unit
+        override suspend fun setHosts(hosts: List<String>) = Unit
+        override suspend fun setUiLocaleTag(tag: String?) = Unit
+        override suspend fun setAppMode(mode: AppMode) = Unit
+        override suspend fun setKillswitchEnabled(enabled: Boolean) = Unit
+        override suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean) = Unit
+        override suspend fun setTrafficMode(mode: TrafficMode) = Unit
     }
 }

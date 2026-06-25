@@ -88,7 +88,7 @@ class SingboxHttp204RoutedProbe(
         const val LATENCY_FAILED = -1L
         private const val LOOPBACK = "127.0.0.1"
         private const val DEFAULT_TIMEOUT_MS = 3_000
-        private const val MAX_PROBE_URLS = 2
+        private const val DEFAULT_MAX_PROBE_URLS = 3
         private const val GENERATE_204_PATH = "/generate_204"
         private val SUCCESS_HTTP_CODES = 200..299
     }
