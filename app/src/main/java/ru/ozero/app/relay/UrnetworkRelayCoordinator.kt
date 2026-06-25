@@ -103,7 +103,9 @@ class UrnetworkRelayCoordinator(
             attachDummyIoLoop()
             runCatching { bridge.setProvidePaused(false) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: worker pause toggle threw: ${it.message}") }
-            runCatching { bridge.setProvideControlMode(UrnetworkProvideControlMode.ALWAYS) }
+            val controlMode = runCatching { configStore.config().first().provideControlMode }
+                .getOrDefault(UrnetworkProvideControlMode.ALWAYS)
+            runCatching { bridge.setProvideControlMode(controlMode) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: setProvideControlMode threw: ${it.message}") }
             val networkMode = runCatching { configStore.provideNetworkMode().first() }
                 .getOrDefault(UrnetworkProvideNetworkMode.WIFI)

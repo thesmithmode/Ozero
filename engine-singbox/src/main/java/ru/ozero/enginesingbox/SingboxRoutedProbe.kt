@@ -18,7 +18,7 @@ class SingboxHttp204RoutedProbe(
     private val fallbackProbeUrls: List<URL> = FALLBACK_PROBE_URLS.map(::URL),
     private val socksHost: String = LOOPBACK,
     private val timeoutMs: Int = DEFAULT_TIMEOUT_MS,
-    private val maxProbeUrls: Int = MAX_PROBE_URLS,
+    private val maxProbeUrls: Int = DEFAULT_MAX_PROBE_URLS,
     private val nanoTime: () -> Long = System::nanoTime,
 ) : SingboxRoutedProbe {
 
