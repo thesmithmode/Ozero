@@ -96,6 +96,7 @@ private fun DockButton(
     val iconSize = (DOCK_ICON_SIZE_DP * verticalScale).dp
     val verticalPadding = (DOCK_BUTTON_VERTICAL_PADDING_DP * verticalScale).dp
     val labelSize = (DOCK_LABEL_SIZE_SP * verticalScale).sp
+    val labelLineHeight = (DOCK_LABEL_LINE_HEIGHT_SP * verticalScale).sp
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(DOCK_BUTTON_RADIUS_DP.dp))
@@ -123,6 +124,7 @@ private fun DockButton(
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = labelSize,
+                    lineHeight = labelLineHeight,
                 ),
                 color = tint,
                 maxLines = 1,
@@ -140,6 +142,7 @@ private const val DOCK_GAP_DP: Int = 2
 private const val DOCK_ICON_SIZE_DP: Int = 21
 private const val DOCK_BUTTON_VERTICAL_PADDING_DP: Int = 8
 private const val DOCK_LABEL_SIZE_SP: Float = 10.5f
+private const val DOCK_LABEL_LINE_HEIGHT_SP: Float = 16f
 
 const val BOTTOM_DOCK_TEST_TAG: String = "bottom_dock"
 const val BOTTOM_DOCK_TAB_TEST_TAG_PREFIX: String = "bottom_dock_tab_"
