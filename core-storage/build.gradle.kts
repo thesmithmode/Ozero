@@ -15,6 +15,21 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
+val robolectricRuntimeDeps by configurations.creating
+
+val prepareRobolectricRuntimeDeps by tasks.registering(Copy::class) {
+    from(robolectricRuntimeDeps)
+    into(layout.buildDirectory.dir("robolectric-runtime-deps"))
+}
+
+tasks.withType<Test>().configureEach {
+    dependsOn(prepareRobolectricRuntimeDeps)
+    systemProperty(
+        "robolectric.dependency.dir",
+        layout.buildDirectory.dir("robolectric-runtime-deps").get().asFile.absolutePath,
+    )
+}
+
 dependencies {
     api(libs.bundles.room)
     ksp(libs.room.compiler)
@@ -27,5 +42,9 @@ dependencies {
     testImplementation(libs.junit4)
     testImplementation(libs.room.testing)
     testImplementation(libs.robolectric)
+    testRuntimeOnly(libs.robolectric.android.all.instrumented)
+    testRuntimeOnly(libs.robolectric.android.all.instrumented35)
     testRuntimeOnly(libs.junit.vintage.engine)
+    robolectricRuntimeDeps(libs.robolectric.android.all.instrumented)
+    robolectricRuntimeDeps(libs.robolectric.android.all.instrumented35)
 }
