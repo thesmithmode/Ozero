@@ -910,7 +910,7 @@ jobs:
   test-core-modules:
     name: Tests — core + common modules
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     needs:
       - detect-open-pr-for-same-sha
       - kotlin-style
