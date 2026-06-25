@@ -142,6 +142,16 @@ private fun SingboxSettingsContent(
     ) {
         Spacer(Modifier.height(8.dp))
 
+        OutlinedTextField(
+            value = state.probeTimeoutSeconds.toString(),
+            onValueChange = viewModel::onProbeTimeoutSecondsChange,
+            label = { Text(stringResource(R.string.singbox_probe_timeout_label)) },
+            supportingText = { Text(stringResource(R.string.singbox_probe_timeout_hint)) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+        )
+        Spacer(Modifier.height(8.dp))
+
         if (state.groups.isNotEmpty()) {
             AutoSelectModeItem(
                 isSelected = state.isAutoSelectMode,
