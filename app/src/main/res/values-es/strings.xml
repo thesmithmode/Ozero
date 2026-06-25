@@ -215,10 +215,6 @@
     <string name="evolution_population_label">Población</string>
     <string name="urnetwork_provide_mode_never">Nunca</string>
     <string name="urnetwork_auto_select">Selección automática</string>
-    <string name="urnetwork_provide_control_mode_title">Modo de provisión</string>
-    <string name="urnetwork_provide_control_mode_auto">Auto</string>
-    <string name="urnetwork_provide_control_mode_always">Siempre</string>
-    <string name="urnetwork_provide_control_mode_desc">Auto — el sistema decide cuándo proveer. Siempre — proveer mientras esté conectado.</string>
     <string name="urnetwork_provide_mode_desc">El uso compartido siempre está activado. Solo puedes elegir qué redes usa.</string>
     <string name="urnetwork_provide_network_mode_title">Red para proveer</string>
     <string name="urnetwork_provide_network_mode_wifi">Solo Wi-Fi</string>

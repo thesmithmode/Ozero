@@ -276,10 +276,6 @@
     <string name="urnetwork_provide_title">Раздача трафика</string>
     <string name="urnetwork_provide_subtitle">Делиться пропускной способностью с сетью URnetwork</string>
     <string name="urnetwork_provide_mode_never">Никогда</string>
-    <string name="urnetwork_provide_control_mode_title">Режим предоставления</string>
-    <string name="urnetwork_provide_control_mode_auto">Авто</string>
-    <string name="urnetwork_provide_control_mode_always">Всегда</string>
-    <string name="urnetwork_provide_control_mode_desc">Авто — система решает когда раздавать. Всегда — раздавать пока подключён.</string>
     <string name="urnetwork_provide_mode_desc">Раздача трафика всегда включена. Можно выбрать только сети, на которых она работает.</string>
     <string name="urnetwork_provide_network_mode_title">Сеть для раздачи</string>
     <string name="urnetwork_provide_network_mode_wifi">Только Wi-Fi</string>

@@ -7,25 +7,21 @@ import kotlin.test.assertTrue
 class UrnetworkRelayArchitectureSentinelTest {
 
     @Test
-    fun `network monitor cannot unpause relay when sharing disabled`() {
+    fun `relay coordinator always starts monitor with enabled sharing`() {
         val coordinator = source("src/main/java/ru/ozero/app/relay/UrnetworkRelayCoordinator.kt")
         val monitor = source("src/main/java/ru/ozero/app/relay/RelayNetworkMonitor.kt")
 
         assertTrue(
-            coordinator.contains("networkMonitor?.start(networkMode, provideEnabled)"),
-            "RelayCoordinator обязан передавать provideEnabled в RelayNetworkMonitor, иначе network callback " +
-                "может снова включить provide при выключенной раздаче.",
+            coordinator.contains("networkMonitor?.start(networkMode, true)"),
+            "RelayCoordinator обязан передавать always-on provide state в RelayNetworkMonitor.",
+        )
+        assertTrue(
+            coordinator.contains("relayLockManager?.acquire()") && !coordinator.contains("if (provideEnabled)"),
+            "RelayCoordinator обязан брать relay lock без legacy provideEnabled branch.",
         )
         assertTrue(
             monitor.contains("fun start(networkMode: UrnetworkProvideNetworkMode, provideEnabled: Boolean)"),
-            "RelayNetworkMonitor обязан принимать provideEnabled как часть lifecycle boundary.",
-        )
-        assertTrue(
-            monitor.contains("if (!provideEnabled)") &&
-                monitor.contains("bridge.setProvidePaused(true)") &&
-                monitor.contains("return"),
-            "RelayNetworkMonitor обязан оставить providePaused=true и не регистрировать network callback, " +
-                "когда раздача отключена пользователем.",
+            "RelayNetworkMonitor оставляет lifecycle boundary для явного always-on state.",
         )
     }
 

@@ -215,10 +215,6 @@
     <string name="evolution_population_label">População</string>
     <string name="urnetwork_provide_mode_never">Nunca</string>
     <string name="urnetwork_auto_select">Seleção automática</string>
-    <string name="urnetwork_provide_control_mode_title">Modo de provisão</string>
-    <string name="urnetwork_provide_control_mode_auto">Auto</string>
-    <string name="urnetwork_provide_control_mode_always">Sempre</string>
-    <string name="urnetwork_provide_control_mode_desc">Auto — o sistema decide quando prover. Sempre — prover enquanto estiver conectado.</string>
     <string name="urnetwork_provide_mode_desc">O compartilhamento fica sempre ativo. Você só pode escolher quais redes ele usa.</string>
     <string name="urnetwork_provide_network_mode_title">Rede para prover</string>
     <string name="urnetwork_provide_network_mode_wifi">Apenas Wi-Fi</string>

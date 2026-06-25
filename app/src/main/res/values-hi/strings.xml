@@ -251,10 +251,6 @@
     <string name="urnetwork_provide_title">Share bandwidth</string>
     <string name="urnetwork_provide_subtitle">Share bandwidth with the URnetwork mesh</string>
     <string name="urnetwork_provide_mode_never">Never</string>
-    <string name="urnetwork_provide_control_mode_title">Provide control mode</string>
-    <string name="urnetwork_provide_control_mode_auto">Auto</string>
-    <string name="urnetwork_provide_control_mode_always">Always</string>
-    <string name="urnetwork_provide_control_mode_desc">Auto — the system decides when to provide. Always — keep providing while connected.</string>
     <string name="urnetwork_provide_mode_desc">Bandwidth sharing is always enabled. You can only choose which networks it uses.</string>
     <string name="urnetwork_provide_network_mode_title">Provide on network</string>
     <string name="urnetwork_provide_network_mode_wifi">Wi-Fi only</string>
