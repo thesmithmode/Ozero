@@ -182,6 +182,54 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `applyDeviceFields keeps provide always active and clamps networks to wifi or all`() {
+        val bytecode = compiledMethodBytecode("applyDeviceFields")
+        assertTrue(
+            bytecode.contains("UrnetworkProvideNetworkMode\$Companion.fromRaw"),
+            "applyDeviceFields обязан нормализовать legacy provideNetworkMode в WIFI/ALL, " +
+                "чтобы старые значения не отключали provider.",
+        )
+        assertTrue(
+            bytecode.contains("com/bringyour/sdk/LocalState.setProvideNetworkMode"),
+            "Нормализованный provideNetworkMode обязан сохраняться в SDK localState.",
+        )
+        assertTrue(
+            bytecode.contains("com/bringyour/sdk/DeviceLocal.setProvidePaused"),
+            "applyDeviceFields не должен отключать раздачу: URnetwork provider всегда активен.",
+        )
+        assertTrue(
+            bytecode.contains("com/bringyour/sdk/DeviceLocal.setProvideNetworkMode"),
+            "applyDeviceFields обязан применять нормализованный network scope в SDK device.",
+        )
+    }
+
+    @Test
+    fun `setProvideNetworkMode persists only network scope without pausing provider`() {
+        val bytecode = compiledMethodBytecode("setProvideNetworkMode")
+        assertTrue(
+            bytecode.contains("com/bringyour/sdk/DeviceLocal.setProvideNetworkMode"),
+            "Runtime смена Wi-Fi/Wi-Fi+cellular должна обновлять SDK device.",
+        )
+        assertTrue(
+            bytecode.contains("com/bringyour/sdk/LocalState.setProvideNetworkMode"),
+            "Runtime смена Wi-Fi/Wi-Fi+cellular должна сохраняться в SDK localState.",
+        )
+        assertTrue(
+            !bytecode.contains("setProvidePaused"),
+            "Смена сети раздачи не должна уметь выключать раздачу полностью.",
+        )
+    }
+
+    @Test
+    fun `setProvideNetworkMode logs missing device instead of success`() {
+        val bytecode = compiledClassBytecode(verbose = true)
+        assertTrue(
+            bytecode.contains("skipped - device=null"),
+            "setProvideNetworkMode не должен логировать OK, если deviceRef пустой и обновлять нечего.",
+        )
+    }
+
+    @Test
     fun `bridge использует UrnetworkRuntime ensure (один manager на процесс)`() {
         assertTrue(
             source.contains("UrnetworkRuntime.ensure(app)"),
@@ -777,5 +825,39 @@ class RealUrnetworkSdkBridgeContractTest {
             "Listener обязан закрывать Sub после первого вызова — иначе listener остаётся attached " +
                 "и может перезаписывать localState.provideSecretKeys при будущих regeneration.",
         )
+    }
+
+    private fun compiledMethodBytecode(methodName: String): String {
+        val output = compiledClassBytecode()
+        val marker = Regex("""(?m)^  .* ${Regex.escape(methodName)}\(""").find(output)
+        assertTrue(marker != null, "method $methodName not found in javap output")
+        val methodOutput = output.substring(marker.range.first)
+        val nextMarker = Regex("""(?m)^  (public|private|protected).*\);""").find(methodOutput, 1)
+        return if (nextMarker == null) {
+            methodOutput
+        } else {
+            methodOutput.substring(0, nextMarker.range.first)
+        }
+    }
+
+    private fun compiledClassBytecode(verbose: Boolean = false): String {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val classDir = File(moduleRoot, "build/tmp/kotlin-classes/debug")
+        val args = mutableListOf(
+            "javap",
+            "-classpath",
+            classDir.absolutePath,
+            "-c",
+            "-p",
+        )
+        if (verbose) args += "-v"
+        args += "ru.ozero.engineurnetwork.RealUrnetworkSdkBridge"
+        val process = ProcessBuilder(args)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().readText()
+        val exit = process.waitFor()
+        assertTrue(exit == 0, "javap failed with exit=$exit output=$output")
+        return output
     }
 }
