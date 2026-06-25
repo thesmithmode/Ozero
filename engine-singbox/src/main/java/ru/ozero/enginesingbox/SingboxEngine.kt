@@ -417,8 +417,13 @@ class SingboxEngine @Inject constructor(
             }
             val autoSelect = pendingTunAutoSelect
             val trafficReady = warmTrafficProbe(pendingSocksPort, autoSelect)
+            if (autoSelect && !trafficReady) {
+                stopRuntimeAfterFailedReadiness(p)
+                clearPendingStart()
+                return TunAttachResult.Failure("sing-box auto-select routed probe failed")
+            }
             activeSocksPort = pendingSocksPort
-            activeTunAutoSelect = autoSelect && !trafficReady
+            activeTunAutoSelect = false
             pendingTunAutoSelect = false
             pendingSocksPort = 0
             pendingConfig = null
@@ -510,10 +515,7 @@ class SingboxEngine @Inject constructor(
     }
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
-        if (activeTunAutoSelect) {
-            return EnginePlugin.ReadyResult.Ready
-        }
-        if (activeAutoSelect) {
+        if (activeAutoSelect || activeTunAutoSelect) {
             return awaitRoutedReady(clearAutoSelect = true)
         }
         return awaitRoutedReady(clearAutoSelect = false)
