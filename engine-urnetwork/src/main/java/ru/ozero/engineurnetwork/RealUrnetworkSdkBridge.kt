@@ -616,8 +616,12 @@ class RealUrnetworkSdkBridge(
     override fun setProvideNetworkMode(mode: UrnetworkProvideNetworkMode) =
         guardedRun("setProvideNetworkMode(${mode.rawValue})") {
             val device = deviceRef.get()
-            device?.provideNetworkMode = mode.rawValue
-            runCatching { device?.networkSpace?.asyncLocalState?.localState?.provideNetworkMode = mode.rawValue }
+            if (device == null) {
+                Log.i(TAG, "setProvideNetworkMode mode=${mode.rawValue} skipped - device=null")
+                return@guardedRun
+            }
+            device.provideNetworkMode = mode.rawValue
+            runCatching { device.networkSpace?.asyncLocalState?.localState?.provideNetworkMode = mode.rawValue }
             Log.i(TAG, "setProvideNetworkMode mode=${mode.rawValue} OK")
         }
 
