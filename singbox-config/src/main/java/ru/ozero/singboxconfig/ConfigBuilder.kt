@@ -530,9 +530,8 @@ private fun tlsServerName(bean: StandardV2RayBean): String {
 }
 
 private fun StandardV2RayBean.canUseHostAsTlsServerName(host: String, server: String): Boolean =
-    securityWithServerName() && host.isDomainNameForSni() && server.isIpAddressForSni()
-
-private fun StandardV2RayBean.securityWithServerName(): Boolean = security == "reality" || security == "tls"
+    host.isDomainNameForSni() &&
+        (security == "reality" || security == "tls" && server.isIpAddressForSni())
 
 private fun String.isIpAddressForSni(): Boolean =
     isNotEmpty() && (all { it.isDigit() || it == '.' } || ":" in this)
