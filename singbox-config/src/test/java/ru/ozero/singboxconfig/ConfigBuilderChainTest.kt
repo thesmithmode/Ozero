@@ -88,6 +88,7 @@ class ConfigBuilderChainTest {
         val json = ConfigBuilder.buildAutoChainConfig(beans, socksPort = 49410)
 
         assertContains(json, "\"type\":\"urltest\"")
+        assertContains(json, "https://www.gstatic.com/generate_204")
         assertContains(json, "\"tag\":\"proxy\"")
         assertContains(json, "\"type\":\"socks\"")
         assertContains(json, "\"listen_port\":49410")

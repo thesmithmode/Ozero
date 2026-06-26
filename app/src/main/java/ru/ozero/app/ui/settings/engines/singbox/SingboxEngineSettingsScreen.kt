@@ -167,7 +167,7 @@ private fun SingboxSettingsContent(
         }
 
         state.groups.forEach { group ->
-            SubscriptionGroupItem(
+            val groupUiState = SubscriptionGroupUiState(
                 group = group,
                 isExpanded = state.expandedGroupId == group.id,
                 profiles = state.groupProfiles[group.id] ?: emptyList(),
@@ -176,6 +176,8 @@ private fun SingboxSettingsContent(
                 isPinging = group.id in state.isPinging,
                 refreshError = state.groupRefreshErrors[group.id],
                 testingProfileIds = state.testingProfileIds,
+            )
+            val groupActions = SubscriptionGroupActions(
                 onToggle = { viewModel.onGroupExpand(group.id) },
                 onRefresh = { viewModel.onRefresh(group.id) },
                 onPing = { viewModel.onPing(group.id) },
@@ -184,6 +186,7 @@ private fun SingboxSettingsContent(
                 onDelete = { viewModel.onDeleteGroup(group) },
                 onProfileSelect = { viewModel.onProfileSelect(it) },
             )
+            SubscriptionGroupItem(groupUiState, groupActions)
             Spacer(Modifier.height(4.dp))
         }
 
@@ -357,34 +360,43 @@ private fun AutoSelectModeItem(
     }
 }
 
+private data class SubscriptionGroupUiState(
+    val group: SubscriptionGroup,
+    val isExpanded: Boolean,
+    val profiles: List<ProxyProfile>,
+    val selectedProfileId: Long?,
+    val isRefreshing: Boolean,
+    val isPinging: Boolean,
+    val refreshError: String?,
+    val testingProfileIds: Set<Long>,
+)
+
+private data class SubscriptionGroupActions(
+    val onToggle: () -> Unit,
+    val onRefresh: () -> Unit,
+    val onPing: () -> Unit,
+    val onCancelRefresh: () -> Unit,
+    val onCancelPing: () -> Unit,
+    val onDelete: () -> Unit,
+    val onProfileSelect: (ProxyProfile) -> Unit,
+)
+
 @Composable
 private fun SubscriptionGroupItem(
-    group: SubscriptionGroup,
-    isExpanded: Boolean,
-    profiles: List<ProxyProfile>,
-    selectedProfileId: Long?,
-    isRefreshing: Boolean,
-    isPinging: Boolean,
-    refreshError: String?,
-    testingProfileIds: Set<Long>,
-    onToggle: () -> Unit,
-    onRefresh: () -> Unit,
-    onPing: () -> Unit,
-    onCancelRefresh: () -> Unit,
-    onCancelPing: () -> Unit,
-    onDelete: () -> Unit,
-    onProfileSelect: (ProxyProfile) -> Unit,
+    state: SubscriptionGroupUiState,
+    actions: SubscriptionGroupActions,
 ) {
+    val group = state.group
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onToggle)
+                .clickable(onClick = actions.onToggle)
                 .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                imageVector = if (state.isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
             )
@@ -394,31 +406,31 @@ private fun SubscriptionGroupItem(
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
             )
-            if (isRefreshing) {
+            if (state.isRefreshing) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                IconButton(onClick = onCancelRefresh, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = actions.onCancelRefresh, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Close, contentDescription = null)
                 }
-            } else if (isPinging) {
+            } else if (state.isPinging) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                IconButton(onClick = onCancelPing, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = actions.onCancelPing, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Close, contentDescription = null)
                 }
             } else {
-                TextButton(onClick = onPing, enabled = profiles.isNotEmpty()) {
+                TextButton(onClick = actions.onPing, enabled = state.profiles.isNotEmpty()) {
                     Text(
                         text = stringResource(R.string.singbox_group_ping),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
                 if (group.subscriptionUrl.isNotEmpty()) {
-                    IconButton(onClick = onRefresh, modifier = Modifier.size(36.dp)) {
+                    IconButton(onClick = actions.onRefresh, modifier = Modifier.size(36.dp)) {
                         Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.singbox_group_refresh))
                     }
                 }
             }
             IconButton(
-                onClick = onDelete,
+                onClick = actions.onDelete,
                 modifier = Modifier
                     .size(36.dp)
                     .testTag("singbox_delete_group_${group.id}"),
@@ -427,28 +439,28 @@ private fun SubscriptionGroupItem(
             }
         }
 
-        if (isExpanded) {
-            if (refreshError != null) {
+        if (state.isExpanded) {
+            if (state.refreshError != null) {
                 Text(
-                    text = stringResource(R.string.singbox_refresh_error, refreshError),
+                    text = stringResource(R.string.singbox_refresh_error, state.refreshError),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
                 )
             }
-            if (profiles.isEmpty() && !isRefreshing && refreshError == null) {
+            if (state.profiles.isEmpty() && !state.isRefreshing && state.refreshError == null) {
                 Text(
                     text = stringResource(R.string.singbox_no_profiles_hint),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
                 )
             } else {
-                profiles.forEach { profile ->
+                state.profiles.forEach { profile ->
                     ProfileItem(
                         profile = profile,
-                        isSelected = profile.id == selectedProfileId,
-                        isTesting = profile.id in testingProfileIds,
-                        onSelect = { onProfileSelect(profile) },
+                        isSelected = profile.id == state.selectedProfileId,
+                        isTesting = profile.id in state.testingProfileIds,
+                        onSelect = { actions.onProfileSelect(profile) },
                     )
                 }
             }
