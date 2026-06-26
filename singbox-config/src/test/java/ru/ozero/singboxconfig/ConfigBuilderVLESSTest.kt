@@ -270,6 +270,21 @@ class ConfigBuilderVLESSTest {
     }
 
     @Test
+    fun `reality server name preserves host fronting when server address is domain`() {
+        val bean = V2RayFmt.parseVLESS(
+            "vless://12345678-1234-1234-1234-123456789abc@proxy.example.com:443" +
+                "?type=tcp&security=reality&host=front.example.com&fp=chrome" +
+                "&pbk=$validRealityPublicKey&sid=ab12#Reality",
+        )
+
+        val json = ConfigBuilder.buildSingboxConfig(bean)
+
+        assertContains(json, "\"server_name\":\"front.example.com\"")
+        assertFalse(json.contains("\"server_name\":\"proxy.example.com\""))
+        assertContains(json, "\"server\":\"proxy.example.com\"")
+    }
+
+    @Test
     fun `should include gRPC transport for grpc type`() {
         val bean = makeBean(type = "grpc").apply {
             grpcServiceName = "myservice"

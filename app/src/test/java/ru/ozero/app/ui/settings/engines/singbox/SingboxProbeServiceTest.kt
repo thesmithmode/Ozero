@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.byteArrayPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -367,7 +368,7 @@ class SingboxProbeServiceTest {
         val job = launch {
             SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(listOf(first, second))
         }
-        delay(1)
+        probe.started.await()
         job.cancel()
         job.join()
 
@@ -476,8 +477,10 @@ class SingboxProbeServiceTest {
 
     private class SlowProfileProbe : SingboxProfileProbe {
         val calls = AtomicInteger(0)
+        val started = CompletableDeferred<Unit>()
         override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
             calls.incrementAndGet()
+            started.complete(Unit)
             delay(10_000)
             return 1
         }

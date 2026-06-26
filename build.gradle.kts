@@ -1,6 +1,3 @@
-import org.gradle.api.tasks.testing.Test
-import java.net.URI
-
 plugins {
         id("com.android.application") apply false
     id("com.android.library") apply false
@@ -40,64 +37,6 @@ allprojects {
             force("com.squareup.okhttp3:okhttp:4.12.0")
             force("com.squareup.okhttp3:mockwebserver:4.12.0")
             force("com.squareup.okhttp3:logging-interceptor:4.12.0")
-        }
-    }
-}
-
-val prefetchRobolectricAndroidAllInstrumented by tasks.registering {
-    val versions = listOf(
-        "7.0.0_r1-robolectric-r1-i6",
-        "9-robolectric-4913185-2-i6",
-        "10-robolectric-5803371-i6",
-        "13-robolectric-9030017-i6",
-        "14-robolectric-10818077-i6",
-    )
-    val m2Root = providers.systemProperty("user.home").map {
-        file("$it/.m2/repository/org/robolectric/android-all-instrumented")
-    }
-    outputs.files(
-        versions.map { version ->
-            m2Root.map { it.resolve("$version/android-all-instrumented-$version.jar") }
-        },
-    )
-    doLast {
-        val root = m2Root.get()
-        versions.forEach { version ->
-            val dir = root.resolve(version)
-            dir.mkdirs()
-            listOf("pom", "jar").forEach { extension ->
-                val target = dir.resolve("android-all-instrumented-$version.$extension")
-                if (!target.isFile || target.length() == 0L) {
-                    val url = URI(
-                        "https://repo1.maven.org/maven2/org/robolectric/android-all-instrumented/" +
-                            "$version/android-all-instrumented-$version.$extension",
-                    ).toURL()
-                    target.outputStream().use { output ->
-                        url.openStream().use { input -> input.copyTo(output) }
-                    }
-                }
-            }
-        }
-    }
-}
-
-subprojects {
-    plugins.withId("com.android.application") {
-        afterEvaluate {
-            tasks.withType<Test>().matching {
-                it.systemProperties["robolectric.offline"] == "true"
-            }.configureEach {
-                dependsOn(rootProject.tasks.named("prefetchRobolectricAndroidAllInstrumented"))
-            }
-        }
-    }
-    plugins.withId("com.android.library") {
-        afterEvaluate {
-            tasks.withType<Test>().matching {
-                it.systemProperties["robolectric.offline"] == "true"
-            }.configureEach {
-                dependsOn(rootProject.tasks.named("prefetchRobolectricAndroidAllInstrumented"))
-            }
         }
     }
 }
