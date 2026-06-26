@@ -480,7 +480,7 @@ class SingboxProbeServiceTest {
         val started = CompletableDeferred<Unit>()
         override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
             calls.incrementAndGet()
-            started.complete(Unit)
+            if (!started.isCompleted) started.complete(Unit)
             delay(10_000)
             return 1
         }

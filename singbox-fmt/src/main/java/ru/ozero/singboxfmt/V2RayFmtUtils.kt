@@ -54,9 +54,12 @@ internal object V2RayFmtUtils {
 
     fun parseTcpParams(bean: StandardV2RayBean, parsed: UriCompat) {
         bean.headerType = parsed.getQueryParameter("headerType") ?: "none"
+        val host = parsed.getQueryParameter("host") ?: ""
         if (bean.headerType == "http") {
-            bean.host = parsed.getQueryParameter("host") ?: ""
+            bean.host = host
             bean.path = parsed.getQueryParameter("path") ?: "/"
+        } else if (bean.security == "reality") {
+            bean.host = host
         }
     }
 
