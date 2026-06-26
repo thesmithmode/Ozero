@@ -122,6 +122,20 @@ class V2RayFmtUtilsTest {
             assertEquals("tcp.example.com", bean.host)
             assertEquals("/tcp", bean.path)
         }
+
+        VLESSBean().also { bean ->
+            V2RayFmtUtils.parseSecurityParams(
+                bean,
+                UriCompat.parse("vless://id@example.com:443?security=reality&host=reality.example.com&pbk=public"),
+            )
+            V2RayFmtUtils.parseTransportParams(
+                bean,
+                UriCompat.parse("vless://id@example.com:443?type=tcp&host=reality.example.com"),
+            )
+            assertEquals("tcp", bean.type)
+            assertEquals("none", bean.headerType)
+            assertEquals("reality.example.com", bean.host)
+        }
     }
 
     @Test

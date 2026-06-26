@@ -18,8 +18,5 @@ dependencies {
     testImplementation(libs.bundles.testing.unit)
     testImplementation(libs.json)
 
-    testImplementation(libs.junit4)
-    testImplementation(libs.robolectric)
-    testRuntimeOnly(libs.junit.vintage.engine)
     testImplementation(libs.okhttp.mockwebserver)
 }

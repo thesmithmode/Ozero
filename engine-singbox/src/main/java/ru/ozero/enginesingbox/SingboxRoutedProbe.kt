@@ -6,6 +6,7 @@ import ru.ozero.enginescore.PersistentLoggers
 import java.net.HttpURLConnection
 import java.net.InetSocketAddress
 import java.net.Proxy
+import java.net.Socket
 import java.net.URL
 import java.util.concurrent.TimeUnit
 
@@ -28,15 +29,37 @@ class SingboxHttp204RoutedProbe(
             PersistentLoggers.warn(TAG, "routed probe failed: invalid socksPort=$socksPort")
             return@withContext LATENCY_FAILED
         }
-        val urls = listOf(probeUrl) + fallbackProbeUrls
-        for (url in urls.distinctBy { it.toString() }.take(maxProbeUrls)) {
-            val latency = probeSingleUrl(url, socksPort)
-            if (latency >= 0) return@withContext latency
+        if (!isSocksPortReady(socksPort)) {
+            PersistentLoggers.debug(
+                TAG,
+                "routed probe failed: socks not ready socksPort=$socksPort timeoutMs=$timeoutMs",
+            )
+            return@withContext LATENCY_FAILED
         }
+        val urls = listOf(probeUrl) + fallbackProbeUrls
+        val failures = mutableListOf<String>()
+        for (url in urls.distinctBy { it.toString() }.take(maxProbeUrls)) {
+            val result = probeSingleUrl(url, socksPort)
+            val latency = result.latencyMs
+            if (latency >= 0) return@withContext latency
+            failures += "${url.host}:${result.reason}"
+        }
+        PersistentLoggers.debug(
+            TAG,
+            "routed probe failed: socksPort=$socksPort timeoutMs=$timeoutMs failures=${failures.joinToString(";")}",
+        )
         LATENCY_FAILED
     }
 
-    private fun probeSingleUrl(url: URL, socksPort: Int): Long {
+    private fun isSocksPortReady(socksPort: Int): Boolean =
+        runCatching {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(socksHost, socksPort), timeoutMs)
+            }
+            true
+        }.getOrDefault(false)
+
+    private fun probeSingleUrl(url: URL, socksPort: Int): ProbeAttempt {
         val start = nanoTime()
         return runCatching {
             val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress(socksHost, socksPort))
@@ -49,24 +72,15 @@ class SingboxHttp204RoutedProbe(
                 connection.readTimeout = timeoutMs
                 val code = connection.responseCode
                 if (isSuccessfulProbeResponse(url, code)) {
-                    TimeUnit.NANOSECONDS.toMillis(nanoTime() - start).coerceAtLeast(1L)
+                    ProbeAttempt(TimeUnit.NANOSECONDS.toMillis(nanoTime() - start).coerceAtLeast(1L), "ok")
                 } else {
-                    PersistentLoggers.warn(
-                        TAG,
-                        "routed probe failed: httpCode=$code urlHost=${url.host} socksPort=$socksPort",
-                    )
-                    LATENCY_FAILED
+                    ProbeAttempt(LATENCY_FAILED, "http-$code")
                 }
             } finally {
                 connection.disconnect()
             }
         }.getOrElse { error ->
-            PersistentLoggers.warn(
-                TAG,
-                "routed probe failed: ${error::class.java.simpleName}: ${error.message} " +
-                    "urlHost=${url.host} socksPort=$socksPort timeoutMs=$timeoutMs",
-            )
-            LATENCY_FAILED
+            ProbeAttempt(LATENCY_FAILED, error::class.java.simpleName)
         }
     }
 
@@ -82,8 +96,8 @@ class SingboxHttp204RoutedProbe(
         private const val TAG = "SingboxRoutedProbe"
         const val PROBE_URL = "http://connectivitycheck.gstatic.com/generate_204"
         val FALLBACK_PROBE_URLS = listOf(
-            "https://www.gstatic.com/generate_204",
             "http://cp.cloudflare.com/generate_204",
+            "https://www.gstatic.com/generate_204",
         )
         const val LATENCY_FAILED = -1L
         private const val LOOPBACK = "127.0.0.1"
@@ -92,4 +106,6 @@ class SingboxHttp204RoutedProbe(
         private const val GENERATE_204_PATH = "/generate_204"
         private val SUCCESS_HTTP_CODES = 200..299
     }
+
+    private data class ProbeAttempt(val latencyMs: Long, val reason: String)
 }

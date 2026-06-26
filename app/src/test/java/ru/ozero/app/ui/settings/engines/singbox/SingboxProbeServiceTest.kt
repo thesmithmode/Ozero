@@ -6,10 +6,12 @@ import androidx.datastore.preferences.core.byteArrayPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginesingbox.SingboxEngine
@@ -354,6 +356,27 @@ class SingboxProbeServiceTest {
         assertNull(dao.latencies[5L])
     }
 
+    @Test
+    fun `probeAndAutoSelect cancellation stops before next profile`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val first = makeProfile(id = 1L, host = "first.example", port = 443)
+        val second = makeProfile(id = 2L, host = "second.example", port = 443)
+        val probe = SlowProfileProbe()
+
+        val job = launch {
+            SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(listOf(first, second))
+        }
+        probe.started.await()
+        job.cancel()
+        job.join()
+
+        assertEquals(1, probe.calls.get())
+        assertNull(dao.latencies[2L])
+        assertNull(prefsFlow.value[selectedProfileKey])
+    }
+
     private fun makeProfile(
         id: Long,
         host: String,
@@ -448,6 +471,17 @@ class SingboxProbeServiceTest {
         val calls = AtomicInteger(0)
         override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
             calls.incrementAndGet()
+            return 1
+        }
+    }
+
+    private class SlowProfileProbe : SingboxProfileProbe {
+        val calls = AtomicInteger(0)
+        val started = CompletableDeferred<Unit>()
+        override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
+            calls.incrementAndGet()
+            if (!started.isCompleted) started.complete(Unit)
+            delay(10_000)
             return 1
         }
     }

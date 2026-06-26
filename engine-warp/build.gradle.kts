@@ -28,7 +28,6 @@ dependencies {
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.bundles.testing.unit)
-    testImplementation(libs.robolectric)
     testImplementation(libs.datastore.preferences.core)
     testImplementation(libs.json)
     testImplementation(libs.okhttp.mockwebserver)

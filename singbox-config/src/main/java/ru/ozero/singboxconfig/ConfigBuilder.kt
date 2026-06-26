@@ -15,6 +15,7 @@ private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
 private const val REALITY_PUBLIC_KEY_BYTES = 32
 private const val DNS_DOMAIN_RESOLVER_TAG = "dns-domain-resolver"
 private val DNS_DOMAIN_RESOLVER_TYPES = setOf("https", "tls")
+private const val AUTO_SELECT_PROBE_URL = "https://www.gstatic.com/generate_204"
 
 @Suppress("TooManyFunctions")
 object ConfigBuilder {
@@ -46,7 +47,7 @@ object ConfigBuilder {
         val tagList = proxyOutbounds.indices.joinToString(",") { jsonString("proxy-$it") }
         val urltest = buildString {
             append("""{"type":"urltest","tag":"proxy","outbounds":[$tagList],""")
-            append(""""url":"https://www.gstatic.com/generate_204",""")
+            append(""""url":"$AUTO_SELECT_PROBE_URL",""")
             append(""""interval":"3m","tolerance":50,""")
             append(""""interrupt_exist_connections":true,"idle_timeout":"30m"}""")
         }
@@ -87,7 +88,7 @@ object ConfigBuilder {
         val tagList = proxyOutbounds.indices.joinToString(",") { jsonString("proxy-$it") }
         val urltest = buildString {
             append("""{"type":"urltest","tag":"proxy","outbounds":[$tagList],""")
-            append(""""url":"https://www.gstatic.com/generate_204",""")
+            append(""""url":"$AUTO_SELECT_PROBE_URL",""")
             append(""""interval":"3m","tolerance":50,""")
             append(""""interrupt_exist_connections":false,"idle_timeout":"30m"}""")
         }
@@ -524,9 +525,17 @@ private fun tlsServerName(bean: StandardV2RayBean): String {
     if (bean.sni.isNotEmpty()) return bean.sni.trim()
     val host = bean.host.trim()
     val server = bean.serverAddress.trim().trim('[', ']')
-    if (host.isDomainNameForSni() && (bean.security == "reality" || server.isIpAddressForSni())) return host
+    if (bean.canUseHostAsTlsServerName(host, server)) return host
     return if (server.isDomainNameForSni()) server else ""
 }
+
+private fun StandardV2RayBean.canUseHostAsTlsServerName(host: String, server: String): Boolean =
+    host.isDomainNameForSni() &&
+        when (security) {
+            "reality" -> true
+            "tls" -> server.isIpAddressForSni()
+            else -> false
+        }
 
 private fun String.isIpAddressForSni(): Boolean =
     isNotEmpty() && (all { it.isDigit() || it == '.' } || ":" in this)

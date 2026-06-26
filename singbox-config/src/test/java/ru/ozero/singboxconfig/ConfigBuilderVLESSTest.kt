@@ -228,6 +228,17 @@ class ConfigBuilderVLESSTest {
     }
 
     @Test
+    fun `tls server name falls back to server address when server address is domain`() {
+        val bean = makeBean(host = "proxy.example.com", type = "ws", security = "tls").apply {
+            this.host = "front.example.com"
+        }
+        val json = ConfigBuilder.buildSingboxConfig(bean)
+
+        assertContains(json, "\"server_name\":\"proxy.example.com\"")
+        assertContains(json, "\"Host\":\"front.example.com\"")
+    }
+
+    @Test
     fun `tls server name alias from VLESS subscription is preserved in generated config`() {
         val bean = V2RayFmt.parseVLESS(
             "vless://12345678-1234-1234-1234-123456789abc@203.0.113.10:443" +
@@ -256,6 +267,21 @@ class ConfigBuilderVLESSTest {
         assertContains(json, "\"short_id\":\"ab12\"")
         assertContains(json, "\"utls\":{\"enabled\":true,\"fingerprint\":\"chrome\"}")
         assertFalse(json.contains("\"insecure\":true"))
+    }
+
+    @Test
+    fun `reality server name preserves host fronting when server address is domain`() {
+        val bean = V2RayFmt.parseVLESS(
+            "vless://12345678-1234-1234-1234-123456789abc@proxy.example.com:443" +
+                "?type=tcp&security=reality&host=front.example.com&fp=chrome" +
+                "&pbk=$validRealityPublicKey&sid=ab12#Reality",
+        )
+
+        val json = ConfigBuilder.buildSingboxConfig(bean)
+
+        assertContains(json, "\"server_name\":\"front.example.com\"")
+        assertFalse(json.contains("\"server_name\":\"proxy.example.com\""))
+        assertContains(json, "\"server\":\"proxy.example.com\"")
     }
 
     @Test
