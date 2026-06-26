@@ -8,6 +8,30 @@ val gitVersionName: String = providers.environmentVariable("OZERO_VERSION_NAME")
 val gitVersionCode: Int = (findProperty("VERSION_CODE") as? String)?.toInt()
     ?: error("VERSION_CODE not set in gradle.properties")
 
+val robolectricRuntimeDeps24 by configurations.creating
+val robolectricRuntimeDeps28 by configurations.creating
+val robolectricRuntimeDeps29 by configurations.creating
+val robolectricRuntimeDeps33 by configurations.creating
+val robolectricRuntimeDeps34 by configurations.creating
+
+val prepareRobolectricRuntimeDeps by tasks.registering(org.gradle.api.tasks.Copy::class) {
+    from(robolectricRuntimeDeps24)
+    from(robolectricRuntimeDeps28)
+    from(robolectricRuntimeDeps29)
+    from(robolectricRuntimeDeps33)
+    from(robolectricRuntimeDeps34)
+    into(layout.buildDirectory.dir("robolectric-runtime-deps"))
+}
+
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    dependsOn(prepareRobolectricRuntimeDeps)
+    systemProperty(
+        "robolectric.dependency.dir",
+        layout.buildDirectory.dir("robolectric-runtime-deps").get().asFile.absolutePath,
+    )
+    systemProperty("robolectric.offline", "true")
+}
+
 plugins {
     id("ozero.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -152,6 +176,11 @@ dependencies {
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)
     testRuntimeOnly(libs.junit.vintage.engine)
+    robolectricRuntimeDeps24("org.robolectric:android-all-instrumented:7.0.0_r1-robolectric-r1-i6")
+    robolectricRuntimeDeps28("org.robolectric:android-all-instrumented:9-robolectric-4913185-2-i6")
+    robolectricRuntimeDeps29("org.robolectric:android-all-instrumented:10-robolectric-5803371-i6")
+    robolectricRuntimeDeps33(libs.robolectric.android.all.instrumented)
+    robolectricRuntimeDeps34(libs.robolectric.android.all.instrumented35)
     androidTestImplementation(libs.bundles.testing.android)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
