@@ -524,7 +524,12 @@ private fun tlsServerName(bean: StandardV2RayBean): String {
     if (bean.sni.isNotEmpty()) return bean.sni.trim()
     val host = bean.host.trim()
     val server = bean.serverAddress.trim().trim('[', ']')
-    if (bean.security == "reality" && host.isDomainNameForSni() && server.isIpAddressForSni()) return host
+    if ((bean.security == "reality" || bean.security == "tls") &&
+        host.isDomainNameForSni() &&
+        server.isIpAddressForSni()
+    ) {
+        return host
+    }
     return if (server.isDomainNameForSni()) server else ""
 }
 
