@@ -179,7 +179,8 @@ private fun SingboxSettingsContent(
                 onToggle = { viewModel.onGroupExpand(group.id) },
                 onRefresh = { viewModel.onRefresh(group.id) },
                 onPing = { viewModel.onPing(group.id) },
-                onCancel = { viewModel.onCancel(ping = true, refresh = true) },
+                onCancelRefresh = { viewModel.onCancel(refresh = true) },
+                onCancelPing = { viewModel.onCancel(ping = true) },
                 onDelete = { viewModel.onDeleteGroup(group) },
                 onProfileSelect = { viewModel.onProfileSelect(it) },
             )
@@ -369,7 +370,8 @@ private fun SubscriptionGroupItem(
     onToggle: () -> Unit,
     onRefresh: () -> Unit,
     onPing: () -> Unit,
-    onCancel: () -> Unit,
+    onCancelRefresh: () -> Unit,
+    onCancelPing: () -> Unit,
     onDelete: () -> Unit,
     onProfileSelect: (ProxyProfile) -> Unit,
 ) {
@@ -394,12 +396,12 @@ private fun SubscriptionGroupItem(
             )
             if (isRefreshing) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                IconButton(onClick = onCancel, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = onCancelRefresh, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Close, contentDescription = null)
                 }
             } else if (isPinging) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                IconButton(onClick = onCancel, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = onCancelPing, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Close, contentDescription = null)
                 }
             } else {
