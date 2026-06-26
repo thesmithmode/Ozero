@@ -83,13 +83,21 @@ val prefetchRobolectricAndroidAllInstrumented by tasks.registering {
 
 subprojects {
     plugins.withId("com.android.application") {
-        tasks.withType<Test>().configureEach {
-            dependsOn(rootProject.tasks.named("prefetchRobolectricAndroidAllInstrumented"))
+        afterEvaluate {
+            tasks.withType<Test>().matching {
+                it.systemProperties["robolectric.offline"] == "true"
+            }.configureEach {
+                dependsOn(rootProject.tasks.named("prefetchRobolectricAndroidAllInstrumented"))
+            }
         }
     }
     plugins.withId("com.android.library") {
-        tasks.withType<Test>().configureEach {
-            dependsOn(rootProject.tasks.named("prefetchRobolectricAndroidAllInstrumented"))
+        afterEvaluate {
+            tasks.withType<Test>().matching {
+                it.systemProperties["robolectric.offline"] == "true"
+            }.configureEach {
+                dependsOn(rootProject.tasks.named("prefetchRobolectricAndroidAllInstrumented"))
+            }
         }
     }
 }
