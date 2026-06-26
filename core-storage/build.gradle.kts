@@ -30,6 +30,7 @@ tasks.withType<Test>().configureEach {
         "robolectric.dependency.dir",
         layout.buildDirectory.dir("robolectric-runtime-deps").get().asFile.absolutePath,
     )
+    systemProperty("robolectric.offline", "true")
 }
 
 dependencies {

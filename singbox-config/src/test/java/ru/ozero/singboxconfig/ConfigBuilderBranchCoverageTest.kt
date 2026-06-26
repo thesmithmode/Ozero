@@ -178,6 +178,7 @@ class ConfigBuilderBranchCoverageTest {
     fun `tls reality and transport variants keep branch coverage honest`() {
         val reality = vless().apply {
             security = "reality"
+            serverAddress = "203.0.113.10"
             host = "front.example.com"
             sni = ""
             alpn = "h2,http/1.1"
