@@ -25,7 +25,7 @@ class SingboxProfileTestingStateSentinelTest {
             "ViewModel must expose per-profile testing state, not only group-level ping state",
         )
         assertTrue(
-            screenSource.contains("isTesting = profile.id in testingProfileIds") &&
+            screenSource.contains("isTesting = profile.id in state.testingProfileIds") &&
                 screenSource.contains("CircularProgressIndicator"),
             "Each profile row must show that the specific server is being tested",
         )
