@@ -86,7 +86,7 @@ class SingboxProbeService internal constructor(
         val probeCandidates = profiles.mapNotNull { profile ->
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(profile.beanBlob) }.getOrNull()
             if (bean == null || !ConfigBuilder.isSupportedBean(bean) || !bean.hasRoutableServerAddress()) {
-                profileDao.updateLatency(profile.id, LATENCY_FAILED)
+                profileDao.updateProbeResult(profile.id, LATENCY_FAILED, PROBE_ERROR_UNSUPPORTED)
                 null
             } else {
                 profile to bean
@@ -108,7 +108,8 @@ class SingboxProbeService internal constructor(
                             val latency = probeLatencyMs(bean, probeSettings)
                             if (latency == LATENCY_SKIPPED_ACTIVE_RUNTIME) continue
                             val storedLatency = if (latency >= 0) latency else LATENCY_FAILED
-                            profileDao.updateLatency(profile.id, storedLatency)
+                            val probeError = if (storedLatency >= 0) null else PROBE_ERROR_FAILED
+                            profileDao.updateProbeResult(profile.id, storedLatency, probeError)
                             results.add(ProbeResult(index, profile, storedLatency))
                         } finally {
                             onProfileTestingChanged(profile.id, false)
@@ -136,6 +137,10 @@ class SingboxProbeService internal constructor(
     private suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int =
         profileProbe.probeLatencyMs(bean, settings)
 
+    private suspend fun ProxyProfileDao.updateProbeResult(id: Long, latency: Int, error: String?) {
+        updateProbeResult(id, latency, error, System.currentTimeMillis())
+    }
+
     private data class ProbeResult(
         val index: Int,
         val profile: ProxyProfile,
@@ -148,6 +153,8 @@ class SingboxProbeService internal constructor(
         const val LATENCY_UNTESTED = -1
         const val LATENCY_FAILED = -2
         const val MAX_CONCURRENT_PROFILE_PROBES = 1
+        const val PROBE_ERROR_UNSUPPORTED = "unsupported"
+        const val PROBE_ERROR_FAILED = "probe failed"
         const val DEFAULT_PROBE_TIMEOUT_MS = 3_000
         const val MIN_PROBE_TIMEOUT_MS = 1_000
         const val MAX_PROBE_TIMEOUT_MS = 30_000

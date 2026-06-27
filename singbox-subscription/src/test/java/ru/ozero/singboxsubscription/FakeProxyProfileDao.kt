@@ -69,9 +69,15 @@ class FakeProxyProfileDao : ProxyProfileDao {
         profiles.removeAll { it.id in idSet }
     }
 
-    override suspend fun updateLatency(id: Long, latency: Int) {
+    override suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long) {
         val idx = profiles.indexOfFirst { it.id == id }
-        if (idx >= 0) profiles[idx] = profiles[idx].copy(latencyMs = latency)
+        if (idx >= 0) {
+            profiles[idx] = profiles[idx].copy(
+                latencyMs = latency,
+                probeError = probeError,
+                lastProbeAt = lastProbeAt,
+            )
+        }
     }
 
     override suspend fun countByGroupId(groupId: Long): Int =

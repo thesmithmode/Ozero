@@ -90,6 +90,7 @@ class ConfigBuilderChainTest {
         assertContains(json, "\"type\":\"urltest\"")
         assertContains(json, "https://www.gstatic.com/generate_204")
         assertContains(json, "\"tag\":\"proxy\"")
+        assertContains(json, "\"interrupt_exist_connections\":true")
         assertContains(json, "\"type\":\"socks\"")
         assertContains(json, "\"listen_port\":49410")
     }

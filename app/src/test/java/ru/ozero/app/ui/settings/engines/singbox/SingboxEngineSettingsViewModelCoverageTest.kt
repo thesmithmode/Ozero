@@ -1128,7 +1128,8 @@ class SingboxEngineSettingsViewModelCoverageTest {
             flow.value = flow.value.filterNot { it.id in idSet }
         }
 
-        override suspend fun updateLatency(id: Long, latency: Int) = Unit
+        override suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long) =
+            Unit
 
         override suspend fun countByGroupId(groupId: Long): Int = flow.value.count { it.groupId == groupId }
 

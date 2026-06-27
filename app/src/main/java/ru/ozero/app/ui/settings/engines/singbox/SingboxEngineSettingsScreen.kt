@@ -50,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -502,17 +503,13 @@ private fun ProfileItem(
                 Text(
                     text = "${profile.latencyMs}ms",
                     style = MaterialTheme.typography.labelSmall,
-                    color = when {
-                        profile.latencyMs < 200 -> MaterialTheme.colorScheme.primary
-                        profile.latencyMs < 500 -> MaterialTheme.colorScheme.secondary
-                        else -> MaterialTheme.colorScheme.error
-                    },
+                    color = singboxLatencyColor(profile.latencyMs),
                 )
             }
             profile.latencyMs == SingboxProbeService.LATENCY_FAILED -> {
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    text = stringResource(R.string.singbox_latency_failed),
+                    text = singboxProbeErrorText(profile.probeError),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
                 )
@@ -723,3 +720,36 @@ private fun AddManualLinksDialog(
         },
     )
 }
+
+@Composable
+internal fun singboxProbeErrorText(probeError: String?): String =
+    when (probeError) {
+        SingboxProbeService.PROBE_ERROR_UNSUPPORTED -> stringResource(R.string.singbox_latency_failed)
+        SingboxProbeService.PROBE_ERROR_FAILED -> stringResource(R.string.singbox_latency_failed)
+        else -> stringResource(R.string.singbox_latency_failed)
+    }
+
+internal fun singboxLatencyColor(latencyMs: Int): Color {
+    val points = listOf(
+        0f to Color(0xFF00A651),
+        100f to Color(0xFF00A651),
+        500f to Color(0xFFB7D500),
+        1_000f to Color(0xFFFFD600),
+        2_000f to Color(0xFFD50000),
+        3_000f to Color(0xFF050505),
+    )
+    val value = latencyMs.coerceAtLeast(0).toFloat()
+    val upperIndex = points.indexOfFirst { it.first >= value }.takeIf { it >= 0 } ?: points.lastIndex
+    if (upperIndex == 0) return points.first().second
+    val lower = points[upperIndex - 1]
+    val upper = points[upperIndex]
+    val fraction = ((value - lower.first) / (upper.first - lower.first)).coerceIn(0f, 1f)
+    return lerpColor(lower.second, upper.second, fraction)
+}
+
+private fun lerpColor(start: Color, end: Color, fraction: Float): Color = Color(
+    red = start.red + (end.red - start.red) * fraction,
+    green = start.green + (end.green - start.green) * fraction,
+    blue = start.blue + (end.blue - start.blue) * fraction,
+    alpha = start.alpha + (end.alpha - start.alpha) * fraction,
+)
