@@ -515,13 +515,9 @@ class SingboxEngine @Inject constructor(
     }
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
-        if (activeTunAutoSelect && isRuntimeRunning()) return EnginePlugin.ReadyResult.Ready
         val autoSelectRuntime = activeAutoSelect || activeTunAutoSelect
         return awaitRoutedReady(clearAutoSelect = autoSelectRuntime)
     }
-
-    private fun isRuntimeRunning(): Boolean =
-        proxy?.let { runCatching { it.runtimeRunning() }.getOrDefault(false) } == true
 
     private suspend fun awaitRoutedReady(clearAutoSelect: Boolean): EnginePlugin.ReadyResult {
         var lastFailure: ProbeResult.Failure? = null
