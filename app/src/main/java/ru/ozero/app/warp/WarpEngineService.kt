@@ -122,17 +122,25 @@ class WarpEngineService : Service() {
 
     override fun onBind(intent: Intent): IBinder = binder
 
+    override fun onDestroy() {
+        leaveForeground()
+        super.onDestroy()
+    }
+
     private fun startForegroundSession(): Int {
-        OzeroNotificationFactory(this, OzeroVpnService::class.java).enterForeground(this)
+        val foreground = OzeroNotificationFactory(this, OzeroVpnService::class.java).enterForeground(this)
+        if (!foreground) stopSelf()
         return START_NOT_STICKY
     }
 
     private fun leaveForeground() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_DETACH)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(false)
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_DETACH)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(false)
+            }
         }
     }
 

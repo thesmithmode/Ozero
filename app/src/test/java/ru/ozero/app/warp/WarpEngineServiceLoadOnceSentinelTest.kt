@@ -56,8 +56,17 @@ class WarpEngineServiceLoadOnceSentinelTest {
             "WarpEngineService не должен иметь отдельный title/channel/id для второго WARP notification.",
         )
         assertTrue(
+            source.contains("override fun onDestroy()") && source.contains("leaveForeground()"),
+            "RemoteAwgRuntime.close вызывает stopService, поэтому detach обязан быть в onDestroy, " +
+                "а не только в ACTION_STOP_SESSION ветке.",
+        )
+        assertTrue(
             source.contains("STOP_FOREGROUND_DETACH"),
             "Stop WARP foreground не должен удалять основной VPN notification с traffic stats.",
+        )
+        assertTrue(
+            source.contains("val foreground =") && source.contains("if (!foreground) stopSelf()"),
+            "Если startForeground rejected, service обязан self-stop, иначе Android O+ убьёт его по FGS timeout.",
         )
     }
 }
