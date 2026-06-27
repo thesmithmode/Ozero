@@ -177,6 +177,12 @@ class RemoteAwgRuntimeContractTest {
             source.contains("ACTION_START_SESSION") && source.contains("startForegroundService"),
             "WARP session start должен идти через foreground service action на Android O+.",
         )
+        assertTrue(
+            source.contains("WarpEngineServiceActions.START_SESSION") &&
+                source.contains("WarpEngineServiceActions.STOP_SESSION"),
+            "RemoteAwgRuntime обязан ссылаться на shared action constants, а не дублировать строки " +
+                "из WarpEngineService.",
+        )
     }
 
     @Test

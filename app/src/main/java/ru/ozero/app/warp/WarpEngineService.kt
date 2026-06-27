@@ -14,6 +14,7 @@ import org.amnezia.awg.GoBackend
 import org.amnezia.awg.ProxyGoBackend
 import org.amnezia.awg.backend.SocketProtector
 import ru.ozero.enginewarp.IWarpEngineProcess
+import ru.ozero.enginewarp.WarpEngineServiceActions
 import ru.ozero.enginewarp.WarpTurnOnResult
 
 class WarpEngineService : Service() {
@@ -183,8 +184,8 @@ class WarpEngineService : Service() {
 
     private companion object {
         const val TAG = "WarpEngineService"
-        const val ACTION_START_SESSION = "ru.ozero.warp.ACTION_START_SESSION"
-        const val ACTION_STOP_SESSION = "ru.ozero.warp.ACTION_STOP_SESSION"
+        const val ACTION_START_SESSION = WarpEngineServiceActions.START_SESSION
+        const val ACTION_STOP_SESSION = WarpEngineServiceActions.STOP_SESSION
         const val CHANNEL_ID = "ozero_warp_engine"
         const val NOTIFICATION_ID = 7302
     }

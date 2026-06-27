@@ -402,11 +402,35 @@ class EngineWarpStatsRecoverTest {
         assertEquals(1, bridge.detachCalls)
     }
 
+    @Test
+    fun `successful reattach resets recover failure counter`() = runTest {
+        val bridge = FakeBridge()
+        val reader = MutableReader(null)
+        val e = newEngine(
+            bridge = bridge,
+            reader = reader,
+            scope = backgroundScope,
+        )
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.attachTun(tunFd = 19)
+        assertIs<EnginePlugin.RecoverResult.Failed>(e.recover())
+        assertIs<EnginePlugin.RecoverResult.Success>(e.recover())
+        val attachCallsAfterSuccess = bridge.attachCalls
+
+        assertIs<EnginePlugin.RecoverResult.Failed>(e.recover())
+
+        assertEquals(attachCallsAfterSuccess, bridge.attachCalls)
+    }
+
     private fun interface WarpUapiStateReader {
         operator fun invoke(uapiPath: String, tunnelName: String): WarpUapiState?
     }
 
     private class FixedReader(private val state: WarpUapiState?) : WarpUapiStateReader {
+        override fun invoke(uapiPath: String, tunnelName: String): WarpUapiState? = state
+    }
+
+    private class MutableReader(var state: WarpUapiState?) : WarpUapiStateReader {
         override fun invoke(uapiPath: String, tunnelName: String): WarpUapiState? = state
     }
 

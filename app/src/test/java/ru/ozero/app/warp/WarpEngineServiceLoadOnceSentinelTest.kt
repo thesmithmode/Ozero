@@ -55,6 +55,12 @@ class WarpEngineServiceLoadOnceSentinelTest {
                 "чтобы Android 14+ SPECIAL_USE rejection не ронял service.",
         )
         assertTrue(
+            source.contains("WarpEngineServiceActions.START_SESSION") &&
+                source.contains("WarpEngineServiceActions.STOP_SESSION"),
+            "WarpEngineService обязан брать action strings из shared constants, иначе " +
+                "RemoteAwgRuntime и service могут незаметно разъехаться.",
+        )
+        assertTrue(
             source.contains("ACTION_STOP_SESSION") &&
                 source.contains("stopForeground(STOP_FOREGROUND_REMOVE)") &&
                 source.contains("START_NOT_STICKY"),

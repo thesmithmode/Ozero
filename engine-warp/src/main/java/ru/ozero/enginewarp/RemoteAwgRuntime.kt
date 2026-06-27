@@ -211,7 +211,7 @@ class RemoteAwgRuntime(
     private companion object {
         const val TAG = "RemoteAwgRuntime"
         const val CONNECT_TIMEOUT_S = 5L
-        const val ACTION_START_SESSION = "ru.ozero.warp.ACTION_START_SESSION"
-        const val ACTION_STOP_SESSION = "ru.ozero.warp.ACTION_STOP_SESSION"
+        const val ACTION_START_SESSION = WarpEngineServiceActions.START_SESSION
+        const val ACTION_STOP_SESSION = WarpEngineServiceActions.STOP_SESSION
     }
 }
