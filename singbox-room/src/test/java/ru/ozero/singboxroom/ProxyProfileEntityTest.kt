@@ -1,5 +1,6 @@
 package ru.ozero.singboxroom
 
+import androidx.room.ColumnInfo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -51,6 +52,14 @@ class ProxyProfileEntityTest {
         val second = profile(beanBlob = byteArrayOf(1, 2, 4))
 
         assertTrue(first.hashCode() != second.hashCode())
+    }
+
+    @Test
+    fun `lastProbeAt declares SQL default matching migration`() {
+        val field = ProxyProfile::class.java.getDeclaredField("lastProbeAt")
+        val columnInfo = field.getAnnotation(ColumnInfo::class.java)
+
+        assertEquals("0", columnInfo.defaultValue)
     }
 
     private fun profile(

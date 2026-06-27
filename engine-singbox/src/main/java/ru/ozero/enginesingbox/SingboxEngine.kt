@@ -416,7 +416,12 @@ class SingboxEngine @Inject constructor(
                 return TunAttachResult.Failure("sing-box runtime failed to start")
             }
             val autoSelect = pendingTunAutoSelect
-            warmTrafficProbe(pendingSocksPort, autoSelect)
+            val routedReady = warmTrafficProbe(pendingSocksPort, autoSelect)
+            if (!routedReady && !autoSelect) {
+                stopRuntimeAfterFailedReadiness(p)
+                clearPendingStart()
+                return TunAttachResult.Failure("sing-box routed probe failed")
+            }
             activeSocksPort = pendingSocksPort
             activeTunAutoSelect = autoSelect
             pendingTunAutoSelect = false

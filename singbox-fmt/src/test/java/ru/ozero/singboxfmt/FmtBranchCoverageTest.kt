@@ -85,12 +85,16 @@ class FmtBranchCoverageTest {
 
     @Test
     fun `shadowsocks parses plain userinfo ipv6 fallback port and base64 method only`() {
-        val ipv6 = V2RayFmt.parseShadowsocks("ss://aes-128-gcm:pwd@[2001:db8::1]:bad?plugin=obfs-local#IPv6")
+        val ipv6 = V2RayFmt.parseShadowsocks(
+            "ss://aes-128-gcm:pwd@[2001:db8::1]:bad" +
+                "?plugin=obfs-local&plugin-opts=obfs=http%3Bobfs-host=front.example.com#IPv6",
+        )
         assertEquals("aes-128-gcm", ipv6.method)
         assertEquals("pwd", ipv6.password)
         assertEquals("2001:db8::1", ipv6.serverAddress)
         assertEquals(443, ipv6.serverPort)
         assertEquals("obfs-local", ipv6.plugin)
+        assertEquals("obfs=http;obfs-host=front.example.com", ipv6.pluginOpts)
         assertEquals("IPv6", ipv6.name)
 
         val methodOnly = Base64.getUrlEncoder().withoutPadding().encodeToString("aes-256-gcm:pwd".toByteArray())

@@ -312,7 +312,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `attachTun keeps non auto runtime when warmup probes fail after runtime starts`() = runTest {
+    fun `attachTun fails non auto runtime when warmup probes fail after runtime starts`() = runTest {
         mockkStatic(ParcelFileDescriptor::class)
         try {
             val engine = buildEngine()
@@ -330,11 +330,12 @@ class SingboxEngineProbeTest {
 
             val result = engine.attachTun(42)
 
-            assertIs<TunAttachResult.Success>(result)
-            verify(exactly = 0) { process.stopAndWait(3_000L) }
+            val failure = assertIs<TunAttachResult.Failure>(result)
+            assertTrue(failure.reason.contains("routed probe"))
+            verify(exactly = 1) { process.stopAndWait(3_000L) }
             assertEquals(null, engine.privateField("pendingConfig"))
             assertEquals(0, engine.privateIntField("pendingSocksPort"))
-            assertEquals(49408, engine.privateIntField("activeSocksPort"))
+            assertEquals(0, engine.privateIntField("activeSocksPort"))
             assertEquals(false, engine.privateBooleanField("activeTunAutoSelect"))
         } finally {
             unmockkStatic(ParcelFileDescriptor::class)

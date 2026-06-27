@@ -1,5 +1,6 @@
 package ru.ozero.singboxroom.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -26,6 +27,7 @@ data class ProxyProfile(
     val userOrder: Int = 0,
     val latencyMs: Int = -1,
     val probeError: String? = null,
+    @ColumnInfo(defaultValue = "0")
     val lastProbeAt: Long = 0L,
 ) {
     override fun equals(other: Any?): Boolean {
