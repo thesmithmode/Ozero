@@ -128,6 +128,18 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
+    fun `state clamps migrated probe timeout before rendering slider`() = runTest {
+        val harness = Harness()
+        harness.prefsFlow.value = mutablePreferencesOf(
+            SingboxProbeService.PROBE_TIMEOUT_MS_KEY to 30_000,
+        )
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+
+        assertEquals(10, harness.viewModel.state.value.probeTimeoutSeconds)
+    }
+
+    @Test
     fun `add group dialog show and hide preserve then reset fields`() = runTest {
         val harness = Harness()
         harness.startStateCollection(backgroundScope)

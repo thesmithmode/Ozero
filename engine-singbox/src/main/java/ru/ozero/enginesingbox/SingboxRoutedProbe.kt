@@ -24,24 +24,29 @@ class SingboxHttp204RoutedProbe(
 ) : SingboxRoutedProbe {
 
     override suspend fun probeLatencyMs(socksPort: Int): Long = withContext(Dispatchers.IO) {
-        if (maxProbeUrls <= 0) return@withContext LATENCY_FAILED
+        probeLatencyMsUntil(socksPort, deadlineNanos = nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs.toLong()))
+    }
+
+    fun probeLatencyMsUntil(socksPort: Int, deadlineNanos: Long): Long {
+        if (maxProbeUrls <= 0) return LATENCY_FAILED
         if (socksPort <= 0) {
             PersistentLoggers.warn(TAG, "routed probe failed: invalid socksPort=$socksPort")
-            return@withContext LATENCY_FAILED
+            return LATENCY_FAILED
         }
-        if (!isSocksPortReady(socksPort)) {
+        if (!isSocksPortReady(socksPort, deadlineNanos)) {
             PersistentLoggers.debug(
                 TAG,
                 "routed probe failed: socks not ready socksPort=$socksPort timeoutMs=$timeoutMs",
             )
-            return@withContext LATENCY_FAILED
+            return LATENCY_FAILED
         }
         val urls = listOf(probeUrl) + fallbackProbeUrls
         val failures = mutableListOf<String>()
         for (url in urls.distinctBy { it.toString() }.take(maxProbeUrls)) {
-            val result = probeSingleUrl(url, socksPort)
+            val remainingTimeoutMs = remainingTimeoutMs(deadlineNanos) ?: break
+            val result = probeSingleUrl(url, socksPort, remainingTimeoutMs)
             val latency = result.latencyMs
-            if (latency >= 0) return@withContext latency
+            if (latency >= 0) return latency
             failures += "${url.host}:${result.reason}"
         }
         PersistentLoggers.debug(
@@ -51,15 +56,16 @@ class SingboxHttp204RoutedProbe(
         LATENCY_FAILED
     }
 
-    private fun isSocksPortReady(socksPort: Int): Boolean =
+    private fun isSocksPortReady(socksPort: Int, deadlineNanos: Long): Boolean =
         runCatching {
+            val connectTimeoutMs = remainingTimeoutMs(deadlineNanos) ?: return false
             Socket().use { socket ->
-                socket.connect(InetSocketAddress(socksHost, socksPort), timeoutMs)
+                socket.connect(InetSocketAddress(socksHost, socksPort), connectTimeoutMs)
             }
             true
         }.getOrDefault(false)
 
-    private fun probeSingleUrl(url: URL, socksPort: Int): ProbeAttempt {
+    private fun probeSingleUrl(url: URL, socksPort: Int, remainingTimeoutMs: Int): ProbeAttempt {
         val start = nanoTime()
         return runCatching {
             val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress(socksHost, socksPort))
@@ -68,8 +74,8 @@ class SingboxHttp204RoutedProbe(
                 connection.requestMethod = "GET"
                 connection.instanceFollowRedirects = false
                 connection.useCaches = false
-                connection.connectTimeout = timeoutMs
-                connection.readTimeout = timeoutMs
+                connection.connectTimeout = remainingTimeoutMs
+                connection.readTimeout = remainingTimeoutMs
                 val code = connection.responseCode
                 if (isSuccessfulProbeResponse(url, code)) {
                     ProbeAttempt(TimeUnit.NANOSECONDS.toMillis(nanoTime() - start).coerceAtLeast(1L), "ok")
@@ -82,6 +88,15 @@ class SingboxHttp204RoutedProbe(
         }.getOrElse { error ->
             ProbeAttempt(LATENCY_FAILED, error::class.java.simpleName)
         }
+    }
+
+    private fun remainingTimeoutMs(deadlineNanos: Long): Int? {
+        val remainingNanos = deadlineNanos - nanoTime()
+        if (remainingNanos <= 0) return null
+        return TimeUnit.NANOSECONDS.toMillis(remainingNanos)
+            .coerceAtLeast(1L)
+            .coerceAtMost(timeoutMs.toLong())
+            .toInt()
     }
 
     private fun isSuccessfulProbeResponse(url: URL, code: Int): Boolean {

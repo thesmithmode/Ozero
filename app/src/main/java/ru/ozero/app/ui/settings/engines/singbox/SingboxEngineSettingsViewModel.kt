@@ -131,10 +131,8 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             sortOrder = sort,
             dnsPresetId = dnsPresetId,
             dnsServers = dnsServers,
-            probeTimeoutSeconds = (
-                prefs[SingboxProbeService.PROBE_TIMEOUT_MS_KEY]
-                    ?: SingboxProbeService.DEFAULT_PROBE_TIMEOUT_MS
-                ) / 1_000,
+            probeTimeoutSeconds = prefs[SingboxProbeService.PROBE_TIMEOUT_MS_KEY]
+                .normalizedSingboxProbeTimeoutMs() / 1_000,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SingboxSettingsUiState())
 
