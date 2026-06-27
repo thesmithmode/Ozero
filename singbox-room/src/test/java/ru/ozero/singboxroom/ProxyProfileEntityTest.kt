@@ -1,11 +1,11 @@
 package ru.ozero.singboxroom
 
-import androidx.room.ColumnInfo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import ru.ozero.singboxroom.entity.ProxyProfile
+import java.io.File
 
 class ProxyProfileEntityTest {
 
@@ -56,10 +56,12 @@ class ProxyProfileEntityTest {
 
     @Test
     fun `lastProbeAt declares SQL default matching migration`() {
-        val field = ProxyProfile::class.java.getDeclaredField("lastProbeAt")
-        val columnInfo = field.getAnnotation(ColumnInfo::class.java)
+        val root = File(System.getProperty("user.dir") ?: ".")
+        val entity = File(root, "src/main/java/ru/ozero/singboxroom/entity/ProxyProfile.kt").readText()
+        val database = File(root, "src/main/java/ru/ozero/singboxroom/SingboxDatabase.kt").readText()
 
-        assertEquals("0", columnInfo.defaultValue)
+        assertTrue(entity.contains("@field:ColumnInfo(defaultValue = \"0\")"))
+        assertTrue(database.contains("ADD COLUMN `lastProbeAt` INTEGER NOT NULL DEFAULT 0"))
     }
 
     private fun profile(

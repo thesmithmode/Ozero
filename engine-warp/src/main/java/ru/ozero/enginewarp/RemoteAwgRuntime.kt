@@ -74,9 +74,10 @@ class RemoteAwgRuntime(
                     val ref = serviceConnection
                     serviceConnection = null
                     if (ref != null) runCatching { context.unbindService(ref) }
+                    runCatching { onProcessDied() }
                     PersistentLoggers.warn(
                         TAG,
-                        "WarpEngineService disconnected process=$name — system unbind, recovery will rebind",
+                        "WarpEngineService disconnected process=$name - service process lost",
                     )
                 }
                 override fun onBindingDied(name: ComponentName?) {

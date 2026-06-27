@@ -147,9 +147,9 @@ class RemoteAwgRuntimeContractTest {
         val onDisconnected = source.substringAfter("override fun onServiceDisconnected")
             .substringBefore("override fun onBindingDied")
         assertTrue(
-            !onDisconnected.contains("onProcessDied()"),
-            "onServiceDisconnected не должен звать onProcessDied(): recoverable system unbind в фоне " +
-                "должен дать WARP rebind/reattach, а не немедленный stop/killswitch. " +
+            onDisconnected.contains("onProcessDied()"),
+            "onServiceDisconnected must call onProcessDied because Android can kill :engine_warp " +
+                "without onBindingDied, so active WARP enters failure handling immediately. " +
                 "Body=$onDisconnected",
         )
         assertTrue(
