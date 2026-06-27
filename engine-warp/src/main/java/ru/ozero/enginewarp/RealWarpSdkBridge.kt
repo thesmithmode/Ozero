@@ -5,6 +5,8 @@ import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.VpnSocketProtector
@@ -17,6 +19,7 @@ class RealWarpSdkBridge(
 
     private val tunnelHandle = AtomicInteger(INVALID_HANDLE)
     private val proxyHandle = AtomicInteger(INVALID_HANDLE)
+    private val lifecycleLock = Mutex()
 
     @Volatile private var savedProtector: VpnSocketProtector? = null
 
@@ -27,15 +30,21 @@ class RealWarpSdkBridge(
         uapiPath: String,
         protector: VpnSocketProtector,
     ): WarpSdkBridge.AttachResult = withContext(Dispatchers.IO) {
-        validateAttachArgs(tunFd, iniConfig, uapiPath)?.let {
-            return@withContext WarpSdkBridge.AttachResult.Failed(it)
+        lifecycleLock.withLock {
+            validateAttachArgs(tunFd, iniConfig, uapiPath)?.let {
+                return@withLock WarpSdkBridge.AttachResult.Failed(it)
+            }
+            closeStaleHandle()
+            cleanupStaleSockets(uapiPath, tunnelName)
+            logIniDigest(tunnelName, iniConfig)
+            val result = invokeAwgTurnOnAndProtect(tunnelName, tunFd, iniConfig, uapiPath, protector)
+            if (result is WarpSdkBridge.AttachResult.Success) {
+                savedProtector = protector
+            } else {
+                cleanupFailedAttachStart()
+            }
+            result
         }
-        closeStaleHandle()
-        cleanupStaleSockets(uapiPath, tunnelName)
-        logIniDigest(tunnelName, iniConfig)
-        val result = invokeAwgTurnOnAndProtect(tunnelName, tunFd, iniConfig, uapiPath, protector)
-        if (result is WarpSdkBridge.AttachResult.Success) savedProtector = protector
-        result
     }
 
     override fun reprotectSockets() {
@@ -55,37 +64,41 @@ class RealWarpSdkBridge(
         socksPort: Int,
         protector: VpnSocketProtector,
     ): WarpSdkBridge.ProxyResult = withContext(Dispatchers.IO) {
-        validateProxyArgs(iniConfig, uapiPath, socksPort)?.let {
-            return@withContext WarpSdkBridge.ProxyResult.Failed(it)
-        }
-        closeStaleProxy()
-        cleanupStaleSockets(uapiPath, tunnelName)
-        logIniDigest(tunnelName, iniConfig)
-        val started = System.currentTimeMillis()
-        val threadName = Thread.currentThread().name
-        PersistentLoggers.debug(
-            TAG,
-            "awgStartProxy JNI entry name=$tunnelName port=$socksPort iniLen=${iniConfig.length} thread=$threadName",
-        )
-        val handle = try {
-            awgRuntime.startProxy(tunnelName, iniConfig, uapiPath, socksPort, protector)
-        } catch (ce: CancellationException) {
-            throw ce
-        } catch (t: Throwable) {
-            val dt = System.currentTimeMillis() - started
-            PersistentLoggers.error(TAG, "awgStartProxy threw dt=${dt}ms: ${t.message} (${t.javaClass.name})")
-            return@withContext WarpSdkBridge.ProxyResult.Failed(
-                "awgStartProxy failed: ${t.message ?: t.javaClass.simpleName}",
+        lifecycleLock.withLock {
+            validateProxyArgs(iniConfig, uapiPath, socksPort)?.let {
+                return@withLock WarpSdkBridge.ProxyResult.Failed(it)
+            }
+            closeStaleProxy()
+            cleanupStaleSockets(uapiPath, tunnelName)
+            logIniDigest(tunnelName, iniConfig)
+            val started = System.currentTimeMillis()
+            val threadName = Thread.currentThread().name
+            PersistentLoggers.debug(
+                TAG,
+                "awgStartProxy JNI entry name=$tunnelName port=$socksPort iniLen=${iniConfig.length} thread=$threadName",
             )
+            val handle = try {
+                awgRuntime.startProxy(tunnelName, iniConfig, uapiPath, socksPort, protector)
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (t: Throwable) {
+                val dt = System.currentTimeMillis() - started
+                PersistentLoggers.error(TAG, "awgStartProxy threw dt=${dt}ms: ${t.message} (${t.javaClass.name})")
+                cleanupFailedProxyStart()
+                return@withLock WarpSdkBridge.ProxyResult.Failed(
+                    "awgStartProxy failed: ${t.message ?: t.javaClass.simpleName}",
+                )
+            }
+            val dt = System.currentTimeMillis() - started
+            PersistentLoggers.debug(TAG, "awgStartProxy JNI exit handle=$handle dt=${dt}ms thread=$threadName")
+            if (handle < 0) {
+                cleanupFailedProxyStart()
+                return@withLock WarpSdkBridge.ProxyResult.Failed("awgStartProxy handle=$handle")
+            }
+            proxyHandle.set(handle)
+            savedProtector = protector
+            WarpSdkBridge.ProxyResult.Success
         }
-        val dt = System.currentTimeMillis() - started
-        PersistentLoggers.debug(TAG, "awgStartProxy JNI exit handle=$handle dt=${dt}ms thread=$threadName")
-        if (handle < 0) {
-            return@withContext WarpSdkBridge.ProxyResult.Failed("awgStartProxy handle=$handle")
-        }
-        proxyHandle.set(handle)
-        savedProtector = protector
-        WarpSdkBridge.ProxyResult.Success
     }
 
     private fun validateProxyArgs(iniConfig: String, uapiPath: String, socksPort: Int): String? {
@@ -109,6 +122,18 @@ class RealWarpSdkBridge(
             awgRuntime.resetProxyGlobals()
             awgRuntime.stopProxy()
         }.onFailure { PersistentLoggers.error(TAG, "stale awgStopProxy failed: ${it.message}") }
+    }
+
+    private fun cleanupFailedProxyStart() {
+        runCatching { awgRuntime.resetProxyGlobals() }
+            .onFailure { PersistentLoggers.warn(TAG, "failed proxy reset cleanup failed: ${it.message}") }
+        runCatching { awgRuntime.stopProxy() }
+            .onFailure { PersistentLoggers.warn(TAG, "failed proxy stop cleanup failed: ${it.message}") }
+        closeRuntimeIfIdle()
+    }
+
+    private fun cleanupFailedAttachStart() {
+        closeRuntimeIfIdle()
     }
 
     private fun validateAttachArgs(tunFd: Int, iniConfig: String, uapiPath: String): String? {
@@ -257,43 +282,60 @@ class RealWarpSdkBridge(
 
     override suspend fun detachTun() {
         withContext(Dispatchers.IO) {
-            val h = tunnelHandle.getAndSet(INVALID_HANDLE)
-            if (h == INVALID_HANDLE) return@withContext
-            val started = System.currentTimeMillis()
-            val thread = Thread.currentThread().name
-            PersistentLoggers.debug(TAG, "awgTurnOff JNI entry handle=$h thread=$thread")
-            try {
-                awgRuntime.turnOff(h)
-                val dt = System.currentTimeMillis() - started
-                PersistentLoggers.debug(TAG, "awgTurnOff JNI exit handle=$h dt=${dt}ms thread=$thread")
-                // Go goroutines from the killed tunnel don't stop synchronously.
-                // Without a pause, a rapid awgTurnOn reuses handle=0 before the old
-                // goroutines finish, causing handshake interference on the next session.
-                delay(AWG_TEARDOWN_COOLDOWN_MS)
-            } catch (t: Throwable) {
-                val dt = System.currentTimeMillis() - started
-                PersistentLoggers.error(TAG, "awgTurnOff failed dt=${dt}ms: ${t.message} (${t.javaClass.name})")
+            lifecycleLock.withLock {
+                val h = tunnelHandle.getAndSet(INVALID_HANDLE)
+                if (h == INVALID_HANDLE) {
+                    closeRuntimeIfIdle()
+                    return@withLock
+                }
+                val started = System.currentTimeMillis()
+                val thread = Thread.currentThread().name
+                PersistentLoggers.debug(TAG, "awgTurnOff JNI entry handle=$h thread=$thread")
+                try {
+                    awgRuntime.turnOff(h)
+                    val dt = System.currentTimeMillis() - started
+                    PersistentLoggers.debug(TAG, "awgTurnOff JNI exit handle=$h dt=${dt}ms thread=$thread")
+                    // Go goroutines from the killed tunnel don't stop synchronously.
+                    // Without a pause, a rapid awgTurnOn reuses handle=0 before the old
+                    // goroutines finish, causing handshake interference on the next session.
+                    delay(AWG_TEARDOWN_COOLDOWN_MS)
+                } catch (t: Throwable) {
+                    val dt = System.currentTimeMillis() - started
+                    PersistentLoggers.error(TAG, "awgTurnOff failed dt=${dt}ms: ${t.message} (${t.javaClass.name})")
+                }
+                closeRuntimeIfIdle()
             }
         }
     }
 
     override suspend fun stopProxy() {
         withContext(Dispatchers.IO) {
-            val h = proxyHandle.getAndSet(INVALID_HANDLE)
-            if (h == INVALID_HANDLE) return@withContext
-            val started = System.currentTimeMillis()
-            PersistentLoggers.debug(TAG, "awgStopProxy JNI entry handle=$h")
-            try {
-                awgRuntime.resetProxyGlobals()
-                awgRuntime.stopProxy()
-                val dt = System.currentTimeMillis() - started
-                PersistentLoggers.debug(TAG, "awgStopProxy JNI exit handle=$h dt=${dt}ms")
-                delay(AWG_TEARDOWN_COOLDOWN_MS)
-            } catch (t: Throwable) {
-                val dt = System.currentTimeMillis() - started
-                PersistentLoggers.error(TAG, "awgStopProxy failed dt=${dt}ms: ${t.message} (${t.javaClass.name})")
+            lifecycleLock.withLock {
+                val h = proxyHandle.getAndSet(INVALID_HANDLE)
+                if (h == INVALID_HANDLE) {
+                    closeRuntimeIfIdle()
+                    return@withLock
+                }
+                val started = System.currentTimeMillis()
+                PersistentLoggers.debug(TAG, "awgStopProxy JNI entry handle=$h")
+                try {
+                    awgRuntime.resetProxyGlobals()
+                    awgRuntime.stopProxy()
+                    val dt = System.currentTimeMillis() - started
+                    PersistentLoggers.debug(TAG, "awgStopProxy JNI exit handle=$h dt=${dt}ms")
+                    delay(AWG_TEARDOWN_COOLDOWN_MS)
+                } catch (t: Throwable) {
+                    val dt = System.currentTimeMillis() - started
+                    PersistentLoggers.error(TAG, "awgStopProxy failed dt=${dt}ms: ${t.message} (${t.javaClass.name})")
+                }
+                closeRuntimeIfIdle()
             }
         }
+    }
+
+    private fun closeRuntimeIfIdle() {
+        if (tunnelHandle.get() != INVALID_HANDLE || proxyHandle.get() != INVALID_HANDLE) return
+        awgRuntime.close()
     }
 
     override fun isRunning(): Boolean = tunnelHandle.get() != INVALID_HANDLE || proxyHandle.get() != INVALID_HANDLE
@@ -380,6 +422,8 @@ interface AwgRuntime {
     fun stopProxy() = Unit
 
     fun resetProxyGlobals() = Unit
+
+    fun close() = Unit
 
     fun version(): String = "unknown"
 

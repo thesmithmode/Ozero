@@ -291,6 +291,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
         assertEquals(1, harness.insertedGroups.size)
         assertEquals("Ozero-1", harness.insertedGroups.single().name)
+        assertFalse(harness.insertedGroups.single().autoUpdate)
         assertEquals(1, harness.profileDao.insertedProfiles.size)
         assertEquals("Server 1", harness.profileDao.insertedProfiles.single().name)
         assertFalse(harness.viewModel.state.value.showAddManualLinksDialog)
@@ -758,6 +759,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         advanceUntilIdle()
 
         assertEquals("protocols", harness.insertedGroups.single().name)
+        assertFalse(harness.insertedGroups.single().autoUpdate)
         assertEquals(listOf(0, 1, 2, 3), harness.profileDao.insertedProfiles.map { it.protocolType })
     }
 
@@ -1128,7 +1130,8 @@ class SingboxEngineSettingsViewModelCoverageTest {
             flow.value = flow.value.filterNot { it.id in idSet }
         }
 
-        override suspend fun updateLatency(id: Long, latency: Int) = Unit
+        override suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long) =
+            Unit
 
         override suspend fun countByGroupId(groupId: Long): Int = flow.value.count { it.groupId == groupId }
 

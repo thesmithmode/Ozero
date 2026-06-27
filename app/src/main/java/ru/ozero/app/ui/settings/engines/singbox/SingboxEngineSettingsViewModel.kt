@@ -409,7 +409,12 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         val name = rawName.ifEmpty { "Ozero-${state.value.groups.size + 1}" }
         viewModelScope.launch {
             val groupId = groupDao.insert(
-                SubscriptionGroup(name = name, subscriptionUrl = "", userOrder = nextGroupOrder()),
+                SubscriptionGroup(
+                    name = name,
+                    subscriptionUrl = "",
+                    autoUpdate = false,
+                    userOrder = nextGroupOrder(),
+                ),
             )
             val profiles = parsed.take(MAX_IMPORT_PROFILES).mapIndexed { idx, bean ->
                 ProxyProfile(
@@ -448,7 +453,12 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         val name = fileName?.substringBeforeLast(".") ?: "Ozero-${state.value.groups.size + 1}"
         viewModelScope.launch {
             val groupId = groupDao.insert(
-                SubscriptionGroup(name = name, subscriptionUrl = "", userOrder = nextGroupOrder()),
+                SubscriptionGroup(
+                    name = name,
+                    subscriptionUrl = "",
+                    autoUpdate = false,
+                    userOrder = nextGroupOrder(),
+                ),
             )
             val profiles = parsed.take(MAX_IMPORT_PROFILES).mapIndexed { idx, bean ->
                 ProxyProfile(

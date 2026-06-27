@@ -76,7 +76,12 @@ class RawUpdater(
                         existingByBaseIdentity[baseKey]?.removeFirstOrNull()
                     }
                     if (matched != null) {
-                        profile.copy(id = matched.id, latencyMs = matched.latencyMs)
+                        profile.copy(
+                            id = matched.id,
+                            latencyMs = matched.latencyMs,
+                            probeError = matched.probeError,
+                            lastProbeAt = matched.lastProbeAt,
+                        )
                     } else {
                         profile
                     }

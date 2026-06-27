@@ -161,6 +161,7 @@ class RealWarpSdkBridgeTest {
         val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
         assertTrue(f.reason.contains("handle=-2"))
         assertFalse(b.isRunning())
+        assertEquals(1, rt.closeCalls)
     }
 
     @Test
@@ -184,6 +185,8 @@ class RealWarpSdkBridgeTest {
         val r = b.attachTun("n", tunFd = 5, iniConfig = validIni, uapiPath = "/x", protector = noopProtector)
         val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
         assertTrue(f.reason.contains("native crash"))
+        assertFalse(b.isRunning())
+        assertEquals(1, rt.closeCalls)
     }
 
     @Test
@@ -208,6 +211,7 @@ class RealWarpSdkBridgeTest {
         val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
         assertTrue(f.reason.contains("protect"))
         assertEquals(1, rt.turnOffCalls)
+        assertEquals(1, rt.closeCalls)
         assertFalse(b.isRunning())
     }
 
@@ -227,6 +231,7 @@ class RealWarpSdkBridgeTest {
             rt.turnOffCalls,
             "при throw из protect — обязан вызвать turnOff rollback, иначе AWG handle leak",
         )
+        assertEquals(1, rt.closeCalls)
         assertFalse(b.isRunning())
     }
 
@@ -238,6 +243,7 @@ class RealWarpSdkBridgeTest {
         val r = b.attachTun("n", 5, validIni, "/x", protector)
         assertIs<WarpSdkBridge.AttachResult.Failed>(r)
         assertEquals(1, rt.turnOffCalls)
+        assertEquals(1, rt.closeCalls)
     }
 
     @Test
@@ -385,6 +391,7 @@ class RealWarpSdkBridgeTest {
     private class FakeAwgRuntime(
         var returnHandle: Int = 1,
         var throwOnTurnOn: Throwable? = null,
+        var throwOnStartProxy: Throwable? = null,
         var throwOnTurnOff: Throwable? = null,
         var throwOnVersion: Throwable? = null,
         var socketV4: Int = 0,
@@ -397,10 +404,15 @@ class RealWarpSdkBridgeTest {
         var getConfigCalls: Int = 0
         var versionCalls: Int = 0
         var combinedCalls: Int = 0
+        var startProxyCalls: Int = 0
+        var stopProxyCalls: Int = 0
+        var resetProxyGlobalsCalls: Int = 0
+        var closeCalls: Int = 0
         var lastName: String? = null
         var lastFd: Int = -1
         var lastIni: String? = null
         var lastUapi: String? = null
+        var lastProxyPort: Int = -1
         var lastTurnOffHandle: Int = -1
 
         override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int {
@@ -448,6 +460,66 @@ class RealWarpSdkBridgeTest {
             throwOnTurnOn?.let { throw it }
             return AwgTurnOnResult(returnHandle, socketV4, socketV6)
         }
+
+        override fun startProxy(
+            name: String,
+            ini: String,
+            uapiPath: String,
+            port: Int,
+            protector: VpnSocketProtector,
+        ): Int {
+            startProxyCalls++
+            lastName = name
+            lastIni = ini
+            lastUapi = uapiPath
+            lastProxyPort = port
+            throwOnStartProxy?.let { throw it }
+            return returnHandle
+        }
+
+        override fun stopProxy() {
+            stopProxyCalls++
+        }
+
+        override fun resetProxyGlobals() {
+            resetProxyGlobalsCalls++
+        }
+
+        override fun close() {
+            closeCalls++
+        }
+    }
+
+    @Test
+    fun `startProxy negative handle closes foreground runtime session`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = -7)
+        val (b, _) = bridgeWith(rt)
+
+        val r = b.startProxy("ozero-warp", validIni, "/x", 2080, noopProtector)
+
+        val f = assertIs<WarpSdkBridge.ProxyResult.Failed>(r)
+        assertTrue(f.reason.contains("handle=-7"))
+        assertFalse(b.isRunning())
+        assertEquals(1, rt.startProxyCalls)
+        assertEquals(1, rt.resetProxyGlobalsCalls)
+        assertEquals(1, rt.stopProxyCalls)
+        assertEquals(1, rt.closeCalls)
+    }
+
+    @Test
+    fun `startProxy throw closes foreground runtime session`() = runTest {
+        val rt = FakeAwgRuntime(throwOnStartProxy = IllegalStateException("binder failed"))
+        val (b, _) = bridgeWith(rt)
+
+        val r = b.startProxy("ozero-warp", validIni, "/x", 2080, noopProtector)
+
+        val f = assertIs<WarpSdkBridge.ProxyResult.Failed>(r)
+        assertTrue(f.reason.contains("binder failed"))
+        assertFalse(b.isRunning())
+        assertEquals(1, rt.startProxyCalls)
+        assertEquals(1, rt.resetProxyGlobalsCalls)
+        assertEquals(1, rt.stopProxyCalls)
+        assertEquals(1, rt.closeCalls)
     }
 
     @Test
@@ -508,6 +580,23 @@ class RealWarpSdkBridgeTest {
         assertTrue(
             src.contains("delay(AWG_TEARDOWN_COOLDOWN_MS)"),
             "detachTun обязан вызывать delay(AWG_TEARDOWN_COOLDOWN_MS) после awgTurnOff",
+        )
+    }
+
+    @Test
+    fun `lifecycle operations serialized before closeRuntimeIfIdle`() {
+        val f = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginewarp/RealWarpSdkBridge.kt",
+        )
+        assertTrue(f.exists(), "RealWarpSdkBridge.kt не найден: $f")
+        val src = f.readText()
+        assertTrue(
+            src.contains("private val lifecycleLock = Mutex()") &&
+                src.contains("lifecycleLock.withLock") &&
+                src.contains("closeRuntimeIfIdle()"),
+            "RealWarpSdkBridge обязан сериализовать attach/start/stop/detach вокруг closeRuntimeIfIdle, " +
+                "иначе runtime можно закрыть одновременно с новым attach/start.",
         )
     }
 

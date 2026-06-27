@@ -251,6 +251,20 @@ class ConfigBuilderBranchCoverageTest {
     }
 
     @Test
+    fun `http transport serializes comma separated hosts as array entries`() {
+        val json = ConfigBuilder.buildSingboxConfig(
+            vless().apply {
+                type = "http"
+                host = "front.example.com,edge.example.com"
+                path = "/h2"
+            },
+        )
+
+        assertContains(json, "\"host\":[\"front.example.com\",\"edge.example.com\"]")
+        assertFalse(json.contains("\"host\":[\"front.example.com,edge.example.com\"]"))
+    }
+
+    @Test
     fun `tls branch escapes special characters and emits optional knobs`() {
         val bean = vless().apply {
             security = "tls"

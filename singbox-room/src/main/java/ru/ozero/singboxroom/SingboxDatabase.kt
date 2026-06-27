@@ -13,7 +13,7 @@ import ru.ozero.singboxroom.entity.SubscriptionGroup
 
 @Database(
     entities = [SubscriptionGroup::class, ProxyProfile::class, ProxyChainStep::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class SingboxDatabase : RoomDatabase() {
@@ -42,6 +42,13 @@ abstract class SingboxDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_proxy_chain_steps_userOrder` " +
                         "ON `proxy_chain_steps` (`userOrder`)",
                 )
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `proxy_profiles` ADD COLUMN `probeError` TEXT")
+                db.execSQL("ALTER TABLE `proxy_profiles` ADD COLUMN `lastProbeAt` INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

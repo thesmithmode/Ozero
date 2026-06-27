@@ -90,7 +90,7 @@ object ConfigBuilder {
             append("""{"type":"urltest","tag":"proxy","outbounds":[$tagList],""")
             append(""""url":"$AUTO_SELECT_PROBE_URL",""")
             append(""""interval":"3m","tolerance":50,""")
-            append(""""interrupt_exist_connections":false,"idle_timeout":"30m"}""")
+            append(""""interrupt_exist_connections":true,"idle_timeout":"30m"}""")
         }
         return buildChainFullConfig(socksPort, listOf(urltest) + proxyOutbounds, upstream, dnsServers, ipv6Enabled)
     }
@@ -474,7 +474,7 @@ private fun buildTransport(bean: StandardV2RayBean): String? = when (bean.type) 
     "http", "h2" -> buildMap(
         "type" to "http",
         "path" to (bean.path.ifEmpty { "/" }),
-        "host" to if (bean.host.isNotEmpty()) """[${jsonString(bean.host)}]""" else "[]",
+        "host" to httpHostArray(bean.host),
     )
     "httpupgrade" -> buildMap(
         "type" to "httpupgrade",
@@ -484,6 +484,12 @@ private fun buildTransport(bean: StandardV2RayBean): String? = when (bean.type) 
     "tcp" -> null
     else -> null
 }
+
+private fun httpHostArray(hosts: String): String =
+    hosts.split(',')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .joinToString(separator = ",", prefix = "[", postfix = "]") { jsonString(it) }
 
 private fun buildTls(bean: StandardV2RayBean): String? {
     val security = bean.security

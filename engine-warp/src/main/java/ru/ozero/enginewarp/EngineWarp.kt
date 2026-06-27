@@ -174,7 +174,18 @@ class EngineWarp(
     override suspend fun recover(): EnginePlugin.RecoverResult {
         val uapiPath = uapiPathProvider()
         val state = uapiStateReader(uapiPath, TUNNEL_NAME)
-            ?: return EnginePlugin.RecoverResult.Failed("UAPI unavailable - handshake state unreadable")
+        if (state == null) {
+            consecutiveRecoverFails++
+            if (consecutiveRecoverFails < RECOVER_PASSIVE_ATTEMPTS) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "recover: UAPI unavailable - passive attempt " +
+                        "$consecutiveRecoverFails/$RECOVER_PASSIVE_ATTEMPTS",
+                )
+                return EnginePlugin.RecoverResult.Failed("UAPI unavailable - handshake state unreadable")
+            }
+            return reattachAfterStale(uapiPath, "UAPI unavailable")
+        }
         val ageS = state.handshakeAgeSeconds
         if (ageS != null && ageS < handshakeStaleThresholdSec) {
             consecutiveRecoverFails = 0
@@ -190,13 +201,17 @@ class EngineWarp(
             )
             return EnginePlugin.RecoverResult.Failed("handshake stale age=${ageS ?: "never"}s")
         }
+        return reattachAfterStale(uapiPath, "handshake stale")
+    }
+
+    private suspend fun reattachAfterStale(uapiPath: String, reason: String): EnginePlugin.RecoverResult {
         val fd = savedTunFd
         val ini = resolvedIni
         if (fd < 0 || ini == null) {
             PersistentLoggers.warn(TAG, "recover: reattach impossible - fd=$fd ini=${ini != null}")
-            return EnginePlugin.RecoverResult.Failed("handshake stale, reattach unavailable")
+            return EnginePlugin.RecoverResult.Failed("$reason, reattach unavailable")
         }
-        PersistentLoggers.warn(TAG, "recover: handshake stale age=$ageS - reattach attempt")
+        PersistentLoggers.warn(TAG, "recover: $reason - reattach attempt")
         statsJobRef.getAndSet(null)?.cancel()
         networkCallback?.let { cb ->
             networkCallback = null

@@ -73,6 +73,9 @@ object ShadowsocksFmt {
                 "ss://x@x:0?${serverPart.substring(queryIdx + 1)}",
             )
             bean.plugin = parsed.getQueryParameter("plugin") ?: ""
+            bean.pluginOpts = parsed.getQueryParameter("plugin-opts")
+                ?: parsed.getQueryParameter("plugin_opts")
+                ?: ""
         }
     }
 }

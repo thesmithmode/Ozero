@@ -5,6 +5,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import ru.ozero.singboxroom.entity.ProxyProfile
+import java.io.File
 
 class ProxyProfileEntityTest {
 
@@ -29,6 +30,8 @@ class ProxyProfileEntityTest {
             base.copy(protocolType = 2),
             base.copy(userOrder = 2),
             base.copy(latencyMs = 5),
+            base.copy(probeError = "timeout"),
+            base.copy(lastProbeAt = 123L),
         ).forEach { changed ->
             assertNotEquals(base, changed)
         }
@@ -51,6 +54,16 @@ class ProxyProfileEntityTest {
         assertTrue(first.hashCode() != second.hashCode())
     }
 
+    @Test
+    fun `lastProbeAt declares SQL default matching migration`() {
+        val root = File(System.getProperty("user.dir") ?: ".")
+        val entity = File(root, "src/main/java/ru/ozero/singboxroom/entity/ProxyProfile.kt").readText()
+        val database = File(root, "src/main/java/ru/ozero/singboxroom/SingboxDatabase.kt").readText()
+
+        assertTrue(entity.contains("@field:ColumnInfo(defaultValue = \"0\")"))
+        assertTrue(database.contains("ADD COLUMN `lastProbeAt` INTEGER NOT NULL DEFAULT 0"))
+    }
+
     private fun profile(
         id: Long = 1,
         groupId: Long = 1,
@@ -59,6 +72,8 @@ class ProxyProfileEntityTest {
         protocolType: Int = 1,
         userOrder: Int = 0,
         latencyMs: Int = -1,
+        probeError: String? = null,
+        lastProbeAt: Long = 0L,
     ) = ProxyProfile(
         id = id,
         groupId = groupId,
@@ -67,5 +82,7 @@ class ProxyProfileEntityTest {
         protocolType = protocolType,
         userOrder = userOrder,
         latencyMs = latencyMs,
+        probeError = probeError,
+        lastProbeAt = lastProbeAt,
     )
 }

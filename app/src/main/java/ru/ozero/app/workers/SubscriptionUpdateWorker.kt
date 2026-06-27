@@ -15,6 +15,7 @@ import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.enginesingbox.prioritizeSingboxAutoProfiles
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
+import ru.ozero.singboxroom.entity.SubscriptionGroup
 import ru.ozero.singboxsubscription.RawUpdater
 import java.util.concurrent.TimeUnit
 
@@ -31,7 +32,7 @@ class SubscriptionUpdateWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val now = System.currentTimeMillis()
         val groups = groupDao.getAll().filter { group ->
-            group.autoUpdate && (now - group.lastUpdated) >= MIN_UPDATE_INTERVAL_MS
+            group.shouldRunSingboxSubscriptionUpdate(now)
         }
         if (groups.isEmpty()) return Result.success()
         val results = groups.map { group ->
@@ -58,7 +59,7 @@ class SubscriptionUpdateWorker @AssistedInject constructor(
     companion object {
         private const val WORK_NAME = "singbox_subscription_update"
         private const val INTERVAL_HOURS = 24L
-        private const val MIN_UPDATE_INTERVAL_MS = 23L * 60 * 60 * 1000
+        internal const val MIN_UPDATE_INTERVAL_MS = 23L * 60 * 60 * 1000
         private const val MAX_BACKGROUND_PROBE_PROFILES = 20
         private const val MAX_BACKGROUND_PROBE_WINDOW = 2_000
 
@@ -73,3 +74,8 @@ class SubscriptionUpdateWorker @AssistedInject constructor(
         }
     }
 }
+
+internal fun SubscriptionGroup.shouldRunSingboxSubscriptionUpdate(now: Long): Boolean =
+    autoUpdate &&
+        subscriptionUrl.isNotBlank() &&
+        (now - lastUpdated) >= SubscriptionUpdateWorker.MIN_UPDATE_INTERVAL_MS

@@ -143,13 +143,13 @@ class RemoteAwgRuntimeContractTest {
     }
 
     @Test
-    fun `onServiceDisconnected вызывает onProcessDied и unbind`() {
+    fun `onServiceDisconnected не вызывает onProcessDied и unbind`() {
         val onDisconnected = source.substringAfter("override fun onServiceDisconnected")
             .substringBefore("override fun onBindingDied")
         assertTrue(
             onDisconnected.contains("onProcessDied()"),
-            "onServiceDisconnected обязан вызвать onProcessDied() — system unbind " +
-                "(OOM kill процесса :engine_warp) минует binder.died → killswitch не engaging без явного fire. " +
+            "onServiceDisconnected must call onProcessDied because Android can kill :engine_warp " +
+                "without onBindingDied, so active WARP enters failure handling immediately. " +
                 "Body=$onDisconnected",
         )
         assertTrue(
@@ -161,6 +161,37 @@ class RemoteAwgRuntimeContractTest {
             onDisconnected.contains("engine = null"),
             "onServiceDisconnected обязан обнулить engine — stale IWarpEngineProcess после disconnect. " +
                 "Body=$onDisconnected",
+        )
+    }
+
+    @Test
+    fun `ensureConnected стартует foreground service session до bind`() {
+        val ensureBlock = source.substringAfter("private fun ensureConnected")
+            .substringBefore("override fun close")
+        assertTrue(
+            ensureBlock.contains("startEngineService()"),
+            "RemoteAwgRuntime обязан стартовать WARP service session до bind, иначе :engine_warp " +
+                "остаётся обычным bound process и может уснуть/быть выгружен в фоне.",
+        )
+        assertTrue(
+            source.contains("ACTION_START_SESSION") && source.contains("startForegroundService"),
+            "WARP session start должен идти через foreground service action на Android O+.",
+        )
+        assertTrue(
+            source.contains("WarpEngineServiceActions.START_SESSION") &&
+                source.contains("WarpEngineServiceActions.STOP_SESSION"),
+            "RemoteAwgRuntime обязан ссылаться на shared action constants, а не дублировать строки " +
+                "из WarpEngineService.",
+        )
+    }
+
+    @Test
+    fun `close останавливает foreground service session`() {
+        val closeBlock = source.substringAfter("override fun close()").substringBefore("override fun turnOn")
+        assertTrue(
+            closeBlock.contains("ACTION_STOP_SESSION") && closeBlock.contains("stopService"),
+            "Explicit teardown обязан остановить foreground WARP session, иначе manual OFF оставит " +
+                ":engine_warp живым после выключения VPN. Body=$closeBlock",
         )
     }
 

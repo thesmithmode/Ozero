@@ -179,15 +179,37 @@ class ProxyProfileDaoTest {
     }
 
     @Test
-    fun `should update latency for a specific profile`() = runBlocking {
+    fun `should update probe result for a specific profile`() = runBlocking {
         val groupId = insertGroup()
         val id = db.proxyProfileDao().insert(
             ProxyProfile(groupId = groupId, name = "S1", beanBlob = byteArrayOf(0), protocolType = 1),
         )
 
-        db.proxyProfileDao().updateLatency(id, 150)
+        db.proxyProfileDao().updateProbeResult(id, 150, null, 123L)
 
-        assertEquals(150, db.proxyProfileDao().getById(id)!!.latencyMs)
+        val updated = db.proxyProfileDao().getById(id)!!
+        assertEquals(150, updated.latencyMs)
+        assertNull(updated.probeError)
+        assertEquals(123L, updated.lastProbeAt)
+    }
+
+    @Test
+    fun `should update only probe result columns`() = runBlocking {
+        val groupId = insertGroup()
+        val dao = db.proxyProfileDao()
+        val id = dao.insert(
+            ProxyProfile(groupId = groupId, name = "S1", beanBlob = byteArrayOf(0), protocolType = 1, userOrder = 7),
+        )
+
+        dao.updateProbeResult(id, -2, "probe failed", 123L)
+
+        val updated = dao.getById(id)!!
+        assertEquals("S1", updated.name)
+        assertArrayEquals(byteArrayOf(0), updated.beanBlob)
+        assertEquals(7, updated.userOrder)
+        assertEquals(-2, updated.latencyMs)
+        assertEquals("probe failed", updated.probeError)
+        assertEquals(123L, updated.lastProbeAt)
     }
 
     @Test
