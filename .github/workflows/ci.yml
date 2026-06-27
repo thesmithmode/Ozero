@@ -30,7 +30,7 @@ jobs:
     steps:
       - name: Check open PR to main for current SHA
         id: detect-open-pr
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const { owner, repo } = context.repo;
