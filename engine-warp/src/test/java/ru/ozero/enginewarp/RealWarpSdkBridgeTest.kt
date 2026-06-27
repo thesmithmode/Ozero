@@ -161,6 +161,7 @@ class RealWarpSdkBridgeTest {
         val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
         assertTrue(f.reason.contains("handle=-2"))
         assertFalse(b.isRunning())
+        assertEquals(1, rt.closeCalls)
     }
 
     @Test
@@ -184,6 +185,8 @@ class RealWarpSdkBridgeTest {
         val r = b.attachTun("n", tunFd = 5, iniConfig = validIni, uapiPath = "/x", protector = noopProtector)
         val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
         assertTrue(f.reason.contains("native crash"))
+        assertFalse(b.isRunning())
+        assertEquals(1, rt.closeCalls)
     }
 
     @Test
@@ -208,6 +211,7 @@ class RealWarpSdkBridgeTest {
         val f = assertIs<WarpSdkBridge.AttachResult.Failed>(r)
         assertTrue(f.reason.contains("protect"))
         assertEquals(1, rt.turnOffCalls)
+        assertEquals(1, rt.closeCalls)
         assertFalse(b.isRunning())
     }
 
@@ -227,6 +231,7 @@ class RealWarpSdkBridgeTest {
             rt.turnOffCalls,
             "при throw из protect — обязан вызвать turnOff rollback, иначе AWG handle leak",
         )
+        assertEquals(1, rt.closeCalls)
         assertFalse(b.isRunning())
     }
 
@@ -238,6 +243,7 @@ class RealWarpSdkBridgeTest {
         val r = b.attachTun("n", 5, validIni, "/x", protector)
         assertIs<WarpSdkBridge.AttachResult.Failed>(r)
         assertEquals(1, rt.turnOffCalls)
+        assertEquals(1, rt.closeCalls)
     }
 
     @Test

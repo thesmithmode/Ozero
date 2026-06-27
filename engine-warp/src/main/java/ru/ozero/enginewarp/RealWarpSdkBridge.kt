@@ -38,7 +38,11 @@ class RealWarpSdkBridge(
             cleanupStaleSockets(uapiPath, tunnelName)
             logIniDigest(tunnelName, iniConfig)
             val result = invokeAwgTurnOnAndProtect(tunnelName, tunFd, iniConfig, uapiPath, protector)
-            if (result is WarpSdkBridge.AttachResult.Success) savedProtector = protector
+            if (result is WarpSdkBridge.AttachResult.Success) {
+                savedProtector = protector
+            } else {
+                cleanupFailedAttachStart()
+            }
             result
         }
     }
@@ -125,6 +129,10 @@ class RealWarpSdkBridge(
             .onFailure { PersistentLoggers.warn(TAG, "failed proxy reset cleanup failed: ${it.message}") }
         runCatching { awgRuntime.stopProxy() }
             .onFailure { PersistentLoggers.warn(TAG, "failed proxy stop cleanup failed: ${it.message}") }
+        closeRuntimeIfIdle()
+    }
+
+    private fun cleanupFailedAttachStart() {
         closeRuntimeIfIdle()
     }
 
