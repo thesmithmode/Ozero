@@ -512,6 +512,23 @@ class RealWarpSdkBridgeTest {
     }
 
     @Test
+    fun `lifecycle operations serialized before closeRuntimeIfIdle`() {
+        val f = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginewarp/RealWarpSdkBridge.kt",
+        )
+        assertTrue(f.exists(), "RealWarpSdkBridge.kt не найден: $f")
+        val src = f.readText()
+        assertTrue(
+            src.contains("private val lifecycleLock = Mutex()") &&
+                src.contains("lifecycleLock.withLock") &&
+                src.contains("closeRuntimeIfIdle()"),
+            "RealWarpSdkBridge обязан сериализовать attach/start/stop/detach вокруг closeRuntimeIfIdle, " +
+                "иначе runtime можно закрыть одновременно с новым attach/start.",
+        )
+    }
+
+    @Test
     fun `concurrent detachTun не вызывает double awgTurnOff на одном handle`() = runTest {
         val runtime = FakeAwgRuntime(returnHandle = 7, socketV4 = 100)
         val (bridge, _) = bridgeWith(runtime)

@@ -1,7 +1,12 @@
 package ru.ozero.app.warp
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.util.Log
@@ -9,9 +14,28 @@ import org.amnezia.awg.GoBackend
 import org.amnezia.awg.ProxyGoBackend
 import org.amnezia.awg.backend.SocketProtector
 import ru.ozero.enginewarp.IWarpEngineProcess
+import ru.ozero.enginewarp.WarpEngineServiceActions
 import ru.ozero.enginewarp.WarpTurnOnResult
 
 class WarpEngineService : Service() {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        return when (intent?.action) {
+            ACTION_START_SESSION -> startForegroundSession()
+            ACTION_STOP_SESSION -> {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf(startId)
+                START_NOT_STICKY
+            }
+            null -> {
+                stopSelf(startId)
+                START_NOT_STICKY
+            }
+            else -> {
+                stopSelf(startId)
+                START_NOT_STICKY
+            }
+        }
+    }
 
     private val binder = object : IWarpEngineProcess.Stub() {
 
@@ -104,6 +128,60 @@ class WarpEngineService : Service() {
 
     override fun onBind(intent: Intent): IBinder = binder
 
+    private fun startForegroundSession(): Int {
+        enterForeground()
+        return START_NOT_STICKY
+    }
+
+    private fun enterForeground(): Boolean {
+        createChannel()
+        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, CHANNEL_ID)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+        }
+            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setContentTitle("Ozero WARP")
+            .setContentText("WARP engine active")
+            .setOngoing(true)
+            .build()
+        return runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        }.recoverCatching { t ->
+            Log.w(TAG, "startForeground SPECIAL_USE failed, fallback to MANIFEST: ${t.message}")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST,
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        }.onFailure { t ->
+            Log.e(TAG, "startForeground failed: ${t.message}")
+            stopSelf()
+        }.isSuccess
+    }
+
+    private fun createChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val nm = getSystemService(NotificationManager::class.java) ?: return
+        if (nm.getNotificationChannel(CHANNEL_ID) != null) return
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, "Ozero WARP", NotificationManager.IMPORTANCE_LOW),
+        )
+    }
+
     private fun ensureLibraryLoaded() {
         try {
             System.loadLibrary("am-go")
@@ -115,5 +193,9 @@ class WarpEngineService : Service() {
 
     private companion object {
         const val TAG = "WarpEngineService"
+        const val ACTION_START_SESSION = WarpEngineServiceActions.START_SESSION
+        const val ACTION_STOP_SESSION = WarpEngineServiceActions.STOP_SESSION
+        const val CHANNEL_ID = "ozero_warp_engine"
+        const val NOTIFICATION_ID = 7302
     }
 }
