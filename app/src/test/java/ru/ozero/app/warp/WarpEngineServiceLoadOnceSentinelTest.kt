@@ -42,4 +42,24 @@ class WarpEngineServiceLoadOnceSentinelTest {
                 "Native call безопасен. Body:\n$body",
         )
     }
+
+    @Test
+    fun `WarpEngineService держится foreground только в рамках WARP session`() {
+        assertTrue(
+            source.contains("ACTION_START_SESSION") &&
+                source.contains("startForeground(") &&
+                source.contains("START_STICKY") &&
+                source.contains("FOREGROUND_SERVICE_TYPE_MANIFEST"),
+            "WARP engine process обязан быть foreground/started во время active session, иначе " +
+                ":engine_warp может быть выгружен в фоне. Fallback to MANIFEST обязателен, " +
+                "чтобы Android 14+ SPECIAL_USE rejection не ронял service.",
+        )
+        assertTrue(
+            source.contains("ACTION_STOP_SESSION") &&
+                source.contains("stopForeground(STOP_FOREGROUND_REMOVE)") &&
+                source.contains("START_NOT_STICKY"),
+            "Manual OFF обязан гасить foreground WARP session, иначе :engine_warp останется жить " +
+                "после выключения VPN.",
+        )
+    }
 }

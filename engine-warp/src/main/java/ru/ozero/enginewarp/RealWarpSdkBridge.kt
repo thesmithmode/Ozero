@@ -258,7 +258,10 @@ class RealWarpSdkBridge(
     override suspend fun detachTun() {
         withContext(Dispatchers.IO) {
             val h = tunnelHandle.getAndSet(INVALID_HANDLE)
-            if (h == INVALID_HANDLE) return@withContext
+            if (h == INVALID_HANDLE) {
+                closeRuntimeIfIdle()
+                return@withContext
+            }
             val started = System.currentTimeMillis()
             val thread = Thread.currentThread().name
             PersistentLoggers.debug(TAG, "awgTurnOff JNI entry handle=$h thread=$thread")
@@ -274,13 +277,17 @@ class RealWarpSdkBridge(
                 val dt = System.currentTimeMillis() - started
                 PersistentLoggers.error(TAG, "awgTurnOff failed dt=${dt}ms: ${t.message} (${t.javaClass.name})")
             }
+            closeRuntimeIfIdle()
         }
     }
 
     override suspend fun stopProxy() {
         withContext(Dispatchers.IO) {
             val h = proxyHandle.getAndSet(INVALID_HANDLE)
-            if (h == INVALID_HANDLE) return@withContext
+            if (h == INVALID_HANDLE) {
+                closeRuntimeIfIdle()
+                return@withContext
+            }
             val started = System.currentTimeMillis()
             PersistentLoggers.debug(TAG, "awgStopProxy JNI entry handle=$h")
             try {
@@ -293,7 +300,13 @@ class RealWarpSdkBridge(
                 val dt = System.currentTimeMillis() - started
                 PersistentLoggers.error(TAG, "awgStopProxy failed dt=${dt}ms: ${t.message} (${t.javaClass.name})")
             }
+            closeRuntimeIfIdle()
         }
+    }
+
+    private fun closeRuntimeIfIdle() {
+        if (tunnelHandle.get() != INVALID_HANDLE || proxyHandle.get() != INVALID_HANDLE) return
+        awgRuntime.close()
     }
 
     override fun isRunning(): Boolean = tunnelHandle.get() != INVALID_HANDLE || proxyHandle.get() != INVALID_HANDLE
@@ -380,6 +393,8 @@ interface AwgRuntime {
     fun stopProxy() = Unit
 
     fun resetProxyGlobals() = Unit
+
+    fun close() = Unit
 
     fun version(): String = "unknown"
 

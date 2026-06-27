@@ -383,6 +383,25 @@ class EngineWarpStatsRecoverTest {
         assertEquals("handshake stale, reattach unavailable", failed.reason)
     }
 
+    @Test
+    fun `recover reattaches after repeated UAPI unavailable while session is active`() = runTest {
+        val bridge = FakeBridge()
+        val e = newEngine(
+            bridge = bridge,
+            reader = FixedReader(null),
+            scope = backgroundScope,
+        )
+        e.start(EngineConfig.Warp, Upstream.None)
+        e.attachTun(tunFd = 17)
+
+        assertIs<EnginePlugin.RecoverResult.Failed>(e.recover())
+        val second = e.recover()
+
+        assertIs<EnginePlugin.RecoverResult.Success>(second)
+        assertEquals(2, bridge.attachCalls)
+        assertEquals(1, bridge.detachCalls)
+    }
+
     private fun interface WarpUapiStateReader {
         operator fun invoke(uapiPath: String, tunnelName: String): WarpUapiState?
     }
