@@ -509,7 +509,7 @@ private fun ProfileItem(
             profile.latencyMs == SingboxProbeService.LATENCY_FAILED -> {
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    text = profile.probeError ?: stringResource(R.string.singbox_latency_failed),
+                    text = singboxProbeErrorText(profile.probeError),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
                 )
@@ -720,6 +720,15 @@ private fun AddManualLinksDialog(
         },
     )
 }
+
+@Composable
+internal fun singboxProbeErrorText(probeError: String?): String =
+    when (probeError) {
+        SingboxProbeService.PROBE_ERROR_UNSUPPORTED -> stringResource(R.string.singbox_latency_failed)
+        SingboxProbeService.PROBE_ERROR_FAILED -> stringResource(R.string.singbox_latency_failed)
+        else -> stringResource(R.string.singbox_latency_failed)
+    }
+
 internal fun singboxLatencyColor(latencyMs: Int): Color {
     val points = listOf(
         0f to Color(0xFF00A651),

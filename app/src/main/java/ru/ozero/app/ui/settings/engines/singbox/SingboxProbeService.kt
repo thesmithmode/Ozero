@@ -138,13 +138,7 @@ class SingboxProbeService internal constructor(
         profileProbe.probeLatencyMs(bean, settings)
 
     private suspend fun ProxyProfileDao.updateProbeResult(id: Long, latency: Int, error: String?) {
-        val now = System.currentTimeMillis()
-        val existing = getById(id)
-        if (existing == null) {
-            updateLatency(id, latency)
-            return
-        }
-        update(existing.copy(latencyMs = latency, probeError = error, lastProbeAt = now))
+        updateProbeResult(id, latency, error, System.currentTimeMillis())
     }
 
     private data class ProbeResult(

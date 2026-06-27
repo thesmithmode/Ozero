@@ -104,8 +104,14 @@ interface ProxyProfileDao {
         const val MAX_SQL_BIND_IDS = 500
     }
 
-    @Query("UPDATE proxy_profiles SET latencyMs = :latency WHERE id = :id")
-    suspend fun updateLatency(id: Long, latency: Int)
+    @Query(
+        """
+        UPDATE proxy_profiles
+        SET latencyMs = :latency, probeError = :probeError, lastProbeAt = :lastProbeAt
+        WHERE id = :id
+        """,
+    )
+    suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long)
 
     @Query("SELECT COUNT(*) FROM proxy_profiles WHERE groupId = :groupId")
     suspend fun countByGroupId(groupId: Long): Int

@@ -724,7 +724,12 @@ class SingboxEngineProbeTest {
             override suspend fun getIdsByGroupId(groupId: Long): List<Long> = emptyList()
             override suspend fun deleteByIds(ids: List<Long>) = Unit
             override suspend fun replaceForGroup(groupId: Long, profiles: List<ProxyProfile>) = Unit
-            override suspend fun updateLatency(id: Long, latency: Int) = Unit
+            override suspend fun updateProbeResult(
+                id: Long,
+                latency: Int,
+                probeError: String?,
+                lastProbeAt: Long,
+            ) = Unit
             override suspend fun countByGroupId(groupId: Long): Int = 0
             override suspend fun update(profile: ProxyProfile) = Unit
             override suspend fun delete(profile: ProxyProfile) = Unit
