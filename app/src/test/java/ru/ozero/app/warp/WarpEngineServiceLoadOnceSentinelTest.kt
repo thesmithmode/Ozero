@@ -44,36 +44,29 @@ class WarpEngineServiceLoadOnceSentinelTest {
     }
 
     @Test
-    fun `WarpEngineService держится foreground только в рамках WARP session`() {
+    fun `WarpEngineService foreground использует основной VPN notification id`() {
         assertTrue(
-            source.contains("ACTION_START_SESSION") &&
-                source.contains("startForeground(") &&
-                source.contains("FOREGROUND_SERVICE_TYPE_MANIFEST") &&
-                !source.contains("START_STICKY"),
-            "WARP engine process обязан быть foreground/started во время active session, иначе " +
-                ":engine_warp может быть выгружен в фоне. Service не должен быть sticky, " +
-                "иначе Android restart с null intent даст orphan notification без реального Go handle.",
+            source.contains("startForegroundSession()") &&
+                source.contains("OzeroNotificationFactory(this, OzeroVpnService::class.java).enterForeground(this)"),
+            "WARP engine process обязан оставаться foreground в фоне, но через основной VPN notification id, " +
+                "чтобы не показывать второе уведомление.",
+        )
+        assertFalse(
+            source.contains("Ozero WARP") || source.contains("ozero_warp_engine") || source.contains("7302"),
+            "WarpEngineService не должен иметь отдельный title/channel/id для второго WARP notification.",
         )
         assertTrue(
-            source.contains("WarpEngineServiceActions.START_SESSION") &&
-                source.contains("WarpEngineServiceActions.STOP_SESSION"),
-            "WarpEngineService обязан брать action strings из shared constants, иначе " +
-                "RemoteAwgRuntime и service могут незаметно разъехаться.",
+            source.contains("override fun onDestroy()") && source.contains("leaveForeground()"),
+            "RemoteAwgRuntime.close вызывает stopService, поэтому detach обязан быть в onDestroy, " +
+                "а не только в ACTION_STOP_SESSION ветке.",
         )
         assertTrue(
-            source.contains("ACTION_STOP_SESSION") &&
-                source.contains("stopForeground(STOP_FOREGROUND_REMOVE)") &&
-                source.contains("START_NOT_STICKY"),
-            "Manual OFF обязан гасить foreground WARP session, иначе :engine_warp останется жить " +
-                "после выключения VPN.",
+            source.contains("STOP_FOREGROUND_DETACH"),
+            "Stop WARP foreground не должен удалять основной VPN notification с traffic stats.",
         )
-
         assertTrue(
-            source.contains("null -> {") &&
-                source.contains("stopSelf(startId)") &&
-                source.substringAfter("null -> {").substringBefore("else ->").contains("START_NOT_STICKY"),
-            "Restart с null intent обязан завершать service без foreground notification: " +
-                "native handles умерли вместе со старым :engine_warp process, reattach делает main process.",
+            source.contains("val foreground =") && source.contains("if (!foreground) stopSelf()"),
+            "Если startForeground rejected, service обязан self-stop, иначе Android O+ убьёт его по FGS timeout.",
         )
     }
 }
