@@ -26,7 +26,14 @@ class WarpEngineService : Service() {
                 stopSelf(startId)
                 START_NOT_STICKY
             }
-            else -> startForegroundSession()
+            null -> {
+                stopSelf(startId)
+                START_NOT_STICKY
+            }
+            else -> {
+                stopSelf(startId)
+                START_NOT_STICKY
+            }
         }
     }
 
@@ -121,8 +128,10 @@ class WarpEngineService : Service() {
 
     override fun onBind(intent: Intent): IBinder = binder
 
-    private fun startForegroundSession(): Int =
-        if (enterForeground()) START_STICKY else START_NOT_STICKY
+    private fun startForegroundSession(): Int {
+        enterForeground()
+        return START_NOT_STICKY
+    }
 
     private fun enterForeground(): Boolean {
         createChannel()
