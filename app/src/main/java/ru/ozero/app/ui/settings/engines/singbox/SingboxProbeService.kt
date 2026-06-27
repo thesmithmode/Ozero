@@ -24,6 +24,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.VpnSocketProtectorHolder
@@ -105,7 +106,9 @@ class SingboxProbeService internal constructor(
                         val (profile, bean) = probeCandidates[index]
                         onProfileTestingChanged(profile.id, true)
                         try {
-                            val latency = probeLatencyMs(bean, probeSettings)
+                            val latency = withTimeoutOrNull(probeSettings.timeoutMs.toLong()) {
+                                probeLatencyMs(bean, probeSettings)
+                            } ?: LATENCY_TIMED_OUT
                             if (latency == LATENCY_SKIPPED_ACTIVE_RUNTIME) continue
                             val storedLatency = if (latency >= 0) latency else LATENCY_FAILED
                             val probeError = if (storedLatency >= 0) null else PROBE_ERROR_FAILED
@@ -157,7 +160,7 @@ class SingboxProbeService internal constructor(
         const val PROBE_ERROR_FAILED = "probe failed"
         const val DEFAULT_PROBE_TIMEOUT_MS = 3_000
         const val MIN_PROBE_TIMEOUT_MS = 1_000
-        const val MAX_PROBE_TIMEOUT_MS = 30_000
+        const val MAX_PROBE_TIMEOUT_MS = 10_000
         val PROBE_TIMEOUT_MS_KEY = intPreferencesKey("singbox_probe_timeout_ms")
         val SINGBOX_DNS_SERVERS_KEY = stringSetPreferencesKey("singbox_dns_servers")
     }
@@ -174,6 +177,7 @@ internal data class SingboxProfileProbeSettings(
 )
 
 internal const val LATENCY_SKIPPED_ACTIVE_RUNTIME = Int.MIN_VALUE
+internal const val LATENCY_TIMED_OUT = Int.MIN_VALUE + 1
 internal fun Int?.normalizedSingboxProbeTimeoutMs(): Int =
     (this ?: SingboxProbeService.DEFAULT_PROBE_TIMEOUT_MS).coerceIn(
         SingboxProbeService.MIN_PROBE_TIMEOUT_MS,
@@ -194,6 +198,7 @@ private class SingboxServiceProfileProbe(
         settings: SingboxProfileProbeSettings,
     ): Int = mutex.withLock {
         withContext(Dispatchers.IO) {
+            val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(settings.timeoutMs.toLong())
             coroutineContext.ensureActive()
             val port = allocateProbePort()
             if (!bean.hasRoutableServerAddress()) return@withContext SingboxProbeService.LATENCY_FAILED
@@ -207,7 +212,7 @@ private class SingboxServiceProfileProbe(
                 )
             }
                 .getOrElse { return@withContext SingboxProbeService.LATENCY_FAILED }
-            val binding = bindProcess()
+            val binding = bindProcess(deadlineNanos)
                 ?: return@withContext SingboxProbeService.LATENCY_FAILED
             var shouldStop = false
             try {
@@ -219,11 +224,12 @@ private class SingboxServiceProfileProbe(
                 runCatching { process.startProxyMode(config, localProtector) }
                     .getOrElse { return@withContext SingboxProbeService.LATENCY_FAILED }
                 coroutineContext.ensureActive()
-                delay(PROBE_START_DELAY_MS)
+                delay(minOf(PROBE_START_DELAY_MS, remainingTimeoutMs(deadlineNanos)?.toLong() ?: 0L))
+                if (remainingTimeoutMs(deadlineNanos) == null) return@withContext SingboxProbeService.LATENCY_FAILED
                 val running = runCatching { process.runtimeRunning() }.getOrDefault(false)
                 if (!running) return@withContext SingboxProbeService.LATENCY_FAILED
                 coroutineContext.ensureActive()
-                val latency = probeRoutedWithRetry(port, settings.timeoutMs)
+                val latency = probeRoutedWithRetry(port, settings.timeoutMs, deadlineNanos)
                 if (latency >= 0) {
                     latency.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
                 } else {
@@ -240,18 +246,21 @@ private class SingboxServiceProfileProbe(
         }
     }
 
-    private suspend fun probeRoutedWithRetry(port: Int, timeoutMs: Int): Long {
+    private suspend fun probeRoutedWithRetry(port: Int, timeoutMs: Int, deadlineNanos: Long): Long {
         val probe = SingboxHttp204RoutedProbe(timeoutMs = timeoutMs.normalizedSingboxProbeTimeoutMs())
         repeat(PROBE_ATTEMPTS) { attempt ->
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            val latency = probe.probeLatencyMs(port)
+            if (remainingTimeoutMs(deadlineNanos) == null) return SingboxHttp204RoutedProbe.LATENCY_FAILED
+            val latency = probe.probeLatencyMsUntil(port, deadlineNanos)
             if (latency >= 0) return latency
-            if (attempt < PROBE_ATTEMPTS - 1) delay(PROBE_RETRY_DELAY_MS)
+            if (attempt < PROBE_ATTEMPTS - 1) {
+                delay(minOf(PROBE_RETRY_DELAY_MS, remainingTimeoutMs(deadlineNanos)?.toLong() ?: 0L))
+            }
         }
         return SingboxHttp204RoutedProbe.LATENCY_FAILED
     }
 
-    private fun bindProcess(): Binding? {
+    private fun bindProcess(deadlineNanos: Long): Binding? {
         val latch = CountDownLatch(1)
         var process: ISingboxEngineProcess? = null
         val connection = object : ServiceConnection {
@@ -271,7 +280,8 @@ private class SingboxServiceProfileProbe(
             runCatching { context.unbindService(connection) }
             return null
         }
-        if (!latch.await(BIND_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+        val bindTimeoutMs = remainingTimeoutMs(deadlineNanos)?.coerceAtMost(BIND_TIMEOUT_MS) ?: 0
+        if (bindTimeoutMs <= 0 || !latch.await(bindTimeoutMs, TimeUnit.MILLISECONDS)) {
             runCatching { context.unbindService(connection) }
             return null
         }
@@ -283,6 +293,12 @@ private class SingboxServiceProfileProbe(
 
     private fun allocateProbePort(): Int =
         ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { it.localPort }
+
+    private fun remainingTimeoutMs(deadlineNanos: Long): Long? {
+        val remainingNanos = deadlineNanos - System.nanoTime()
+        if (remainingNanos <= 0) return null
+        return TimeUnit.NANOSECONDS.toMillis(remainingNanos).coerceAtLeast(1L)
+    }
 
     private data class Binding(
         val process: ISingboxEngineProcess,

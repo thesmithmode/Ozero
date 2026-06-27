@@ -189,7 +189,7 @@ class SingboxProbeServiceTest {
     @Test
     fun `probeAndAutoSelect passes configured timeout to profile probe`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(
-            mutablePreferencesOf(SingboxProbeService.PROBE_TIMEOUT_MS_KEY to 7_000),
+            mutablePreferencesOf(SingboxProbeService.PROBE_TIMEOUT_MS_KEY to 10_000),
         )
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
@@ -198,8 +198,25 @@ class SingboxProbeServiceTest {
 
         SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(listOf(profile))
 
-        assertEquals(listOf(7_000), probe.timeouts)
+        assertEquals(listOf(10_000), probe.timeouts)
         assertEquals(12, dao.latencies[10L])
+    }
+
+    @Test
+    fun `probeAndAutoSelect applies timeout to the whole profile check`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(
+            mutablePreferencesOf(SingboxProbeService.PROBE_TIMEOUT_MS_KEY to 1_000),
+        )
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val profile = makeProfile(id = 12L, host = "slow-timeout.example", port = 443)
+
+        SingboxProbeService(dao, dataStore, DelayingProfileProbe(delayMs = 2_000))
+            .probeAndAutoSelect(listOf(profile))
+
+        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[12L])
+        assertEquals(SingboxProbeService.PROBE_ERROR_FAILED, dao.errors[12L])
+        assertNull(prefsFlow.value[selectedProfileKey])
     }
 
     @Test
@@ -410,9 +427,15 @@ class SingboxProbeServiceTest {
 
     private class FakeProxyProfileDao : ProxyProfileDao {
         val latencies = ConcurrentHashMap<Long, Int>()
+        val errors = ConcurrentHashMap<Long, String>()
 
         override suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long) {
             latencies[id] = latency
+            if (probeError == null) {
+                errors.remove(id)
+            } else {
+                errors[id] = probeError
+            }
         }
 
         override suspend fun insert(profile: ProxyProfile): Long = profile.id
@@ -463,6 +486,15 @@ class SingboxProbeServiceTest {
     private class TrackingProfileProbe : SingboxProfileProbe {
         override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
             delay(10)
+            return 1
+        }
+    }
+
+    private class DelayingProfileProbe(
+        private val delayMs: Long,
+    ) : SingboxProfileProbe {
+        override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
+            delay(delayMs)
             return 1
         }
     }

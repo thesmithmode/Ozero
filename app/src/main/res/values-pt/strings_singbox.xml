@@ -41,5 +41,6 @@
     <string name="singbox_manual_links_error_empty">Cole pelo menos um link</string>
     <string name="singbox_manual_links_error_parse">Nenhum link válido encontrado</string>
     <string name="singbox_probe_timeout_label">Tempo limite, s</string>
-    <string name="singbox_probe_timeout_hint">Padrão: 3 s. Intervalo permitido: 1–30 s.</string>
+    <string name="singbox_probe_timeout_hint">Padrão: 3 s. O controle define o limite total de teste de um servidor: 1–10 s.</string>
+    <string name="singbox_probe_timeout_value">%1$d s</string>
 </resources>
