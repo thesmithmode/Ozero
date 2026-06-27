@@ -25,6 +25,8 @@ data class ProxyProfile(
     val protocolType: Int,
     val userOrder: Int = 0,
     val latencyMs: Int = -1,
+    val probeError: String? = null,
+    val lastProbeAt: Long = 0L,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -35,7 +37,9 @@ data class ProxyProfile(
             beanBlob.contentEquals(other.beanBlob) &&
             protocolType == other.protocolType &&
             userOrder == other.userOrder &&
-            latencyMs == other.latencyMs
+            latencyMs == other.latencyMs &&
+            probeError == other.probeError &&
+            lastProbeAt == other.lastProbeAt
     }
 
     override fun hashCode(): Int {
@@ -46,6 +50,8 @@ data class ProxyProfile(
         result = 31 * result + protocolType
         result = 31 * result + userOrder
         result = 31 * result + latencyMs
+        result = 31 * result + (probeError?.hashCode() ?: 0)
+        result = 31 * result + lastProbeAt.hashCode()
         return result
     }
 }

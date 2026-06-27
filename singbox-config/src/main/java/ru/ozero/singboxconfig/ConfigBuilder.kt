@@ -90,7 +90,7 @@ object ConfigBuilder {
             append("""{"type":"urltest","tag":"proxy","outbounds":[$tagList],""")
             append(""""url":"$AUTO_SELECT_PROBE_URL",""")
             append(""""interval":"3m","tolerance":50,""")
-            append(""""interrupt_exist_connections":false,"idle_timeout":"30m"}""")
+            append(""""interrupt_exist_connections":true,"idle_timeout":"30m"}""")
         }
         return buildChainFullConfig(socksPort, listOf(urltest) + proxyOutbounds, upstream, dnsServers, ipv6Enabled)
     }

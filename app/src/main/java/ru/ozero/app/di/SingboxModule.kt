@@ -54,7 +54,7 @@ object SingboxModule {
         @ApplicationContext context: Context,
     ): SingboxDatabase =
         Room.databaseBuilder(context, SingboxDatabase::class.java, "singbox.db")
-            .addMigrations(SingboxDatabase.MIGRATION_1_2)
+            .addMigrations(SingboxDatabase.MIGRATION_1_2, SingboxDatabase.MIGRATION_2_3)
             .fallbackToDestructiveMigration()
             .build()
 
