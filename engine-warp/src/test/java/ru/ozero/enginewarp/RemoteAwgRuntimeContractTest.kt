@@ -2,7 +2,6 @@ package ru.ozero.enginewarp
 
 import org.junit.jupiter.api.Test
 import java.io.File
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class RemoteAwgRuntimeContractTest {
@@ -166,30 +165,32 @@ class RemoteAwgRuntimeContractTest {
     }
 
     @Test
-    fun `ensureConnected использует bound service без WARP foreground notification`() {
+    fun `ensureConnected стартует foreground service session до bind`() {
         val ensureBlock = source.substringAfter("private fun ensureConnected")
             .substringBefore("override fun close")
-        assertFalse(
-            ensureBlock.contains("startForegroundService") || ensureBlock.contains("startService"),
-            "RemoteAwgRuntime не должен стартовать отдельную foreground session: второе уведомление WARP " +
-                "дублирует основной VPN notification.",
+        assertTrue(
+            ensureBlock.contains("startEngineService()"),
+            "RemoteAwgRuntime обязан стартовать WARP foreground session до bind, иначе :engine_warp " +
+                "может быть выгружен в фоне на активном WARP.",
         )
         assertTrue(
-            ensureBlock.contains("bindService") && ensureBlock.contains("Context.BIND_AUTO_CREATE"),
-            "WARP process должен жить через binding к активной VPN session, без собственного notification.",
+            source.contains("ACTION_START_SESSION") && source.contains("startForegroundService"),
+            "WARP session start должен идти через foreground service action на Android O+.",
+        )
+        assertTrue(
+            source.contains("WarpEngineServiceActions.START_SESSION") &&
+                source.contains("WarpEngineServiceActions.STOP_SESSION"),
+            "RemoteAwgRuntime обязан ссылаться на shared action constants.",
         )
     }
 
     @Test
-    fun `close только unbind без stop foreground service`() {
+    fun `close останавливает foreground service session`() {
         val closeBlock = source.substringAfter("override fun close()").substringBefore("override fun turnOn")
-        assertFalse(
-            closeBlock.contains("ACTION_STOP_SESSION") || closeBlock.contains("stopService"),
-            "close не должен управлять отдельной foreground session, иначе возвращается второе WARP notification.",
-        )
         assertTrue(
-            closeBlock.contains("context.unbindService"),
-            "Explicit teardown обязан unbind WARP service connection.",
+            closeBlock.contains("ACTION_STOP_SESSION") && closeBlock.contains("stopService"),
+            "Explicit teardown обязан остановить foreground WARP session, иначе :engine_warp останется жить " +
+                "после выключения VPN.",
         )
     }
 

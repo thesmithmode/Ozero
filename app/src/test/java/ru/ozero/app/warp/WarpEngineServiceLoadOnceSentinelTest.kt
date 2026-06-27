@@ -44,20 +44,20 @@ class WarpEngineServiceLoadOnceSentinelTest {
     }
 
     @Test
-    fun `WarpEngineService не поднимает отдельный foreground notification`() {
-        assertFalse(
-            source.contains("startForeground("),
-            "WARP engine process не должен показывать второе уведомление рядом с основным VPN notification.",
+    fun `WarpEngineService foreground использует основной VPN notification id`() {
+        assertTrue(
+            source.contains("startForegroundSession()") &&
+                source.contains("OzeroNotificationFactory(this, OzeroVpnService::class.java).enterForeground(this)"),
+            "WARP engine process обязан оставаться foreground в фоне, но через основной VPN notification id, " +
+                "чтобы не показывать второе уведомление.",
         )
         assertFalse(
-            source.contains("Notification.Builder") || source.contains("NotificationCompat.Builder"),
-            "WarpEngineService не должен строить собственное уведомление: UI/traffic notification принадлежит OzeroVpnService.",
+            source.contains("Ozero WARP") || source.contains("ozero_warp_engine") || source.contains("7302"),
+            "WarpEngineService не должен иметь отдельный title/channel/id для второго WARP notification.",
         )
         assertTrue(
-            source.contains("onStartCommand") &&
-                source.contains("stopSelf(startId)") &&
-                source.contains("START_NOT_STICKY"),
-            "Если system всё же стартанёт service командой, он обязан завершиться без orphan notification.",
+            source.contains("STOP_FOREGROUND_DETACH"),
+            "Stop WARP foreground не должен удалять основной VPN notification с traffic stats.",
         )
     }
 }

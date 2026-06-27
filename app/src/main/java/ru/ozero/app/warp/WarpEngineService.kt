@@ -2,19 +2,33 @@ package ru.ozero.app.warp
 
 import android.app.Service
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import org.amnezia.awg.GoBackend
 import org.amnezia.awg.ProxyGoBackend
 import org.amnezia.awg.backend.SocketProtector
+import ru.ozero.commonvpn.OzeroNotificationFactory
+import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.enginewarp.IWarpEngineProcess
+import ru.ozero.enginewarp.WarpEngineServiceActions
 import ru.ozero.enginewarp.WarpTurnOnResult
 
 class WarpEngineService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        stopSelf(startId)
-        return START_NOT_STICKY
+        return when (intent?.action) {
+            ACTION_START_SESSION -> startForegroundSession()
+            ACTION_STOP_SESSION -> {
+                leaveForeground()
+                stopSelf(startId)
+                START_NOT_STICKY
+            }
+            else -> {
+                stopSelf(startId)
+                START_NOT_STICKY
+            }
+        }
     }
 
     private val binder = object : IWarpEngineProcess.Stub() {
@@ -108,6 +122,20 @@ class WarpEngineService : Service() {
 
     override fun onBind(intent: Intent): IBinder = binder
 
+    private fun startForegroundSession(): Int {
+        OzeroNotificationFactory(this, OzeroVpnService::class.java).enterForeground(this)
+        return START_NOT_STICKY
+    }
+
+    private fun leaveForeground() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_DETACH)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(false)
+        }
+    }
+
     private fun ensureLibraryLoaded() {
         try {
             System.loadLibrary("am-go")
@@ -119,5 +147,7 @@ class WarpEngineService : Service() {
 
     private companion object {
         const val TAG = "WarpEngineService"
+        const val ACTION_START_SESSION = WarpEngineServiceActions.START_SESSION
+        const val ACTION_STOP_SESSION = WarpEngineServiceActions.STOP_SESSION
     }
 }

@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.Build
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.util.Log
@@ -32,6 +33,7 @@ class RemoteAwgRuntime(
         engine?.let { return it }
         synchronized(bindLock) {
             engine?.let { return it }
+            startEngineService()
             serviceConnection?.let { stale ->
                 runCatching { context.unbindService(stale) }
                 serviceConnection = null
@@ -109,6 +111,19 @@ class RemoteAwgRuntime(
         }
     }
 
+    private fun startEngineService() {
+        val intent = Intent().setComponent(serviceComponent).setAction(ACTION_START_SESSION)
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }.onFailure {
+            PersistentLoggers.warn(TAG, "start WARP foreground service failed: ${it.message}")
+        }
+    }
+
     private fun unlinkDeathRecipient() {
         val binder = engineBinder
         val recipient = deathRecipient
@@ -126,6 +141,11 @@ class RemoteAwgRuntime(
             serviceConnection?.let { conn ->
                 runCatching { context.unbindService(conn) }
                 serviceConnection = null
+            }
+            runCatching {
+                context.stopService(Intent().setComponent(serviceComponent).setAction(ACTION_STOP_SESSION))
+            }.onFailure {
+                PersistentLoggers.warn(TAG, "stop WARP foreground service failed: ${it.message}")
             }
         }
     }
@@ -192,5 +212,7 @@ class RemoteAwgRuntime(
     private companion object {
         const val TAG = "RemoteAwgRuntime"
         const val CONNECT_TIMEOUT_S = 5L
+        const val ACTION_START_SESSION = WarpEngineServiceActions.START_SESSION
+        const val ACTION_STOP_SESSION = WarpEngineServiceActions.STOP_SESSION
     }
 }
