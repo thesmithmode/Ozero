@@ -80,6 +80,7 @@ class RealWarpSdkBridge(
             } catch (t: Throwable) {
                 val dt = System.currentTimeMillis() - started
                 PersistentLoggers.error(TAG, "awgStartProxy threw dt=${dt}ms: ${t.message} (${t.javaClass.name})")
+                cleanupFailedProxyStart()
                 return@withLock WarpSdkBridge.ProxyResult.Failed(
                     "awgStartProxy failed: ${t.message ?: t.javaClass.simpleName}",
                 )
@@ -87,6 +88,7 @@ class RealWarpSdkBridge(
             val dt = System.currentTimeMillis() - started
             PersistentLoggers.debug(TAG, "awgStartProxy JNI exit handle=$handle dt=${dt}ms thread=$threadName")
             if (handle < 0) {
+                cleanupFailedProxyStart()
                 return@withLock WarpSdkBridge.ProxyResult.Failed("awgStartProxy handle=$handle")
             }
             proxyHandle.set(handle)
@@ -116,6 +118,14 @@ class RealWarpSdkBridge(
             awgRuntime.resetProxyGlobals()
             awgRuntime.stopProxy()
         }.onFailure { PersistentLoggers.error(TAG, "stale awgStopProxy failed: ${it.message}") }
+    }
+
+    private fun cleanupFailedProxyStart() {
+        runCatching { awgRuntime.resetProxyGlobals() }
+            .onFailure { PersistentLoggers.warn(TAG, "failed proxy reset cleanup failed: ${it.message}") }
+        runCatching { awgRuntime.stopProxy() }
+            .onFailure { PersistentLoggers.warn(TAG, "failed proxy stop cleanup failed: ${it.message}") }
+        closeRuntimeIfIdle()
     }
 
     private fun validateAttachArgs(tunFd: Int, iniConfig: String, uapiPath: String): String? {

@@ -385,6 +385,7 @@ class RealWarpSdkBridgeTest {
     private class FakeAwgRuntime(
         var returnHandle: Int = 1,
         var throwOnTurnOn: Throwable? = null,
+        var throwOnStartProxy: Throwable? = null,
         var throwOnTurnOff: Throwable? = null,
         var throwOnVersion: Throwable? = null,
         var socketV4: Int = 0,
@@ -397,10 +398,15 @@ class RealWarpSdkBridgeTest {
         var getConfigCalls: Int = 0
         var versionCalls: Int = 0
         var combinedCalls: Int = 0
+        var startProxyCalls: Int = 0
+        var stopProxyCalls: Int = 0
+        var resetProxyGlobalsCalls: Int = 0
+        var closeCalls: Int = 0
         var lastName: String? = null
         var lastFd: Int = -1
         var lastIni: String? = null
         var lastUapi: String? = null
+        var lastProxyPort: Int = -1
         var lastTurnOffHandle: Int = -1
 
         override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int {
@@ -448,6 +454,66 @@ class RealWarpSdkBridgeTest {
             throwOnTurnOn?.let { throw it }
             return AwgTurnOnResult(returnHandle, socketV4, socketV6)
         }
+
+        override fun startProxy(
+            name: String,
+            ini: String,
+            uapiPath: String,
+            port: Int,
+            protector: VpnSocketProtector,
+        ): Int {
+            startProxyCalls++
+            lastName = name
+            lastIni = ini
+            lastUapi = uapiPath
+            lastProxyPort = port
+            throwOnStartProxy?.let { throw it }
+            return returnHandle
+        }
+
+        override fun stopProxy() {
+            stopProxyCalls++
+        }
+
+        override fun resetProxyGlobals() {
+            resetProxyGlobalsCalls++
+        }
+
+        override fun close() {
+            closeCalls++
+        }
+    }
+
+    @Test
+    fun `startProxy negative handle closes foreground runtime session`() = runTest {
+        val rt = FakeAwgRuntime(returnHandle = -7)
+        val (b, _) = bridgeWith(rt)
+
+        val r = b.startProxy("ozero-warp", validIni, "/x", 2080, noopProtector)
+
+        val f = assertIs<WarpSdkBridge.ProxyResult.Failed>(r)
+        assertTrue(f.reason.contains("handle=-7"))
+        assertFalse(b.isRunning())
+        assertEquals(1, rt.startProxyCalls)
+        assertEquals(1, rt.resetProxyGlobalsCalls)
+        assertEquals(1, rt.stopProxyCalls)
+        assertEquals(1, rt.closeCalls)
+    }
+
+    @Test
+    fun `startProxy throw closes foreground runtime session`() = runTest {
+        val rt = FakeAwgRuntime(throwOnStartProxy = IllegalStateException("binder failed"))
+        val (b, _) = bridgeWith(rt)
+
+        val r = b.startProxy("ozero-warp", validIni, "/x", 2080, noopProtector)
+
+        val f = assertIs<WarpSdkBridge.ProxyResult.Failed>(r)
+        assertTrue(f.reason.contains("binder failed"))
+        assertFalse(b.isRunning())
+        assertEquals(1, rt.startProxyCalls)
+        assertEquals(1, rt.resetProxyGlobalsCalls)
+        assertEquals(1, rt.stopProxyCalls)
+        assertEquals(1, rt.closeCalls)
     }
 
     @Test

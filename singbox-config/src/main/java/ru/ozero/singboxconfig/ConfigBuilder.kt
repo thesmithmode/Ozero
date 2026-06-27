@@ -489,7 +489,7 @@ private fun httpHostArray(hosts: String): String =
     hosts.split(',')
         .map { it.trim() }
         .filter { it.isNotEmpty() }
-        .joinToString(prefix = "[", postfix = "]") { jsonString(it) }
+        .joinToString(separator = ",", prefix = "[", postfix = "]") { jsonString(it) }
 
 private fun buildTls(bean: StandardV2RayBean): String? {
     val security = bean.security
