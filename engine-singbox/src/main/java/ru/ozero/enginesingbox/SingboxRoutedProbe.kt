@@ -53,17 +53,18 @@ class SingboxHttp204RoutedProbe(
             TAG,
             "routed probe failed: socksPort=$socksPort timeoutMs=$timeoutMs failures=${failures.joinToString(";")}",
         )
-        LATENCY_FAILED
+        return LATENCY_FAILED
     }
 
-    private fun isSocksPortReady(socksPort: Int, deadlineNanos: Long): Boolean =
-        runCatching {
-            val connectTimeoutMs = remainingTimeoutMs(deadlineNanos) ?: return false
+    private fun isSocksPortReady(socksPort: Int, deadlineNanos: Long): Boolean {
+        val connectTimeoutMs = remainingTimeoutMs(deadlineNanos) ?: return false
+        return runCatching {
             Socket().use { socket ->
                 socket.connect(InetSocketAddress(socksHost, socksPort), connectTimeoutMs)
             }
             true
         }.getOrDefault(false)
+    }
 
     private fun probeSingleUrl(url: URL, socksPort: Int, remainingTimeoutMs: Int): ProbeAttempt {
         val start = nanoTime()
