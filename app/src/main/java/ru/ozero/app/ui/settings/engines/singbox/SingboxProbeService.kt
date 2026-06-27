@@ -24,6 +24,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.VpnSocketProtectorHolder
@@ -105,7 +106,9 @@ class SingboxProbeService internal constructor(
                         val (profile, bean) = probeCandidates[index]
                         onProfileTestingChanged(profile.id, true)
                         try {
-                            val latency = probeLatencyMs(bean, probeSettings)
+                            val latency = withTimeoutOrNull(probeSettings.timeoutMs.toLong()) {
+                                probeLatencyMs(bean, probeSettings)
+                            } ?: LATENCY_TIMED_OUT
                             if (latency == LATENCY_SKIPPED_ACTIVE_RUNTIME) continue
                             val storedLatency = if (latency >= 0) latency else LATENCY_FAILED
                             val probeError = if (storedLatency >= 0) null else PROBE_ERROR_FAILED
@@ -157,7 +160,7 @@ class SingboxProbeService internal constructor(
         const val PROBE_ERROR_FAILED = "probe failed"
         const val DEFAULT_PROBE_TIMEOUT_MS = 3_000
         const val MIN_PROBE_TIMEOUT_MS = 1_000
-        const val MAX_PROBE_TIMEOUT_MS = 30_000
+        const val MAX_PROBE_TIMEOUT_MS = 10_000
         val PROBE_TIMEOUT_MS_KEY = intPreferencesKey("singbox_probe_timeout_ms")
         val SINGBOX_DNS_SERVERS_KEY = stringSetPreferencesKey("singbox_dns_servers")
     }
@@ -174,6 +177,7 @@ internal data class SingboxProfileProbeSettings(
 )
 
 internal const val LATENCY_SKIPPED_ACTIVE_RUNTIME = Int.MIN_VALUE
+internal const val LATENCY_TIMED_OUT = Int.MIN_VALUE + 1
 internal fun Int?.normalizedSingboxProbeTimeoutMs(): Int =
     (this ?: SingboxProbeService.DEFAULT_PROBE_TIMEOUT_MS).coerceIn(
         SingboxProbeService.MIN_PROBE_TIMEOUT_MS,

@@ -195,14 +195,14 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onProbeTimeoutSecondsChange(value: String) {
-        val seconds = value.toIntOrNull()?.coerceIn(
+    fun onProbeTimeoutSecondsChange(seconds: Int) {
+        val normalizedSeconds = seconds.coerceIn(
             SingboxProbeService.MIN_PROBE_TIMEOUT_MS / 1_000,
             SingboxProbeService.MAX_PROBE_TIMEOUT_MS / 1_000,
-        ) ?: return
+        )
         viewModelScope.launch {
             dataStore.edit { prefs ->
-                prefs[SingboxProbeService.PROBE_TIMEOUT_MS_KEY] = seconds * 1_000
+                prefs[SingboxProbeService.PROBE_TIMEOUT_MS_KEY] = normalizedSeconds * 1_000
             }
         }
     }

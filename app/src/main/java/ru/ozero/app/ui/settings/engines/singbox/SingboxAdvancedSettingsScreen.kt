@@ -21,9 +21,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -44,6 +44,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 import ru.ozero.enginewarp.DnsPresets
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -185,16 +186,33 @@ fun SingboxAdvancedSettingsScreen(
 @Composable
 private fun ProbeTimeoutSection(
     probeTimeoutSeconds: Int,
-    onProbeTimeoutSecondsChange: (String) -> Unit,
+    onProbeTimeoutSecondsChange: (Int) -> Unit,
 ) {
-    OutlinedTextField(
-        value = probeTimeoutSeconds.toString(),
-        onValueChange = onProbeTimeoutSecondsChange,
-        label = { Text(stringResource(R.string.singbox_probe_timeout_label)) },
-        supportingText = { Text(stringResource(R.string.singbox_probe_timeout_hint)) },
-        modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-    )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.singbox_probe_timeout_label),
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.singbox_probe_timeout_value, probeTimeoutSeconds),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Slider(
+            value = probeTimeoutSeconds.toFloat(),
+            onValueChange = { onProbeTimeoutSecondsChange(it.roundToInt()) },
+            valueRange = 1f..10f,
+            steps = 8,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("singbox_probe_timeout_slider"),
+        )
+        Text(
+            text = stringResource(R.string.singbox_probe_timeout_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable
