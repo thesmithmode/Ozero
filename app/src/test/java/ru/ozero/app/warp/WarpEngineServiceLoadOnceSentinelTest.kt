@@ -44,36 +44,20 @@ class WarpEngineServiceLoadOnceSentinelTest {
     }
 
     @Test
-    fun `WarpEngineService держится foreground только в рамках WARP session`() {
-        assertTrue(
-            source.contains("ACTION_START_SESSION") &&
-                source.contains("startForeground(") &&
-                source.contains("FOREGROUND_SERVICE_TYPE_MANIFEST") &&
-                !source.contains("START_STICKY"),
-            "WARP engine process обязан быть foreground/started во время active session, иначе " +
-                ":engine_warp может быть выгружен в фоне. Service не должен быть sticky, " +
-                "иначе Android restart с null intent даст orphan notification без реального Go handle.",
+    fun `WarpEngineService не поднимает отдельный foreground notification`() {
+        assertFalse(
+            source.contains("startForeground("),
+            "WARP engine process не должен показывать второе уведомление рядом с основным VPN notification.",
+        )
+        assertFalse(
+            source.contains("Notification.Builder") || source.contains("NotificationCompat.Builder"),
+            "WarpEngineService не должен строить собственное уведомление: UI/traffic notification принадлежит OzeroVpnService.",
         )
         assertTrue(
-            source.contains("WarpEngineServiceActions.START_SESSION") &&
-                source.contains("WarpEngineServiceActions.STOP_SESSION"),
-            "WarpEngineService обязан брать action strings из shared constants, иначе " +
-                "RemoteAwgRuntime и service могут незаметно разъехаться.",
-        )
-        assertTrue(
-            source.contains("ACTION_STOP_SESSION") &&
-                source.contains("stopForeground(STOP_FOREGROUND_REMOVE)") &&
-                source.contains("START_NOT_STICKY"),
-            "Manual OFF обязан гасить foreground WARP session, иначе :engine_warp останется жить " +
-                "после выключения VPN.",
-        )
-
-        assertTrue(
-            source.contains("null -> {") &&
+            source.contains("onStartCommand") &&
                 source.contains("stopSelf(startId)") &&
-                source.substringAfter("null -> {").substringBefore("else ->").contains("START_NOT_STICKY"),
-            "Restart с null intent обязан завершать service без foreground notification: " +
-                "native handles умерли вместе со старым :engine_warp process, reattach делает main process.",
+                source.contains("START_NOT_STICKY"),
+            "Если system всё же стартанёт service командой, он обязан завершиться без orphan notification.",
         )
     }
 }

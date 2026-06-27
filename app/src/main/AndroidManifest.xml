@@ -123,12 +123,7 @@
         <service
             android:name=".warp.WarpEngineService"
             android:process=":engine_warp"
-            android:foregroundServiceType="specialUse"
-            android:exported="false">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="vpn" />
-        </service>
+            android:exported="false" />
 
         <service
             android:name="ru.ozero.singboxprocess.SingboxEngineService"
