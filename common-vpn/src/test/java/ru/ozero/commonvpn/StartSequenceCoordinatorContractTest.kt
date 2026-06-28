@@ -180,12 +180,12 @@ class StartSequenceCoordinatorContractTest {
     }
 
     @Test
-    fun `establishTunForEngine использует excludeSelf = true`() {
+    fun `establishTunForEngine использует excludeSelf из TunSpec`() {
         val body = source.substringAfter("private suspend fun establishTunForEngine(")
             .substringBefore("private fun captureTunIfaceName(")
         assertTrue(
-            body.contains("excludeSelf = true"),
-            "establishTunForEngine обязан использовать excludeSelf=true для всех движков.",
+            body.contains("excludeSelf = spec.excludeSelf"),
+            "establishTunForEngine обязан использовать engine-provided TunSpec.excludeSelf.",
         )
     }
 

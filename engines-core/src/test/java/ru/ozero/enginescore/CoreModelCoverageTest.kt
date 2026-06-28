@@ -36,6 +36,7 @@ class CoreModelCoverageTest {
         assertEquals(false, spec.routeAllV6)
         assertEquals(emptyList(), spec.routeCidrsV4)
         assertEquals(emptyList(), spec.routeCidrsV6)
+        assertEquals(true, spec.excludeSelf)
     }
 
     @Test
@@ -63,6 +64,7 @@ class CoreModelCoverageTest {
         assertEquals(1280, copy.mtu)
         assertContains(spec.toString(), "excludeRfc1918=true")
         assertContains(spec.toString(), "routeCidrsV6=[::/0]")
+        assertContains(spec.toString(), "excludeSelf=true")
     }
 
     @Test

@@ -369,6 +369,7 @@ class EngineWarp(
             routeAllV6 = routeAllV6,
             routeCidrsV4 = if (routeAllV4) emptyList() else allowedV4,
             routeCidrsV6 = if (routeAllV6) emptyList() else allowedV6,
+            excludeSelf = false,
         )
     }
 

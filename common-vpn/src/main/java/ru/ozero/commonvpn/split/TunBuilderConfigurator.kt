@@ -9,9 +9,8 @@ class TunBuilderConfigurator(
     private val packageName: String,
 ) {
 
-    // SENTINEL [feedback_split_tunnel_exclude_self]: excludeSelf=true для всех движков сверху.
-    // IP-probe должен идти через EnginePlugin.ipProbeRoute(), не через split tunnel — иначе IP UI
-    // показывает реальный, мимо туннеля.
+    // SENTINEL [feedback_split_tunnel_exclude_self]: custom-TUN движки задают excludeSelf через TunSpec.
+    // IP-probe должен идти через EnginePlugin.ipProbeRoute(), не через split tunnel.
     fun apply(
         builder: VpnService.Builder,
         config: SplitTunnelConfig,
