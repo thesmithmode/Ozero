@@ -61,11 +61,20 @@ class ShutdownCoordinator(
             SessionStatsRecorder.Status.DISCONNECTED
         }
         recordSessionEnd(endStatus)
-        val job = scope.launch { performShutdown(callStopSelf = callStopSelf) }
+        val stopRequestStartId = latestStartIdProvider()
+        val job = scope.launch {
+            performShutdown(
+                callStopSelf = callStopSelf,
+                stopRequestStartId = stopRequestStartId,
+            )
+        }
         state.shutdownJobRef.set(job)
     }
 
-    suspend fun performShutdown(callStopSelf: Boolean = true) {
+    suspend fun performShutdown(
+        callStopSelf: Boolean = true,
+        stopRequestStartId: Int = latestStartIdProvider(),
+    ) {
         PersistentLoggers.info(TAG, "performShutdown begin")
         try {
             deps.statsLogger.cancel()
@@ -106,7 +115,7 @@ class ShutdownCoordinator(
             state.stopSignal.set(false)
             state.tunIfaceNameRef.set(null)
             stopForegroundRequest()
-            if (callStopSelf) stopSelfRequest(latestStartIdProvider())
+            if (callStopSelf) stopSelfRequest(stopRequestStartId)
             PersistentLoggers.info(TAG, "performShutdown end")
         }
     }

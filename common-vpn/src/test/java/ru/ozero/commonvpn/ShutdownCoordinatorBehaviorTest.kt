@@ -101,7 +101,7 @@ class ShutdownCoordinatorBehaviorTest {
     }
 
     @Test
-    fun `stopVpn uses latest start id when shutdown reaches stopSelf`() = runTest {
+    fun `stopVpn stopSelf uses stop request start id even when newer start arrives`() = runTest {
         var latestStartId = 10
         val fixture = shutdownFixture(this, latestStartIdProvider = { latestStartId })
         coEvery { fixture.chainOrchestrator.stop() } coAnswers {
@@ -112,7 +112,7 @@ class ShutdownCoordinatorBehaviorTest {
         fixture.coordinator.stopVpn()
         advanceUntilIdle()
 
-        verify(exactly = 1) { fixture.stopSelfRequest.invoke(77) }
+        verify(exactly = 1) { fixture.stopSelfRequest.invoke(10) }
     }
 
     @Test
