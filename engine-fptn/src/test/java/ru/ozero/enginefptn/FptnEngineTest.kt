@@ -1440,6 +1440,15 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `tunSpec routes IPv6 default to prevent bypass leaks`() = runTest {
+        val spec = engine.tunSpec()
+
+        assertEquals(true, spec.allowFamilyV6)
+        assertEquals("fd00::1", spec.ipv6Address)
+        assertEquals(true, spec.routeAllV6)
+    }
+
+    @Test
     fun `EngineConfig Fptn default bypassMethod matches enum DEFAULT`() {
         assertEquals(
             FptnBypassMethod.DEFAULT.strategyName,
