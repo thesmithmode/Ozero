@@ -7,6 +7,9 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+MEMORY_DIR_NAME = ".memory"
+SAFE_ENV_NAMES = {"PATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT", "TMP", "TEMP", "TMPDIR"}
+
 DEFAULT_CODEX_TIMEOUT = 900
 
 
@@ -56,28 +59,65 @@ def find_codex_cli() -> str:
     return "codex"
 
 
+def _safe_env(home: Path) -> dict[str, str]:
+    env = {key: value for key, value in os.environ.items() if key.upper() in SAFE_ENV_NAMES}
+    env["CODEX_INVOKED_BY"] = "wiki"
+    env["HOME"] = str(home)
+    env["USERPROFILE"] = str(home)
+    return env
+
+
+def _prepare_workspace(cwd: Path, sandbox: str, root: Path) -> tuple[Path, Path | None]:
+    if cwd.name != MEMORY_DIR_NAME:
+        return cwd, None
+
+    workspace = root / MEMORY_DIR_NAME
+
+    def ignore_logs(path: str, names: list[str]) -> set[str]:
+        if Path(path).name == "scripts":
+            return {name for name in names if name.endswith(".log") or name == "last-flush.json"}
+        return set()
+
+    shutil.copytree(cwd, workspace, ignore=ignore_logs)
+    return workspace, workspace if sandbox == "workspace-write" else None
+
+
+def _sync_memory_output(source: Path, target: Path) -> None:
+    for name in ("knowledge", "daily"):
+        source_path = source / name
+        if source_path.exists():
+            target_path = target / name
+            if target_path.exists():
+                shutil.rmtree(target_path)
+            shutil.copytree(source_path, target_path)
+
+
 def _run_codex(prompt: str, cwd: Path, sandbox: str) -> str:
     timeout = int(os.environ.get("WIKI_CODEX_TIMEOUT", str(DEFAULT_CODEX_TIMEOUT)))
-    env = os.environ.copy()
-    env["CODEX_INVOKED_BY"] = "wiki"
 
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".md") as out:
-        output_path = Path(out.name)
+    with tempfile.TemporaryDirectory(prefix="wiki-codex-") as tmp:
+        tmp_path = Path(tmp)
+        home = tmp_path / "home"
+        home.mkdir()
+        run_cwd, sync_from = _prepare_workspace(cwd, sandbox, tmp_path)
+        output_path = tmp_path / "output.md"
 
-    try:
         result = subprocess.run(
-            _codex_command(cwd, sandbox, output_path),
+            _codex_command(run_cwd, sandbox, output_path),
             input=prompt,
             text=True,
             encoding="utf-8",
             capture_output=True,
-            cwd=str(cwd),
-            env=env,
+            cwd=str(run_cwd),
+            env=_safe_env(home),
             timeout=timeout,
             check=False,
         )
         if result.returncode != 0:
             raise RuntimeError((result.stderr or result.stdout or f"codex exited {result.returncode}").strip())
+
+        if sync_from is not None:
+            _sync_memory_output(sync_from, cwd)
 
         if output_path.exists():
             output = output_path.read_text(encoding="utf-8").strip()
@@ -85,8 +125,6 @@ def _run_codex(prompt: str, cwd: Path, sandbox: str) -> str:
                 return output
 
         return result.stdout.strip()
-    finally:
-        output_path.unlink(missing_ok=True)
 
 
 async def run_text_prompt(prompt: str, cwd: Path) -> str:
