@@ -57,6 +57,8 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -542,10 +544,13 @@ private fun SessionsDrillDown(
 @Composable
 private fun SessionSortMenu(current: SessionSort, onSelect: (SessionSort) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val sortContentDescription = stringResource(R.string.stats_history_sort_cd)
     Box {
         IconButton(
             onClick = { expanded = true },
-            modifier = Modifier.testTag("sort_menu"),
+            modifier = Modifier
+                .testTag("sort_menu")
+                .semantics { contentDescription = sortContentDescription },
         ) {
             Text("↕", style = MaterialTheme.typography.bodySmall)
         }
