@@ -45,7 +45,7 @@ class FileUsageHistoryStore(
                     .put("name", e.name ?: ""),
             )
         }
-        runCatching { file.writeText(array.toString()) }
+        file.writeText(array.toString())
         return trimmed
     }
 }
