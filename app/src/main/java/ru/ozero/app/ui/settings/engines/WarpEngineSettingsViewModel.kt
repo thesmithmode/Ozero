@@ -34,7 +34,6 @@ import ru.ozero.enginewarp.draftFromSlot
 import ru.ozero.enginewarp.hasRequiredFields
 import ru.ozero.enginewarp.toWarpConfig
 import java.io.InputStream
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 @HiltViewModel
@@ -47,27 +46,17 @@ class WarpEngineSettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(WarpSettingsUiState())
     val uiState: StateFlow<WarpSettingsUiState> = _uiState.asStateFlow()
     private var registerJob: Job? = null
-    private val autoTriggered = AtomicBoolean(false)
-
     init {
         viewModelScope.launch {
-            val migrationOk = runCatching { store.migrateIfNeeded() }
+            runCatching { store.migrateIfNeeded() }
                 .onFailure { t ->
                     _uiState.value = _uiState.value.copy(errorMessage = t.message ?: "migration failed")
                 }
-                .isSuccess
             store.slots().collect { slots ->
                 _uiState.value = _uiState.value.copy(
                     slots = slots,
                     activeSlotId = slots.firstOrNull { it.isActive }?.id,
                 )
-                val canAutoTrigger = migrationOk &&
-                    slots.isEmpty() &&
-                    !_uiState.value.isRegistering &&
-                    autoConfig.remainingCooldownMs() == 0L
-                if (canAutoTrigger && autoTriggered.compareAndSet(false, true)) {
-                    onGenerate()
-                }
             }
         }
     }
