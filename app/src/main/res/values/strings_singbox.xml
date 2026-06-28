@@ -42,4 +42,7 @@
     <string name="singbox_restore_defaults_hint">Восстанавливает удалённые стандартные подписки, не затрагивая добавленные вами</string>
     <string name="singbox_probe_timeout_label">Таймаут проверки, сек</string>
     <string name="singbox_probe_timeout_hint">По умолчанию 3 сек. Допустимо 1–30 сек.</string>
+    <string name="singbox_probe_all_privacy_title">Проверить все серверы?</string>
+    <string name="singbox_probe_all_privacy_message">Проверка задержки подключается ко всем проверяемым серверам. Адреса из подписок могут увидеть ваш сетевой IP и факт проверки.</string>
+    <string name="singbox_probe_all_privacy_confirm">Проверить</string>
 </resources>

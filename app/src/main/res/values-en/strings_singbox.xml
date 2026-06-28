@@ -42,4 +42,7 @@
     <string name="singbox_restore_defaults_hint">Restores deleted default subscriptions without affecting your custom ones</string>
     <string name="singbox_probe_timeout_label">Probe timeout, sec</string>
     <string name="singbox_probe_timeout_hint">Default is 3 sec. Allowed range: 1–30 sec.</string>
+    <string name="singbox_probe_all_privacy_title">Test all servers?</string>
+    <string name="singbox_probe_all_privacy_message">Latency testing connects to every tested server. Subscription endpoints may see your network IP address and that the test happened.</string>
+    <string name="singbox_probe_all_privacy_confirm">Test</string>
 </resources>

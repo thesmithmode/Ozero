@@ -573,6 +573,29 @@ private fun SingboxTopBarActions(
     filePickerLauncher: ManagedActivityResultLauncher<Array<String>, Uri?>,
     onOpenAdvanced: () -> Unit,
 ) {
+    var showAllGroupsProbeDialog by remember { mutableStateOf(false) }
+    if (showAllGroupsProbeDialog) {
+        AlertDialog(
+            onDismissRequest = { showAllGroupsProbeDialog = false },
+            title = { Text(stringResource(R.string.singbox_probe_all_privacy_title)) },
+            text = { Text(stringResource(R.string.singbox_probe_all_privacy_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showAllGroupsProbeDialog = false
+                        viewModel.onPing()
+                    },
+                ) {
+                    Text(stringResource(R.string.singbox_probe_all_privacy_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAllGroupsProbeDialog = false }) {
+                    Text(stringResource(R.string.singbox_cancel))
+                }
+            },
+        )
+    }
     Box {
         IconButton(
             onClick = { viewModel.onShowAddMenu(true) },
@@ -613,7 +636,7 @@ private fun SingboxTopBarActions(
         }
     } else {
         TextButton(
-            onClick = { viewModel.onPing() },
+            onClick = { showAllGroupsProbeDialog = true },
             enabled = state.groups.isNotEmpty(),
             modifier = Modifier.testTag("singbox_ping_all_button"),
         ) {
