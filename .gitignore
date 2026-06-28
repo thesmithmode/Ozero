@@ -75,6 +75,9 @@ engine-urnetwork/libs/
 *.jks
 *.keystore
 !debug.keystore
+private.asc
+.gpg-pass
+.passwords
 
 # Python
 __pycache__/
