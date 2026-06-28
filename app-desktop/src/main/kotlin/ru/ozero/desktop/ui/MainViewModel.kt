@@ -50,12 +50,13 @@ class MainViewModel(
         .stateIn(scope, SharingStarted.Eagerly, SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY)
 
     fun onConnectClick() {
-        val mode = settingsStore.settings.value.vpnMode
+        val settings = settingsStore.settings.value
+        val mode = settings.vpnMode
         when (state.value) {
             is TunnelState.Connected -> vpnManager.disconnect()
             is TunnelState.Idle, is TunnelState.Failed -> {
-                val engine = settingsStore.settings.value.manualEngine
-                vpnManager.connect(engine, mode)
+                val engine = settings.manualEngine
+                vpnManager.connect(engine, mode, settings)
             }
             else -> Unit
         }
