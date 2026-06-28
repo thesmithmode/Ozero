@@ -11,7 +11,7 @@ internal class MasterDnsDeployerImpl(
 ) : MasterDnsServerDeployer {
 
     override fun deploy(credentials: MasterDnsDeployCredentials): Flow<MasterDnsDeployState> = flow {
-        PersistentLoggers.debug(TAG, "deploy: start host=${credentials.host}:${credentials.port}")
+        PersistentLoggers.debug(TAG, "deploy: start")
         if (!connectAndAuth(credentials, "deploy")) return@flow
         try {
             if (!preflightChecks(credentials.host)) return@flow
@@ -19,7 +19,7 @@ internal class MasterDnsDeployerImpl(
             if (!postDockerPortChecks(credentials.host)) return@flow
             if (!buildAndRun(credentials.host)) return@flow
             val key = extractKey() ?: return@flow
-            PersistentLoggers.debug(TAG, "deploy: done host=${credentials.host} key_len=${key.length}")
+            PersistentLoggers.debug(TAG, "deploy: done key_len=${key.length}")
             emit(MasterDnsDeployState.Done(buildClientToml(credentials.host, key)))
         } catch (e: Exception) {
             PersistentLoggers.warn(TAG, "deploy: unexpected error", e)
@@ -50,12 +50,12 @@ internal class MasterDnsDeployerImpl(
     override fun removeAmneziaDnsAndContinue(
         credentials: MasterDnsDeployCredentials,
     ): Flow<MasterDnsDeployState> = flow {
-        PersistentLoggers.debug(TAG, "removeAmneziaDnsAndContinue: start host=${credentials.host}:${credentials.port}")
+        PersistentLoggers.debug(TAG, "removeAmneziaDnsAndContinue: start")
         if (!connectAndAuth(credentials, "removeAmneziaDnsAndContinue")) return@flow
         try {
             emit(MasterDnsDeployState.Removing)
             val removeResult = transport.exec(MasterDnsDockerScripts.removeAmneziaDnsOnly)
-            PersistentLoggers.debug(TAG, "removeAmneziaDnsAndContinue: remove result=${removeResult.takeShort()}")
+            PersistentLoggers.debug(TAG, "removeAmneziaDnsAndContinue: remove result received")
             if (!removeResult.contains(MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_REMOVED) &&
                 !removeResult.contains(MasterDnsDockerScripts.MARKER_AMNEZIA_DNS_NOT_FOUND)
             ) {
@@ -69,7 +69,7 @@ internal class MasterDnsDeployerImpl(
             val key = extractKey() ?: return@flow
             PersistentLoggers.debug(
                 TAG,
-                "removeAmneziaDnsAndContinue: done host=${credentials.host} key_len=${key.length}",
+                "removeAmneziaDnsAndContinue: done key_len=${key.length}",
             )
             emit(MasterDnsDeployState.Done(buildClientToml(credentials.host, key)))
         } catch (e: Exception) {
@@ -115,7 +115,7 @@ internal class MasterDnsDeployerImpl(
     private suspend fun FlowCollector<MasterDnsDeployState>.preflightChecks(serverHost: String): Boolean {
         PersistentLoggers.debug(TAG, "deploy: sudo check")
         val sudoResult = transport.exec(MasterDnsDockerScripts.checkSudoNoPassword)
-        PersistentLoggers.debug(TAG, "deploy: sudo result=${sudoResult.takeShort()}")
+        PersistentLoggers.debug(TAG, "deploy: sudo result received")
         val sudoError = mapSudoResult(sudoResult)
         if (sudoError != null) {
             emit(MasterDnsDeployState.Error(sudoError))
@@ -130,9 +130,9 @@ internal class MasterDnsDeployerImpl(
     private suspend fun cleanupLegacyMasterDns() {
         PersistentLoggers.debug(TAG, "deploy: cleanup legacy MasterDNS artifacts")
         val result = transport.exec(MasterDnsDockerScripts.cleanupLegacyMasterDns)
-        PersistentLoggers.debug(TAG, "deploy: legacy cleanup result=${result.takeShort()}")
+        PersistentLoggers.debug(TAG, "deploy: legacy cleanup result received")
         if (!result.contains(MasterDnsDockerScripts.MARKER_LEGACY_MASTERDNS_CLEANUP_OK)) {
-            PersistentLoggers.warn(TAG, "deploy: legacy cleanup returned unexpected result=${result.take(120)}")
+            PersistentLoggers.warn(TAG, "deploy: legacy cleanup returned unexpected result")
         }
     }
 
@@ -144,7 +144,7 @@ internal class MasterDnsDeployerImpl(
     private suspend fun FlowCollector<MasterDnsDeployState>.checkAmneziaDns53Conflict(logLabel: String): Boolean {
         PersistentLoggers.debug(TAG, logLabel)
         val amneziaResult = transport.exec(MasterDnsDockerScripts.checkAmneziaDns53)
-        PersistentLoggers.debug(TAG, "deploy: amnezia-dns result=${amneziaResult.takeShort()}")
+        PersistentLoggers.debug(TAG, "deploy: amnezia-dns result received")
         parseAmneziaDnsConflict(amneziaResult)?.let { conflict ->
             emit(conflict)
             return false
@@ -159,12 +159,12 @@ internal class MasterDnsDeployerImpl(
         PersistentLoggers.debug(TAG, logLabel)
         val portResult = transport.exec(MasterDnsDockerScripts.checkPort53(serverHost))
         var finalPortResult = portResult
-        PersistentLoggers.debug(TAG, "deploy: port result=${finalPortResult.takeShort()}")
+        PersistentLoggers.debug(TAG, "deploy: port result received")
         val initialPortBusy = parsePortBusy(finalPortResult)
         if (initialPortBusy?.owner.isLegacyMasterDnsOwner()) {
             cleanupLegacyMasterDns()
             finalPortResult = transport.exec(MasterDnsDockerScripts.checkPort53(serverHost))
-            PersistentLoggers.debug(TAG, "deploy: port after legacy cleanup result=${finalPortResult.takeShort()}")
+            PersistentLoggers.debug(TAG, "deploy: port after legacy cleanup result received")
         }
         val portBusy = parsePortBusy(finalPortResult)
         if (portBusy != null) {
@@ -196,7 +196,7 @@ internal class MasterDnsDeployerImpl(
         emit(MasterDnsDeployState.InstallingDocker)
         PersistentLoggers.debug(TAG, "deploy: installing docker (timeout 360s)")
         val dockerResult = transport.exec(MasterDnsDockerScripts.installDocker, timeoutMs = 360_000L)
-        PersistentLoggers.debug(TAG, "deploy: docker install result=${dockerResult.takeShort()}")
+        PersistentLoggers.debug(TAG, "deploy: docker install result received")
         if (dockerResult.contains(MasterDnsDockerScripts.MARKER_ERR_DPKG_LOCKED)) {
             emit(MasterDnsDeployState.Error("dpkg_locked"))
             return false
@@ -212,7 +212,7 @@ internal class MasterDnsDeployerImpl(
         emit(MasterDnsDeployState.BuildingImage)
         PersistentLoggers.debug(TAG, "deploy: docker build masterdns-ozero (timeout 300s)")
         val buildResult = transport.exec(MasterDnsDockerScripts.deployMasterDns, timeoutMs = 300_000L)
-        PersistentLoggers.debug(TAG, "deploy: build result=${buildResult.takeShort()}")
+        PersistentLoggers.debug(TAG, "deploy: build result received")
         if (!buildResult.contains(MasterDnsDockerScripts.MARKER_BUILD_OK)) {
             emit(MasterDnsDeployState.Error(mapBuildError(buildResult)))
             return false
@@ -220,7 +220,7 @@ internal class MasterDnsDeployerImpl(
         emit(MasterDnsDeployState.StartingContainer)
         PersistentLoggers.debug(TAG, "deploy: docker run masterdns-ozero published on external host ip udp/53")
         val runResult = transport.exec(MasterDnsDockerScripts.runContainer(serverHost))
-        PersistentLoggers.debug(TAG, "deploy: run result=${runResult.takeShort()}")
+        PersistentLoggers.debug(TAG, "deploy: run result received")
         if (!runResult.contains(MasterDnsDockerScripts.MARKER_RUN_OK)) {
             emit(MasterDnsDeployState.Error(mapRunError(runResult)))
             return false
@@ -233,11 +233,11 @@ internal class MasterDnsDeployerImpl(
     private suspend fun openFirewall() {
         PersistentLoggers.debug(TAG, "deploy: открываю 53/udp в firewall")
         val fwResult = transport.exec(MasterDnsDockerScripts.openFirewallPort53)
-        PersistentLoggers.debug(TAG, "deploy: firewall result=${fwResult.takeShort()}")
+        PersistentLoggers.debug(TAG, "deploy: firewall result received")
         if (!fwResult.contains("FW_") || fwResult.contains(MasterDnsDockerScripts.MARKER_FW_NONE_OK)) {
             PersistentLoggers.warn(
                 TAG,
-                "deploy: firewall step не открыл 53/udp (result=${fwResult.take(80)}) — продолжаем, " +
+                "deploy: firewall step не открыл 53/udp — продолжаем, " +
                     "юзеру возможно придётся открыть порт вручную",
             )
         }
@@ -429,15 +429,6 @@ private fun buildClientToml(serverIp: String, encryptionKey: String): String =
     SERVER = "$serverIp"
     DOMAINS = ["${MasterDnsDockerScripts.DEFAULT_DOMAIN}"]
     """.trimIndent()
-
-private fun String.takeShort(maxLen: Int = 1_200): String {
-    val normalized = replace('\n', ' ').replace('\r', ' ').trim()
-    if (normalized.length <= maxLen) return normalized
-    val safeMaxLen = maxLen.coerceAtLeast(80)
-    val headLen = 360.coerceAtMost(safeMaxLen / 2)
-    val tailLen = (safeMaxLen - headLen - 5).coerceAtLeast(0)
-    return normalized.take(headLen) + " ... " + normalized.takeLast(tailLen)
-}
 
 private fun String.sanitizeDeployDiagnostic(maxLen: Int = 700): String =
     replace('\n', ' ')
