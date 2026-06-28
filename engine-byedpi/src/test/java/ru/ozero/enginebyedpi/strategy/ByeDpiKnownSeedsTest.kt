@@ -27,6 +27,16 @@ class ByeDpiKnownSeedsTest {
     }
 
     @Test
+    fun `commands do not override managed listen port`() {
+        val portOption = Regex("^-p(\\d+)?$")
+        val offenders = ByeDpiKnownSeeds.commands.filter { command ->
+            command.split(Regex("\\s+")).any { token -> portOption.matches(token) }
+        }
+
+        assertTrue(offenders.isEmpty(), "managed port option must not be present in known seeds: $offenders")
+    }
+
+    @Test
     fun `GenePool accepts known seeds without error`() {
         val pool = GenePool(ByeDpiKnownSeeds.commands)
         val gene = pool.randomGene()
