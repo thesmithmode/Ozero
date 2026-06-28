@@ -5,6 +5,13 @@ param(
 
 $ErrorActionPreference = "Continue"
 
+if ($env:CODEX_MEMORY_HOOKS_ENABLED -ne "1") {
+    if ($HookScript -eq "session-start.py") {
+        Write-Output "{}"
+    }
+    exit 0
+}
+
 $repoRoot = (Resolve-Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent)).Path
 $memoryDir = Join-Path $repoRoot ".memory"
 

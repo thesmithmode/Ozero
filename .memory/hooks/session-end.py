@@ -28,7 +28,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 from transcript import discover_codex_transcript, extract_conversation_context
 
-if os.environ.get("CODEX_INVOKED_BY"):
+if os.environ.get("CODEX_INVOKED_BY") or os.environ.get("CODEX_MEMORY_HOOKS_ENABLED") != "1":
     sys.exit(0)
 
 logging.basicConfig(

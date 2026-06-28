@@ -52,3 +52,8 @@ If hook input has no `transcript_path`, hooks discover the latest Codex transcri
 - `codex.exe` or `codex` on PATH
 
 This avoids the WindowsApps execution-alias trap where Python subprocess can fail with access denied.
+
+
+## Hook Safety
+
+Project Codex hooks are inert by default. Set `CODEX_MEMORY_HOOKS_ENABLED=1` only for trusted local sessions where transcript persistence and SessionStart memory injection are intentional.
