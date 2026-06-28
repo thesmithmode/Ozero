@@ -9,6 +9,7 @@ Configured in project `.codex/hooks.json`.
 """
 
 import json
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -68,6 +69,10 @@ def build_context() -> str:
 
 
 def main():
+    if os.environ.get("CODEX_MEMORY_HOOKS_ENABLED") != "1":
+        print(json.dumps({}))
+        return
+
     context = build_context()
 
     output = {
