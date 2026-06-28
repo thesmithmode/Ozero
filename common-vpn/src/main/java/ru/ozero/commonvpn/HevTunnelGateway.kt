@@ -24,9 +24,16 @@ class NativeHevTunnelGateway(
     },
     private val pollIntervalMs: Long = STATS_POLL_INTERVAL_MS,
     private val statsPollerEnabled: Boolean = false,
+    private val startupProbeEnabled: Boolean = false,
+    private val startupProbeTimeoutMs: Long = STARTUP_PROBE_TIMEOUT_MS,
+    private val startupProbeIntervalMs: Long = STARTUP_PROBE_INTERVAL_MS,
 ) : HevTunnelGateway {
 
-    constructor(context: Context) : this(cacheDir = context.cacheDir, statsPollerEnabled = true)
+    constructor(context: Context) : this(
+        cacheDir = context.cacheDir,
+        statsPollerEnabled = true,
+        startupProbeEnabled = true,
+    )
 
     private val started = AtomicBoolean(false)
     private val statsPoller = AtomicReference<Thread?>(null)
@@ -67,11 +74,24 @@ class NativeHevTunnelGateway(
             .getOrElse { -1 }
         val tNativeMs = (System.nanoTime() - tNative0) / 1_000_000
         PersistentLoggers.info(TAG, "checkpoint post-nativeStart code=$code dt=${tNativeMs}ms")
-        if (code == 0) {
-            started.set(true)
-            if (statsPollerEnabled) startStatsPoller()
+        if (code != 0) return code
+        if (startupProbeEnabled && !awaitStartupProbe()) {
+            PersistentLoggers.error(TAG, "TProxyStartService returned without readable stats")
+            return -1
         }
-        return code
+        started.set(true)
+        if (statsPollerEnabled) startStatsPoller()
+        return 0
+    }
+
+    private fun awaitStartupProbe(): Boolean {
+        val deadline = System.nanoTime() + startupProbeTimeoutMs * 1_000_000
+        do {
+            val stats = nativeStats()
+            if (stats != null && stats.size >= MIN_STATS_SIZE) return true
+            if (startupProbeIntervalMs > 0) Thread.sleep(startupProbeIntervalMs)
+        } while (System.nanoTime() < deadline)
+        return false
     }
 
     private fun startStatsPoller() {
@@ -153,6 +173,9 @@ class NativeHevTunnelGateway(
         const val STATS_IDX_RX_BYTES = 3
         const val STATS_POLL_INTERVAL_MS = 5_000L
         const val STATS_IDLE_REPORT_EVERY = 6
+        const val MIN_STATS_SIZE = 4
+        const val STARTUP_PROBE_TIMEOUT_MS = 250L
+        const val STARTUP_PROBE_INTERVAL_MS = 25L
     }
 }
 

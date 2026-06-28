@@ -169,4 +169,42 @@ class NativeHevTunnelGatewayTest {
 
         assertTrue(nested.exists(), "cacheDir должен быть создан")
     }
+
+    @Test
+    fun `start returns failure when production startup probe cannot read stats`(@TempDir tmp: File) {
+        val tun = pfd(42)
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = loader,
+            nativeStart = { _, _ -> 0 },
+            nativeStop = {},
+            nativeStats = { null },
+            startupProbeEnabled = true,
+            startupProbeTimeoutMs = 1,
+            startupProbeIntervalMs = 0,
+        )
+
+        val rc = gateway.start(HevTunnelConfig(tunPfd = tun, socksAddress = "127.0.0.1", socksPort = 1080))
+
+        assertEquals(-1, rc)
+    }
+
+    @Test
+    fun `start succeeds when production startup probe reads stats`(@TempDir tmp: File) {
+        val tun = pfd(42)
+        val gateway = NativeHevTunnelGateway(
+            cacheDir = tmp,
+            loader = loader,
+            nativeStart = { _, _ -> 0 },
+            nativeStop = {},
+            nativeStats = { longArrayOf(0L, 0L, 0L, 0L) },
+            startupProbeEnabled = true,
+            startupProbeTimeoutMs = 1,
+            startupProbeIntervalMs = 0,
+        )
+
+        val rc = gateway.start(HevTunnelConfig(tunPfd = tun, socksAddress = "127.0.0.1", socksPort = 1080))
+
+        assertEquals(0, rc)
+    }
 }
