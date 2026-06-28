@@ -183,13 +183,17 @@ object UrnetworkModule {
     ): UrnetworkContractStatusObserver = UrnetworkContractStatusObserver(
         bridge = bridge,
         tunnelController = tunnelController,
-        requestStopVpn = { reason ->
+        reportEngineFailure = { reason ->
             val intent = android.content.Intent(
                 context,
                 ru.ozero.commonvpn.OzeroVpnService::class.java,
             ).apply {
-                action = ru.ozero.commonvpn.OzeroVpnService.ACTION_STOP
-                putExtra("stop_reason", reason)
+                action = ru.ozero.commonvpn.OzeroVpnService.ACTION_ENGINE_FAILURE
+                putExtra(
+                    ru.ozero.commonvpn.OzeroVpnService.EXTRA_ENGINE_ID,
+                    EngineId.URNETWORK.name,
+                )
+                putExtra(ru.ozero.commonvpn.OzeroVpnService.EXTRA_ENGINE_FAILURE_REASON, reason)
             }
             androidx.core.content.ContextCompat.startForegroundService(context, intent)
         },

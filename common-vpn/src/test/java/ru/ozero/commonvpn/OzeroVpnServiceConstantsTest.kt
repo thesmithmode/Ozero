@@ -15,6 +15,17 @@ class OzeroVpnServiceConstantsTest {
     }
 
     @Test
+    fun actionEngineFailureHasCorrectValue() {
+        assertEquals("ru.ozero.vpn.ACTION_ENGINE_FAILURE", OzeroVpnService.ACTION_ENGINE_FAILURE)
+    }
+
+    @Test
+    fun engineFailureExtrasHaveCorrectValues() {
+        assertEquals("ru.ozero.vpn.EXTRA_ENGINE_ID", OzeroVpnService.EXTRA_ENGINE_ID)
+        assertEquals("ru.ozero.vpn.EXTRA_ENGINE_FAILURE_REASON", OzeroVpnService.EXTRA_ENGINE_FAILURE_REASON)
+    }
+
+    @Test
     fun tunAddressIsPrivateRange() {
         assertEquals("10.10.10.10", OzeroVpnService.TUN_ADDRESS)
     }

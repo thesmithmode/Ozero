@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicReference
 class UrnetworkContractStatusObserver(
     private val bridge: UrnetworkSdkBridge,
     private val tunnelController: TunnelController,
-    private val requestStopVpn: (String) -> Unit,
+    private val reportEngineFailure: (String) -> Unit,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
 
@@ -64,14 +64,14 @@ class UrnetworkContractStatusObserver(
             !contractStatus.premium &&
             disconnectInFlight.compareAndSet(false, true)
         ) {
-            Log.i(TAG, "insufficientBalance=true → request VPN stop")
+            Log.i(TAG, "insufficientBalance=true → report engine failure")
             PersistentLoggers.warn(
                 TAG,
-                "URnetwork insufficient balance — VPN auto-disconnect",
+                "URnetwork insufficient balance",
             )
             warningSink.tryEmit(Warning.InsufficientBalance)
-            runCatching { requestStopVpn(STOP_REASON_INSUFFICIENT_BALANCE) }
-                .onFailure { PersistentLoggers.warn(TAG, "requestStopVpn threw: ${it.message}") }
+            runCatching { reportEngineFailure(FAILURE_REASON_INSUFFICIENT_BALANCE) }
+                .onFailure { PersistentLoggers.warn(TAG, "reportEngineFailure threw: ${it.message}") }
         }
     }
 
@@ -86,6 +86,6 @@ class UrnetworkContractStatusObserver(
 
     private companion object {
         const val TAG = "UrnetworkContractObs"
-        const val STOP_REASON_INSUFFICIENT_BALANCE = "urnetwork-insufficient-balance"
+        const val FAILURE_REASON_INSUFFICIENT_BALANCE = "urnetwork-insufficient-balance"
     }
 }

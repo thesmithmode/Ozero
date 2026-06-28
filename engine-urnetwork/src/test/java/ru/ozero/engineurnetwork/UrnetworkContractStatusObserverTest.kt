@@ -29,7 +29,7 @@ class UrnetworkContractStatusObserverTest {
     private lateinit var contractFlow: MutableStateFlow<UrnetworkSdkBridge.ContractStatusSnapshot>
     private lateinit var tunnelFlow: MutableStateFlow<TunnelState>
     private lateinit var bridge: FakeBridge
-    private lateinit var stopReasons: MutableList<String>
+    private lateinit var failureReasons: MutableList<String>
     private lateinit var observer: UrnetworkContractStatusObserver
 
     @BeforeEach
@@ -39,18 +39,18 @@ class UrnetworkContractStatusObserverTest {
         bridge = FakeBridge(contractFlow)
         val tunnelController = mockk<TunnelController>()
         every { tunnelController.state } returns tunnelFlow
-        stopReasons = mutableListOf()
+        failureReasons = mutableListOf()
         observer = UrnetworkContractStatusObserver(
             bridge = bridge,
             tunnelController = tunnelController,
-            requestStopVpn = { reason -> stopReasons += reason },
+            reportEngineFailure = { reason -> failureReasons += reason },
             scope = scope,
         )
         observer.start()
     }
 
     @Test
-    fun `insufficient balance при URnetwork Connected → requestStopVpn вызывается`() = runTest(dispatcher) {
+    fun `insufficient balance при URnetwork Connected → reportEngineFailure вызывается`() = runTest(dispatcher) {
         tunnelFlow.value = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0)
         contractFlow.value = UrnetworkSdkBridge.ContractStatusSnapshot(
             insufficientBalance = true,
@@ -58,11 +58,11 @@ class UrnetworkContractStatusObserverTest {
             premium = false,
         )
 
-        assertEquals(listOf("urnetwork-insufficient-balance"), stopReasons)
+        assertEquals(listOf("urnetwork-insufficient-balance"), failureReasons)
     }
 
     @Test
-    fun `insufficient balance при URnetwork Connecting → requestStopVpn вызывается`() = runTest(dispatcher) {
+    fun `insufficient balance при URnetwork Connecting → reportEngineFailure вызывается`() = runTest(dispatcher) {
         tunnelFlow.value = TunnelState.Connecting(EngineId.URNETWORK)
         contractFlow.value = UrnetworkSdkBridge.ContractStatusSnapshot(
             insufficientBalance = true,
@@ -70,11 +70,11 @@ class UrnetworkContractStatusObserverTest {
             premium = false,
         )
 
-        assertEquals(1, stopReasons.size)
+        assertEquals(1, failureReasons.size)
     }
 
     @Test
-    fun `premium=true при insufficientBalance — НЕ вызывается стоп`() = runTest(dispatcher) {
+    fun `premium=true при insufficientBalance — НЕ вызывается failure`() = runTest(dispatcher) {
         tunnelFlow.value = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0)
         contractFlow.value = UrnetworkSdkBridge.ContractStatusSnapshot(
             insufficientBalance = true,
@@ -82,11 +82,11 @@ class UrnetworkContractStatusObserverTest {
             premium = true,
         )
 
-        assertTrue(stopReasons.isEmpty(), "premium-юзеры не должны автоотключаться")
+        assertTrue(failureReasons.isEmpty(), "premium-юзеры не должны автоотключаться")
     }
 
     @Test
-    fun `Idle tunnel state при insufficientBalance — НЕ вызывается стоп`() = runTest(dispatcher) {
+    fun `Idle tunnel state при insufficientBalance — НЕ вызывается failure`() = runTest(dispatcher) {
         tunnelFlow.value = TunnelState.Idle
         contractFlow.value = UrnetworkSdkBridge.ContractStatusSnapshot(
             insufficientBalance = true,
@@ -94,7 +94,7 @@ class UrnetworkContractStatusObserverTest {
             premium = false,
         )
 
-        assertTrue(stopReasons.isEmpty())
+        assertTrue(failureReasons.isEmpty())
     }
 
     @Test
@@ -106,11 +106,11 @@ class UrnetworkContractStatusObserverTest {
             premium = false,
         )
 
-        assertTrue(stopReasons.isEmpty(), "другой engine — URnetwork balance не учитывается")
+        assertTrue(failureReasons.isEmpty(), "другой engine — URnetwork balance не учитывается")
     }
 
     @Test
-    fun `повторный insufficient balance при том же активном URnetwork — без двойного стопа`() = runTest(dispatcher) {
+    fun `повторный insufficient balance при том же активном URnetwork — без двойного failure`() = runTest(dispatcher) {
         tunnelFlow.value = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0)
         val snapshot = UrnetworkSdkBridge.ContractStatusSnapshot(
             insufficientBalance = true,
@@ -121,18 +121,18 @@ class UrnetworkContractStatusObserverTest {
         contractFlow.value = snapshot.copy(noPermission = true)
         contractFlow.value = snapshot
 
-        assertEquals(1, stopReasons.size, "disconnectInFlight guard защищает от двойного стопа")
+        assertEquals(1, failureReasons.size, "disconnectInFlight guard защищает от двойного failure")
     }
 
     @Test
-    fun `disconnect → reconnect → новый insufficient снова стопит`() = runTest(dispatcher) {
+    fun `disconnect → reconnect → новый insufficient снова reports failure`() = runTest(dispatcher) {
         tunnelFlow.value = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0)
         contractFlow.value = UrnetworkSdkBridge.ContractStatusSnapshot(
             insufficientBalance = true,
             noPermission = false,
             premium = false,
         )
-        assertEquals(1, stopReasons.size)
+        assertEquals(1, failureReasons.size)
 
         tunnelFlow.value = TunnelState.Idle
         contractFlow.value = UrnetworkSdkBridge.ContractStatusSnapshot.UNKNOWN
@@ -144,7 +144,7 @@ class UrnetworkContractStatusObserverTest {
             premium = false,
         )
 
-        assertEquals(2, stopReasons.size, "после Idle disconnectInFlight=false → новое срабатывание разрешено")
+        assertEquals(2, failureReasons.size, "после Idle disconnectInFlight=false → новое срабатывание разрешено")
     }
 
     @Test
@@ -170,11 +170,11 @@ class UrnetworkContractStatusObserverTest {
             premium = false,
         )
 
-        assertTrue(stopReasons.isEmpty(), "после stop() observer не реагирует")
+        assertTrue(failureReasons.isEmpty(), "после stop() observer не реагирует")
     }
 
     @Test
-    fun `start() второй раз заменяет job — без удвоения стопов`() = runTest(dispatcher) {
+    fun `start() второй раз заменяет job — без удвоения failure`() = runTest(dispatcher) {
         observer.start()
         observer.start()
         tunnelFlow.value = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0)
@@ -184,17 +184,17 @@ class UrnetworkContractStatusObserverTest {
             premium = false,
         )
 
-        assertEquals(1, stopReasons.size, "несколько start() не должны умножать стопы")
+        assertEquals(1, failureReasons.size, "несколько start() не должны умножать failure")
     }
 
     @Test
-    fun `requestStopVpn бросает исключение — observer не падает`() = runTest(dispatcher) {
+    fun `reportEngineFailure бросает исключение — observer не падает`() = runTest(dispatcher) {
         val crashingObserver = UrnetworkContractStatusObserver(
             bridge = bridge,
             tunnelController = mockk<TunnelController>().also {
                 every { it.state } returns tunnelFlow
             },
-            requestStopVpn = { error("stop hook crash") },
+            reportEngineFailure = { error("failure hook crash") },
             scope = scope,
         )
         crashingObserver.start()

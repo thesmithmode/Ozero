@@ -79,6 +79,28 @@ class OzeroVpnServicePeerWatchdogTest {
     }
 
     @Test
+    fun `engine failure action routes through killswitch-aware watchdog`() {
+        val commandBlock = serviceSource
+            .substringAfter("when (intent?.action)")
+            .substringBefore("START_STICKY")
+        assertTrue(
+            commandBlock.contains("ACTION_ENGINE_FAILURE -> handleEngineFailureIntent(intent)"),
+            "ACTION_ENGINE_FAILURE обязан идти в handleEngineFailureIntent, не в stopVpn. Body:\n$commandBlock",
+        )
+        val handlerBlock = serviceSource
+            .substringAfter("private fun handleEngineFailureIntent")
+            .substringBefore("private fun startVpn")
+        assertTrue(
+            handlerBlock.contains("engineWatchdog.handleEngineFailure(engineId, reason)"),
+            "engine failure intent обязан звать killswitch-aware handleEngineFailure. Body:\n$handlerBlock",
+        )
+        assertTrue(
+            !handlerBlock.contains("stopVpn()"),
+            "engine failure intent НЕ должен вызывать stopVpn напрямую — это обходит killswitch. Body:\n$handlerBlock",
+        )
+    }
+
+    @Test
     fun `startPeerWatchdog запускается только для usesCustomTun`() {
         val body = startSequenceSource
             .substringAfter("suspend fun run()")

@@ -50,6 +50,26 @@ class EnginePluginRegistrationTest {
     }
 
     @Test
+    fun `Urnetwork insufficient balance reports engine failure instead of stop`() {
+        val src = module("UrnetworkModule.kt")
+        val providerBody = src
+            .substringAfter("fun provideUrnetworkContractStatusObserver")
+        assertTrue(
+            providerBody.contains("OzeroVpnService.ACTION_ENGINE_FAILURE"),
+            "URnetwork balance observer обязан отправлять engine failure action для killswitch-aware path.",
+        )
+        assertTrue(
+            providerBody.contains("OzeroVpnService.EXTRA_ENGINE_ID") &&
+                providerBody.contains("EngineId.URNETWORK.name"),
+            "URnetwork balance observer обязан передать EngineId.URNETWORK в service.",
+        )
+        assertTrue(
+            !providerBody.contains("OzeroVpnService.ACTION_STOP"),
+            "URnetwork balance observer НЕ должен отправлять ACTION_STOP — это обходит killswitch.",
+        )
+    }
+
+    @Test
     fun `WarpModule регистрирует EngineWarp через IntoSet EnginePlugin`() {
         val src = module("WarpModule.kt")
         assertTrue(

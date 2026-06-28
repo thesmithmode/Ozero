@@ -21,11 +21,13 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_ENGINE_FAILURE
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_START
 import ru.ozero.commonvpn.OzeroVpnService.Companion.ACTION_STOP
 import ru.ozero.enginescore.ChainOrchestrator
-import ru.ozero.enginescore.PersistentLoggers
+import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.settings.TrafficMode
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -160,6 +162,9 @@ class OzeroVpnService : android.net.VpnService() {
     companion object {
         const val ACTION_START = "ru.ozero.vpn.ACTION_START"
         const val ACTION_STOP = "ru.ozero.vpn.ACTION_STOP"
+        const val ACTION_ENGINE_FAILURE = "ru.ozero.vpn.ACTION_ENGINE_FAILURE"
+        const val EXTRA_ENGINE_ID = "ru.ozero.vpn.EXTRA_ENGINE_ID"
+        const val EXTRA_ENGINE_FAILURE_REASON = "ru.ozero.vpn.EXTRA_ENGINE_FAILURE_REASON"
         const val TUN_ADDRESS = TunBuilderHelper.TUN_ADDRESS
         const val TUN_PREFIX_LENGTH = TunBuilderHelper.TUN_PREFIX_LENGTH
         const val TUN_ADDRESS_V6 = TunBuilderHelper.TUN_ADDRESS_V6
@@ -257,6 +262,7 @@ class OzeroVpnService : android.net.VpnService() {
             latestStartId.set(startId)
             when (intent?.action) {
                 ACTION_STOP -> stopVpn()
+                ACTION_ENGINE_FAILURE -> handleEngineFailureIntent(intent)
                 ACTION_START, null -> {
                     stopping.set(false)
                     startVpn()
@@ -268,6 +274,17 @@ class OzeroVpnService : android.net.VpnService() {
             runCatching { stopVpn() }
             START_NOT_STICKY
         }
+    }
+
+    private fun handleEngineFailureIntent(intent: Intent) {
+        val engineId = intent.getStringExtra(EXTRA_ENGINE_ID)
+            ?.let { runCatching { EngineId.valueOf(it) }.getOrNull() }
+        if (engineId == null) {
+            PersistentLoggers.warn(TAG, "engine failure intent missing engine id")
+            return
+        }
+        val reason = intent.getStringExtra(EXTRA_ENGINE_FAILURE_REASON) ?: "engine-failure"
+        engineWatchdog.handleEngineFailure(engineId, reason)
     }
 
     private fun startVpn() {
