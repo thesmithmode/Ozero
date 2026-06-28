@@ -459,16 +459,14 @@ jobs:
         env:
           GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
         run: |
+          set -euo pipefail
           if [ -z "$GPG_PRIVATE_KEY" ]; then
-            echo "::warning::RELEASE_GPG_PRIVATE_KEY not set — skipping GPG signature"
-            echo "GPG_AVAILABLE=false" >> "$GITHUB_ENV"
-            exit 0
+            echo "::error::RELEASE_GPG_PRIVATE_KEY is required for release APK signatures"
+            exit 1
           fi
           printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --yes --import
-          echo "GPG_AVAILABLE=true" >> "$GITHUB_ENV"
 
       - name: GPG-sign APKs
-        if: env.GPG_AVAILABLE == 'true'
         env:
           GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
         run: |
@@ -510,11 +508,19 @@ jobs:
           cd release-all
           echo "=== Release artifacts ==="
           ls -la
-          if ! ls Ozero-*.apk >/dev/null 2>&1; then
+          shopt -s nullglob
+          apks=(Ozero-*.apk)
+          if [ ${#apks[@]} -eq 0 ]; then
             echo "::error::Missing APK artifact"
             exit 1
           fi
-          echo "APK artifact present"
+          for apk in "${apks[@]}"; do
+            if [ ! -s "${apk}.asc" ]; then
+              echo "::error::Missing GPG signature for ${apk}"
+              exit 1
+            fi
+          done
+          echo "APK artifacts and signatures present"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
