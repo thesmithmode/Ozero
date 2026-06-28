@@ -634,7 +634,7 @@ class RawShareLinksParserTest {
         val grpc = result[2] as TrojanBean
         assertEquals("grpc", grpc.type)
         assertEquals("svc", grpc.grpcServiceName)
-        assertTrue(grpc.allowInsecure)
+        assertFalse(grpc.allowInsecure)
     }
 
     @Test

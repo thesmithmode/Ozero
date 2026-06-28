@@ -127,7 +127,7 @@ class SubscriptionParserYamlEdgeCoverageTest {
         assertEquals("list,name", directGrpc.name)
         assertEquals("grpc", directGrpc.type)
         assertEquals("direct-service", directGrpc.grpcServiceName)
-        assertTrue(directGrpc.allowInsecure)
+        assertFalse(directGrpc.allowInsecure)
         val httpUpgrade = result[2] as VMessBean
         assertEquals("httpupgrade", httpUpgrade.type)
         assertEquals("/upgrade", httpUpgrade.path)

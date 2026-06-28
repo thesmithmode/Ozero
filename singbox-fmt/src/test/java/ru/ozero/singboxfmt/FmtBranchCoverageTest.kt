@@ -74,12 +74,12 @@ class FmtBranchCoverageTest {
     }
 
     @Test
-    fun `trojan accepts shared tls insecure aliases`() {
-        listOf("allowInsecure=1", "allow-insecure=yes", "skip-cert-verify=true").forEach { query ->
+    fun `trojan ignores subscription tls downgrade flags`() {
+        listOf("security=none", "allowInsecure=1", "allow-insecure=yes", "skip-cert-verify=true").forEach { query ->
             val bean = V2RayFmt.parseTrojan("trojan://secret@example.com?$query")
 
-            assertEquals("tls", bean.security)
-            assertTrue(bean.allowInsecure, query)
+            assertEquals("tls", bean.security, query)
+            assertFalse(bean.allowInsecure, query)
         }
     }
 
