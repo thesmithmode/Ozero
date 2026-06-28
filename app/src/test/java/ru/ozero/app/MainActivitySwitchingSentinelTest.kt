@@ -2,6 +2,7 @@ package ru.ozero.app
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MainActivitySwitchingSentinelTest {
@@ -14,65 +15,11 @@ class MainActivitySwitchingSentinelTest {
     }
 
     @Test
-    fun `restartVpnIfConnected обязан помечать switching ДО stop`() {
-        val block = source.substringAfter("private suspend fun restartVpnIfConnected")
-            .substringBefore("private fun observeLiveEngineSettingsChanges")
-        val swStartIdx = block.indexOf("onSwitchingStarted")
-        val stopIdx = block.indexOf("vpnIntentLauncher.stop()")
-        assertTrue(
-            swStartIdx in 0 until stopIdx,
-            "onSwitchingStarted обязан вызываться ДО stop, иначе UI покажет Idle-вспышку. " +
-                "Block:\n$block",
-        )
-    }
-
-    @Test
-    fun `restartVpnIfConnected обязан очищать switching в catch при ошибке`() {
-        val block = source.substringAfter("private suspend fun restartVpnIfConnected")
-            .substringBefore("private fun observeLiveEngineSettingsChanges")
-        assertTrue(
-            block.contains("onSwitchingFinished") && block.contains("catch"),
-            "При throw в restart пути switching marker должен очищаться явно — иначе UI зависнет в 'переключении'. " +
-                "Block:\n$block",
-        )
-    }
-
-    @Test
-    fun `restartVpnIfConnected обязан передавать pendingTarget из switching а не null`() {
-        val block = source.substringAfter("private suspend fun restartVpnIfConnected")
-            .substringBefore("private fun observeLiveEngineSettingsChanges")
-        assertTrue(
-            block.contains("switching.value?.to"),
-            "to=null в onSwitchingStarted перетирает ранее установленный target от onManualEngineSelect — " +
-                "диск показывает Connected пока chip уже другой движок (UI desync для любой пары движков). " +
-                "Обязан читать tunnelController.switching.value?.to как pendingTarget. Block:\n$block",
-        )
-    }
-
-    @Test
-    fun `restartVpnIfConnected waits for stop before start`() {
-        val block = source.substringAfter("private suspend fun restartVpnIfConnected")
-            .substringBefore("private fun observeLiveEngineSettingsChanges")
-        val stoppedIdx = block.indexOf("val stopped = withTimeoutOrNull(RESTART_STOP_TIMEOUT_MS)")
-        val guardIdx = block.indexOf("if (stopped == null)")
-        val startIdx = block.indexOf("vpnIntentLauncher.start()")
-        assertTrue(
-            stoppedIdx >= 0 && guardIdx in stoppedIdx until startIdx,
-            "restart must not send ACTION_START until stop published Idle/Failed. Block:\n$block",
-        )
-    }
-
-    @Test
-    fun `coalesced restart settle wait ignores stale Idle after start`() {
-        val block = source.substringAfter("withTimeoutOrNull(RESTART_SETTLE_TIMEOUT_MS)")
-            .substringBefore("} while")
-        assertTrue(
-            block.contains("TunnelState.Connected") &&
-                block.contains("TunnelState.Failed") &&
-                !block.contains("TunnelState.Idle"),
-            "coalesced restart must not treat stale Idle from the previous stop as post-start settlement. " +
-                "Block:\n$block",
-        )
+    fun `MainActivity does not auto stop-start VPN on settings changes`() {
+        assertFalse(source.contains("observeLiveEngineSettingsChanges"))
+        assertFalse(source.contains("restartVpnIfConnected"))
+        assertFalse(source.contains("vpnIntentLauncher.stop()"))
+        assertFalse(source.contains("vpnIntentLauncher.start()"))
     }
 
     @Test
