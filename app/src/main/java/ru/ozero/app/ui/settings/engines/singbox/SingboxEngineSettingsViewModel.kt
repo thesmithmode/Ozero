@@ -506,6 +506,10 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
+    fun consumeRestoreError() {
+        _uiState.update { it.copy(restoreError = null) }
+    }
+
     companion object {
         private val SORT_ORDER_KEY = intPreferencesKey("singbox_sort_order")
         private val SINGBOX_DNS_SERVERS_KEY = stringSetPreferencesKey("singbox_dns_servers")
