@@ -506,6 +506,20 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `applyPerformanceProfile AUTO allowDirect очищает runtime profile`() {
+        val block = source.substringAfter("override fun applyPerformanceProfile(")
+            .substringBefore("override fun peerCount")
+        val autoBlock = block.substringAfter("windowType == UrnetworkWindowType.AUTO && allowDirect")
+            .substringBefore("return")
+
+        assertTrue(
+            autoBlock.contains("device.performanceProfile = null"),
+            "AUTO+allowDirect обязан очищать ранее выставленный runtime profile, иначе UI/DataStore " +
+                "показывают Auto, а активная сессия остаётся на прошлом QUALITY/SPEED профиле.",
+        )
+    }
+
+    @Test
     fun `attachTun сериализуется через lifecycleMutex — guard на race со stop`() {
         val attachOuterBlock = source.substringAfter("override suspend fun attachTun")
             .substringBefore("private suspend fun attachTunUnderLock")

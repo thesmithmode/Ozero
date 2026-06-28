@@ -666,11 +666,15 @@ class RealUrnetworkSdkBridge(
             PersistentLoggers.warn(TAG, "applyPerformanceProfile skipped - bridge not running")
             return
         }
+        val device = deviceRef.get() ?: return
         if (windowType == UrnetworkWindowType.AUTO && allowDirect) {
-            Log.i(TAG, "applyPerformanceProfile skip - AUTO+allowDirect uses SDK defaults")
+            runCatching { device.performanceProfile = null }
+                .onFailure {
+                    PersistentLoggers.warn(TAG, "applyPerformanceProfile reset threw: ${it.message}")
+                }
+            Log.i(TAG, "applyPerformanceProfile reset - AUTO+allowDirect uses SDK defaults")
             return
         }
-        val device = deviceRef.get() ?: return
         runCatching {
             val profile = PerformanceProfile()
             profile.windowType = when (windowType) {
