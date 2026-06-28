@@ -74,10 +74,12 @@ jobs:
       - name: Download and explode Singbox AAR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LIBBOX_AAR_SHA256: 7a5fa900e73352a18d55ef7ae55427e3e60ba7208b5848ccf64ec5acdf154867
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
           gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          echo "$LIBBOX_AAR_SHA256  $TMPAAR" | sha256sum -c -
           mkdir -p singbox-core/libs singbox-core/libs-stubs /tmp/go-stubs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
