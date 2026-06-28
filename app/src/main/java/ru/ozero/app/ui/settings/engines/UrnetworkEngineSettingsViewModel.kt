@@ -71,7 +71,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     val provideControlMode: StateFlow<UrnetworkProvideControlMode> = configStore.provideControlMode()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, UrnetworkProvideControlMode.ALWAYS)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, UrnetworkProvideControlMode.AUTO)
 
     val provideNetworkMode: StateFlow<UrnetworkProvideNetworkMode> = configStore.provideNetworkMode()
         .stateIn(viewModelScope, SharingStarted.Eagerly, UrnetworkProvideNetworkMode.WIFI)

@@ -19,7 +19,7 @@ data class UrnetworkConfig(
     val fixedIpSize: Boolean = false,
     val allowDirect: Boolean = true,
     val provideEnabled: Boolean = true,
-    val provideControlMode: UrnetworkProvideControlMode = UrnetworkProvideControlMode.ALWAYS,
+    val provideControlMode: UrnetworkProvideControlMode = UrnetworkProvideControlMode.AUTO,
     val provideNetworkMode: UrnetworkProvideNetworkMode = UrnetworkProvideNetworkMode.WIFI,
     val selectedLocation: UrnetworkLocationSelection = UrnetworkLocationSelection.EMPTY,
     val cachedCountries: List<UrnetworkCachedLocation> = emptyList(),
