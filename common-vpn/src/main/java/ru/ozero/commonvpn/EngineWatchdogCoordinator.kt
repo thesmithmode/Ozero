@@ -162,9 +162,11 @@ class EngineWatchdogCoordinator(
         stagnationWatchJobRef.getAndSet(null)?.cancel()
     }
 
+    fun isKillswitchEnabled(): Boolean = killswitchProvider()
+
     fun handleEngineFailure(engineId: EngineId, reason: String) {
         val fdAlive = tunFdRef.get() != null
-        if (killswitchProvider() && fdAlive) {
+        if (isKillswitchEnabled() && fdAlive) {
             enterKillswitchMode(engineId, reason)
         } else {
             tunnelController.onEngineDied(engineId, reason)

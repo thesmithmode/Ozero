@@ -498,9 +498,10 @@ class StartSequenceCoordinator(
             val result = try {
                 engine.attachTun(rawDupFd)
             } catch (t: Throwable) {
+                val keepTunForKillswitch = shouldKeepTunForKillswitch(notifyFailure)
                 runCatching { ParcelFileDescriptor.adoptFd(rawDupFd).close() }
-                runCatching { state.tunFdRef.getAndSet(null)?.close() }
-                PersistentLoggers.error(TAG, "attachTun threw, fd closed: ${t.message}")
+                if (!keepTunForKillswitch) closeActiveTun()
+                PersistentLoggers.error(TAG, "attachTun threw, raw fd closed: ${t.message}")
                 runCatching { deps.chainOrchestrator.stop() }
                 reportEngineFailure(engineId, "attachTun threw: ${t.message}", notifyFailure)
                 return false
@@ -508,8 +509,9 @@ class StartSequenceCoordinator(
             return when (result) {
                 TunAttachResult.Success -> true
                 is TunAttachResult.Failure -> {
+                    val keepTunForKillswitch = shouldKeepTunForKillswitch(notifyFailure)
                     runCatching { ParcelFileDescriptor.adoptFd(rawDupFd).close() }
-                    runCatching { state.tunFdRef.getAndSet(null)?.close() }
+                    if (!keepTunForKillswitch) closeActiveTun()
                     PersistentLoggers.error(TAG, "attachTun failed: ${result.reason}")
                     runCatching { deps.chainOrchestrator.stop() }
                     reportEngineFailure(engineId, "attachTun: ${result.reason}", notifyFailure)
@@ -518,6 +520,13 @@ class StartSequenceCoordinator(
             }
         }
         return startNativeTunnel(engineId, fd, socksPort, notifyFailure)
+    }
+
+    private fun shouldKeepTunForKillswitch(notifyFailure: Boolean): Boolean =
+        notifyFailure && deps.engineWatchdog.isKillswitchEnabled()
+
+    private fun closeActiveTun() {
+        runCatching { state.tunFdRef.getAndSet(null)?.close() }
     }
 
     private suspend fun startNativeTunnel(

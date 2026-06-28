@@ -90,14 +90,15 @@ class RouteTrafficForEngineContractTest {
     }
 
     @Test
-    fun `tunFdRef очищается после detachFd`() {
+    fun `tunFdRef очищается после detachFd если killswitch не удерживает TUN`() {
         val acceptorBranch = routeBody.substringAfter("TunFdAcceptor").substringBefore("startNativeTunnel")
         assertTrue(
-            acceptorBranch.contains("tunFdRef.compareAndSet(fd, null)") ||
-                acceptorBranch.contains("tunFdRef.getAndSet(null)") ||
-                acceptorBranch.contains("tunFdRef.set(null)"),
-            "После detachFd() tunFdRef обязан очиститься — иначе onDestroy попытается close уже " +
-                "detached fd, double-close = native crash.",
+            acceptorBranch.contains("keepTunForKillswitch") &&
+                acceptorBranch.contains("if (!keepTunForKillswitch) closeActiveTun()") &&
+                source.contains("state.tunFdRef.getAndSet(null)"),
+            "После detachFd() tunFdRef обязан очищаться на обычном failure path, но при " +
+                "killswitch=true финальный failure обязан сохранить active TUN до handleEngineFailure. " +
+                "Иначе startup failure Sing-box отключает in-app lockdown.",
         )
     }
 
