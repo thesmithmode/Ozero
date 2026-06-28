@@ -52,8 +52,8 @@ class ServersViewModel @Inject constructor(
         val exit = state.exit ?: return
         viewModelScope.launch {
             dao.upsertPair(
-                entry = entry.copy(pairId = exit.id),
-                exit = exit.copy(pairId = entry.id),
+                entry = entry.copy(role = "entry", pairId = exit.id),
+                exit = exit.copy(role = "exit", pairId = entry.id),
             )
         }
     }
