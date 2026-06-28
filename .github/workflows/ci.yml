@@ -2,8 +2,8 @@ name: CI
 
 on:
   push:
-    branches-ignore:
-      - main
+    branches:
+      - '**'
   pull_request:
     branches:
       - main
@@ -54,11 +54,9 @@ jobs:
             const isPullRequestToMain =
               context.eventName === 'pull_request' &&
               context.payload.pull_request?.base?.ref === 'main';
-            const isNonMainNonPullRequest =
-              context.eventName !== 'pull_request' &&
-              context.ref !== 'refs/heads/main';
+            const isNonPullRequest = context.eventName !== 'pull_request';
             const runCi =
-              isPullRequestToMain || (isNonMainNonPullRequest && !skipPush);
+              isPullRequestToMain || (isNonPullRequest && !skipPush);
             core.setOutput('skip_push', skipPush ? 'true' : 'false');
             core.setOutput('run_ci', runCi ? 'true' : 'false');
 
