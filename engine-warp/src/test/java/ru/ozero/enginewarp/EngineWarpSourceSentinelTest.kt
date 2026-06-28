@@ -56,9 +56,9 @@ class EngineWarpSourceSentinelTest {
             body.contains("PersistentLoggers.trace") && body.contains("warp stats"),
             "stats poll обязан вызывать PersistentLoggers.trace с \"warp stats\" prefix — boot.log readable, не info/warn",
         )
-        assertTrue(
-            body.contains("deltaTx") && body.contains("deltaRx"),
-            "stats log must contain traffic deltas (deltaTx/deltaRx), not only absolute counters.",
+        assertFalse(
+            body.contains("deltaTx") || body.contains("deltaRx") || body.contains("tx=\${") || body.contains("rx=\${"),
+            "stats log must not persist traffic counters or deltas.",
         )
     }
 
