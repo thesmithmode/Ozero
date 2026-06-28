@@ -227,6 +227,31 @@ class AppBackupSerializerTest {
     }
 
     @Test
+    fun `backup categories classify split mode as split tunnel`() {
+        val data = makeMinimalBackup().copy(
+            settings = BackupSettings(
+                splitMode = "ALLOWLIST",
+                ipv6Enabled = null,
+                autoStart = null,
+                manualEngine = null,
+                bydpiWinningArgs = null,
+                urnetworkEnabled = null,
+                urnetworkJwt = null,
+                customDnsServers = null,
+                hostsMode = null,
+                hostsList = null,
+                uiLocaleTag = null,
+                appMode = null,
+            ),
+            splitRules = emptyList(),
+        )
+
+        assertFalse(BackupCategory.GENERAL_SETTINGS.isPresentIn(data))
+        assertTrue(BackupCategory.SPLIT_TUNNEL.isPresentIn(data))
+        assertEquals(setOf(BackupCategory.SPLIT_TUNNEL), BackupCategory.availableIn(data))
+    }
+
+    @Test
     fun `backup categories detect every single settings bucket`() {
         assertEquals(
             setOf(BackupCategory.GENERAL_SETTINGS),
