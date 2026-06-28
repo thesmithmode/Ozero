@@ -334,6 +334,7 @@
     <string name="urnetwork_consent_warning_title">Advertencia</string>
     <string name="urnetwork_consent_warning_body">URnetwork es una red P2P donde cada participante puede actuar como nodo de salida. Si activas URnetwork, tu dispositivo retransmitirá tráfico de otros usuarios a internet desde tu propia IP. Esto puede llamar la atención de tu ISP y conlleva riesgos legales en algunas jurisdicciones. Actívalo solo si entiendes las consecuencias.</string>
     <string name="urnetwork_consent_short">Red P2P: tu IP puede retransmitir el tráfico de otros.</string>
+    <string name="urnetwork_consent_accept">Entiendo y acepto</string>
     <string name="urnetwork_search_hint">Buscar país…</string>
     <string name="urnetwork_location_title">Región de salida</string>
     <string name="urnetwork_location_best_available">Mejor disponible</string>

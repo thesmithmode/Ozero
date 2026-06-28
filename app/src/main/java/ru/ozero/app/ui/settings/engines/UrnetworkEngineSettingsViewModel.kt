@@ -29,12 +29,14 @@ import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 import ru.ozero.engineurnetwork.allowDirect
+import ru.ozero.engineurnetwork.consentGranted
 import ru.ozero.engineurnetwork.fixedIpSize
 import ru.ozero.engineurnetwork.provideControlMode
 import ru.ozero.engineurnetwork.provideEnabled
 import ru.ozero.engineurnetwork.provideNetworkMode
 import ru.ozero.engineurnetwork.setAllowDirect
 import ru.ozero.engineurnetwork.setFixedIpSize
+import ru.ozero.engineurnetwork.setConsentGranted
 import ru.ozero.engineurnetwork.setProvideControlMode
 import ru.ozero.engineurnetwork.setProvideNetworkMode
 import ru.ozero.engineurnetwork.setWindowType
@@ -81,6 +83,10 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val consentGranted: StateFlow<Boolean> = configStore.consentGranted()
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     val insufficientBalance: StateFlow<Boolean> = bridge.contractStatus()
         .map { it.insufficientBalance && !it.premium }
         .distinctUntilChanged()
@@ -118,6 +124,12 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(POLLER_KEEP_ALIVE_MS),
             initialValue = balanceRepository.state.value,
         )
+
+    fun grantConsent() {
+        viewModelScope.launch {
+            configStore.setConsentGranted(true)
+        }
+    }
 
     fun selectProvideControlMode(value: UrnetworkProvideControlMode) {
         viewModelScope.launch {

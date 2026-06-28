@@ -76,6 +76,10 @@ class EngineUrnetwork(
             "EngineUrnetwork не принимает upstream — supportsUpstreamSocks=false"
         }
 
+        if (!configStore.consentGranted().first()) {
+            return StartResult.Failure(reason = "URnetwork consent not granted")
+        }
+
         when (val r = jwtBootstrapper.ensureClientJwt()) {
             UrnetworkJwtBootstrapper.Result.AlreadyPresent,
             UrnetworkJwtBootstrapper.Result.Acquired -> Unit

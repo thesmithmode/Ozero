@@ -41,7 +41,9 @@ class UrnetworkRelayCoordinatorTest {
     fun setUp() {
         coordinatorScope = CoroutineScope(dispatcher + SupervisorJob())
         tunnelStateFlow = MutableStateFlow(TunnelState.Idle)
-        configStore = InMemoryUrnetworkConfigStore(UrnetworkConfig(walletOverride = "test-wallet"))
+        configStore = InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(consentGranted = true, walletOverride = "test-wallet"),
+        )
         bridge = FakeBridge()
         bootstrapper = FakeJwtBootstrapper()
 

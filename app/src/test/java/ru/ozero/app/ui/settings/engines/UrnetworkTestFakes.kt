@@ -23,12 +23,12 @@ internal fun idleTunnel(): TunnelController = TunnelController()
 
 internal fun fakeUrnetworkConfigStore(): UrnetworkConfigStore =
     ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
-        ru.ozero.engineurnetwork.UrnetworkConfig(walletOverride = "0xWALLET"),
+        ru.ozero.engineurnetwork.UrnetworkConfig(consentGranted = true, walletOverride = "0xWALLET"),
     )
 
 internal fun fakeUrnetworkConfigStoreWithJwt(jwt: String = "test-jwt"): UrnetworkConfigStore =
     ru.ozero.engineurnetwork.InMemoryUrnetworkConfigStore(
-        ru.ozero.engineurnetwork.UrnetworkConfig(walletOverride = "0xWALLET", byClientJwt = jwt),
+        ru.ozero.engineurnetwork.UrnetworkConfig(consentGranted = true, walletOverride = "0xWALLET", byClientJwt = jwt),
     )
 
 internal data class FakeLocationToken(override val countryCode: String?) : UrnetworkSdkBridge.LocationToken

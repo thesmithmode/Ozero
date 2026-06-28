@@ -183,7 +183,7 @@ class EngineUrnetworkAwaitReadyTest {
     }
 
     private val minimalConfigStore = InMemoryUrnetworkConfigStore(
-        UrnetworkConfig(byJwt = "j", byClientJwt = "cj"),
+        UrnetworkConfig(consentGranted = true, byJwt = "j", byClientJwt = "cj"),
     )
 
     private object ImmediateAuthService : UrnetworkAuthService {

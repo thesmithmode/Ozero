@@ -42,7 +42,7 @@ class EngineUrnetworkDeviceJwtTest {
     @Test
     fun `existing byJwt + devicePubkey set → ни walletAuth ни guest не вызываются — idempotent`() = runTest {
         val store = InMemoryUrnetworkConfigStore(
-            UrnetworkConfig(byJwt = "saved", byClientJwt = "saved-cjwt", devicePubkey = "pk"),
+            UrnetworkConfig(consentGranted = true, byJwt = "saved", byClientJwt = "saved-cjwt", devicePubkey = "pk"),
         )
         val auth = RecordingAuthService()
         val identity = InMemoryUrnetworkDeviceIdentity(SEED_A)
@@ -58,7 +58,7 @@ class EngineUrnetworkDeviceJwtTest {
     fun `legacy guest byJwt без devicePubkey → walletAuth migration — заменяет byJwt и сбрасывает byClientJwt`() =
         runTest {
             val store = InMemoryUrnetworkConfigStore(
-                UrnetworkConfig(byJwt = "legacy-guest", byClientJwt = "legacy-cjwt"),
+                UrnetworkConfig(consentGranted = true, byJwt = "legacy-guest", byClientJwt = "legacy-cjwt"),
             )
             val auth = RecordingAuthService(
                 walletResult = DeviceWalletJwtResult.Success("device-jwt-migrated", isNewNetwork = true),
@@ -82,7 +82,9 @@ class EngineUrnetworkDeviceJwtTest {
 
     @Test
     fun `legacy guest byJwt + walletAuth Error → existing byJwt сохраняется, guest НЕ вызывается заново`() = runTest {
-        val store = InMemoryUrnetworkConfigStore(UrnetworkConfig(byJwt = "legacy", byClientJwt = "legacy-cjwt"))
+        val store = InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(consentGranted = true, byJwt = "legacy", byClientJwt = "legacy-cjwt"),
+        )
         val auth = RecordingAuthService(walletResult = DeviceWalletJwtResult.Error("server down"))
         val identity = InMemoryUrnetworkDeviceIdentity(SEED_A)
         val engine = newEngine(store, auth, identity)
@@ -130,7 +132,7 @@ class EngineUrnetworkDeviceJwtTest {
 
     @Test
     fun `сохранённый networkName переиспользуется — повторный walletAuth не пересоздаёт network`() = runTest {
-        val store = InMemoryUrnetworkConfigStore(UrnetworkConfig(deviceNetworkName = "n-cached"))
+        val store = InMemoryUrnetworkConfigStore(UrnetworkConfig(consentGranted = true, deviceNetworkName = "n-cached"))
         val auth = RecordingAuthService(
             walletResult = DeviceWalletJwtResult.Success("device-jwt", isNewNetwork = false),
             clientResult = ClientJwtResult.Success("cjwt"),

@@ -19,6 +19,7 @@ data class UrnetworkConfig(
     val fixedIpSize: Boolean = false,
     val allowDirect: Boolean = true,
     val provideEnabled: Boolean = true,
+    val consentGranted: Boolean = false,
     val provideControlMode: UrnetworkProvideControlMode = UrnetworkProvideControlMode.ALWAYS,
     val provideNetworkMode: UrnetworkProvideNetworkMode = UrnetworkProvideNetworkMode.WIFI,
     val selectedLocation: UrnetworkLocationSelection = UrnetworkLocationSelection.EMPTY,
@@ -124,6 +125,12 @@ fun UrnetworkConfigStore.provideEnabled(): Flow<Boolean> = config().map { it.pro
 
 suspend fun UrnetworkConfigStore.setProvideEnabled(value: Boolean) {
     update { it.copy(provideEnabled = value) }
+}
+
+fun UrnetworkConfigStore.consentGranted(): Flow<Boolean> = config().map { it.consentGranted }
+
+suspend fun UrnetworkConfigStore.setConsentGranted(value: Boolean) {
+    update { it.copy(consentGranted = value) }
 }
 
 fun UrnetworkConfigStore.provideControlMode(): Flow<UrnetworkProvideControlMode> =

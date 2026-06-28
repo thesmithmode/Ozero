@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -96,6 +97,7 @@ fun UrnetworkEngineSettingsScreen(
                 val provideControlMode by settingsVm.provideControlMode.collectAsStateWithLifecycle()
                 val provideNetworkMode by settingsVm.provideNetworkMode.collectAsStateWithLifecycle()
                 val providePaused by settingsVm.providePaused.collectAsStateWithLifecycle()
+                val consentGranted by settingsVm.consentGranted.collectAsStateWithLifecycle()
                 val balanceState by settingsVm.balanceState.collectAsStateWithLifecycle()
                 Column(
                     modifier = Modifier
@@ -108,6 +110,9 @@ fun UrnetworkEngineSettingsScreen(
                         InsufficientBalanceBanner()
                     }
                     UrnetworkBalanceCard(state = balanceState)
+                    if (!consentGranted) {
+                        ConsentWarningCard(onAccept = settingsVm::grantConsent)
+                    }
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
@@ -145,6 +150,7 @@ fun UrnetworkEngineSettingsScreen(
                 val provideControlMode by settingsVm.provideControlMode.collectAsStateWithLifecycle()
                 val provideNetworkMode by settingsVm.provideNetworkMode.collectAsStateWithLifecycle()
                 val sharedTrafficBytes by settingsVm.sharedTrafficBytes.collectAsStateWithLifecycle()
+                val consentGranted by settingsVm.consentGranted.collectAsStateWithLifecycle()
                 val balanceState by settingsVm.balanceState.collectAsStateWithLifecycle()
                 LocationListContent(
                     modifier = Modifier.padding(padding),
@@ -163,6 +169,8 @@ fun UrnetworkEngineSettingsScreen(
                     sharedTrafficBytes = sharedTrafficBytes,
                     balanceState = balanceState,
                     insufficientBalance = insufficientBalance,
+                    consentGranted = consentGranted,
+                    onGrantConsent = settingsVm::grantConsent,
                     onSearchQueryChange = locationsVm::setSearchQuery,
                     onSelect = locationsVm::selectLocation,
                     onSetProvidePaused = locationsVm::setProvidePaused,
@@ -173,6 +181,34 @@ fun UrnetworkEngineSettingsScreen(
                     onSelectProvideNetworkMode = settingsVm::selectProvideNetworkMode,
                     onOpenSharedTraffic = onOpenSharedTraffic,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConsentWarningCard(
+    onAccept: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
+        border = BorderStroke(1.dp, OzeroPalette.Amber),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.urnetwork_consent_warning_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = OzeroPalette.Text,
+            )
+            Text(
+                text = stringResource(R.string.urnetwork_consent_warning_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = OzeroPalette.Text2,
+            )
+            Button(onClick = onAccept, modifier = Modifier.align(Alignment.End)) {
+                Text(stringResource(R.string.urnetwork_consent_accept))
             }
         }
     }
@@ -197,6 +233,8 @@ private fun LocationListContent(
     sharedTrafficBytes: Long,
     balanceState: UrnetworkBalanceState,
     insufficientBalance: Boolean,
+    consentGranted: Boolean,
+    onGrantConsent: () -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onSelect: (UrnetworkSdkBridge.LocationToken?) -> Unit,
     onSetProvidePaused: (Boolean) -> Unit,
@@ -222,6 +260,14 @@ private fun LocationListContent(
                 state = balanceState,
                 modifier = Modifier.padding(top = 12.dp),
             )
+        }
+        if (!consentGranted) {
+            item {
+                ConsentWarningCard(
+                    onAccept = onGrantConsent,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
         }
         item {
             Column(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {

@@ -217,7 +217,7 @@ class EngineUrnetworkStatsPollingTest {
         byJwt: String? = null,
         byClientJwt: String? = null,
     ): UrnetworkConfigStore =
-        InMemoryUrnetworkConfigStore(UrnetworkConfig(byJwt = byJwt, byClientJwt = byClientJwt))
+        InMemoryUrnetworkConfigStore(UrnetworkConfig(consentGranted = true, byJwt = byJwt, byClientJwt = byClientJwt))
 
     private class FakeAuth : UrnetworkAuthService {
         override suspend fun acquireGuestJwt(): GuestJwtResult = GuestJwtResult.Success("g")

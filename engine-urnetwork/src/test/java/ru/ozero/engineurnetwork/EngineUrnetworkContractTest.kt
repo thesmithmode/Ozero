@@ -30,6 +30,7 @@ class EngineUrnetworkContractTest {
     ): Triple<EngineUrnetwork, FakeUrnetworkSdkBridge, InMemoryUrnetworkConfigStore> {
         val store = InMemoryUrnetworkConfigStore(
             UrnetworkConfig(
+                consentGranted = true,
                 walletOverride = override,
                 byJwt = byJwt,
                 byClientJwt = byClientJwt,
@@ -297,6 +298,7 @@ class EngineUrnetworkContractTest {
         val bridge = FakeUrnetworkSdkBridge()
         val store = InMemoryUrnetworkConfigStore(
             UrnetworkConfig(
+                consentGranted = true,
                 byJwt = "j",
                 byClientJwt = "cj",
                 selectedLocation = UrnetworkLocationSelection(
@@ -447,6 +449,7 @@ class EngineUrnetworkPerformanceProfileTest {
     fun `start применяет windowType QUALITY из configStore к bridge`() = runTest {
         val store = InMemoryUrnetworkConfigStore(
             UrnetworkConfig(
+                consentGranted = true,
                 byJwt = "j",
                 byClientJwt = "cj",
                 windowType = UrnetworkWindowType.QUALITY,
@@ -468,6 +471,7 @@ class EngineUrnetworkPerformanceProfileTest {
     fun `start применяет windowType SPEED с fixedIp true из configStore к bridge`() = runTest {
         val store = InMemoryUrnetworkConfigStore(
             UrnetworkConfig(
+                consentGranted = true,
                 byJwt = "j",
                 byClientJwt = "cj",
                 windowType = UrnetworkWindowType.SPEED,
@@ -489,6 +493,7 @@ class EngineUrnetworkPerformanceProfileTest {
     fun `start применяет AUTO windowType из configStore (AUTO не skipped на уровне engine)`() = runTest {
         val store = InMemoryUrnetworkConfigStore(
             UrnetworkConfig(
+                consentGranted = true,
                 byJwt = "j",
                 byClientJwt = "cj",
                 windowType = UrnetworkWindowType.AUTO,
@@ -509,6 +514,7 @@ class EngineUrnetworkPerformanceProfileTest {
     fun `start пробрасывает allowDirect=true в bridge — anonymization OFF по умолчанию`() = runTest {
         val store = InMemoryUrnetworkConfigStore(
             UrnetworkConfig(
+                consentGranted = true,
                 byJwt = "j",
                 byClientJwt = "cj",
                 windowType = UrnetworkWindowType.QUALITY,
@@ -531,6 +537,7 @@ class EngineUrnetworkPerformanceProfileTest {
         runTest {
             val store = InMemoryUrnetworkConfigStore(
                 UrnetworkConfig(
+                    consentGranted = true,
                     byJwt = "j",
                     byClientJwt = "cj",
                     windowType = UrnetworkWindowType.AUTO,
@@ -553,6 +560,7 @@ class EngineUrnetworkPerformanceProfileTest {
     fun `start пробрасывает allowDirect=false с QUALITY windowType — комбинация anonymization+quality`() = runTest {
         val store = InMemoryUrnetworkConfigStore(
             UrnetworkConfig(
+                consentGranted = true,
                 byJwt = "j",
                 byClientJwt = "cj",
                 windowType = UrnetworkWindowType.QUALITY,

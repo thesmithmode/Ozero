@@ -35,6 +35,7 @@ class DataStoreUrnetworkConfigStore(
         fixedIpSize = prefs[KEY_FIXED_IP_SIZE] == true,
         allowDirect = prefs[KEY_ALLOW_DIRECT] != false,
         provideEnabled = prefs[KEY_PROVIDE_ENABLED] != false,
+        consentGranted = prefs[KEY_CONSENT_GRANTED] == true,
         provideControlMode = UrnetworkProvideControlMode.fromRaw(prefs[KEY_PROVIDE_CONTROL_MODE]),
         provideNetworkMode = UrnetworkProvideNetworkMode.fromRaw(prefs[KEY_PROVIDE_NETWORK_MODE]),
         selectedLocation = UrnetworkLocationSelection(
@@ -58,6 +59,7 @@ class DataStoreUrnetworkConfigStore(
         prefs[KEY_FIXED_IP_SIZE] = cfg.fixedIpSize
         prefs[KEY_ALLOW_DIRECT] = cfg.allowDirect
         prefs[KEY_PROVIDE_ENABLED] = cfg.provideEnabled
+        prefs[KEY_CONSENT_GRANTED] = cfg.consentGranted
         prefs[KEY_PROVIDE_CONTROL_MODE] = cfg.provideControlMode.rawValue
         prefs[KEY_PROVIDE_NETWORK_MODE] = cfg.provideNetworkMode.rawValue
         prefs.writeOrRemove(KEY_SELECTED_COUNTRY_CODE, cfg.selectedLocation.countryCode)
@@ -122,6 +124,7 @@ class DataStoreUrnetworkConfigStore(
         val KEY_FIXED_IP_SIZE = booleanPreferencesKey("urnetwork_fixed_ip_size")
         val KEY_ALLOW_DIRECT = booleanPreferencesKey("urnetwork_allow_direct")
         val KEY_PROVIDE_ENABLED = booleanPreferencesKey("urnetwork_provide_enabled")
+        val KEY_CONSENT_GRANTED = booleanPreferencesKey("urnetwork_consent_granted")
         val KEY_PROVIDE_CONTROL_MODE = stringPreferencesKey("urnetwork_provide_control_mode")
         val KEY_PROVIDE_NETWORK_MODE = stringPreferencesKey("urnetwork_provide_network_mode")
         val KEY_SELECTED_COUNTRY_CODE = stringPreferencesKey("urnetwork_selected_country_code")
