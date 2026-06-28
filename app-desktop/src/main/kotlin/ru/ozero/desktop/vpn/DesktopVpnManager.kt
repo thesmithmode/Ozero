@@ -12,7 +12,6 @@ import ru.ozero.desktop.engine.DesktopEngine
 import ru.ozero.desktop.engine.DesktopEngineRegistry
 import ru.ozero.desktop.engine.EngineConfig
 import ru.ozero.desktop.engine.EngineStartResult
-import ru.ozero.desktop.engine.SingboxDesktopEngine
 import ru.ozero.desktop.engine.TunFrontend
 import ru.ozero.desktop.model.EngineId
 import ru.ozero.desktop.model.SwitchingTransition
@@ -84,7 +83,7 @@ class DesktopVpnManager(
 
     private suspend fun connectTun(id: EngineId, engine: DesktopEngine) {
         when (id) {
-            EngineId.SINGBOX -> connectSingboxTun(id, engine)
+            EngineId.SINGBOX -> failSingboxTun(id)
             EngineId.WARP -> connectWarpTun(id, engine)
             EngineId.BYEDPI -> connectWithTunFrontend(id, engine)
             else -> {
@@ -95,11 +94,8 @@ class DesktopVpnManager(
         }
     }
 
-    private suspend fun connectSingboxTun(id: EngineId, engine: DesktopEngine) {
-        val tunJson = SingboxDesktopEngine.buildTunConfig()
-        val config = EngineConfig(singboxJson = tunJson)
-        val result = engine.start(config)
-        handleStartResult(id, engine, result)
+    private fun failSingboxTun(id: EngineId) {
+        handleFailedResult(id, EngineStartResult.Failed(SINGBOX_TUN_REQUIRES_PROTECTED_OUTBOUND))
     }
 
     private suspend fun connectWarpTun(id: EngineId, engine: DesktopEngine) {
@@ -290,6 +286,7 @@ class DesktopVpnManager(
 
     private companion object {
         const val WATCHDOG_INTERVAL_MS = 2_000L
+        const val SINGBOX_TUN_REQUIRES_PROTECTED_OUTBOUND = "Sing-box TUN requires a protected outbound"
     }
 }
 
