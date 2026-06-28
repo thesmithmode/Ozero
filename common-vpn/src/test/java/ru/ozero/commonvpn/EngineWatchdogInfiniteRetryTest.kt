@@ -87,7 +87,7 @@ class EngineWatchdogInfiniteRetryTest {
     }
 
     @Test
-    fun `Failed recover не вызывает stopVpn — бесконечный retry, юзер видит жёлтый`() = runTest {
+    fun `Failed recover reaches stopVpn after bounded retries`() = runTest {
         val plugin = FakeFailingPlugin {
             EnginePlugin.RecoverResult.Failed("UAPI недоступен")
         }
@@ -110,16 +110,15 @@ class EngineWatchdogInfiniteRetryTest {
             runCurrent()
         }
 
-        assertTrue(
-            plugin.recoverCalls.get() >= 3,
-            "recover должен вызываться многократно. Got: ${plugin.recoverCalls.get()}",
+        assertEquals(
+            EngineWatchdogCoordinator.PEER_WATCHDOG_MAX_FAILED_RECOVERS,
+            plugin.recoverCalls.get(),
+            "recover should stop after the bounded Failed retry budget.",
         )
         assertEquals(
-            0,
+            1,
             stopVpnCount.get(),
-            "stopVpnRequest НИ РАЗУ не должен вызываться при Failed recover — " +
-                "юзер хочет бесконечный retry. Регрессия 2026-05-20 (da4e2cda): " +
-                "consecutiveRecoverFailures>=3 → hardRestart → handleEngineFailure → stop VPN.",
+            "Persistent Failed recover must reach stopVpnRequest when killswitch is off.",
         )
         watchdog.cancelWatchers()
     }

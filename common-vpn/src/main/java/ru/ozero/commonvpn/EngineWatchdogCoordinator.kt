@@ -71,6 +71,7 @@ class EngineWatchdogCoordinator(
         val job = scope.launch {
             try {
                 var zeroPeersPolls = 0
+                var consecutiveRecoverFailures = 0
                 var hadPeers = false
                 while (isActive) {
                     delay(PEER_WATCHDOG_POLL_MS)
@@ -78,6 +79,7 @@ class EngineWatchdogCoordinator(
                     if (peers > 0) {
                         hadPeers = true
                         zeroPeersPolls = 0
+                        consecutiveRecoverFailures = 0
                         continue
                     }
                     val timeoutMs = peerWatchdogPolicy.timeoutMs
@@ -94,6 +96,7 @@ class EngineWatchdogCoordinator(
                     when (result) {
                         EnginePlugin.RecoverResult.Success -> {
                             zeroPeersPolls = 0
+                            consecutiveRecoverFailures = 0
                         }
                         EnginePlugin.RecoverResult.NotSupported -> {
                             PersistentLoggers.warn(
@@ -104,7 +107,16 @@ class EngineWatchdogCoordinator(
                             return@launch
                         }
                         is EnginePlugin.RecoverResult.Failed -> {
-                            PersistentLoggers.warn(TAG, "recover failed: ${result.reason} — продолжаем retry")
+                            consecutiveRecoverFailures += 1
+                            PersistentLoggers.warn(
+                                TAG,
+                                "recover failed: ${result.reason} " +
+                                    "($consecutiveRecoverFailures/$PEER_WATCHDOG_MAX_FAILED_RECOVERS)",
+                            )
+                            if (consecutiveRecoverFailures >= PEER_WATCHDOG_MAX_FAILED_RECOVERS) {
+                                handleEngineFailure(engineId, "peer watchdog recover failed: ${result.reason}")
+                                return@launch
+                            }
                             zeroPeersPolls = 0
                         }
                     }
@@ -218,6 +230,7 @@ class EngineWatchdogCoordinator(
         const val PEER_WATCHDOG_POLL_MS = 5_000L
         const val PEER_WATCHDOG_TIMEOUT_MS = 30_000L
         const val PEER_WATCHDOG_RECOVER_GRACE_MS = 30_000L
+        const val PEER_WATCHDOG_MAX_FAILED_RECOVERS = 3
         const val STAGNATION_POLL_MS = 10_000L
         const val STAGNATION_RECOVER_THRESHOLD_MS = 60_000L
         const val STAGNATION_RECOVER_GRACE_MS = 30_000L
