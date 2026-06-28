@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import ru.ozero.engineurnetwork.UrnetworkDefaults
 import ru.ozero.engineurnetwork.UrnetworkRuntime
 import ru.ozero.enginescore.PersistentLoggers
+import java.security.SecureRandom
 import kotlin.coroutines.resume
 
 class RealUrnetworkAuthService(
@@ -111,11 +112,20 @@ class RealUrnetworkAuthService(
             }
         val api = space.api
             ?: return@withContext DeviceWalletJwtResult.Error("api null after runtime init")
-        val walletAuth = UrnetworkWalletAuthMapper.buildWalletAuth(identity)?.toSdkArgs()
-            ?: return@withContext DeviceWalletJwtResult.Error("identity sign failed")
-        when (val r = authLoginWithWallet(api, walletAuth)) {
+        val loginWalletAuth = UrnetworkWalletAuthMapper.buildWalletAuth(
+            identity = identity,
+            action = WalletAuthAction.AuthLogin,
+        )?.toSdkArgs() ?: return@withContext DeviceWalletJwtResult.Error("identity sign failed")
+        when (val r = authLoginWithWallet(api, loginWalletAuth)) {
             is LoginOutcome.Existing -> DeviceWalletJwtResult.Success(r.byJwt, isNewNetwork = false)
-            is LoginOutcome.NeedCreate -> networkCreateWithWallet(api, walletAuth, networkName)
+            is LoginOutcome.NeedCreate -> {
+                val createWalletAuth = UrnetworkWalletAuthMapper.buildWalletAuth(
+                    identity = identity,
+                    action = WalletAuthAction.NetworkCreate,
+                    networkName = networkName,
+                )?.toSdkArgs() ?: return@withContext DeviceWalletJwtResult.Error("identity sign failed")
+                networkCreateWithWallet(api, createWalletAuth, networkName)
+            }
             is LoginOutcome.Error -> DeviceWalletJwtResult.Error("authLogin: ${r.message}")
         }
     }
@@ -164,6 +174,10 @@ class RealUrnetworkAuthService(
 internal object UrnetworkWalletAuthMapper {
     suspend fun buildWalletAuth(
         identity: UrnetworkDeviceIdentity,
+        action: WalletAuthAction = WalletAuthAction.AuthLogin,
+        networkName: String? = null,
+        issuedAtMs: Long = System.currentTimeMillis(),
+        nonceBytes: ByteArray = randomNonceBytes(),
         encodeSignature: (ByteArray) -> String = { raw -> Base64.encodeToString(raw, Base64.NO_WRAP) },
     ): WalletAuthPayload? {
         val pubkey = runCatching { identity.pubkeyBase58() }
@@ -171,7 +185,13 @@ internal object UrnetworkWalletAuthMapper {
                 PersistentLoggers.warn(TAG, "identity.pubkeyBase58 threw: ${it.message}")
                 return null
             }
-        val message = WALLET_MESSAGE_PREFIX + pubkey
+        val message = buildMessage(
+            pubkey = pubkey,
+            action = action,
+            networkName = networkName,
+            issuedAtMs = issuedAtMs,
+            nonceBytes = nonceBytes,
+        )
         val signature = runCatching {
             val raw = identity.sign(message.toByteArray(Charsets.UTF_8))
             encodeSignature(raw)
@@ -240,9 +260,38 @@ internal object UrnetworkWalletAuthMapper {
         else -> DeviceWalletJwtResult.Success(byJwt = byJwt, isNewNetwork = true)
     }
 
+    private fun buildMessage(
+        pubkey: String,
+        action: WalletAuthAction,
+        networkName: String?,
+        issuedAtMs: Long,
+        nonceBytes: ByteArray,
+    ): String = listOfNotNull(
+        WALLET_MESSAGE_PREFIX,
+        "action=${action.wireName}",
+        "pubkey=$pubkey",
+        networkName?.let { "networkName=${encodeMessagePart(it.toByteArray(Charsets.UTF_8))}" },
+        "issuedAtMs=$issuedAtMs",
+        "nonce=${encodeMessagePart(nonceBytes)}",
+    ).joinToString("\n")
+
+    private fun randomNonceBytes(): ByteArray = ByteArray(WALLET_NONCE_BYTES).also(SECURE_RANDOM::nextBytes)
+
+    private fun encodeMessagePart(bytes: ByteArray): String = Base64.encodeToString(
+        bytes,
+        Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING,
+    )
+
     const val WALLET_BLOCKCHAIN_SOLANA = "solana"
-    const val WALLET_MESSAGE_PREFIX = "ozero-auth-v1:"
+    const val WALLET_MESSAGE_PREFIX = "ozero-auth-v2"
+    private const val WALLET_NONCE_BYTES = 16
     private const val TAG = "RealUrnetworkAuthService"
+    private val SECURE_RANDOM = SecureRandom()
+}
+
+internal enum class WalletAuthAction(val wireName: String) {
+    AuthLogin("authLogin"),
+    NetworkCreate("networkCreate"),
 }
 
 internal data class WalletAuthPayload(
