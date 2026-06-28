@@ -30,6 +30,7 @@ fun main() {
         var isWindowVisible by remember { mutableStateOf(true) }
         val scope = rememberCoroutineScope()
         val vpnManager = remember { DesktopVpnManager(scope) }
+        val viewModel = remember { MainViewModel(scope, vpnManager, settingsStore) }
 
         OzeroSystemTray(
             vpnManager = vpnManager,
@@ -50,8 +51,6 @@ fun main() {
                 state = WindowState(size = DpSize(420.dp, 780.dp)),
                 icon = windowIcon,
             ) {
-                val viewModel = remember { MainViewModel(scope, vpnManager, settingsStore) }
-
                 OzeroTheme {
                     Surface(modifier = Modifier.fillMaxSize()) {
                         RootNavigation(viewModel = viewModel, settingsStore = settingsStore)
