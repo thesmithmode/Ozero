@@ -110,13 +110,13 @@ class TunBuilderHelperContractTest {
     }
 
     @Test
-    fun `buildTunBuilder вызывает TunBuilderConfigurator с excludeSelf=true и service packageName`() {
+    fun `buildTunBuilder вызывает TunBuilderConfigurator без self exclusion и с service packageName`() {
         val body = source.substringAfter("fun buildTunBuilder(").substringBefore("private fun applyLockdown")
         assertTrue(
             body.contains("TunBuilderConfigurator(service.packageName)"),
-            "configurator обязан брать packageName из переданного VpnService — иначе self-исключение не сработает",
+            "configurator обязан брать packageName из переданного VpnService",
         )
-        assertTrue(body.contains("excludeSelf = true"), "excludeSelf=true для всех движков")
+        assertTrue(body.contains("excludeSelf = false"), "buildTunBuilder не должен исключать UID приложения из VPN")
     }
 
     @Test
