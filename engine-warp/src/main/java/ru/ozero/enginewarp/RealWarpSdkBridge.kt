@@ -371,7 +371,6 @@ class RealWarpSdkBridge(
                 TAG,
                 "INI digest ($tunnelName): bytes=$totalBytes lines=${lines.size} nonEmpty=$nonEmpty keys=$keys",
             )
-            Log.i(TAG, "INI passthrough ($tunnelName):\n${IniSanitizer.sanitize(ini)}")
         }
     }
 }

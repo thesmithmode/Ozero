@@ -386,8 +386,7 @@ class EngineWarp(
                 TunAttachResult.Success
             }
             is WarpSdkBridge.AttachResult.Failed -> {
-                val maskedIni = ini.replace(Regex("(?m)^(PrivateKey\\s*=\\s*)(.+)$"), "$1<masked>")
-                PersistentLoggers.error(TAG, "attachTun failed: ${r.reason}\nini:\n$maskedIni")
+                PersistentLoggers.error(TAG, "attachTun failed: ${r.reason}")
                 TunAttachResult.Failure(r.reason)
             }
         }
