@@ -124,8 +124,6 @@ Thumbs.db
 build-tools/upstream-bumps.md
 
 # === wiki-init ===
-!.claude/settings.json
-!CLAUDE.md
 !.memory/AGENTS.md
 # === /wiki-init ===
 
