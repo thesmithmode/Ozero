@@ -170,8 +170,8 @@ class RemoteAwgRuntimeContractTest {
             .substringBefore("override fun close")
         assertTrue(
             ensureBlock.contains("startEngineService()"),
-            "RemoteAwgRuntime обязан стартовать WARP service session до bind, иначе :engine_warp " +
-                "остаётся обычным bound process и может уснуть/быть выгружен в фоне.",
+            "RemoteAwgRuntime обязан стартовать WARP foreground session до bind, иначе :engine_warp " +
+                "может быть выгружен в фоне на активном WARP.",
         )
         assertTrue(
             source.contains("ACTION_START_SESSION") && source.contains("startForegroundService"),
@@ -180,8 +180,7 @@ class RemoteAwgRuntimeContractTest {
         assertTrue(
             source.contains("WarpEngineServiceActions.START_SESSION") &&
                 source.contains("WarpEngineServiceActions.STOP_SESSION"),
-            "RemoteAwgRuntime обязан ссылаться на shared action constants, а не дублировать строки " +
-                "из WarpEngineService.",
+            "RemoteAwgRuntime обязан ссылаться на shared action constants.",
         )
     }
 
@@ -190,8 +189,8 @@ class RemoteAwgRuntimeContractTest {
         val closeBlock = source.substringAfter("override fun close()").substringBefore("override fun turnOn")
         assertTrue(
             closeBlock.contains("ACTION_STOP_SESSION") && closeBlock.contains("stopService"),
-            "Explicit teardown обязан остановить foreground WARP session, иначе manual OFF оставит " +
-                ":engine_warp живым после выключения VPN. Body=$closeBlock",
+            "Explicit teardown обязан остановить foreground WARP session, иначе :engine_warp останется жить " +
+                "после выключения VPN.",
         )
     }
 

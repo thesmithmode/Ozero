@@ -375,7 +375,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun speedHistoryGapAfterBackgroundStartsFreshSeries() = runTest {
+    fun speedHistoryGapAfterBackgroundKeepsPreviousSeries() = runTest {
         val first = TunnelStats(txPackets = 1, txBytes = 100, rxPackets = 2, rxBytes = 200, timestampMs = 1)
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
@@ -390,8 +390,9 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         val historyAfterGap = viewModel.speedHistory.value
-        assertEquals(1, historyAfterGap.size)
-        assertTrue(historyAfterGap.single().tsMs > beforeGap.tsMs)
+        assertEquals(2, historyAfterGap.size)
+        assertEquals(beforeGap, historyAfterGap.first())
+        assertTrue(historyAfterGap.last().tsMs > beforeGap.tsMs)
     }
 
     @Test

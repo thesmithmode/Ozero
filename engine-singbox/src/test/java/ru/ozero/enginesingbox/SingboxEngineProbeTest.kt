@@ -588,7 +588,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `awaitReady fails tun auto select runtime after routed probe miss`() = runTest {
+    fun `awaitReady requires routed proof for tun auto select runtime`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
         val process = mockk<ISingboxEngineProcess>()

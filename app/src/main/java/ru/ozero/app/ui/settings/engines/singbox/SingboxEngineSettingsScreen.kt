@@ -476,6 +476,7 @@ private fun ProfileItem(
     isTesting: Boolean,
     onSelect: () -> Unit,
 ) {
+    val display = remember(profile.name) { profile.name.toSingboxProfileDisplay() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -488,11 +489,19 @@ private fun ProfileItem(
             onClick = null,
         )
         Spacer(Modifier.width(4.dp))
-        Text(
-            text = profile.name,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.weight(1f),
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = display.title,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (display.subtitle.isNotEmpty()) {
+                Text(
+                    text = display.subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         when {
             isTesting -> {
                 Spacer(Modifier.width(4.dp))
@@ -516,6 +525,29 @@ private fun ProfileItem(
             }
         }
     }
+}
+
+private data class SingboxProfileDisplay(
+    val title: String,
+    val subtitle: String,
+)
+
+private fun String.toSingboxProfileDisplay(): SingboxProfileDisplay {
+    val parts = split("|")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+    if (parts.size < 2) return SingboxProfileDisplay(trim(), "")
+    val sniPart = parts.firstOrNull { it.contains("SNI:", ignoreCase = true) }
+    val host = sniPart
+        ?.substringAfter("SNI:", "")
+        ?.replace("✅", "")
+        ?.trim()
+        .orEmpty()
+    val title = host.ifEmpty { parts.first() }
+    val subtitle = parts
+        .filterNot { it == sniPart }
+        .joinToString(" · ")
+    return SingboxProfileDisplay(title, subtitle)
 }
 
 @Composable

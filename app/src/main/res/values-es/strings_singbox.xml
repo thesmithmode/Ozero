@@ -41,5 +41,6 @@
     <string name="singbox_manual_links_error_empty">Pegue al menos un enlace</string>
     <string name="singbox_manual_links_error_parse">No se encontraron enlaces válidos</string>
     <string name="singbox_probe_timeout_label">Tiempo de espera, seg</string>
-    <string name="singbox_probe_timeout_hint">Predeterminado: 3 s. Rango permitido: 1–30 s.</string>
+    <string name="singbox_probe_timeout_hint">Predeterminado: 3 s. El control define el límite total de prueba de un servidor: 1–10 s.</string>
+    <string name="singbox_probe_timeout_value">%1$d s</string>
 </resources>

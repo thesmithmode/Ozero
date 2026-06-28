@@ -131,10 +131,8 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             sortOrder = sort,
             dnsPresetId = dnsPresetId,
             dnsServers = dnsServers,
-            probeTimeoutSeconds = (
-                prefs[SingboxProbeService.PROBE_TIMEOUT_MS_KEY]
-                    ?: SingboxProbeService.DEFAULT_PROBE_TIMEOUT_MS
-                ) / 1_000,
+            probeTimeoutSeconds = prefs[SingboxProbeService.PROBE_TIMEOUT_MS_KEY]
+                .normalizedSingboxProbeTimeoutMs() / 1_000,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SingboxSettingsUiState())
 
@@ -195,14 +193,14 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onProbeTimeoutSecondsChange(value: String) {
-        val seconds = value.toIntOrNull()?.coerceIn(
+    fun onProbeTimeoutSecondsChange(seconds: Int) {
+        val normalizedSeconds = seconds.coerceIn(
             SingboxProbeService.MIN_PROBE_TIMEOUT_MS / 1_000,
             SingboxProbeService.MAX_PROBE_TIMEOUT_MS / 1_000,
-        ) ?: return
+        )
         viewModelScope.launch {
             dataStore.edit { prefs ->
-                prefs[SingboxProbeService.PROBE_TIMEOUT_MS_KEY] = seconds * 1_000
+                prefs[SingboxProbeService.PROBE_TIMEOUT_MS_KEY] = normalizedSeconds * 1_000
             }
         }
     }
