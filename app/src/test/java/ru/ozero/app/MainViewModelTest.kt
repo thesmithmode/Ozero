@@ -864,11 +864,31 @@ class MainViewModelTest {
     @Test
     fun refreshIpInfoForcesRefetch() = runTest {
         backgroundScope.launch { viewModel.ipInfo.collect {} }
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
+        advanceUntilIdle()
+        ipInfoProvider.calls = 0
+
         viewModel.refreshIpInfo()
         advanceUntilIdle()
+
         val s = viewModel.ipInfo.value
         assertIs<IpInfoState.Loaded>(s)
         assertEquals(1, ipInfoProvider.calls)
+    }
+
+    @Test
+    fun refreshIpInfoWhileConnectingDoesNotProbeDirectly() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
+        tunnelController.onProbing()
+        tunnelController.onConnecting(EngineId.BYEDPI)
+        advanceUntilIdle()
+
+        viewModel.refreshIpInfo()
+        advanceUntilIdle()
+
+        assertIs<IpInfoState.Idle>(viewModel.ipInfo.value)
+        assertEquals(0, ipInfoProvider.calls)
     }
 
     @Test
