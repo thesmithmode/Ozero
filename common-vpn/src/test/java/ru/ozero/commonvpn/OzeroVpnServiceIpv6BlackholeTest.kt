@@ -59,15 +59,19 @@ class OzeroVpnServiceIpv6BlackholeTest {
     }
 
     @Test
-    fun `buildTunBuilder НЕ blackhole IPv6 — upstream parity`() {
+    fun `buildTunBuilder blackhole IPv6 when disabled`() {
         val body = helperSource
             .substringAfter("fun buildTunBuilder(")
             .substringBefore("private fun applyLockdown")
         assertTrue(
-            !body.contains("blackholeIpv6(builder"),
-            "buildTunBuilder НЕ должен blackhole IPv6 при ipv6Enabled=false — upstream ByeByeDPI 1.7.4 " +
-                "не делает blackhole, hev получает только IPv4 fd, иначе IPv6 пакеты заходят в hev " +
-                "и SOCKS upstream (ByeDPI без IPv6) их отбрасывает → traffic stuck.",
+            body.contains(
+                """
+                } else {
+                    blackholeIpv6(builder, "buildTunBuilder")
+                }
+                """.trimIndent(),
+            ),
+            "buildTunBuilder must capture IPv6 with blackholeIpv6 when ipv6Enabled=false",
         )
     }
 

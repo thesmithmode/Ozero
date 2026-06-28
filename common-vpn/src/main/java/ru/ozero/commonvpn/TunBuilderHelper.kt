@@ -8,20 +8,6 @@ import ru.ozero.commonvpn.split.TunBuilderConfigurator
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.TunSpec
 
-/**
- * Строит VpnService.Builder под две архитектурно разные категории движков:
- *
- * 1. `applyEngineTunSpec` — full-IP-stack engines (WARP, URnetwork) с killswitch invariant.
- *    Используют lockdown через setUnderlyingNetworks(null) — необходимо для WiFi↔Mobile
- *    транзиций (P37 incident: без lockdown TUN теряет route).
- *
- * 2. `buildTunBuilder` — local SOCKS5 proxy engines (ByeDPI) с upstream parity.
- *    НЕ применяют lockdown — upstream ByeByeDPI 1.7.5 не вызывает setUnderlyingNetworks,
- *    и наш opt-in вызов ломает QUIC/UDP routing (см. 2026-05-20 investigation,
- *    `byedpi-vpn-pipeline-upstream-divergence` concept article).
- *
- * Per-engine override через `applyUnderlying` parameter в applyLockdown.
- */
 class TunBuilderHelper(private val service: VpnService) {
 
     @Suppress("UnusedParameter")
@@ -80,8 +66,9 @@ class TunBuilderHelper(private val service: VpnService) {
         if (ipv6Enabled) {
             builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)
             builder.addRoute("::", 0)
+        } else {
+            blackholeIpv6(builder, "buildTunBuilder")
         }
-        // Ровно один DNS — паритет с upstream ByeByeDPI. Множественные DNS дублируют lookup через TUN и тормозят resolve.
         val dnsServers = (if (customDnsServers.isNotEmpty()) customDnsServers else TUN_DNS_SERVERS).take(1)
         dnsServers.forEach { dns ->
             runCatching { builder.addDnsServer(dns) }
@@ -94,19 +81,6 @@ class TunBuilderHelper(private val service: VpnService) {
         return builder
     }
 
-    /**
-     * Per-engine lockdown через setUnderlyingNetworks(null).
-     *
-     * applyUnderlying=true (WARP/URnetwork): killswitch invariant. Без вызова при
-     * WiFi→Mobile транзиции Android освобождает старый underlying network → TUN теряет
-     * route → lockdown breaks. P37 incident зафиксирован sentinel'ом.
-     *
-     * applyUnderlying=false (ByeDPI): upstream ByeByeDPI 1.7.5 parity. Вызов с null
-     * ломает QUIC routing — outgoing UDP socket в byedpi process теряет authoritative
-     * underlying network → kernel routes UDP packets через wrong interface → QUIC
-     * handshake fail на ~10-15с после connect (YouTube fallback). TCP менее affected
-     * (kernel cache route per-socket). Reasoning: `byedpi-vpn-pipeline-upstream-divergence`.
-     */
     private fun applyLockdown(builder: VpnService.Builder, callerTag: String, applyUnderlying: Boolean) {
         if (!applyUnderlying) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
