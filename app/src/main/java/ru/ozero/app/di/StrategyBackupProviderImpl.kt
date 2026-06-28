@@ -59,7 +59,7 @@ class StrategyBackupProviderImpl(
                     evolutionMutationRate = ss.evolutionMutationRate ?: current.evolutionMutationRate,
                     evolutionEliteCount = ss.evolutionEliteCount ?: current.evolutionEliteCount,
                     evolutionTargetFitness = ss.evolutionTargetFitness ?: current.evolutionTargetFitness,
-                ),
+                ).normalized(),
             )
         }
         if (strategy.domainLists.isNotEmpty()) {
