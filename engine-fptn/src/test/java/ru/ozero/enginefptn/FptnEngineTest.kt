@@ -59,6 +59,15 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `tunSpec routes IPv6 when IPv6 family is enabled`() = runTest {
+        val spec = engine.tunSpec()
+
+        assertEquals(true, spec.allowFamilyV6)
+        assertNotNull(spec.ipv6Address)
+        assertEquals(true, spec.routeAllV6)
+    }
+
+    @Test
     fun `start with blank token returns failure`() = runTest {
         val result = engine.start(EngineConfig.Fptn(token = ""), Upstream.None)
         val failure = assertIs<StartResult.Failure>(result)
