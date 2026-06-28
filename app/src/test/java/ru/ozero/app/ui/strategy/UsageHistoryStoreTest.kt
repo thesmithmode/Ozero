@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class UsageHistoryStoreTest {
@@ -66,6 +67,16 @@ class UsageHistoryStoreTest {
         val result = store.record("-Ku -An", name = "Test")
         assertEquals(1, result.size)
         assertEquals("-Ku -An", result[0].command)
+    }
+
+    @Test
+    fun `record propagates write failure without returning transient history`() {
+        File(tempDir, "strategy_usage_history.json").mkdir()
+
+        assertFailsWith<java.io.IOException> {
+            store.record("-Ku -An", name = "Test")
+        }
+        assertEquals(emptyList(), store.load())
     }
 
     @Test
