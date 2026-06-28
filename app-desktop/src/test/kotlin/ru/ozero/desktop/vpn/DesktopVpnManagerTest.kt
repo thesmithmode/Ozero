@@ -129,7 +129,7 @@ class DesktopVpnManagerTest {
         }
 
         @Test
-        fun `should use TUN when canUseTun is true for singbox`() = testScope.runTest {
+        fun `should fail closed for singbox TUN without protected outbound`() = testScope.runTest {
             every { mockPlatformDetector.canUseTun() } returns true
             every { mockPlatformDetector.isAdmin() } returns true
             every { mockPlatformDetector.hasWintun() } returns true
@@ -137,7 +137,11 @@ class DesktopVpnManagerTest {
             manager.connect(EngineId.SINGBOX, VpnMode.TUN)
             advanceUntilIdle()
 
+            val state = manager.state.value
             assertEquals(VpnMode.TUN, manager.effectiveVpnMode.value)
+            assertTrue(state is TunnelState.Failed)
+            assertEquals("Sing-box TUN requires a protected outbound", (state as TunnelState.Failed).reason)
+            assertEquals(PowerDiscState.Off, manager.powerDiscState.value)
         }
 
         @Test

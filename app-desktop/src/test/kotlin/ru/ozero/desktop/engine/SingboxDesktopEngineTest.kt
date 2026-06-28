@@ -118,6 +118,13 @@ class SingboxDesktopEngineTest {
         }
 
         @Test
+        fun `should resolve dns through proxy`() {
+            val proxyOutbound = """{"type":"socks","tag":"proxy","server":"127.0.0.1","server_port":1080}"""
+            val config = SingboxDesktopEngine.buildFullProxyConfig(proxyOutbound)
+            assertTrue(config.contains(""""detour":"proxy""""))
+        }
+
+        @Test
         fun `should use custom port`() {
             val proxyOutbound = """{"type":"direct","tag":"proxy"}"""
             val config = SingboxDesktopEngine.buildFullProxyConfig(proxyOutbound, port = 5555)
@@ -172,9 +179,12 @@ class SingboxDesktopEngineTest {
         }
 
         @Test
-        fun `should route final to direct`() {
+        fun `should fail closed without direct route`() {
             val config = SingboxDesktopEngine.buildTunConfig()
-            assertTrue(config.contains(""""final":"direct""""))
+            assertTrue(config.contains(""""final":"block""""))
+            assertTrue(config.contains("""{"protocol":"dns","outbound":"block"}"""))
+            assertFalse(config.contains(""""type":"direct""""))
+            assertFalse(config.contains(""""final":"direct""""))
         }
 
         @Test
@@ -227,6 +237,12 @@ class SingboxDesktopEngineTest {
         }
 
         @Test
+        fun `should resolve dns through proxy`() {
+            val config = SingboxDesktopEngine.buildTunForwardConfig(1080)
+            assertTrue(config.contains(""""detour":"proxy""""))
+        }
+
+        @Test
         fun `should produce balanced json`() {
             val config = SingboxDesktopEngine.buildTunForwardConfig(1080)
             assertEquals(config.count { it == '{' }, config.count { it == '}' })
@@ -256,6 +272,13 @@ class SingboxDesktopEngineTest {
             val proxyOutbound = """{"type":"vless","tag":"proxy","server":"example.com","server_port":443}"""
             val config = SingboxDesktopEngine.buildFullTunConfig(proxyOutbound)
             assertTrue(config.contains(""""final":"proxy""""))
+        }
+
+        @Test
+        fun `should resolve dns through proxy`() {
+            val proxyOutbound = """{"type":"vless","tag":"proxy","server":"example.com","server_port":443}"""
+            val config = SingboxDesktopEngine.buildFullTunConfig(proxyOutbound)
+            assertTrue(config.contains(""""detour":"proxy""""))
         }
     }
 
