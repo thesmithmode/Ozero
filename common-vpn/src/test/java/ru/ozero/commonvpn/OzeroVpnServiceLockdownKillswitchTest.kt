@@ -315,7 +315,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
 
     @Test
     fun `killswitch=on lockdownStartupTun establish выполняется ДО pickAutoCandidate (P35)`() {
-        val lockdownEstablishIdx = runBody.indexOf("lockdownStartupFdRef.set")
+        val lockdownEstablishIdx = runBody.indexOf("replaceLockdownStartupFd(fd)")
         val pickIdx = runBody.indexOf("autoCandidatesWithPreflight")
         val manualIdx = runBody.indexOf("settings?.manualEngine")
         val anyPickIdx = listOf(pickIdx, manualIdx).filter { it >= 0 }.minOrNull() ?: -1
@@ -325,9 +325,60 @@ class OzeroVpnServiceLockdownKillswitchTest {
         )
         assertTrue(
             lockdownEstablishIdx < anyPickIdx,
-            "lockdownStartupFdRef.set (instant lockdown TUN) обязан случаться ДО выбора движка — " +
+            "replaceLockdownStartupFd(fd) (instant lockdown TUN) обязан случаться ДО выбора движка — " +
                 "иначе preflight probe (network call) при killswitch=on проходит без активного TUN " +
                 "и трафик утекает на этапе probe. lockdownIdx=$lockdownEstablishIdx pickIdx=$anyPickIdx",
+        )
+    }
+
+    @Test
+    fun `startVpn не закрывает retained TUN до нового establish`() {
+        val body = serviceSource
+            .substringAfter("private fun startVpn()")
+            .substringBefore("private fun engineExtras()")
+        assertTrue(
+            !body.contains("tunFdRef.getAndSet(null)?.close()"),
+            "startVpn не должен закрывать retained TUN до StartSequenceCoordinator establish — " +
+                "иначе kill switch пропускает трафик во время reconnect.",
+        )
+        assertTrue(
+            !body.contains("onKillswitchReleased()"),
+            "startVpn не должен сбрасывать kill switch badge до успешного engine start.",
+        )
+    }
+
+    @Test
+    fun `новый TUN заменяет старый retained TUN только после establish`() {
+        assertTrue(
+            startSequenceSource.contains("private fun replaceTunFd(fd: ParcelFileDescriptor)"),
+            "StartSequenceCoordinator обязан централизованно заменять retained TUN.",
+        )
+        val establishTunBody = startSequenceSource
+            .substringAfter("private fun establishTun(")
+            .substringBefore("private fun hasBlockingTun()")
+        assertTrue(
+            establishTunBody.contains("replaceTunFd(fd)"),
+            "Обычный establish должен заменить старый retained TUN только после успешного Builder.establish().",
+        )
+        val engineTunBody = startSequenceSource
+            .substringAfter("private suspend fun establishTunForEngine(")
+            .substringBefore("private fun captureTunIfaceName")
+        assertTrue(
+            engineTunBody.contains("replaceTunFd(pfd)"),
+            "Engine TUN establish должен заменить старый retained TUN только после успешного Builder.establish().",
+        )
+    }
+
+    @Test
+    fun `no engine reachable при killswitch сохраняет blocking TUN`() {
+        val emptyPicksBody = runBody
+            .substringAfter("if (picks.isEmpty()) {")
+            .substringBefore("picks.forEachIndexed")
+        val keepIdx = emptyPicksBody.indexOf("trafficMode == TrafficMode.TUN && killswitch && hasBlockingTun()")
+        val stopIdx = emptyPicksBody.indexOf("stopVpnRequest()")
+        assertTrue(
+            keepIdx >= 0 && stopIdx >= 0 && keepIdx < stopIdx,
+            "При reconnect из kill switch отсутствие engine не должно вызывать stopVpn до проверки blocking TUN.",
         )
     }
 

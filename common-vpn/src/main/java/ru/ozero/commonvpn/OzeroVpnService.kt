@@ -275,9 +275,6 @@ class OzeroVpnService : android.net.VpnService() {
         stopSignal.set(false)
         PersistentLoggers.info(TAG, "startVpn entry")
         val externalVpnActive = logActiveExternalVpn()
-        runCatching { tunFdRef.getAndSet(null)?.close() }
-            .onFailure { PersistentLoggers.warn(TAG, "startVpn: stale tunFd close threw: ${it.message}") }
-        tunnelController.onKillswitchReleased()
 
         val tName = Thread.currentThread().name
         val isMain = android.os.Looper.myLooper() === android.os.Looper.getMainLooper()

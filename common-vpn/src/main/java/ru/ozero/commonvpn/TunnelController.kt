@@ -52,6 +52,7 @@ class TunnelController(
         smoothedBpsOut = 0.0
         stagnationMonitor.reset()
         _stagnant.value = false
+        onKillswitchReleased()
         transition(TunnelState.Connected(engineId, socksPort))
     }
 

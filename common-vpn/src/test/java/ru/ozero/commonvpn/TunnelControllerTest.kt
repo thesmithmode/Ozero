@@ -61,6 +61,19 @@ class TunnelControllerTest {
     }
 
     @Test
+    fun engineStartedReleasesKillswitchBadge() {
+        controller.onProbing()
+        controller.onKillswitchEngaged(EngineId.BYEDPI, "crash")
+        assertTrue(controller.killswitchActive.value)
+
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+
+        assertTrue(!controller.killswitchActive.value)
+    }
+
+    @Test
     fun engineDeathFromConnectedTransitionsToFailed() {
         controller.onProbing()
         controller.onConnecting(EngineId.BYEDPI)

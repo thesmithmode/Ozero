@@ -79,7 +79,7 @@ class StartSequenceCoordinator(
             }
                 .onSuccess { fd ->
                     if (fd != null) {
-                        state.lockdownStartupFdRef.set(fd)
+                        replaceLockdownStartupFd(fd)
                         PersistentLoggers.info(TAG, "instant lockdown TUN — engine pick pending")
                     }
                 }
@@ -112,6 +112,7 @@ class StartSequenceCoordinator(
                 deps.tunnelController.onProbing(targetForUi)
                 deps.tunnelController.onEngineDied(targetForUi, "no engine reachable ($mode mode)")
             }
+            if (trafficMode == TrafficMode.TUN && killswitch && hasBlockingTun()) return
             stopVpnRequest()
             return
         }
@@ -415,7 +416,7 @@ class StartSequenceCoordinator(
             stopVpnRequest()
             return null
         }
-        state.tunFdRef.set(pfd)
+        replaceTunFd(pfd)
         captureTunIfaceName(before)
         val iface = state.tunIfaceNameRef.get()
         Log.i(TAG, "engine TUN established fd=${pfd.fd} engineId=$engineId mtu=${spec.mtu} iface=$iface")
@@ -456,10 +457,29 @@ class StartSequenceCoordinator(
             stopVpnRequest()
             return null
         }
-        state.tunFdRef.set(fd)
+        replaceTunFd(fd)
         captureTunIfaceName(before)
         Log.i(TAG, "TUN established fd=${fd.fd} iface=${state.tunIfaceNameRef.get()}")
         return fd
+    }
+
+    private fun hasBlockingTun(): Boolean =
+        state.tunFdRef.get() != null || state.lockdownStartupFdRef.get() != null
+
+    private fun replaceTunFd(fd: ParcelFileDescriptor) {
+        val old = state.tunFdRef.getAndSet(fd)
+        if (old !== fd) {
+            runCatching { old?.close() }
+                .onFailure { PersistentLoggers.warn(TAG, "old tunFd close threw: ${it.message}") }
+        }
+    }
+
+    private fun replaceLockdownStartupFd(fd: ParcelFileDescriptor) {
+        val old = state.lockdownStartupFdRef.getAndSet(fd)
+        if (old !== fd) {
+            runCatching { old?.close() }
+                .onFailure { PersistentLoggers.warn(TAG, "old lockdownStartupFd close threw: ${it.message}") }
+        }
     }
 
     private suspend fun startChain(
