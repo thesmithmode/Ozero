@@ -477,6 +477,7 @@
     <string name="warp_tweaks_endpoint_section">Конечная точка</string>
     <string name="warp_tweaks_awg_section">Параметры AmneziaWG</string>
     <string name="logs_copy_empty_toast">Пусто — нечего копировать</string>
+    <string name="logs_copy_done_private_toast_fmt">Скопировано после очистки секретов (%1$d симв.). Буфер очистится через минуту.</string>
     <string name="logs_copy_done_toast_fmt">Скопировано (%1$d симв.)</string>
     <string name="logs_export_level_title">Минимальный уровень</string>
 

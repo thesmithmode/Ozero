@@ -467,6 +467,7 @@
     <string name="logs_empty">No entries</string>
     <string name="logs_share_chooser_title">Share ozero.log</string>
     <string name="logs_copy_empty_toast">Empty — nothing to copy</string>
+    <string name="logs_copy_done_private_toast_fmt">Copied with secrets redacted (%1$d chars). Clipboard clears in one minute.</string>
     <string name="logs_copy_done_toast_fmt">Copied (%1$d chars)</string>
     <string name="logs_export">Export .log</string>
     <string name="logs_export_level_title">Minimum level</string>
