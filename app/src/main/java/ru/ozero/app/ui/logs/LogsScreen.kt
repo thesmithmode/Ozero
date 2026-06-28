@@ -5,6 +5,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.PersistableBundle
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -63,6 +66,7 @@ import ru.ozero.app.R
 import ru.ozero.app.logging.LogEntry
 import ru.ozero.app.logging.LogLevel
 import ru.ozero.app.ui.theme.OzeroPalette
+import ru.ozero.enginescore.LogSanitizer
 import java.io.File
 import java.util.Calendar
 
@@ -481,16 +485,39 @@ internal fun copyToClipboard(context: Context, label: String, text: String) {
         Toast.makeText(context, context.getString(R.string.logs_copy_empty_toast), Toast.LENGTH_SHORT).show()
         return
     }
+    val safeText = sanitizeClipboardLogText(text)
     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    cm.setPrimaryClip(ClipData.newPlainText(label, text))
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-        Toast.makeText(
-            context,
-            context.getString(R.string.logs_copy_done_toast_fmt, text.length),
-            Toast.LENGTH_SHORT,
-        ).show()
+    val clip = ClipData.newPlainText(label, safeText).apply {
+        description.extras = PersistableBundle().apply {
+            putBoolean(CLIPBOARD_SENSITIVE_EXTRA, true)
+        }
     }
+    cm.setPrimaryClip(clip)
+    scheduleClipboardClear(cm, label, safeText)
+    Toast.makeText(
+        context,
+        context.getString(R.string.logs_copy_done_private_toast_fmt, safeText.length),
+        Toast.LENGTH_LONG,
+    ).show()
 }
+
+internal fun sanitizeClipboardLogText(text: String): String = LogSanitizer.sanitize(text)
+
+private fun scheduleClipboardClear(cm: ClipboardManager, label: String, text: String) {
+    Handler(Looper.getMainLooper()).postDelayed({
+        val current = cm.primaryClip
+        if (current?.description?.label == label && current.itemCount == 1 && current.getItemAt(0).text == text) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                cm.clearPrimaryClip()
+            } else {
+                cm.setPrimaryClip(ClipData.newPlainText("", ""))
+            }
+        }
+    }, CLIPBOARD_CLEAR_DELAY_MS)
+}
+
+private const val CLIPBOARD_SENSITIVE_EXTRA = "android.content.extra.IS_SENSITIVE"
+private const val CLIPBOARD_CLEAR_DELAY_MS = 60_000L
 
 object LogsScreenTestTags {
     const val BACK = "logs_back"
