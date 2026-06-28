@@ -55,8 +55,13 @@ class OzeroQuickTile : TileService() {
 
     private fun syncTileState(state: TunnelState) {
         val tileState = when (state) {
-            is TunnelState.Connected, is TunnelState.Connecting, is TunnelState.Probing -> Tile.STATE_ACTIVE
-            is TunnelState.Idle, is TunnelState.Failed, is TunnelState.Disconnecting -> Tile.STATE_INACTIVE
+            is TunnelState.Connected -> Tile.STATE_ACTIVE
+            is TunnelState.Idle,
+            is TunnelState.Connecting,
+            is TunnelState.Probing,
+            is TunnelState.Failed,
+            is TunnelState.Disconnecting,
+            -> Tile.STATE_INACTIVE
         }
         updateTile(tileState)
     }
@@ -68,7 +73,6 @@ class OzeroQuickTile : TileService() {
                 action = OzeroVpnService.ACTION_START
             },
         )
-        updateTile(Tile.STATE_ACTIVE)
     }
 
     private fun stopVpn() {
