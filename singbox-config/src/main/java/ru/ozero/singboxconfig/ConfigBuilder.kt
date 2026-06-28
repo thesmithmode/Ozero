@@ -22,6 +22,8 @@ object ConfigBuilder {
     private val SUPPORTED_TRANSPORTS = setOf("tcp", "ws", "grpc", "http", "h2", "httpupgrade", "")
     private const val MIN_PORT = 1
     private const val MAX_PORT = 65_535
+    private const val MAX_AUTO_OUTBOUNDS = 50
+    private const val MAX_AUTO_CONFIG_BYTES = 512 * 1024
 
     fun buildSingboxConfig(
         bean: AbstractBean,
@@ -40,6 +42,7 @@ object ConfigBuilder {
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
+        require(beans.size <= MAX_AUTO_OUTBOUNDS) { "auto-select supports at most $MAX_AUTO_OUTBOUNDS outbounds" }
         val supported = beans.filter { isSupportedBean(it) }
         require(supported.isNotEmpty()) { "no beans with supported transport types" }
         val proxyOutbounds = supported.mapIndexed { index, bean -> beanOutbound(bean, "proxy-$index") }
@@ -51,6 +54,11 @@ object ConfigBuilder {
             append(""""interrupt_exist_connections":true,"idle_timeout":"30m"}""")
         }
         return buildFullConfig(listOf(urltest) + proxyOutbounds, probeSocksPort, dnsServers, ipv6Enabled)
+            .also { json ->
+                require(json.toByteArray(Charsets.UTF_8).size <= MAX_AUTO_CONFIG_BYTES) {
+                    "auto-select config is too large"
+                }
+            }
     }
 
     fun isSupportedBean(bean: AbstractBean): Boolean {
@@ -78,6 +86,7 @@ object ConfigBuilder {
         ipv6Enabled: Boolean = true,
     ): String {
         require(beans.isNotEmpty()) { "beans must not be empty for auto-select chain config" }
+        require(beans.size <= MAX_AUTO_OUTBOUNDS) { "auto-select supports at most $MAX_AUTO_OUTBOUNDS outbounds" }
         val supported = beans.filter { isSupportedBean(it) }
         require(supported.isNotEmpty()) { "no beans with supported transport types" }
         val detourTag = upstream?.let { "upstream" }

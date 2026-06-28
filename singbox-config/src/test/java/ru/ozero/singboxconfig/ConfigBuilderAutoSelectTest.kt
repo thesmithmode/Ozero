@@ -5,6 +5,7 @@ import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
 import kotlin.test.assertContains
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -167,6 +168,15 @@ class ConfigBuilderAutoSelectTest {
         assertContains(json, "\"tag\":\"proxy\"")
         assertFalse(json.contains("\"tag\":\"proxy-0\""), "Single-profile config must not use indexed tags")
         assertFalse(json.contains("\"type\":\"urltest\""), "Single-profile config must not have urltest")
+    }
+
+    @Test
+    fun `should reject auto configs above outbound cap`() {
+        val beans = (1..51).map { makeVless("server$it.example.com", 443) }
+
+        assertFailsWith<IllegalArgumentException> {
+            ConfigBuilder.buildSingboxAutoConfig(beans)
+        }
     }
 
     @Test

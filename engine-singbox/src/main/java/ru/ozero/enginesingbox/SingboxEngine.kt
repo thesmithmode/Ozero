@@ -650,18 +650,24 @@ class SingboxEngine @Inject constructor(
         }
 
     private fun supportedBeans(blobs: List<ByteArray>): List<AbstractBean> =
-        blobs.mapNotNull { blob ->
-            runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
-                .onFailure { e -> PersistentLoggers.warn(TAG, "bean deserialize: ${e.message}") }
-                .getOrNull()
-                ?.takeIf { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
-        }
+        blobs.asSequence()
+            .filter { it.size <= MAX_AUTO_SELECT_BLOB_BYTES }
+            .take(MAX_AUTO_SELECT_OUTBOUNDS)
+            .mapNotNull { blob ->
+                runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
+                    .onFailure { e -> PersistentLoggers.warn(TAG, "bean deserialize: ${e.message}") }
+                    .getOrNull()
+                    ?.takeIf { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
+            }
+            .toList()
 
-    private fun isSupportedRoutableBlob(blob: ByteArray): Boolean =
-        runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
+    private fun isSupportedRoutableBlob(blob: ByteArray): Boolean {
+        if (blob.size > MAX_AUTO_SELECT_BLOB_BYTES) return false
+        return runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
             .getOrNull()
             ?.let { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
             ?: false
+    }
 
     private fun autoSelectBlobWindow(profiles: List<ProxyProfile>): List<ByteArray> =
         profiles
@@ -810,6 +816,7 @@ class SingboxEngine @Inject constructor(
         private const val READY_PROBE_ATTEMPTS = 5
         private const val READY_PROBE_RETRY_MS = 500L
         private const val MAX_AUTO_SELECT_OUTBOUNDS = 50
+        private const val MAX_AUTO_SELECT_BLOB_BYTES = 64 * 1024
         private const val MAX_AUTO_PROFILE_SCAN = 2_000
         private const val CHAIN_PORT_BASE = 49408
         private const val CHAIN_PORT_RANGE = 256
