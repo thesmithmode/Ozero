@@ -873,6 +873,18 @@ class MainViewModelTest {
     }
 
     @Test
+    fun refreshIpInfoDoesNotUseDirectHttpDuringSwitchingIdle() = runTest {
+        backgroundScope.launch { viewModel.ipInfo.collect {} }
+        tunnelController.onSwitchingStarted(from = EngineId.BYEDPI, to = EngineId.WARP)
+        viewModel.refreshIpInfo()
+        advanceUntilIdle()
+        assertIs<IpInfoState.Idle>(viewModel.ipInfo.value)
+        assertEquals(0, ipInfoProvider.calls)
+        assertEquals(0, ipInfoProvider.fetchCalls)
+        assertEquals(0, ipInfoProvider.fetchViaCalls)
+    }
+
+    @Test
     fun isReconnectingFalseInitially() = runTest {
         advanceUntilIdle()
         assertEquals(false, viewModel.isReconnecting.value)

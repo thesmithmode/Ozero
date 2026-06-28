@@ -330,6 +330,7 @@ class MainViewModel @Inject constructor(
     fun refreshIpInfo() {
         viewModelScope.launch {
             val s = tunnelController.state.value
+            if (s !is TunnelState.Connected && tunnelController.switching.value != null) return@launch
             _ipInfo.value = IpInfoState.Loading
             _ipInfo.value = if (s is TunnelState.Connected) {
                 resolveIpInfoWithRetry(s.engineId, s.socksPort)
