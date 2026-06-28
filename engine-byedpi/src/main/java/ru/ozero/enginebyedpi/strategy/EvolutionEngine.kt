@@ -269,6 +269,7 @@ class EvolutionEngine(
         elites: List<Chromosome>,
         mutationRate: Float,
     ): List<Chromosome> {
+        if (elites.isEmpty()) return buildNextGeneration(elites, mutationRate)
         val offspring = mutableListOf<Chromosome>()
         offspring.addAll(elites)
         val randomCount = (settings.populationSize - elites.size) / 2
