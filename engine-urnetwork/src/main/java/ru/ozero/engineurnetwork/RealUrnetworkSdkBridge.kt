@@ -296,6 +296,7 @@ class RealUrnetworkSdkBridge(
         tunnelStartedRef.set(false)
         connectIssuedRef.set(false)
         sharingTrafficLogged.set(false)
+        val hadLoopBeforeStop = ioLoopRef.get() != null
         val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
             withContext(Dispatchers.Main.immediate) {
                 walletVcRef.getAndSet(null)?.also { vc ->
@@ -317,11 +318,20 @@ class RealUrnetworkSdkBridge(
                 } else {
                     deviceRef.set(null)
                 }
+                hadLoop
             }
         }
         if (completed == null) {
             PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms - refs cleared")
         }
+        if (completed == true || (completed == null && hadLoopBeforeStop)) {
+            Log.i(TAG, "stop complete - runtime release deferred until IoLoop done")
+        } else {
+            releaseRuntimeWithTimeout()
+        }
+    }
+
+    private suspend fun releaseRuntimeWithTimeout() {
         val releaseOutcome = runCatching {
             withTimeoutOrNull(RUNTIME_RELEASE_TIMEOUT_MS) { UrnetworkRuntime.release() }
         }
@@ -349,6 +359,10 @@ class RealUrnetworkSdkBridge(
         } else {
             PersistentLoggers.warn(TAG, "stop complete - runtime release not confirmed")
         }
+    }
+
+    private fun releaseRuntimeAfterIoLoopDone() {
+        bridgeScope.launch { releaseRuntimeWithTimeout() }
     }
 
     private fun closeDevice(device: DeviceLocal) {
@@ -900,6 +914,9 @@ class RealUrnetworkSdkBridge(
                     tunnelStartedRef.set(false)
                     connectIssuedRef.set(false)
                     closeDevice(capturedDevice)
+                    if (!wasRunning) {
+                        releaseRuntimeAfterIoLoopDone()
+                    }
                     if (wasRunning) {
                         PersistentLoggers.error(
                             TAG,

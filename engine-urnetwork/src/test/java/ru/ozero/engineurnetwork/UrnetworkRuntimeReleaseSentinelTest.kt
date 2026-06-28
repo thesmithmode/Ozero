@@ -98,6 +98,31 @@ class UrnetworkRuntimeReleaseSentinelTest {
     }
 
     @Test
+    fun `bridge stop откладывает release до IoLoopDoneCallback при активном IoLoop`() {
+        val stopBlock = bridgeSource.substringAfter("private suspend fun stopUnderLock()")
+            .substringBefore("private fun closeDevice")
+        val callbackBlock = bridgeSource.substringAfter("IoLoopDoneCallback {")
+            .substringBefore("val loop = Sdk.newIoLoop")
+        assertTrue(
+            stopBlock.contains("completed == true") &&
+                stopBlock.contains("runtime release deferred until IoLoop done"),
+            "stopUnderLock обязан откладывать UrnetworkRuntime.release(), если loop.close() только запросил " +
+                "асинхронное завершение IoLoop.",
+        )
+        assertTrue(
+            callbackBlock.contains("releaseRuntimeAfterIoLoopDone()"),
+            "IoLoopDoneCallback обязан запускать release только после closeDevice(capturedDevice), когда Go IoLoop " +
+                "уже подтвердил завершение.",
+        )
+        val closeDeviceIndex = callbackBlock.indexOf("closeDevice(capturedDevice)")
+        val releaseIndex = callbackBlock.indexOf("releaseRuntimeAfterIoLoopDone()")
+        assertTrue(
+            closeDeviceIndex < releaseIndex,
+            "runtime нельзя освобождать до закрытия DeviceLocal в IoLoopDoneCallback.",
+        )
+    }
+
+    @Test
     fun `release warns если manager null но space non-null — anomaly не молчит`() {
         val body = runtimeSource.substringAfter("suspend fun release()").substringBefore("}\n}")
         assertTrue(
