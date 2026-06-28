@@ -11,13 +11,15 @@ jobs:
   apply:
     name: Squash-merge or open issue
     runs-on: ubuntu-22.04
-    if: github.event.workflow_run.head_branch != '' && startsWith(github.event.workflow_run.head_branch, 'bot/update-')
+    if: github.event.workflow_run.head_branch != '' && startsWith(github.event.workflow_run.head_branch, 'bot/update-') && github.event.workflow_run.actor.login == 'github-actions[bot]'
     permissions:
       contents: write
       issues: write
     env:
       BRANCH: ${{ github.event.workflow_run.head_branch }}
       CI_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v6
@@ -30,50 +32,74 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Check semver bump magnitude
-        id: semver
+      - name: Validate bot update branch
+        id: validate
         run: |
-          # TAG = engine-sha8, e.g. byedpi-a1b2c3d4
-          # Extract engine name from branch: bot/update-<engine>-<sha8>
+          set -euo pipefail
+          if [ "$HEAD_REPOSITORY" != "${{ github.repository }}" ]; then
+            echo "Unexpected head repository: $HEAD_REPOSITORY" >&2
+            exit 1
+          fi
+          if [[ ! "$BRANCH" =~ ^bot/update-[a-z0-9-]+-[0-9a-f]{8}$ ]]; then
+            echo "Unexpected bot update branch name: $BRANCH" >&2
+            exit 1
+          fi
           ENGINE=$(echo "$BRANCH" | sed 's|bot/update-||' | rev | cut -d- -f2- | rev)
+          case "$ENGINE" in
+            byedpi|amneziawg|urnetwork-sdk|userwireguard|fptn)
+              ;;
+            *)
+              echo "Unsupported native update engine: $ENGINE" >&2
+              exit 1
+              ;;
+          esac
+          git fetch origin "refs/heads/dev:refs/remotes/origin/dev" "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+          if [ "$(git rev-parse "origin/$BRANCH")" != "$HEAD_SHA" ]; then
+            echo "Branch head changed after CI completed" >&2
+            exit 1
+          fi
+          if [ "$(git rev-list --count "origin/dev..origin/$BRANCH")" != "1" ]; then
+            echo "Bot update branch must contain exactly one commit over dev" >&2
+            exit 1
+          fi
+          mapfile -t CHANGED_FILES < <(git diff --name-only "origin/dev...origin/$BRANCH")
+          if [ "${#CHANGED_FILES[@]}" -eq 0 ]; then
+            echo "Bot update branch has no changes" >&2
+            exit 1
+          fi
+          for FILE in "${CHANGED_FILES[@]}"; do
+            case "$ENGINE:$FILE" in
+              byedpi:engine-byedpi/src/main/jniLibs/arm64-v8a/libbyedpi.so|byedpi:engine-byedpi/src/main/jniLibs/armeabi-v7a/libbyedpi.so|byedpi:engine-byedpi/src/main/jniLibs/x86_64/libbyedpi.so|byedpi:engine-byedpi/src/main/jniLibs/x86/libbyedpi.so|amneziawg:engine-warp/src/main/jniLibs/arm64-v8a/*.so|amneziawg:engine-warp/src/main/jniLibs/armeabi-v7a/*.so|amneziawg:engine-warp/src/main/jniLibs/x86_64/*.so|urnetwork-sdk:engine-urnetwork/libs/URnetworkSdk.aar|userwireguard:engine-urnetwork/libs/userwireguard.aar|fptn:engine-fptn/src/main/jniLibs/arm64-v8a/libfptn_native_lib.so)
+                ;;
+              *)
+                echo "Unexpected file in native update: $FILE" >&2
+                exit 1
+                ;;
+            esac
+          done
           echo "engine=$ENGINE" >> "$GITHUB_OUTPUT"
-
-          # Check upstream-check.yml bump report if present in PR/issue comments
-          # Fallback: treat as minor (auto-merge allowed)
-          BUMP_LEVEL="minor"
-          echo "bump_level=$BUMP_LEVEL" >> "$GITHUB_OUTPUT"
 
       - name: CI failed — open issue
         if: env.CI_CONCLUSION != 'success'
         run: |
-          ENGINE="${{ steps.semver.outputs.engine }}"
+          ENGINE="${{ steps.validate.outputs.engine }}"
           gh issue create \
             --repo "${{ github.repository }}" \
             --title "CI failed on native binary update: $BRANCH" \
-            --body "$(printf 'Branch: \`%s\`\nCI conclusion: \`%s\`\nCI run: %s\n\nCheck the CI logs and re-trigger **Build native binaries** if needed.' \
-              "$BRANCH" "$CI_CONCLUSION" "${{ github.event.workflow_run.html_url }}")"
+            --body "$(printf 'Engine: `%s`\nBranch: `%s`\nCI conclusion: `%s`\nCI run: %s\n\nCheck the CI logs and re-trigger **Build native binaries** if needed.' \
+              "$ENGINE" "$BRANCH" "$CI_CONCLUSION" "${{ github.event.workflow_run.html_url }}")"
           echo "Issue created — manual intervention required"
 
-      - name: Major bump — open issue, skip merge
-        if: env.CI_CONCLUSION == 'success' && steps.semver.outputs.bump_level == 'major'
-        run: |
-          gh issue create \
-            --repo "${{ github.repository }}" \
-            --title "Major upstream bump requires manual review: $BRANCH" \
-            --body "$(printf 'Branch \`%s\` has CI green but contains a **major** version bump.\nReview the changelog and merge manually:\n\n\`\`\`\ngit fetch origin\ngit checkout dev\ngit merge --squash origin/%s\ngit commit -m \"CHORE: обновить нативные бинари — мажорный бамп\"\n\`\`\`' \
-              "$BRANCH" "$BRANCH")"
-
       - name: Squash-merge to dev
-        if: env.CI_CONCLUSION == 'success' && steps.semver.outputs.bump_level != 'major'
+        if: env.CI_CONCLUSION == 'success'
         run: |
-          git fetch origin dev "$BRANCH"
-          git checkout dev
+          git checkout -B dev origin/dev
           git merge --squash "origin/$BRANCH"
           git commit -m "CHORE: обновить нативные бинари — $BRANCH"
           git push origin dev
           echo "Squash-merged $BRANCH → dev"
 
       - name: Delete bot branch
-        if: env.CI_CONCLUSION == 'success' && steps.semver.outputs.bump_level != 'major'
+        if: env.CI_CONCLUSION == 'success'
         run: |
           git push origin --delete "$BRANCH" || true
