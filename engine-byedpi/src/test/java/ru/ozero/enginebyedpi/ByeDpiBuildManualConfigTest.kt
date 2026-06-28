@@ -98,5 +98,4 @@ private class FakeByeDpiProxy : ByeDpiProxyContract {
     override fun startProxy(args: Array<String>): Int = 0
     override fun stopProxy(): Int = 0
     override fun forceClose(): Int = 0
-    override fun emergencyReset(): Int = 0
 }

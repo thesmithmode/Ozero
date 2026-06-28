@@ -133,7 +133,7 @@ class ByeDpiEngine(
         val generation = proxyGeneration.incrementAndGet()
         val proxyJob = proxyScope.launch {
             PersistentLoggers.debug(TAG, "launch entered port=$resolvedPort")
-            val code = startProxyWithRecovery(args)
+            val code = startProxySafely(args)
             PersistentLoggers.debug(TAG, "startProxy returned code=$code port=$resolvedPort")
             when {
                 code == 0 -> Unit
@@ -199,23 +199,10 @@ class ByeDpiEngine(
         PersistentLoggers.warn(TAG, "$reason — new ByeDPI proxy lane")
     }
 
-    private fun startProxyWithRecovery(args: Array<String>): Int {
-        val code = safeJniCall(fallback = -1, tag = "jniStartProxy threw") {
+    private fun startProxySafely(args: Array<String>): Int =
+        safeJniCall(fallback = -1, tag = "jniStartProxy threw") {
             proxy.startProxy(args)
         }
-        if (code != JNI_GUARD_BUSY) return code
-
-        val priorGuardState = safeJniCall(fallback = 0, tag = "emergencyReset threw") {
-            proxy.emergencyReset()
-        }
-        PersistentLoggers.error(
-            TAG,
-            "byedpi hang detected — emergencyReset выполнен (prior guard=$priorGuardState); retry start",
-        )
-        return safeJniCall(fallback = -1, tag = "jniStartProxy threw after reset") {
-            proxy.startProxy(args)
-        }
-    }
 
     private inline fun <T> safeJniCall(fallback: T, tag: String, block: () -> T): T = try {
         block()
