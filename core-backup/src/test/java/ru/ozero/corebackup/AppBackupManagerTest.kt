@@ -187,7 +187,7 @@ class AppBackupManagerTest {
     fun `import — настройки записываются в DataStore`() = runTest {
         val data = makeMinimalBackup().copy(
             settings = BackupSettings(
-                splitMode = "global", ipv6Enabled = false, autoStart = true,
+                splitMode = "BLOCKLIST", ipv6Enabled = false, autoStart = true,
                 manualEngine = "warp", bydpiWinningArgs = "--test",
                 urnetworkEnabled = null, urnetworkJwt = null,
                 customDnsServers = null, hostsMode = null, hostsList = null,
@@ -201,7 +201,6 @@ class AppBackupManagerTest {
         manager.import(data)
 
         val prefs = ozeroDs.data.first()
-        assertEquals("global", prefs[SettingsKeys.SPLIT_MODE])
         assertEquals(false, prefs[SettingsKeys.IPV6_ENABLED])
         assertEquals(true, prefs[SettingsKeys.AUTO_START])
         assertEquals("warp", prefs[SettingsKeys.MANUAL_ENGINE])
@@ -212,6 +211,46 @@ class AppBackupManagerTest {
         assertEquals("""{"k":"v"}""", prefs[SettingsKeys.BYDPI_UI_SETTINGS_JSON])
         assertEquals(true, prefs[SettingsKeys.BYDPI_DEFAULT_ACCEPTED])
         assertEquals("FR", prefs[SettingsKeys.URNETWORK_COUNTRY_CODE])
+    }
+
+    @Test
+    fun `import — split mode импортируется только через категорию split tunnel`() = runTest {
+        val data = makeMinimalBackup().copy(
+            settings = makeMinimalBackup().settings.copy(splitMode = "BLOCKLIST"),
+        )
+
+        manager.import(data, setOf(BackupCategory.GENERAL_SETTINGS))
+        assertNull(ozeroDs.data.first()[SettingsKeys.SPLIT_MODE])
+
+        manager.import(data, setOf(BackupCategory.SPLIT_TUNNEL))
+        assertEquals("BLOCKLIST", ozeroDs.data.first()[SettingsKeys.SPLIT_MODE])
+    }
+
+    @Test
+    fun `import — empty ALLOWLIST backup не меняет split mode`() = runTest {
+        ozeroDs.edit { prefs -> prefs[SettingsKeys.SPLIT_MODE] = "ALL" }
+        val data = makeMinimalBackup().copy(
+            settings = makeMinimalBackup().settings.copy(splitMode = "ALLOWLIST"),
+            splitRules = emptyList(),
+        )
+
+        manager.import(data)
+
+        assertEquals("ALL", ozeroDs.data.first()[SettingsKeys.SPLIT_MODE])
+        assertTrue(splitDao.rules.value.isEmpty())
+    }
+
+    @Test
+    fun `import — ALLOWLIST с allow rule импортируется`() = runTest {
+        val data = makeMinimalBackup().copy(
+            settings = makeMinimalBackup().settings.copy(splitMode = "ALLOWLIST"),
+            splitRules = listOf(BackupSplitRule("com.safe", false)),
+        )
+
+        manager.import(data)
+
+        assertEquals("ALLOWLIST", ozeroDs.data.first()[SettingsKeys.SPLIT_MODE])
+        assertEquals(listOf("com.safe"), splitDao.rules.value.map { it.packageName })
     }
 
     @Test

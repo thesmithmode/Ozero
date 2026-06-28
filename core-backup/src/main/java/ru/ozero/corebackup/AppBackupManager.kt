@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
 import ru.ozero.enginescore.settings.SettingsKeys
+import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginefptn.FptnConfigStore
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkLocationSelection
@@ -153,11 +154,21 @@ class AppBackupManager(
             warpSlotStore.replaceAll(data.warpSlots.map { it.toSlot() })
         }
         if (BackupCategory.STRATEGY in categories) data.strategy?.let { strategyProvider?.import(it) }
-        if (BackupCategory.SPLIT_TUNNEL in categories && data.splitRules.isNotEmpty()) importSplit(data.splitRules)
+        if (BackupCategory.SPLIT_TUNNEL in categories) {
+            importSplitMode(data)
+            if (data.splitRules.isNotEmpty()) importSplit(data.splitRules)
+        }
+    }
+
+    private suspend fun importSplitMode(data: AppBackupData) {
+        val mode = data.settings.splitMode
+            ?.let { raw -> runCatching { SplitTunnelMode.valueOf(raw) }.getOrNull() }
+            ?: return
+        if (mode == SplitTunnelMode.ALLOWLIST && data.splitRules.none { !it.isExcluded }) return
+        ozeroSettings.edit { prefs -> prefs[SettingsKeys.SPLIT_MODE] = mode.name }
     }
 
     private fun importGeneral(prefs: MutablePreferences, s: BackupSettings) {
-        s.splitMode?.let { prefs[SettingsKeys.SPLIT_MODE] = it }
         s.ipv6Enabled?.let { prefs[SettingsKeys.IPV6_ENABLED] = it }
         s.autoStart?.let { prefs[SettingsKeys.AUTO_START] = it }
         s.manualEngine?.let { prefs[SettingsKeys.MANUAL_ENGINE] = it }
