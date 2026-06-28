@@ -37,6 +37,24 @@ class SshjTransportContractTest {
     }
 
     @Test
+    fun `ssh host keys are persisted and verified`() {
+        assertTrue(
+            !source.contains("PromiscuousVerifier"),
+            "SshjTransport must not accept arbitrary SSH host keys",
+        )
+        assertTrue(
+            source.contains("OpenSSHKnownHosts") &&
+                source.contains("hostKeyChangedAction") &&
+                source.contains("return false"),
+            "SshjTransport must reject changed SSH host keys",
+        )
+        assertTrue(
+            source.contains("write(entry)"),
+            "SshjTransport must persist first-use SSH host keys",
+        )
+    }
+
+    @Test
     fun `non-zero exit logs stderr via PersistentLoggers warn`() {
         val execBlock = source.substringAfter("override fun exec")
             .substringBefore("override fun close")

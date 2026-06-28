@@ -3,13 +3,18 @@ package ru.ozero.enginemasterdns.deploy
 import net.schmizz.sshj.AndroidConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.IOUtils
-import net.schmizz.sshj.transport.verification.PromiscuousVerifier
+import net.schmizz.sshj.common.KeyType
+import net.schmizz.sshj.transport.verification.OpenSSHKnownHosts
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import ru.ozero.enginescore.PersistentLoggers
+import java.io.File
+import java.security.PublicKey
 import java.security.Security
 import java.util.concurrent.TimeUnit
 
-internal class SshjTransport : SshTransport {
+internal class SshjTransport(
+    private val knownHostsFile: File,
+) : SshTransport {
 
     private var client: SSHClient? = null
 
@@ -21,7 +26,7 @@ internal class SshjTransport : SshTransport {
             "curve25519" !in n && "group-exchange" !in n
         }
         val ssh = SSHClient(config)
-        ssh.addHostKeyVerifier(PromiscuousVerifier())
+        ssh.addHostKeyVerifier(MasterDnsKnownHosts(knownHostsFile))
         ssh.connectTimeout = CONNECTION_TIMEOUT_MS.toInt()
         ssh.connect(host, port)
         client = ssh
@@ -57,6 +62,26 @@ internal class SshjTransport : SshTransport {
     override fun close() {
         client?.disconnect()
         client = null
+    }
+
+    private class MasterDnsKnownHosts(
+        private val file: File,
+    ) : OpenSSHKnownHosts(file) {
+
+        override fun hostKeyUnverifiableAction(hostname: String, key: PublicKey): Boolean {
+            val type = KeyType.fromKey(key)
+            if (type == KeyType.UNKNOWN) return false
+            file.parentFile?.mkdirs()
+            val entry = OpenSSHKnownHosts.HostEntry(null, hostname, type, key)
+            entries().add(entry)
+            write(entry)
+            return true
+        }
+
+        override fun hostKeyChangedAction(hostname: String, key: PublicKey): Boolean {
+            PersistentLoggers.warn(TAG, "host key changed")
+            return false
+        }
     }
 
     private companion object {

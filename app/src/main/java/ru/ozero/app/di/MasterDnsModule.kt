@@ -78,7 +78,12 @@ object MasterDnsModule {
 
     @Provides
     @Singleton
-    fun provideMasterDnsServerDeployer(): MasterDnsServerDeployer = SshjMasterDnsDeployer()
+    fun provideMasterDnsServerDeployer(
+        @ApplicationContext context: Context,
+    ): MasterDnsServerDeployer {
+        val knownHostsFile = File(context.filesDir, "masterdns/ssh_known_hosts")
+        return SshjMasterDnsDeployer(knownHostsFile)
+    }
 
     @Provides
     @Singleton
