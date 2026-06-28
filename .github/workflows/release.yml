@@ -486,7 +486,10 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: apk-artifacts
-          path: release-out/*
+          path: |
+            release-out/Ozero-${{ needs.resolve-version.outputs.tag }}.apk
+            release-out/Ozero-${{ needs.resolve-version.outputs.tag }}.apk.sha256
+            release-out/Ozero-${{ needs.resolve-version.outputs.tag }}.apk.asc
           retention-days: 1
 
   publish:
@@ -498,25 +501,50 @@ jobs:
       contents: write
 
     steps:
-      - name: Download all artifacts
+      - name: Download APK artifacts
         uses: actions/download-artifact@v7
         with:
+          name: apk-artifacts
           path: release-all
-          merge-multiple: true
 
-      - name: Verify APK artifact present
+      - name: Verify APK release assets
+        id: verify-assets
+        env:
+          TAG: ${{ needs.resolve-version.outputs.tag }}
         run: |
           set -euo pipefail
           cd release-all
           echo "=== Release artifacts ==="
           ls -la
-          if ! ls Ozero-*.apk >/dev/null 2>&1; then
-            echo "::error::Missing APK artifact"
+          apk="Ozero-${TAG}.apk"
+          sha="${apk}.sha256"
+          asc="${apk}.asc"
+          if [ ! -f "$apk" ]; then
+            echo "::error::Missing APK asset: $apk"
             exit 1
           fi
-          echo "APK artifact present"
+          if [ ! -f "$sha" ]; then
+            echo "::error::Missing APK checksum asset: $sha"
+            exit 1
+          fi
+          expected=("$apk" "$sha")
+          if [ -f "$asc" ]; then
+            expected+=("$asc")
+            echo "has_asc=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_asc=false" >> "$GITHUB_OUTPUT"
+          fi
+          mapfile -t actual < <(find . -maxdepth 1 -type f -printf '%f\n' | sort)
+          mapfile -t allowed < <(printf '%s\n' "${expected[@]}" | sort)
+          if ! diff -u <(printf '%s\n' "${allowed[@]}") <(printf '%s\n' "${actual[@]}"); then
+            echo "::error::Unexpected release asset set"
+            exit 1
+          fi
+          sha256sum --check "$sha"
+          echo "APK release assets verified"
 
       - name: Publish GitHub Release
+        if: steps.verify-assets.outputs.has_asc == 'false'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.resolve-version.outputs.tag }}
@@ -527,4 +555,21 @@ jobs:
           overwrite_files: true
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            release-all/*
+            release-all/Ozero-${{ needs.resolve-version.outputs.tag }}.apk
+            release-all/Ozero-${{ needs.resolve-version.outputs.tag }}.apk.sha256
+
+      - name: Publish GitHub Release
+        if: steps.verify-assets.outputs.has_asc == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.resolve-version.outputs.tag }}
+          name: ${{ needs.resolve-version.outputs.tag }}
+          prerelease: ${{ contains(needs.resolve-version.outputs.tag, '-') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            release-all/Ozero-${{ needs.resolve-version.outputs.tag }}.apk
+            release-all/Ozero-${{ needs.resolve-version.outputs.tag }}.apk.sha256
+            release-all/Ozero-${{ needs.resolve-version.outputs.tag }}.apk.asc
