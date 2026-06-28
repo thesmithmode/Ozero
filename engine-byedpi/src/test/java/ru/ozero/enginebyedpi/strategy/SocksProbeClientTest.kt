@@ -191,6 +191,18 @@ class SocksProbeClientTest {
     }
 
     @Test
+    fun `declared length greater than max stops at configured max bytes`() = runTest {
+        val body = ByteArray(64) { it.toByte() }
+        val opener = { _: URL, _: Proxy -> fakeConnection(200, 64L, body) }
+
+        val result = client(opener, maxBytesToRead = 16L).probe("example.com")
+
+        assertFalse(result.success)
+        assertEquals(16L, result.actualLength)
+        assertEquals(64L, result.declaredLength)
+    }
+
+    @Test
     fun `read IOException returns bytes read before failure`() = runTest {
         val stream = object : InputStream() {
             var calls = 0
