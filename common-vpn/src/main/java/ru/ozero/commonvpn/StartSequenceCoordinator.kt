@@ -514,7 +514,15 @@ class StartSequenceCoordinator(
                 return false
             }
             return when (result) {
-                TunAttachResult.Success -> true
+                TunAttachResult.Success -> {
+                    if (state.stopping.get()) {
+                        runCatching { deps.chainOrchestrator.stop() }
+                        runCatching { state.tunFdRef.getAndSet(null)?.close() }
+                        false
+                    } else {
+                        true
+                    }
+                }
                 is TunAttachResult.Failure -> {
                     runCatching { ParcelFileDescriptor.adoptFd(rawDupFd).close() }
                     runCatching { state.tunFdRef.getAndSet(null)?.close() }

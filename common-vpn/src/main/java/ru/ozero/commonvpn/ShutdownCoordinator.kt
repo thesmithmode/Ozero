@@ -4,6 +4,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.ChainOrchestrator
@@ -69,6 +70,7 @@ class ShutdownCoordinator(
         PersistentLoggers.info(TAG, "performShutdown begin")
         try {
             deps.statsLogger.cancel()
+            cancelStartBeforeStopPass()
 
             val chainStopJob = scope.launch {
                 runCatching { deps.chainOrchestrator.stop() }
@@ -108,6 +110,14 @@ class ShutdownCoordinator(
             stopForegroundRequest()
             if (callStopSelf) stopSelfRequest(latestStartIdProvider())
             PersistentLoggers.info(TAG, "performShutdown end")
+        }
+    }
+
+    private suspend fun cancelStartBeforeStopPass() {
+        val startJob = state.startJobRef.getAndSet(null) ?: return
+        val joined = withTimeoutOrNull(PARALLEL_STOP_TIMEOUT_MS) { startJob.cancelAndJoin() }
+        if (joined == null) {
+            PersistentLoggers.warn(TAG, "start sequence cancel hung > ${PARALLEL_STOP_TIMEOUT_MS}ms")
         }
     }
 
