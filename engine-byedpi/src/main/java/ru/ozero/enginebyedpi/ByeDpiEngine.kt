@@ -119,6 +119,10 @@ class ByeDpiEngine(
             }
             PersistentLoggers.debug(TAG, "start: barrier pre-drain oldJob.isActive=${oldJob.isActive}")
         }
+        if (!portFreeChecker(resolvedPort)) {
+            PersistentLoggers.error(TAG, "byedpi socks port $resolvedPort уже занят")
+            return StartResult.Failure(reason = "byedpi socks port $resolvedPort уже занят")
+        }
 
         if (rotateBeforeLaunch) {
             rotateProxyLane("start: previous proxy lane wedged")
@@ -239,11 +243,13 @@ class ByeDpiEngine(
                 } catch (_: Throwable) {
                     false
                 }
+                if (!proxyJob.isActive) return@withTimeoutOrNull
                 if (ok) {
+                    delay(READY_STABILITY_MS)
+                    if (!proxyJob.isActive) return@withTimeoutOrNull
                     probeSuccess = true
                     return@withTimeoutOrNull
                 }
-                if (!proxyJob.isActive) return@withTimeoutOrNull
                 delay(READY_RETRY_MS)
             }
         }
@@ -341,6 +347,7 @@ class ByeDpiEngine(
         const val JNI_GUARD_BUSY = -2
         const val READY_PROBE_TIMEOUT_MS = 500
         const val READY_RETRY_MS = 100L
+        const val READY_STABILITY_MS = 100L
         const val STOP_GRACE_MS = 1_500L
 
         const val BYEDPI_STOP_TIMEOUT_MS = 2_500L

@@ -105,6 +105,30 @@ class ByeDpiEngineTest {
     }
 
     @Test
+    fun startFailsWhenConfiguredSocksPortIsAlreadyBound() = runTest {
+        val failEngine = ByeDpiEngine(
+            proxy,
+            socksProbe = { _, _, _ -> 1L },
+            portFreeChecker = { false },
+        )
+        val result = failEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        assertIs<StartResult.Failure>(result)
+        verify(exactly = 0) { proxy.startProxy(any()) }
+    }
+
+    @Test
+    fun startFailsWhenProxyExitsBeforeReadinessEvenIfSocksProbeSucceeds() = runTest {
+        val failEngine = ByeDpiEngine(
+            proxy,
+            socksProbe = { _, _, _ -> 1L },
+            readyTotalTimeoutMs = 500,
+        )
+        every { proxy.startProxy(any()) } returns -1
+        val result = failEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+        assertIs<StartResult.Failure>(result)
+    }
+
+    @Test
     fun startArgsIncludePortFlag() {
         val args = engine.buildArgs(EngineConfig.ByeDpi(socksPort = 1080))
         assertTrue(args.contains("-p"))
