@@ -445,6 +445,7 @@ AWK_DOMAIN_STRIP
         "sudo docker stop masterdns-ozero 2>/dev/null || true;" +
             " sudo docker rm -f masterdns-ozero 2>/dev/null || true;" +
             " sudo docker rmi masterdns-ozero 2>/dev/null || true;" +
+            " sudo docker volume rm masterdns-key 2>/dev/null || true;" +
             " sudo rm -rf /tmp/mdns_build 2>/dev/null || true;" +
             " if [ -f /var/lib/masterdns-ozero/fw_opened ];" +
             " then fw=\$(sudo cat /var/lib/masterdns-ozero/fw_opened 2>/dev/null);" +
