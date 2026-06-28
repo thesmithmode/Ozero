@@ -119,17 +119,11 @@ class NativeLibSafetyContractTest {
     }
 
     @Test
-    fun `jniEmergencyReset использует atomic_exchange для сброса guard`() {
-        val resetBody = Regex(
-            """Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniEmergencyReset[^{]*\{(.*?)^\}""",
-            setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.MULTILINE),
-        ).find(nativeLib)?.groupValues?.get(1)
-            ?: error("jniEmergencyReset не найден в native-lib.c")
-
+    fun `native lib не экспортирует emergency reset guard bypass`() {
         assertTrue(
-            resetBody.contains("atomic_exchange(&g_proxy_running, 0)"),
-            "jniEmergencyReset обязан использовать atomic_exchange(&g_proxy_running, 0). " +
-                "Возвращает старое значение (1 = был wedge / 0 = noop) для logging в Kotlin.",
+            !nativeLib.contains("jniEmergencyReset") && !nativeLib.contains("atomic_exchange(&g_proxy_running"),
+            "native-lib.c не должен иметь emergency reset, который сбрасывает guard до возврата main(). " +
+                "Преждевременный reset допускает concurrent main() на shared upstream globals.",
         )
     }
 

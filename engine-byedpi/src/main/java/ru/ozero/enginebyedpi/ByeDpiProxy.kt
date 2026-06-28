@@ -6,7 +6,6 @@ interface ByeDpiProxyContract {
     fun startProxy(args: Array<String>): Int
     fun stopProxy(): Int
     fun forceClose(): Int
-    fun emergencyReset(): Int
 }
 
 class ByeDpiProxy : ByeDpiProxyContract {
@@ -17,8 +16,6 @@ class ByeDpiProxy : ByeDpiProxyContract {
 
     private external fun jniForceClose(): Int
 
-    private external fun jniEmergencyReset(): Int
-
     override fun startProxy(args: Array<String>): Int = jniStartProxy(args)
 
     override fun stopProxy(): Int = jniStopProxy()
@@ -26,8 +23,6 @@ class ByeDpiProxy : ByeDpiProxyContract {
     // SENTINEL [project_byedpi_native_guard_ownership]: forceClose() НЕ должен релизить g_proxy_running.
     // Native: только jniStartProxy владеет guard, jniForceClose триггерит graceful shutdown цикла main().
     override fun forceClose(): Int = jniForceClose()
-
-    override fun emergencyReset(): Int = jniEmergencyReset()
 
     companion object {
         private const val TAG = "ByeDpiProxy"
