@@ -45,4 +45,20 @@ class DnsLoggingSentinelTest {
             "chain resolver fall-through fail обязан логироваться через PersistentLoggers.warn",
         )
     }
+
+    @Test
+    fun `DnsResolverChain — persistent logs do not include raw hostname`() {
+        val src = srcFile("src/main/java/ru/ozero/commondns/DnsResolver.kt")
+        val resolveBody = src
+            .substringAfter("override suspend fun resolve(hostname: String): DohResult")
+            .substringBefore("private companion object")
+        val persistentLines = resolveBody
+            .lineSequence()
+            .filter { it.contains("PersistentLoggers.") }
+            .joinToString("\n")
+        assertFalse(
+            persistentLines.contains("$" + "hostname"),
+            "persistent DNS diagnostics must not include raw query hostnames",
+        )
+    }
 }

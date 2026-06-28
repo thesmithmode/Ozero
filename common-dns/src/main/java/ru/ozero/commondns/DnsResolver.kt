@@ -17,11 +17,11 @@ class DnsResolverChain(private val resolvers: List<DnsResolver>) : DnsResolver {
         for ((index, resolver) in resolvers.withIndex()) {
             when (val r = resolver.resolve(hostname)) {
                 is DohResult.Ok -> {
-                    if (index > 0) PersistentLoggers.debug(TAG, "fallback #$index OK для $hostname")
+                    if (index > 0) PersistentLoggers.debug(TAG, "fallback #$index OK")
                     return r
                 }
                 is DohResult.Failure -> {
-                    PersistentLoggers.warn(TAG, "resolver #$index fail для $hostname: ${r.reason}")
+                    PersistentLoggers.warn(TAG, "resolver #$index fail: ${r.reason}")
                     lastFailure = r
                 }
             }
