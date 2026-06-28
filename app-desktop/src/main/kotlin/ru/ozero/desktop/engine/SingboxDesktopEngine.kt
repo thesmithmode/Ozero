@@ -14,8 +14,16 @@ class SingboxDesktopEngine : SubprocessEngine() {
     override fun extractPort(config: EngineConfig): Int =
         if (config.socksPort > 0) config.socksPort else DEFAULT_MIXED_PORT
 
+    override suspend fun start(config: EngineConfig): EngineStartResult {
+        val json = config.singboxJson
+        if (json.isNullOrBlank() || !hasProxyOutbound(json)) {
+            return EngineStartResult.Failed(CONFIG_REQUIRED_REASON)
+        }
+        return super.start(config)
+    }
+
     override fun buildCommand(config: EngineConfig, binaryPath: String): List<String> {
-        val json = config.singboxJson ?: buildProxyConfig(extractPort(config))
+        val json = config.singboxJson ?: return emptyList()
         val tempFile = File.createTempFile("singbox-", ".json")
         tempFile.writeText(json)
         tempFile.deleteOnExit()
@@ -34,6 +42,19 @@ class SingboxDesktopEngine : SubprocessEngine() {
 
     companion object {
         const val DEFAULT_MIXED_PORT = 7890
+        const val CONFIG_REQUIRED_REASON = "Sing-box config with a proxy outbound is required"
+
+        private val directFinalPattern = Regex(""""final"\s*:\s*"direct"""")
+        private val proxyOutboundTypePattern = Regex(
+            """"type"\s*:\s*"(socks|http|shadowsocks|vmess|vless|trojan|wireguard|hysteria|hysteria2|tuic|ssh)"""",
+        )
+
+        fun hasProxyOutbound(json: String): Boolean {
+            val outbounds = json.substringAfter(""""outbounds"""", missingDelimiterValue = "")
+            return outbounds.isNotBlank() &&
+                !directFinalPattern.containsMatchIn(json) &&
+                proxyOutboundTypePattern.containsMatchIn(outbounds)
+        }
 
         fun buildProxyConfig(
             port: Int = DEFAULT_MIXED_PORT,
@@ -48,15 +69,11 @@ class SingboxDesktopEngine : SubprocessEngine() {
             append(""""listen_port":$port""")
             append("""}],""")
             append(""""outbounds":[""")
-            append("""{"type":"direct","tag":"direct"},""")
-            append("""{"type":"block","tag":"block"},""")
-            append("""{"type":"dns","tag":"dns-out"}""")
+            append("""{"type":"block","tag":"block"}""")
             append("""],""")
-            append(""""dns":{"servers":[{"type":"udp","tag":"dns-direct","server":"$dnsServer"}]},""")
             append(""""route":{""")
-            append(""""final":"direct",""")
-            append(""""auto_detect_interface":true,""")
-            append(""""rules":[{"protocol":"dns","outbound":"dns-out"}]""")
+            append(""""final":"block",""")
+            append(""""auto_detect_interface":true""")
             append('}')
             append('}')
         }
@@ -80,7 +97,7 @@ class SingboxDesktopEngine : SubprocessEngine() {
             append(""",{"type":"block","tag":"block"}""")
             append(""",{"type":"dns","tag":"dns-out"}""")
             append("""],""")
-            append(""""dns":{"servers":[{"type":"udp","tag":"dns-direct","server":"$dnsServer"}]},""")
+            append(""""dns":{"servers":[{"type":"udp","tag":"dns-proxy","server":"$dnsServer","detour":"proxy"}]},""")
             append(""""route":{""")
             append(""""final":"proxy",""")
             append(""""auto_detect_interface":true,""")
@@ -106,15 +123,11 @@ class SingboxDesktopEngine : SubprocessEngine() {
             append(""""sniff_override_destination":true""")
             append("""}],""")
             append(""""outbounds":[""")
-            append("""{"type":"direct","tag":"direct"},""")
-            append("""{"type":"block","tag":"block"},""")
-            append("""{"type":"dns","tag":"dns-out"}""")
+            append("""{"type":"block","tag":"block"}""")
             append("""],""")
-            append(""""dns":{"servers":[{"type":"udp","tag":"dns-direct","server":"$dnsServer"}]},""")
             append(""""route":{""")
-            append(""""final":"direct",""")
-            append(""""auto_detect_interface":true,""")
-            append(""""rules":[{"protocol":"dns","outbound":"dns-out"}]""")
+            append(""""final":"block",""")
+            append(""""auto_detect_interface":true""")
             append('}')
             append('}')
         }
@@ -142,7 +155,7 @@ class SingboxDesktopEngine : SubprocessEngine() {
             append("""{"type":"block","tag":"block"},""")
             append("""{"type":"dns","tag":"dns-out"}""")
             append("""],""")
-            append(""""dns":{"servers":[{"type":"udp","tag":"dns-direct","server":"$dnsServer"}]},""")
+            append(""""dns":{"servers":[{"type":"udp","tag":"dns-proxy","server":"$dnsServer","detour":"proxy"}]},""")
             append(""""route":{""")
             append(""""final":"proxy",""")
             append(""""auto_detect_interface":true,""")
@@ -174,7 +187,7 @@ class SingboxDesktopEngine : SubprocessEngine() {
             append(""",{"type":"block","tag":"block"}""")
             append(""",{"type":"dns","tag":"dns-out"}""")
             append("""],""")
-            append(""""dns":{"servers":[{"type":"udp","tag":"dns-direct","server":"$dnsServer"}]},""")
+            append(""""dns":{"servers":[{"type":"udp","tag":"dns-proxy","server":"$dnsServer","detour":"proxy"}]},""")
             append(""""route":{""")
             append(""""final":"proxy",""")
             append(""""auto_detect_interface":true,""")

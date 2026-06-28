@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import ru.ozero.desktop.engine.SingboxDesktopEngine
 import ru.ozero.desktop.model.EngineId
 import ru.ozero.desktop.model.TunnelState
 import ru.ozero.desktop.model.VpnMode
@@ -101,17 +102,13 @@ class DesktopVpnManagerTest {
         }
 
         @Test
-        fun `should set state to Failed for binary missing`() = testScope.runTest {
+        fun `should fail singbox proxy when no proxy outbound is configured`() = testScope.runTest {
             manager.connect(EngineId.SINGBOX, VpnMode.PROXY)
-            advanceUntilIdle()
-            Thread.sleep(200)
             advanceUntilIdle()
 
             val state = manager.state.value
-            assertTrue(
-                state is TunnelState.Connecting || state is TunnelState.Failed,
-                "Expected Connecting or Failed, got $state",
-            )
+            assertEquals(TunnelState.Failed::class, state::class)
+            assertEquals(SingboxDesktopEngine.CONFIG_REQUIRED_REASON, (state as TunnelState.Failed).reason)
         }
     }
 
@@ -129,7 +126,7 @@ class DesktopVpnManagerTest {
         }
 
         @Test
-        fun `should use TUN when canUseTun is true for singbox`() = testScope.runTest {
+        fun `should fail singbox TUN when no proxy outbound is configured`() = testScope.runTest {
             every { mockPlatformDetector.canUseTun() } returns true
             every { mockPlatformDetector.isAdmin() } returns true
             every { mockPlatformDetector.hasWintun() } returns true
@@ -137,7 +134,10 @@ class DesktopVpnManagerTest {
             manager.connect(EngineId.SINGBOX, VpnMode.TUN)
             advanceUntilIdle()
 
+            val state = manager.state.value
             assertEquals(VpnMode.TUN, manager.effectiveVpnMode.value)
+            assertEquals(TunnelState.Failed::class, state::class)
+            assertEquals(SingboxDesktopEngine.CONFIG_REQUIRED_REASON, (state as TunnelState.Failed).reason)
         }
 
         @Test
