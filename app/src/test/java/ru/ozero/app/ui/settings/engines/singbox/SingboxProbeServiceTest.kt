@@ -5,8 +5,6 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -16,8 +14,6 @@ import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyProfile
-import java.net.InetAddress
-import java.net.ServerSocket
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -28,81 +24,67 @@ class SingboxProbeServiceTest {
     private val beanKey = byteArrayPreferencesKey("singbox_vless_bean")
 
     @Test
-    fun `probeAndAutoSelect preserves auto-select mode while updating latency`() = runTest {
+    fun `probeAndAutoSelect preserves auto-select mode without opening latency sockets`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(
             mutablePreferencesOf(selectedProfileKey to SingboxEngine.SELECTED_AUTO),
         )
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
 
-        ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
-            val accept = async(Dispatchers.IO) {
-                server.accept().use { }
-            }
-            val profile = ProxyProfile(
-                id = 7L,
-                groupId = 1L,
-                name = "local",
-                beanBlob = KryoSerializer.serialize(
-                    VLESSBean().apply {
-                        serverAddress = "127.0.0.1"
-                        serverPort = server.localPort
-                    },
-                ),
-                protocolType = SingboxEngine.PROTOCOL_VLESS,
-            )
+        val profile = ProxyProfile(
+            id = 7L,
+            groupId = 1L,
+            name = "local",
+            beanBlob = KryoSerializer.serialize(
+                VLESSBean().apply {
+                    serverAddress = "198.51.100.7"
+                    serverPort = 443
+                },
+            ),
+            protocolType = SingboxEngine.PROTOCOL_VLESS,
+        )
 
-            SingboxProbeService(dao, dataStore).probeAndAutoSelect(listOf(profile), this)
-
-            accept.await()
-        }
+        SingboxProbeService(dao, dataStore).probeAndAutoSelect(listOf(profile))
 
         assertEquals(SingboxEngine.SELECTED_AUTO, prefsFlow.value[selectedProfileKey])
         assertNull(prefsFlow.value[beanKey])
-        assertTrue((dao.latencies[7L] ?: -1) >= 0)
+        assertTrue(dao.latencies.isEmpty())
     }
 
     @Test
-    fun `probeAndAutoSelect skips unsupported transport before selecting fastest profile`() = runTest {
+    fun `probeAndAutoSelect skips unsupported transport before selecting known profile`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
 
-        ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
-            val accept = async(Dispatchers.IO) {
-                server.accept().use { }
-            }
-            val unsupported = ProxyProfile(
-                id = 8L,
-                groupId = 1L,
-                name = "unsupported",
-                beanBlob = KryoSerializer.serialize(
-                    VLESSBean().apply {
-                        serverAddress = "127.0.0.1"
-                        serverPort = server.localPort
-                        type = "splithttp"
-                    },
-                ),
-                protocolType = SingboxEngine.PROTOCOL_VLESS,
-            )
-            val supported = ProxyProfile(
-                id = 7L,
-                groupId = 1L,
-                name = "supported",
-                beanBlob = KryoSerializer.serialize(
-                    VLESSBean().apply {
-                        serverAddress = "127.0.0.1"
-                        serverPort = server.localPort
-                        type = "tcp"
-                    },
-                ),
-                protocolType = SingboxEngine.PROTOCOL_VLESS,
-            )
+        val unsupported = ProxyProfile(
+            id = 8L,
+            groupId = 1L,
+            name = "unsupported",
+            beanBlob = KryoSerializer.serialize(
+                VLESSBean().apply {
+                    serverAddress = "198.51.100.8"
+                    serverPort = 443
+                    type = "splithttp"
+                },
+            ),
+            protocolType = SingboxEngine.PROTOCOL_VLESS,
+        )
+        val supported = ProxyProfile(
+            id = 7L,
+            groupId = 1L,
+            name = "supported",
+            beanBlob = KryoSerializer.serialize(
+                VLESSBean().apply {
+                    serverAddress = "198.51.100.7"
+                    serverPort = 443
+                    type = "tcp"
+                },
+            ),
+            protocolType = SingboxEngine.PROTOCOL_VLESS,
+        )
 
-            SingboxProbeService(dao, dataStore).probeAndAutoSelect(listOf(unsupported, supported), this)
-
-            accept.await()
-        }
+        SingboxProbeService(dao, dataStore).probeAndAutoSelect(listOf(unsupported, supported))
 
         assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[8L])
         assertEquals(7L, prefsFlow.value[selectedProfileKey])

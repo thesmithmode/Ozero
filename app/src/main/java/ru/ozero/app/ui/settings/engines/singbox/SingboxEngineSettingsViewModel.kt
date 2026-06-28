@@ -226,7 +226,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                     val profiles = profileDao.getByGroupId(gid)
                     if (profiles.isEmpty()) return@async
                     _uiState.update { it.copy(isPinging = it.isPinging + gid) }
-                    probeService.probeAndAutoSelect(profiles, viewModelScope)
+                    probeService.probeAndAutoSelect(profiles)
                     val updated = profileDao.getByGroupId(gid)
                     _uiState.update {
                         it.copy(
@@ -244,7 +244,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             _uiState.update { it.copy(isAutoSelecting = true) }
             val allProfiles = groupDao.getAll().flatMap { profileDao.getByGroupId(it.id) }
             if (allProfiles.isNotEmpty()) {
-                probeService.probeAndAutoSelect(allProfiles, viewModelScope)
+                probeService.probeAndAutoSelect(allProfiles)
                 val groupIds = _uiState.value.groupProfiles.keys
                 val refreshed = groupIds.associateWith { gid -> profileDao.getByGroupId(gid) }
                 _uiState.update { it.copy(groupProfiles = it.groupProfiles + refreshed) }
@@ -267,7 +267,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             errorMsg = result.exceptionOrNull()?.message
             val profiles = profileDao.getByGroupId(groupId)
             if (result.isSuccess && profiles.isNotEmpty()) {
-                probeService.probeAndAutoSelect(profiles, viewModelScope)
+                probeService.probeAndAutoSelect(profiles)
             }
         } catch (ce: CancellationException) {
             throw ce
