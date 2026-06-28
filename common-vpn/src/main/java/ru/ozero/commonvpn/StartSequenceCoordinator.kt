@@ -74,7 +74,7 @@ class StartSequenceCoordinator(
                     splitConfig = splitConfig,
                     ipv6Enabled = startupIpv6,
                     customDnsServers = startupDns,
-                    applyUnderlying = false,
+                    applyUnderlying = true,
                 ).establish()
             }
                 .onSuccess { fd ->
