@@ -17,12 +17,11 @@ class ConfigBuilderBranchCoverageTest {
     private val validRealityPublicKey = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA"
 
     @Test
-    fun `full config adds probe socks inbound only for positive port`() {
-        val withoutProbe = ConfigBuilder.buildSingboxConfig(vless(), probeSocksPort = 0)
-        val withProbe = ConfigBuilder.buildSingboxConfig(vless(), probeSocksPort = 2080)
+    fun `full config does not add socks inbound`() {
+        val json = ConfigBuilder.buildSingboxConfig(vless())
 
-        assertFalse(withoutProbe.contains("\"listen_port\":0"))
-        assertContains(withProbe, "\"listen_port\":2080")
+        assertFalse(json.contains("\"type\":\"socks\""))
+        assertFalse(json.contains("\"listen_port\""))
     }
 
     @Test
@@ -63,7 +62,6 @@ class ConfigBuilderBranchCoverageTest {
         val json = ConfigBuilder.buildProfileChainConfig(
             selected = vless(uuid = "selected"),
             wrappers = listOf(vmess(), trojan(), shadowsocks()),
-            probeSocksPort = 2081,
         )
 
         assertContains(json, "\"tag\":\"chain-0\"")
@@ -71,7 +69,6 @@ class ConfigBuilderBranchCoverageTest {
         assertContains(json, "\"tag\":\"chain-2\"")
         assertContains(json, "\"tag\":\"proxy\"")
         assertContains(json, "\"detour\":\"chain-2\"")
-        assertContains(json, "\"listen_port\":2081")
     }
 
     @Test
@@ -168,7 +165,7 @@ class ConfigBuilderBranchCoverageTest {
         }
 
         val realityJson = ConfigBuilder.buildSingboxConfig(reality)
-        val wsJson = ConfigBuilder.buildSingboxConfig(ws, probeSocksPort = 0)
+        val wsJson = ConfigBuilder.buildSingboxConfig(ws)
         val grpcJson = ConfigBuilder.buildSingboxConfig(grpc)
 
         assertContains(realityJson, "\"server_name\":\"front.example.com\"")

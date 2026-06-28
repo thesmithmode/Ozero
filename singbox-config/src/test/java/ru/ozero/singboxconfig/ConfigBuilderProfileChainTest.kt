@@ -50,16 +50,15 @@ class ConfigBuilderProfileChainTest {
     }
 
     @Test
-    fun `tun profile chain exposes socks probe through final proxy graph`() {
+    fun `tun profile chain does not expose socks inbound`() {
         val json = ConfigBuilder.buildProfileChainConfig(
             selected = vless("eu.example.com"),
             wrappers = listOf(vless("ru.example.com"), vless("de.example.com")),
-            probeSocksPort = 49445,
         )
 
         assertContains(json, "\"type\":\"tun\"")
-        assertContains(json, "\"type\":\"socks\"")
-        assertContains(json, "\"listen_port\":49445")
+        assertFalse(json.contains("\"type\":\"socks\""))
+        assertFalse(json.contains("\"listen_port\""))
         assertContains(json, "\"tag\":\"proxy\"")
         assertContains(json, "\"detour\":\"chain-1\"")
         assertContains(json, "\"final\":\"proxy\"")

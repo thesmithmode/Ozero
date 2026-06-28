@@ -19,13 +19,13 @@ object ConfigBuilder {
     private const val MIN_PORT = 1
     private const val MAX_PORT = 65_535
 
-    fun buildSingboxConfig(bean: AbstractBean, probeSocksPort: Int? = null): String {
+    fun buildSingboxConfig(bean: AbstractBean): String {
         require(isSupportedBean(bean)) { "Unsupported transport: ${(bean as? StandardV2RayBean)?.type}" }
         val outbound = beanOutbound(bean, "proxy")
-        return buildFullConfig(listOf(outbound), probeSocksPort)
+        return buildFullConfig(listOf(outbound))
     }
 
-    fun buildSingboxAutoConfig(beans: List<AbstractBean>, probeSocksPort: Int? = null): String {
+    fun buildSingboxAutoConfig(beans: List<AbstractBean>): String {
         val supported = beans.filter { isSupportedBean(it) }
         require(supported.isNotEmpty()) { "no beans with supported transport types" }
         val proxyOutbounds = supported.mapIndexed { index, bean -> beanOutbound(bean, "proxy-$index") }
@@ -36,7 +36,7 @@ object ConfigBuilder {
             append(""""interval":"3m","tolerance":50,""")
             append(""""interrupt_exist_connections":true,"idle_timeout":"30m"}""")
         }
-        return buildFullConfig(listOf(urltest) + proxyOutbounds, probeSocksPort)
+        return buildFullConfig(listOf(urltest) + proxyOutbounds)
     }
 
     fun isSupportedBean(bean: AbstractBean): Boolean {
@@ -76,10 +76,9 @@ object ConfigBuilder {
     fun buildProfileChainConfig(
         selected: AbstractBean,
         wrappers: List<AbstractBean>,
-        probeSocksPort: Int? = null,
     ): String {
         val outbounds = profileChainOutbounds(selected, wrappers)
-        return buildFullConfig(outbounds, probeSocksPort)
+        return buildFullConfig(outbounds)
     }
 
     fun buildProfileChainProxyConfig(
@@ -116,16 +115,12 @@ object ConfigBuilder {
         else -> error("Unsupported bean type: ${bean::class.simpleName}")
     }
 
-    private fun buildFullConfig(proxyOutbounds: List<String>, probeSocksPort: Int? = null): String {
+    private fun buildFullConfig(proxyOutbounds: List<String>): String {
         val sb = StringBuilder()
         sb.append('{')
         sb.append(""""log":{"level":"warn","timestamp":true},""")
         sb.append(""""inbounds":[""")
         sb.append(tunInbound())
-        if (probeSocksPort != null && probeSocksPort > 0) {
-            sb.append(',')
-            sb.append(socksInbound(probeSocksPort))
-        }
         sb.append("""],""")
         sb.append(""""outbounds":[""")
         proxyOutbounds.forEachIndexed { i, outbound ->

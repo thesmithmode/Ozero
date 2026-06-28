@@ -7,26 +7,29 @@ import kotlin.test.assertTrue
 class SingboxEngineExitIpProbeSentinelTest {
 
     @Test
-    fun `singbox exit ip probe uses local socks endpoint instead of direct app fetch`() {
+    fun `singbox tun mode does not expose local socks endpoint for exit ip probe`() {
         val source = File(
             System.getProperty("user.dir") ?: ".",
             "src/main/java/ru/ozero/enginesingbox/SingboxEngine.kt",
         ).readText()
 
+        val startBlock = source.substringAfter("override suspend fun start")
+            .substringBefore("private fun buildPendingConfig")
         assertTrue(
-            source.contains("pendingSocksPort = probePort") &&
-                source.contains("activeSocksPort = pendingSocksPort"),
-            "TUN mode must keep the probe SOCKS port pending until sing-box runtime accepts startWithConfig.",
+            startBlock.contains("buildPendingConfig(config)") &&
+                !startBlock.contains("allocateChainPort()") &&
+                !startBlock.contains("pendingSocksPort = probePort"),
+            "TUN mode must not create a localhost SOCKS listener solely for exit-IP probing.",
         )
         assertTrue(
-            source.contains("ConfigBuilder.buildSingboxConfig(bean, probeSocksPort)") &&
-                source.contains("ConfigBuilder.buildSingboxAutoConfig(beans, probeSocksPort)") &&
-                source.contains("ConfigBuilder.buildProfileChainConfig(bean, wrappers, probeSocksPort)"),
-            "All sing-box TUN configs must receive probeSocksPort so exit-IP probe uses the real outbound graph.",
+            source.contains("ConfigBuilder.buildSingboxConfig(bean)") &&
+                source.contains("ConfigBuilder.buildSingboxAutoConfig(beans)") &&
+                source.contains("ConfigBuilder.buildProfileChainConfig(bean, wrappers)"),
+            "TUN configs must be built without a probe SOCKS port.",
         )
         assertTrue(
-            source.contains("ExitNodeStrategy.ViaSocks(\"127.0.0.1\", port)"),
-            "exitNodeStrategy for sing-box must route HTTP probe through the active local SOCKS endpoint.",
+            source.contains("ExitNodeStrategy.DirectHttp"),
+            "TUN exit-node probing must avoid publishing a local SOCKS route when no chain SOCKS port is active.",
         )
     }
 
@@ -40,10 +43,9 @@ class SingboxEngineExitIpProbeSentinelTest {
         val attachBlock = source.substringAfter("override suspend fun attachTun")
             .substringBefore("override suspend fun stop")
         val healthIdx = attachBlock.indexOf("runtimeRunning")
-        val activeIdx = attachBlock.indexOf("activeSocksPort = pendingSocksPort")
         assertTrue(
-            healthIdx >= 0 && activeIdx > healthIdx,
-            "attachTun must check runtime health before publishing activeSocksPort, otherwise exit-IP probe can use stale port",
+            healthIdx >= 0 && !attachBlock.contains("activeSocksPort = pendingSocksPort"),
+            "attachTun must not publish a TUN-only SOCKS probe port.",
         )
         assertTrue(
             attachBlock.contains("clearPendingStart()") &&

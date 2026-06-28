@@ -277,16 +277,17 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `probe fails when active socks port is absent`() = runTest {
+    fun `probe succeeds with runtime health when active socks port is absent`() = runTest {
         val engine = buildEngine()
         val process = mockk<ISingboxEngineProcess>()
+        every { process.runtimeRunning() } returns true
         engine.setPrivateField("proxy", process)
         engine.setPrivateField("activeSocksPort", 0)
 
         val result = engine.probe()
 
-        val failure = assertIs<ProbeResult.Failure>(result)
-        assertTrue(failure.reason.contains("not active"))
+        val success = assertIs<ProbeResult.Success>(result)
+        assertEquals(0L, success.latencyMs)
     }
 
     @Test
@@ -410,7 +411,7 @@ class SingboxEngineProbeTest {
     @Test
     fun `exitNodeStrategy returns socks only when active port exists`() = runTest {
         val engine = buildEngine()
-        assertIs<ExitNodeStrategy.Unavailable>(engine.exitNodeStrategy(0))
+        assertIs<ExitNodeStrategy.DirectHttp>(engine.exitNodeStrategy(0))
 
         engine.setPrivateField("activeSocksPort", 49408)
 

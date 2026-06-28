@@ -164,13 +164,12 @@ class SingboxEngine @Inject constructor(
         activeSocksPort = 0
         pendingSocksPort = 0
         pendingConfig = null
-        val probePort = allocateChainPort()
-        val json = buildPendingConfig(config, probePort) ?: run {
+        val json = buildPendingConfig(config) ?: run {
             return StartResult.Failure("failed to build sing-box config")
         }
         PersistentLoggers.debug(
             TAG,
-            "start TUN config built probePort=$probePort fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
+            "start TUN config built fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
         )
 
         bindOrFail()?.let {
@@ -179,18 +178,17 @@ class SingboxEngine @Inject constructor(
         }
 
         pendingConfig = json
-        pendingSocksPort = probePort
         return StartResult.Success(socksPort = 0)
     }
 
-    private fun buildPendingConfig(config: EngineConfig.Singbox, probeSocksPort: Int): String? {
+    private fun buildPendingConfig(config: EngineConfig.Singbox): String? {
         if (config.autoSelectBeanBlobs.isNotEmpty()) {
             val beans = supportedBeans(config.autoSelectBeanBlobs.take(MAX_AUTO_SELECT_OUTBOUNDS))
             if (beans.isEmpty()) {
                 PersistentLoggers.warn(TAG, "auto-select: all ${config.autoSelectBeanBlobs.size} beans failed")
                 return null
             }
-            return runCatching { ConfigBuilder.buildSingboxAutoConfig(beans, probeSocksPort) }
+            return runCatching { ConfigBuilder.buildSingboxAutoConfig(beans) }
                 .onFailure { PersistentLoggers.warn(TAG, "buildSingboxAutoConfig: ${it.message}") }
                 .getOrNull()
         }
@@ -204,14 +202,14 @@ class SingboxEngine @Inject constructor(
                 PersistentLoggers.warn(TAG, "selected bean unsupported and no supported fallback profiles")
                 return null
             }
-            return runCatching { ConfigBuilder.buildSingboxAutoConfig(fallbackBeans, probeSocksPort) }
+            return runCatching { ConfigBuilder.buildSingboxAutoConfig(fallbackBeans) }
                 .onFailure { PersistentLoggers.warn(TAG, "build fallback auto config: ${it.message}") }
                 .getOrNull()
         }
-        return runCatching { ConfigBuilder.buildSingboxConfig(bean, probeSocksPort) }
+        return runCatching { ConfigBuilder.buildSingboxConfig(bean) }
             .mapCatching {
                 if (wrappers.isNotEmpty()) {
-                    ConfigBuilder.buildProfileChainConfig(bean, wrappers, probeSocksPort)
+                    ConfigBuilder.buildProfileChainConfig(bean, wrappers)
                 } else {
                     it
                 }
@@ -325,7 +323,6 @@ class SingboxEngine @Inject constructor(
                 clearPendingStart()
                 return TunAttachResult.Failure("sing-box runtime failed to start")
             }
-            activeSocksPort = pendingSocksPort
             pendingSocksPort = 0
             pendingConfig = null
             PersistentLoggers.debug(TAG, "startWithConfig sent over AIDL")
@@ -361,8 +358,7 @@ class SingboxEngine @Inject constructor(
     private suspend fun probeInternal(clearOnRoutedFailure: Boolean): ProbeResult {
         val p = proxy ?: return ProbeResult.Failure("sing-box process is not connected")
         val port = activeSocksPort.takeIf { it > 0 }
-            ?: return ProbeResult.Failure("sing-box SOCKS probe port is not active")
-        PersistentLoggers.debug(TAG, "probe start port=$port chainMode=$chainMode")
+        PersistentLoggers.debug(TAG, "probe start port=${port ?: 0} chainMode=$chainMode")
         val runtimeRunning = runCatching { p.runtimeRunning() }.getOrElse {
             clearRuntimeState()
             return ProbeResult.Failure("sing-box runtime health check failed: ${it.message}", it)
@@ -371,6 +367,7 @@ class SingboxEngine @Inject constructor(
             clearRuntimeState()
             return ProbeResult.Failure("sing-box runtime is not running")
         }
+        if (port == null) return ProbeResult.Success(latencyMs = 0)
         val latency = routedProbe.probeLatencyMs(port)
         return if (latency >= 0) {
             ProbeResult.Success(latencyMs = latency)
@@ -443,7 +440,7 @@ class SingboxEngine @Inject constructor(
         return if (port != null) {
             ExitNodeStrategy.ViaSocks("127.0.0.1", port)
         } else {
-            ExitNodeStrategy.Unavailable("sing-box SOCKS probe unavailable")
+            ExitNodeStrategy.DirectHttp
         }
     }
 

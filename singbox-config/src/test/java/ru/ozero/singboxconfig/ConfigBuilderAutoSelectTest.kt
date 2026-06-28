@@ -170,13 +170,12 @@ class ConfigBuilderAutoSelectTest {
     }
 
     @Test
-    fun `tun config can expose local socks inbound for exit ip probe`() {
-        val json = ConfigBuilder.buildSingboxConfig(makeVless(), probeSocksPort = 49421)
+    fun `tun config does not expose local socks inbound`() {
+        val json = ConfigBuilder.buildSingboxConfig(makeVless())
 
         assertContains(json, "\"type\":\"tun\"")
-        assertContains(json, "\"type\":\"socks\"")
-        assertContains(json, "\"listen\":\"127.0.0.1\"")
-        assertContains(json, "\"listen_port\":49421")
+        assertFalse(json.contains("\"type\":\"socks\""))
+        assertFalse(json.contains("\"listen\":\"127.0.0.1\""))
         assertContains(json, "\"final\":\"proxy\"")
     }
 
