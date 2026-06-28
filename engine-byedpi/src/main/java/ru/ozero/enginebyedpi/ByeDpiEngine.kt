@@ -41,7 +41,6 @@ class ByeDpiEngine(
     private val socksProbe: suspend (String, Int, Int) -> Long = Socks5HandshakeProbe::probe,
     private val readyProbeTimeoutMs: Int = READY_PROBE_TIMEOUT_MS,
     private val readyTotalTimeoutMs: Long = READY_TIMEOUT_MS,
-    // Checks whether a loopback port is available. Injectable for unit tests.
     private val portFreeChecker: (Int) -> Boolean = ::defaultPortFreeCheck,
     testDispatcherOverride: CoroutineDispatcher? = null,
 ) : EnginePlugin {
@@ -132,6 +131,10 @@ class ByeDpiEngine(
                 startContext = Dispatchers.IO
             }
         }
+        if (!portFreeChecker(resolvedPort)) {
+            PersistentLoggers.error(TAG, "byedpi socks port $resolvedPort уже занят")
+            return StartResult.Failure(reason = "byedpi socks port $resolvedPort уже занят")
+        }
 
         val args = buildArgs(resolvedConfig)
         PersistentLoggers.debug(
@@ -143,7 +146,7 @@ class ByeDpiEngine(
             val code = startProxyWithRecovery(args)
             PersistentLoggers.debug(TAG, "startProxy returned code=$code port=$resolvedPort")
             when {
-                code == 0 -> { /* success — main() returned 0 */ }
+                code == 0 -> Unit
                 code == JNI_GUARD_BUSY -> PersistentLoggers.warn(
                     TAG,
                     "jniStartProxy guard busy — старая main() ещё держит CAS; queue serialization",
@@ -225,11 +228,13 @@ class ByeDpiEngine(
                 } catch (_: Throwable) {
                     false
                 }
+                if (!proxyJob.isActive) return@withTimeoutOrNull
                 if (ok) {
+                    delay(READY_STABILITY_MS)
+                    if (!proxyJob.isActive) return@withTimeoutOrNull
                     probeSuccess = true
                     return@withTimeoutOrNull
                 }
-                if (!proxyJob.isActive) return@withTimeoutOrNull
                 delay(READY_RETRY_MS)
             }
         }
@@ -326,6 +331,7 @@ class ByeDpiEngine(
         const val JNI_GUARD_BUSY = -2
         const val READY_PROBE_TIMEOUT_MS = 500
         const val READY_RETRY_MS = 100L
+        const val READY_STABILITY_MS = 100L
         const val STOP_GRACE_MS = 1_500L
 
         // Must cover both STOP_GRACE_MS joins in stop(), otherwise restart can hit native guard busy.
