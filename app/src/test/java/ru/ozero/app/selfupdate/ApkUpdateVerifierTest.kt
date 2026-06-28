@@ -77,6 +77,24 @@ class ApkUpdateVerifierTest {
     }
 
     @Test
+    fun rejectsOversizedApkBeforeVerification(@TempDir tmp: Path) {
+        val (_, pub) = generateKeyPair()
+        val apk = (tmp / "ozero.apk").toFile().apply { writeBytes(byteArrayOf(0x01, 0x02)) }
+        val sig = (tmp / "ozero.apk.sig").toFile().apply { writeBytes(ByteArray(64)) }
+
+        assertFalse(ApkUpdateVerifier(pub, maxApkBytes = 1L).verify(apk, sig))
+    }
+
+    @Test
+    fun rejectsOversizedSignatureBeforeReading(@TempDir tmp: Path) {
+        val (_, pub) = generateKeyPair()
+        val apk = (tmp / "ozero.apk").toFile().apply { writeBytes(byteArrayOf(0x01)) }
+        val sig = (tmp / "ozero.apk.sig").toFile().apply { setLength(1024 * 1024) }
+
+        assertFalse(ApkUpdateVerifier(pub).verify(apk, sig))
+    }
+
+    @Test
     fun rejectsInvalidPublicKeyLength() {
         val ex = runCatching { ApkUpdateVerifier(ByteArray(31)) }.exceptionOrNull()
         assertTrue(ex is IllegalArgumentException)
