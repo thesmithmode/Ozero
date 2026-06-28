@@ -142,6 +142,19 @@ class TProxyServiceLogTest {
         assertTrue(source.contains("MAX_MAPS_LINES"), "должен ограничить вывод чтобы не флудить boot.log")
     }
 
+    @Test
+    fun `dumpVendorMaps redacts proc self maps lines before persistent logging`() {
+        val body = funBody(source, "dumpVendorMaps")
+        assertTrue(
+            body.contains("redactProcMapsLine(line)"),
+            "proc maps строки должны редактироваться перед PersistentLoggers, чтобы не сохранять ASLR адреса",
+        )
+        assertFalse(
+            body.contains("matches.add(line)"),
+            "нельзя писать raw /proc/self/maps строки в persistent logs",
+        )
+    }
+
     private fun funBody(src: String, name: String): String {
         val patterns = listOf("fun $name(", "fun $name (")
         var idx = -1

@@ -83,7 +83,7 @@ object TProxyService {
             for (line in seq) {
                 if (matches.size >= MAX_MAPS_LINES) break
                 val lower = line.lowercase()
-                if (keywords.any { it in lower }) matches.add(line)
+                if (keywords.any { it in lower }) matches.add(redactProcMapsLine(line))
             }
         }
         val payload = if (matches.isEmpty()) {
@@ -92,6 +92,11 @@ object TProxyService {
             "proc/maps vendor:\n${matches.joinToString("\n")}"
         }
         PersistentLoggers.instance?.info(TAG, payload)
+    }
+
+    private fun redactProcMapsLine(line: String): String {
+        val fields = line.trim().split(Regex("\\s+"), limit = 6)
+        return fields.getOrNull(5)?.substringAfterLast('/') ?: "[anonymous]"
     }
 
     private const val MAX_MAPS_LINES = 30
