@@ -6,7 +6,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -109,8 +108,8 @@ class OzeroVpnServiceStartCoordinatorTest {
     }
 
     @Test
-    fun `external vpn delays start sequence without blocking preflight side effects`() = runTest {
-        val fixture = fixture(externalVpnActive = true, externalVpnReleaseDelayMs = 50L)
+    fun `external vpn detection does not delay start sequence`() = runTest {
+        val fixture = fixture(externalVpnActive = true)
 
         fixture.coordinator.start()
         runCurrent()
@@ -118,14 +117,6 @@ class OzeroVpnServiceStartCoordinatorTest {
         assertEquals(1, fixture.closeStaleTunCalls)
         assertEquals(1, fixture.killswitchReleasedCalls)
         assertEquals(1, fixture.loadCalls)
-        assertEquals(0, fixture.startSequenceCalls)
-
-        advanceTimeBy(49L)
-        runCurrent()
-        assertEquals(0, fixture.startSequenceCalls)
-
-        advanceTimeBy(1L)
-        runCurrent()
         assertEquals(1, fixture.startSequenceCalls)
     }
 
@@ -145,7 +136,6 @@ class OzeroVpnServiceStartCoordinatorTest {
 
     private fun TestScope.fixture(
         externalVpnActive: Boolean = false,
-        externalVpnReleaseDelayMs: Long = 10L,
         closeStaleTun: () -> Unit = {},
         loadTunnelLibrary: () -> Unit = {},
         startSequence: suspend () -> Unit = {},
@@ -164,7 +154,6 @@ class OzeroVpnServiceStartCoordinatorTest {
                 runtimeConfigRestartCancelled = fixture.restartCancelled,
                 runtimeConfigRestartInProgress = fixture.restartInProgress,
                 shutdownJoinTimeoutMs = 100L,
-                externalVpnReleaseDelayMs = externalVpnReleaseDelayMs,
                 closeStaleTun = {
                     fixture.closeStaleTunCalls++
                     runCatching { closeStaleTun() }
