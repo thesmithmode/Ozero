@@ -312,7 +312,7 @@ class MainViewModel @Inject constructor(
                         val result = resolveIpInfoWithRetry(s.engineId, s.socksPort)
                         when (result) {
                             is IpInfoState.Loaded ->
-                                Log.i(IP_TAG, "resolve ok ip='${result.info.ip}' country=${result.info.country}")
+                                Log.i(IP_TAG, "resolve ok country=${result.info.country}")
                             is IpInfoState.Error ->
                                 PersistentLoggers.warn(IP_TAG, "resolve error: ${result.message}")
                             else -> Unit
