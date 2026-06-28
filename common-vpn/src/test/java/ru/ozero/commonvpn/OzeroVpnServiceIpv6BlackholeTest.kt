@@ -72,14 +72,17 @@ class OzeroVpnServiceIpv6BlackholeTest {
     }
 
     @Test
-    fun `applyEngineTunSpec НЕ blackhole IPv6 — bypass вместо blackhole`() {
+    fun `applyEngineTunSpec при ipv6Enabled всегда добавляет IPv6 default route`() {
         val body = helperSource
             .substringAfter("fun applyEngineTunSpec(")
             .substringBefore("fun buildTunBuilder(")
         assertTrue(
-            !body.contains("blackholeIpv6(builder"),
-            "applyEngineTunSpec НЕ должен blackhole IPv6 — при allowFamilyV6=false IPv6 обходит TUN " +
-                "напрямую (как PORTAL_WG). Blackhole ломал Gemini и IPv6-сервисы в amneziawg конфигах.",
+            body.contains("if (ipv6Enabled)"),
+            "applyEngineTunSpec обязан учитывать пользовательский IPv6 switch для full-IP-stack движков.",
+        )
+        assertTrue(
+            body.substringAfter("if (ipv6Enabled)").substringBefore("} else if").contains("addRoute(\"::\", 0)"),
+            "applyEngineTunSpec при ipv6Enabled=true обязан перехватывать IPv6 default route.",
         )
     }
 
