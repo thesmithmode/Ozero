@@ -224,13 +224,13 @@ class FptnEngine(
                 censorshipStrategy = _bypassMethod,
             )
         }.getOrElse { e ->
-            tun.close()
+            _pfd = null
             PersistentLoggers.error(TAG, "nativeCreate failed: ${e.message}")
             return TunAttachResult.Failure("nativeCreate failed: ${e.message}")
         }
         Log.d(TAG, "attachTun: handle=$handle, starting WS thread")
         runCatching { wsClient.nativeRun(handle) }.getOrElse { e ->
-            tun.close()
+            _pfd = null
             runCatching { wsClient.nativeDestroy(handle) }
             PersistentLoggers.error(TAG, "nativeRun failed: ${e.message}")
             return TunAttachResult.Failure("nativeRun failed: ${e.message}")
