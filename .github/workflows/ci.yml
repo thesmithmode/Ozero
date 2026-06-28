@@ -199,7 +199,7 @@ jobs:
             singbox-core/libs
             singbox-core/libs-stubs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v6
+          key: singbox-libbox-1.13.12-exploded-v7-sha256-7a5fa900e73352a18d55ef7ae55427e3e60ba7208b5848ccf64ec5acdf154867
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -208,7 +208,8 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber -R "${{ github.repository }}"
+          .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -313,7 +314,7 @@ jobs:
             singbox-core/libs
             singbox-core/libs-stubs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v6
+          key: singbox-libbox-1.13.12-exploded-v7-sha256-7a5fa900e73352a18d55ef7ae55427e3e60ba7208b5848ccf64ec5acdf154867
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -322,7 +323,8 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber -R "${{ github.repository }}"
+          .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -689,7 +691,7 @@ jobs:
             singbox-core/libs
             singbox-core/libs-stubs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v6
+          key: singbox-libbox-1.13.12-exploded-v7-sha256-7a5fa900e73352a18d55ef7ae55427e3e60ba7208b5848ccf64ec5acdf154867
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -698,7 +700,8 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber -R "${{ github.repository }}"
+          .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
