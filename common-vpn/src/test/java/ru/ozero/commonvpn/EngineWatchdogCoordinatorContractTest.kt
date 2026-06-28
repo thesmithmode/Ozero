@@ -74,6 +74,15 @@ class EngineWatchdogCoordinatorContractTest {
     }
 
     @Test
+    fun `enterKillswitchMode stops native tunnel gateway`() {
+        val body = source.substringAfter("private fun enterKillswitchMode(").substringBefore("companion object")
+        assertTrue(
+            body.contains("tunnelGateway.stop()"),
+            "Killswitch must stop the native tun2socks gateway so TUN traffic cannot continue to a local SOCKS port. Body:\n$body",
+        )
+    }
+
+    @Test
     fun `cancelWatchers РѕС‚РјРµРЅСЏРµС‚ РІСЃРµ watch jobs`() {
         val body = source.substringAfter("fun cancelWatchers(").substringBefore("fun handleEngineFailure")
         assertTrue(
