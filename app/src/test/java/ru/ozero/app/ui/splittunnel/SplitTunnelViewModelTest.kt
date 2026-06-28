@@ -306,23 +306,22 @@ class SplitTunnelViewModelTest {
     }
 
     @Test
-    fun `BYPASS_LAN persisted мигрирует в ALL — UI не показывает 4й таб`() = runTest {
+    fun `BYPASS_LAN persisted сохраняется без скрытой миграции`() = runTest {
         settings.modeUpdates.clear()
         settings.setSplitMode(SplitTunnelMode.BYPASS_LAN)
         val vm = SplitTunnelViewModel(apps, dao, settings, tunnelController)
         advanceUntilIdle()
 
         val state = vm.uiState.value as SplitTunnelUiState.Content
-        assertEquals(SplitTunnelMode.ALL, state.mode, "BYPASS_LAN persisted → ALL в UI")
-        assertTrue(
+        assertEquals(SplitTunnelMode.BYPASS_LAN, state.mode, "BYPASS_LAN persisted должен отображаться без перезаписи")
+        assertFalse(
             settings.modeUpdates.contains(SplitTunnelMode.ALL),
-            "VM обязана записать ALL в settings когда обнаружила BYPASS_LAN — миграция " +
-                "(BYPASS_LAN скрыт из UI tabs). modeUpdates=${settings.modeUpdates}",
+            "VM не должна записывать ALL при открытии split-tunnel экрана. modeUpdates=${settings.modeUpdates}",
         )
     }
 
     @Test
-    fun `onModeChange BYPASS_LAN игнорируется — UI больше не предлагает этот режим`() = runTest {
+    fun `onModeChange BYPASS_LAN сохраняет выбранный режим`() = runTest {
         advanceUntilIdle()
         settings.modeUpdates.clear()
 
@@ -330,9 +329,9 @@ class SplitTunnelViewModelTest {
         advanceUntilIdle()
 
         assertEquals(
-            emptyList<SplitTunnelMode>(),
+            listOf(SplitTunnelMode.BYPASS_LAN),
             settings.modeUpdates,
-            "onModeChange(BYPASS_LAN) обязан быть no-op — режим скрыт из UI tabs.",
+            "onModeChange(BYPASS_LAN) должен сохранять режим без скрытой замены.",
         )
     }
 
