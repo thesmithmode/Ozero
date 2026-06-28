@@ -41,21 +41,29 @@ interface SessionStatsDao {
 
     @Query(
         """
-        SELECT * FROM session_stats
-        WHERE endedAt IS NOT NULL AND startedAt >= :since
+        SELECT * FROM (
+            SELECT * FROM session_stats
+            WHERE endedAt IS NOT NULL AND startedAt >= :since
+            ORDER BY startedAt DESC
+            LIMIT :limit
+        )
         ORDER BY startedAt ASC
         """,
     )
-    fun observeFrom(since: Long): Flow<List<SessionStatsEntity>>
+    fun observeFrom(since: Long, limit: Int): Flow<List<SessionStatsEntity>>
 
     @Query(
         """
-        SELECT * FROM session_stats
-        WHERE endedAt IS NOT NULL
+        SELECT * FROM (
+            SELECT * FROM session_stats
+            WHERE endedAt IS NOT NULL
+            ORDER BY startedAt DESC
+            LIMIT :limit
+        )
         ORDER BY startedAt ASC
         """,
     )
-    fun observeAll(): Flow<List<SessionStatsEntity>>
+    fun observeAll(limit: Int): Flow<List<SessionStatsEntity>>
 
     @Query("DELETE FROM session_stats WHERE startedAt < :olderThan")
     suspend fun deleteOlderThan(olderThan: Long): Int

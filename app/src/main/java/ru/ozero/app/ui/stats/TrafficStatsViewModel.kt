@@ -37,7 +37,11 @@ class TrafficStatsViewModel @Inject constructor(
     private val rawSessions: StateFlow<List<SessionStatsEntity>> =
         timeframeRef.flatMapLatest { tf ->
             val since = tf.periodMs?.let { System.currentTimeMillis() - it }
-            if (since != null) dao.observeFrom(since) else dao.observeAll()
+            if (since != null) {
+                dao.observeFrom(since, STATS_HISTORY_LIMIT)
+            } else {
+                dao.observeAll(STATS_HISTORY_LIMIT)
+            }
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
@@ -154,6 +158,7 @@ class TrafficStatsViewModel @Inject constructor(
     }
 
     private companion object {
+        const val STATS_HISTORY_LIMIT = 2_000
 
         fun buildChartData(
             sessions: List<SessionStatsEntity>,
