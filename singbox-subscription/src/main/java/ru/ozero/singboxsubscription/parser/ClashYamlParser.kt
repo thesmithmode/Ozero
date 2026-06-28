@@ -13,6 +13,7 @@ import ru.ozero.singboxfmt.VMessBean
 
 object ClashYamlParser {
     private const val MAX_YAML_CODE_POINTS = 16 * 1024 * 1024
+    private const val MAX_FIELD_CHARS = 4_096
     private const val MIN_PORT = 1
     private const val MAX_PORT = 65_535
     private val proxiesKeyPattern = Regex("""(?m)^\s*proxies\s*:""")
@@ -22,6 +23,7 @@ object ClashYamlParser {
         val root = try {
             val loaderOptions = LoaderOptions().apply {
                 codePointLimit = MAX_YAML_CODE_POINTS
+                maxAliasesForCollections = 0
             }
             when (val loaded = Yaml(SafeConstructor(loaderOptions)).load<Any?>(text)) {
                 is Map<*, *> -> loaded.toStringKeyMap()
@@ -92,7 +94,7 @@ object ClashYamlParser {
             else -> defaultSecurity
         }
         sni = fields.string("servername", "sni")
-        alpn = fields.listString("alpn")
+        alpn = fields.string("alpn")
         allowInsecure = fields.bool("skip-cert-verify") || fields.bool("allowInsecure")
         utlsFingerprint = fields.string("client-fingerprint", "fingerprint", "fp")
         applyNestedTransport(fields)
@@ -119,7 +121,7 @@ object ClashYamlParser {
         }
         host = fields.string("host").ifBlank {
             ws.mapValue("headers").string("Host", "host").ifBlank {
-                ws.string("Host", "host").ifBlank { http.listString("host").ifBlank { httpUpgrade.string("host") } }
+                ws.string("Host", "host").ifBlank { http.string("host").ifBlank { httpUpgrade.string("host") } }
             }
         }
         grpcServiceName = fields.string("serviceName", "service-name").ifBlank { grpc.string("grpc-service-name") }
@@ -150,12 +152,7 @@ object ClashYamlParser {
         vararg keys: String,
         entrySeparator: String = ",",
     ): String = keys.firstNotNullOfOrNull { key ->
-        when (val value = this[key]) {
-            null -> null
-            is Map<*, *> -> value.entries.joinToString(entrySeparator) { (k, v) -> "$k=$v" }
-            is Iterable<*> -> value.joinToString(entrySeparator) { it.toString() }
-            else -> value.toString()
-        }?.takeIf { it.isNotBlank() }
+        safeString(this[key], entrySeparator)
     }.orEmpty()
 
     private fun Map<String, Any?>.int(key: String): Int? = when (val value = this[key]) {
@@ -178,20 +175,45 @@ object ClashYamlParser {
         }
     }.orEmpty()
 
-    private fun Map<String, Any?>.listString(key: String): String = when (val value = this[key]) {
-        is Iterable<*> -> value.joinToString(",") { it.toString() }
-        else -> string(key)
-    }
-
     private fun Map<String, Any?>.shadowsocksMethod(): String = when (val cipher = this["cipher"]) {
         is String -> cipher
         is Number,
         is Boolean -> cipher.toString()
         is Map<*, *> -> {
             val parsed = cipher.toStringKeyMap()
-            val method = parsed["method"]?.toString()?.trim()
-            method?.takeIf { it.isNotBlank() } ?: parsed.entries.joinToString(",") { (key, value) -> "$key=$value" }
+            val method = safeString(parsed["method"], ",")
+            method.ifBlank { safeString(parsed, ",") }
         }
         else -> string("method")
     }.ifBlank { string("method") }
+
+    private fun safeString(value: Any?, entrySeparator: String): String {
+        fun scalar(nestedValue: Any?): String = when (nestedValue) {
+            is String -> nestedValue.trim().take(MAX_FIELD_CHARS)
+            is Number,
+            is Boolean -> nestedValue.toString().take(MAX_FIELD_CHARS)
+            else -> ""
+        }
+        fun <T> Iterable<T>.joinBounded(transform: (T) -> String?): String {
+            val builder = StringBuilder()
+            for (item in this) {
+                val scalarValue = transform(item) ?: return ""
+                if (scalarValue.isBlank()) return ""
+                if (builder.isNotEmpty()) builder.append(entrySeparator)
+                if (builder.length + scalarValue.length > MAX_FIELD_CHARS) return ""
+                builder.append(scalarValue)
+            }
+            return builder.toString()
+        }
+        return when (value) {
+            is Map<*, *> -> value.entries.joinBounded { (key, nestedValue) ->
+                val nested = scalar(nestedValue)
+                if (nested.isBlank()) null else "${key.toString().take(MAX_FIELD_CHARS)}=$nested"
+            }
+            is Iterable<*> -> value.joinBounded { nestedValue ->
+                scalar(nestedValue).takeIf { it.isNotBlank() }
+            }
+            else -> scalar(value)
+        }
+    }
 }
