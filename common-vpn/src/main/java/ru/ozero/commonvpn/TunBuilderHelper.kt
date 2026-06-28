@@ -101,7 +101,7 @@ class TunBuilderHelper(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching { builder.setMetered(false) }
         }
-        TunBuilderConfigurator(service.packageName).apply(builder, splitConfig, excludeSelf = true)
+        TunBuilderConfigurator(service.packageName).apply(builder, splitConfig, excludeSelf = false)
         return builder
     }
 

@@ -119,22 +119,20 @@ class SplitTunnelVpnServiceSentinelTest {
     }
 
     @Test
-    fun `buildTunBuilder не имеет параметра engineId — excludeSelf всегда true`() {
+    fun `buildTunBuilder не имеет параметра engineId — self traffic stays in VPN`() {
         val sig = helperSource.substringAfter("fun buildTunBuilder(")
             .substringBefore("): VpnService.Builder")
         assertTrue(
             !sig.contains("engineId"),
-            "buildTunBuilder не должен принимать engineId — вызывается только для не-TunFdAcceptor движков " +
-                "и killswitch TUN; excludeSelf = true там постоянен и не зависит от движка",
+            "buildTunBuilder не должен принимать engineId — self traffic must stay covered by VPN policy",
         )
     }
 
     @Test
-    fun `buildTunBuilder использует excludeSelf = true для не-WARP движков`() {
+    fun `buildTunBuilder не исключает приложение из TUN policy`() {
         assertTrue(
-            buildTunBlock.contains("excludeSelf = true"),
-            "buildTunBuilder обязан использовать excludeSelf = true — не-TunFdAcceptor движки " +
-                "не вызывают protect() на outbound сокетах, иначе routing loop через TUN",
+            buildTunBlock.contains("excludeSelf = false"),
+            "buildTunBuilder не должен вызывать addDisallowedApplication(packageName) для app UID",
         )
     }
 }
