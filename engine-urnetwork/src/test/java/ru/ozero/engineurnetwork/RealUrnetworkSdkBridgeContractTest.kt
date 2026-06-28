@@ -588,6 +588,26 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `location browsing is gated by running engine`() {
+        val openBody = source.substringAfter("override fun openLocationsViewController()")
+            .substringBefore("override fun isDeviceAvailable()")
+        assertTrue(
+            openBody.contains("!running.get() || deviceRef.get() == null"),
+            "openLocationsViewController must require running engine before exposing SDK location browsing.",
+        )
+        assertTrue(
+            source.contains("override fun isDeviceAvailable(): Boolean = running.get() && deviceRef.get() != null"),
+            "isDeviceAvailable must not report bootstrap-only devices when engine is stopped.",
+        )
+        val initBody = source.substringAfter("override suspend fun initDeviceForLocations")
+            .substringBefore("private suspend fun ensureDeviceOnMain")
+        assertTrue(
+            initBody.contains("byClientJwt.isBlank() || !running.get()"),
+            "initDeviceForLocations must not create an SDK device from settings while URnetwork is stopped.",
+        )
+    }
+
+    @Test
     fun `preferredLocationConnector connect вызывается в attachTun под running guard`() {
         val helperField =
             "private val preferredLocationConnector = UrnetworkPreferredLocationConnector(bridgeScope)"
