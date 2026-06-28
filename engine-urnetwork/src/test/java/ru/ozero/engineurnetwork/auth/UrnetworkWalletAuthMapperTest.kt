@@ -43,14 +43,18 @@ class UrnetworkWalletAuthMapperTest {
 
         val auth = UrnetworkWalletAuthMapper.buildWalletAuth(
             identity = identity,
+            operation = WalletAuthOperation.LOGIN,
+            issuedAtMillis = 123L,
+            nonceBytes = { byteArrayOf(9, 8) },
             encodeSignature = { raw -> "encoded:${raw.joinToString("-")}" },
         )
 
+        val expectedMessage = "ozero-auth-v1:pub-key|aud=urnetwork|op=authLogin|iat_ms=123|nonce=encoded:9-8"
         assertEquals("pub-key", auth?.publicKey)
-        assertEquals("ozero-auth-v1:pub-key", auth?.message)
+        assertEquals(expectedMessage, auth?.message)
         assertEquals("encoded:1-2-3-4", auth?.signature)
         assertEquals("solana", auth?.blockchain)
-        assertEquals("ozero-auth-v1:pub-key", identity.signedMessage?.decodeToString())
+        assertEquals(expectedMessage, identity.signedMessage?.decodeToString())
     }
 
     @Test
@@ -59,18 +63,19 @@ class UrnetworkWalletAuthMapperTest {
 
         val auth = UrnetworkWalletAuthMapper.buildWalletAuth(
             identity = identity,
+            operation = WalletAuthOperation.LOGIN,
             encodeSignature = { error("encode failed") },
         )
 
         assertNull(auth)
-        assertEquals("ozero-auth-v1:pub-key", identity.signedMessage?.decodeToString())
+        assertNull(identity.signedMessage)
     }
 
     @Test
     fun `buildWalletAuth returns null when pubkey lookup throws`() = runTest {
         val identity = FakeIdentity(pubkeyFailure = IllegalStateException("pubkey failed"))
 
-        val auth = UrnetworkWalletAuthMapper.buildWalletAuth(identity)
+        val auth = UrnetworkWalletAuthMapper.buildWalletAuth(identity, WalletAuthOperation.LOGIN)
 
         assertNull(auth)
     }
@@ -79,10 +84,24 @@ class UrnetworkWalletAuthMapperTest {
     fun `buildWalletAuth returns null when signing throws`() = runTest {
         val identity = FakeIdentity(pubkey = "pub-key", signFailure = IllegalStateException("sign failed"))
 
-        val auth = UrnetworkWalletAuthMapper.buildWalletAuth(identity)
+        val auth = UrnetworkWalletAuthMapper.buildWalletAuth(identity, WalletAuthOperation.LOGIN)
 
         assertNull(auth)
-        assertEquals("ozero-auth-v1:pub-key", identity.signedMessage?.decodeToString())
+        val signed = identity.signedMessage?.decodeToString().orEmpty()
+        assertEquals(true, signed.startsWith("ozero-auth-v1:pub-key|aud=urnetwork|op=authLogin|iat_ms="))
+        assertEquals(true, signed.contains("|nonce="))
+    }
+
+    @Test
+    fun `wallet message binds audience operation timestamp and nonce`() {
+        val message = UrnetworkWalletAuthMapper.buildWalletMessage(
+            publicKey = "pub-key",
+            operation = WalletAuthOperation.NETWORK_CREATE,
+            issuedAtMillis = 456L,
+            nonce = "nonce",
+        )
+
+        assertEquals("ozero-auth-v1:pub-key|aud=urnetwork|op=networkCreate|iat_ms=456|nonce=nonce", message)
     }
 
     @Test
