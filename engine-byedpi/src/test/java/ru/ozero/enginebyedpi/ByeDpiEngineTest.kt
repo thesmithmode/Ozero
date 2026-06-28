@@ -104,6 +104,39 @@ class ByeDpiEngineTest {
     }
 
     @Test
+    fun startFailsWhenRequestedSocksPortAlreadyOccupied() = runTest {
+        val conflictEngine = ByeDpiEngine(
+            proxy,
+            socksProbe = { _, _, _ -> 1L },
+            portFreeChecker = { false },
+        )
+
+        val result = conflictEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+
+        assertIs<StartResult.Failure>(result)
+        verify(exactly = 0) { proxy.startProxy(any()) }
+    }
+
+    @Test
+    fun startFailsWhenProxyExitedBeforeForeignSocksProbeSucceeds() = runTest {
+        var probeCalls = 0
+        val failEngine = ByeDpiEngine(
+            proxy,
+            socksProbe = { _, _, _ ->
+                probeCalls += 1
+                1L
+            },
+            testDispatcherOverride = UnconfinedTestDispatcher(testScheduler),
+        )
+        every { proxy.startProxy(any()) } returns -1
+
+        val result = failEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+
+        assertIs<StartResult.Failure>(result)
+        assertEquals(0, probeCalls)
+    }
+
+    @Test
     fun startArgsIncludePortFlag() {
         val args = engine.buildArgs(EngineConfig.ByeDpi(socksPort = 1080))
         assertTrue(args.contains("-p"))
@@ -530,8 +563,6 @@ class ByeDpiEngineTest {
 
     @Test
     fun `autoRotatePort skips ports occupied by another app — sentinel for port-conflict regression`() = runTest {
-        // Simulates another app holding 49152 and 49153 on loopback.
-        // ByeDPI must skip those and bind on the first free candidate (49154).
         val busyPorts = setOf(ByeDpiEngine.PORT_ROTATION_BASE, ByeDpiEngine.PORT_ROTATION_BASE + 1)
         val conflictEngine = ByeDpiEngine(
             proxy,

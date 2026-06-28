@@ -39,7 +39,6 @@ class ByeDpiEngine(
     private val socksProbe: suspend (String, Int, Int) -> Long = Socks5HandshakeProbe::probe,
     private val readyProbeTimeoutMs: Int = READY_PROBE_TIMEOUT_MS,
     private val readyTotalTimeoutMs: Long = READY_TIMEOUT_MS,
-    // Checks whether a loopback port is available. Injectable for unit tests.
     private val portFreeChecker: (Int) -> Boolean = ::defaultPortFreeCheck,
     testDispatcherOverride: CoroutineDispatcher? = null,
 ) : EnginePlugin {
@@ -121,18 +120,24 @@ class ByeDpiEngine(
         if (drained == null) {
             PersistentLoggers.warn(TAG, "start: dispatcher drain timeout — native thread may still be active")
         }
+        if (!portFreeChecker(resolvedPort)) {
+            PersistentLoggers.error(TAG, "byedpi socks порт $resolvedPort уже занят")
+            return StartResult.Failure(reason = "byedpi socks порт $resolvedPort уже занят")
+        }
 
         val args = buildArgs(resolvedConfig)
         PersistentLoggers.debug(
             TAG,
             "jniStartProxy argv=[${args.joinToString(" ")}] (native префиксует argv[0]=\"byedpi\")",
         )
+        val proxyExitCode = AtomicInteger(PROXY_EXIT_PENDING)
         val proxyJob = proxyScope.launch {
             PersistentLoggers.debug(TAG, "launch entered port=$resolvedPort")
             val code = startProxyWithRecovery(args)
+            proxyExitCode.set(code)
             PersistentLoggers.debug(TAG, "startProxy returned code=$code port=$resolvedPort")
             when {
-                code == 0 -> { /* success — main() returned 0 */ }
+                code == 0 -> Unit
                 code == JNI_GUARD_BUSY -> PersistentLoggers.warn(
                     TAG,
                     "jniStartProxy guard busy — старая main() ещё держит CAS; queue serialization",
@@ -143,7 +148,7 @@ class ByeDpiEngine(
         }
         proxyJobRef.set(proxyJob)
 
-        val readyAt = waitSocksReady(resolvedPort, proxyJob)
+        val readyAt = waitSocksReady(resolvedPort, proxyExitCode)
         return if (readyAt >= 0) {
             activeSocksPort = resolvedPort
             Log.i(TAG, "started socksPort=$resolvedPort readyMs=$readyAt")
@@ -163,14 +168,11 @@ class ByeDpiEngine(
         }
     }
 
-    // Cycles through 49152-49407 until a port that passes a bind-probe is found.
-    // TOCTOU window exists between probe and native bind, but is negligible in practice.
     private fun nextRotatedPort(): Int {
         repeat(PORT_ROTATION_RANGE) {
             val candidate = PORT_ROTATION_BASE + (portCounter.getAndIncrement() and (PORT_ROTATION_RANGE - 1))
             if (portFreeChecker(candidate)) return candidate
         }
-        // All 256 ports in rotation range are occupied — fall back to OS-assigned ephemeral port.
         return ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { it.localPort }
     }
 
@@ -201,11 +203,12 @@ class ByeDpiEngine(
         fallback
     }
 
-    private suspend fun waitSocksReady(port: Int, proxyJob: Job): Long {
+    private suspend fun waitSocksReady(port: Int, proxyExitCode: AtomicInteger): Long {
         val started = System.currentTimeMillis()
         var probeSuccess = false
         withTimeoutOrNull(readyTotalTimeoutMs) {
             while (true) {
+                if (proxyExitCode.get() != PROXY_EXIT_PENDING) return@withTimeoutOrNull
                 val ok = try {
                     socksProbe("127.0.0.1", port, readyProbeTimeoutMs)
                     true
@@ -218,7 +221,7 @@ class ByeDpiEngine(
                     probeSuccess = true
                     return@withTimeoutOrNull
                 }
-                if (!proxyJob.isActive) return@withTimeoutOrNull
+                if (proxyExitCode.get() != PROXY_EXIT_PENDING) return@withTimeoutOrNull
                 delay(READY_RETRY_MS)
             }
         }
@@ -316,6 +319,7 @@ class ByeDpiEngine(
         const val READY_PROBE_TIMEOUT_MS = 500
         const val READY_RETRY_MS = 100L
         const val STOP_GRACE_MS = 1_500L
+        private const val PROXY_EXIT_PENDING = Int.MIN_VALUE
 
         // Must cover both STOP_GRACE_MS joins in stop(), otherwise restart can hit native guard busy.
         const val BYEDPI_STOP_TIMEOUT_MS = 5_000L
