@@ -104,6 +104,25 @@ class RawUpdaterTest {
     }
 
     @Test
+    fun `should reject oversized subscription body before replacing group profiles`() = runBlocking {
+        val existing = ru.ozero.singboxroom.entity.ProxyProfile(
+            id = 9L,
+            groupId = 1L,
+            name = "Existing",
+            beanBlob = byteArrayOf(1),
+            protocolType = RawUpdater.PROTOCOL_VLESS,
+        )
+        profileDao.profiles.add(existing)
+        server.enqueue(MockResponse().setBody("x".repeat(4 * 1024 * 1024 + 1)))
+        val g = group()
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isFailure)
+        assertEquals(listOf(existing), profileDao.profiles)
+    }
+
+    @Test
     fun `should fetch clash yaml and insert profiles`() = runBlocking {
         server.enqueue(
             MockResponse().setBody(
