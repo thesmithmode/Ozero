@@ -66,17 +66,19 @@ class OzeroNotificationFactoryContractTest {
         val body = source.substringAfter("fun build(").substringBefore("fun notifyStats")
         assertTrue(
             body.contains("FLAG_IMMUTABLE"),
-            "PendingIntent.getActivity/getService на Android 12+ обязан использовать FLAG_IMMUTABLE — " +
+            "PendingIntent.getActivity на Android 12+ обязан использовать FLAG_IMMUTABLE — " +
                 "иначе IllegalArgumentException при создании notification",
         )
     }
 
     @Test
-    fun `build adds Stop action с ACTION_STOP intent`() {
+    fun `build does not expose direct stop service PendingIntent`() {
         val body = source.substringAfter("fun build(").substringBefore("fun notifyStats")
         assertTrue(
-            body.contains("OzeroVpnService.ACTION_STOP"),
-            "Stop action обязан использовать ACTION_STOP — иначе пользователь не остановит VPN из уведомления",
+            !body.contains("OzeroVpnService.ACTION_STOP") &&
+                !body.contains("PendingIntent.getService") &&
+                !body.contains(".addAction("),
+            "VPN notification must not publish delegated ACTION_STOP service PendingIntent",
         )
     }
 

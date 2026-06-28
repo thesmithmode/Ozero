@@ -10,7 +10,6 @@ import org.amnezia.awg.GoBackend
 import org.amnezia.awg.ProxyGoBackend
 import org.amnezia.awg.backend.SocketProtector
 import ru.ozero.commonvpn.OzeroNotificationFactory
-import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.enginewarp.IWarpEngineProcess
 import ru.ozero.enginewarp.WarpEngineServiceActions
 import ru.ozero.enginewarp.WarpTurnOnResult
@@ -128,7 +127,7 @@ class WarpEngineService : Service() {
     }
 
     private fun startForegroundSession(): Int {
-        val foreground = OzeroNotificationFactory(this, OzeroVpnService::class.java).enterForeground(this)
+        val foreground = OzeroNotificationFactory(this).enterForeground(this)
         if (!foreground) stopSelf()
         return START_NOT_STICKY
     }
