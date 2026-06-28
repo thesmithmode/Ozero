@@ -12,9 +12,9 @@ import ru.ozero.desktop.engine.DesktopEngine
 import ru.ozero.desktop.engine.DesktopEngineRegistry
 import ru.ozero.desktop.engine.EngineConfig
 import ru.ozero.desktop.engine.EngineStartResult
-import ru.ozero.desktop.engine.SingboxDesktopEngine
 import ru.ozero.desktop.engine.TunFrontend
 import ru.ozero.desktop.model.EngineId
+import ru.ozero.desktop.model.SettingsModel
 import ru.ozero.desktop.model.SwitchingTransition
 import ru.ozero.desktop.model.TunnelState
 import ru.ozero.desktop.model.TunnelStats
@@ -52,15 +52,21 @@ class DesktopVpnManager(
     private var tunFrontend: TunFrontend? = null
     private var watchdogJob: Job? = null
 
-    fun toggle() {
+    fun toggle(settings: SettingsModel = SettingsModel.DEFAULT) {
         when (_state.value) {
             is TunnelState.Connected -> disconnect()
-            is TunnelState.Idle, is TunnelState.Failed -> connect()
+            is TunnelState.Idle, is TunnelState.Failed -> {
+                connect(settings.manualEngine, settings.vpnMode, settings)
+            }
             else -> Unit
         }
     }
 
-    fun connect(engineId: EngineId? = null, vpnMode: VpnMode = VpnMode.TUN) {
+    fun connect(
+        engineId: EngineId? = null,
+        vpnMode: VpnMode = VpnMode.TUN,
+        settings: SettingsModel = SettingsModel.DEFAULT,
+    ) {
         val id = engineId ?: EngineId.SINGBOX
         val engine = DesktopEngineRegistry.get(id)
         if (engine == null) {
@@ -76,28 +82,32 @@ class DesktopVpnManager(
             _effectiveVpnMode.value = effectiveMode
 
             when (effectiveMode) {
-                VpnMode.TUN -> connectTun(id, engine)
-                VpnMode.PROXY -> connectProxy(id, engine)
+                VpnMode.TUN -> connectTun(id, engine, settings)
+                VpnMode.PROXY -> connectProxy(id, engine, settings)
             }
         }
     }
 
-    private suspend fun connectTun(id: EngineId, engine: DesktopEngine) {
+    private suspend fun connectTun(id: EngineId, engine: DesktopEngine, settings: SettingsModel) {
         when (id) {
-            EngineId.SINGBOX -> connectSingboxTun(id, engine)
+            EngineId.SINGBOX -> connectSingboxTun(id, engine, settings)
             EngineId.WARP -> connectWarpTun(id, engine)
             EngineId.BYEDPI -> connectWithTunFrontend(id, engine)
             else -> {
                 log.info("${id.displayName} no TUN support, falling back to proxy")
                 _effectiveVpnMode.value = VpnMode.PROXY
-                connectProxy(id, engine)
+                connectProxy(id, engine, settings)
             }
         }
     }
 
-    private suspend fun connectSingboxTun(id: EngineId, engine: DesktopEngine) {
-        val tunJson = SingboxDesktopEngine.buildTunConfig()
-        val config = EngineConfig(singboxJson = tunJson)
+    private suspend fun connectSingboxTun(id: EngineId, engine: DesktopEngine, settings: SettingsModel) {
+        val json = SingboxDesktopConfigResolver.resolve(settings, VpnMode.TUN)
+            .getOrElse {
+                handleFailedResult(id, EngineStartResult.Failed(it.message ?: "Sing-box config is invalid"))
+                return
+            }
+        val config = EngineConfig(singboxJson = json)
         val result = engine.start(config)
         handleStartResult(id, engine, result)
     }
@@ -148,8 +158,17 @@ class DesktopVpnManager(
         }
     }
 
-    private suspend fun connectProxy(id: EngineId, engine: DesktopEngine) {
-        val config = EngineConfig()
+    private suspend fun connectProxy(id: EngineId, engine: DesktopEngine, settings: SettingsModel) {
+        val config = if (id == EngineId.SINGBOX) {
+            val json = SingboxDesktopConfigResolver.resolve(settings, VpnMode.PROXY)
+                .getOrElse {
+                    handleFailedResult(id, EngineStartResult.Failed(it.message ?: "Sing-box config is invalid"))
+                    return
+                }
+            EngineConfig(singboxJson = json)
+        } else {
+            EngineConfig()
+        }
         val result = engine.start(config)
 
         when (result) {
@@ -227,7 +246,11 @@ class DesktopVpnManager(
         }
     }
 
-    fun switchEngine(newEngineId: EngineId, vpnMode: VpnMode = VpnMode.TUN) {
+    fun switchEngine(
+        newEngineId: EngineId,
+        vpnMode: VpnMode = VpnMode.TUN,
+        settings: SettingsModel = SettingsModel.DEFAULT,
+    ) {
         val currentState = _state.value
         val currentEngineId = when (currentState) {
             is TunnelState.Connected -> currentState.engineId
@@ -243,7 +266,7 @@ class DesktopVpnManager(
                 disconnect()
                 delay(500)
             }
-            connect(newEngineId, vpnMode)
+            connect(newEngineId, vpnMode, settings)
             _switching.value = null
         }
     }

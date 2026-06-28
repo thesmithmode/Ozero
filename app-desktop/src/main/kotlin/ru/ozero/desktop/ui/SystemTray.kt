@@ -15,11 +15,13 @@ import kotlinx.coroutines.launch
 import ru.ozero.desktop.model.TunnelState
 import ru.ozero.desktop.strings.Strings
 import ru.ozero.desktop.ui.theme.OzeroPalette
+import ru.ozero.desktop.vpn.DesktopSettingsStore
 import ru.ozero.desktop.vpn.DesktopVpnManager
 
 @Composable
 fun ApplicationScope.OzeroSystemTray(
     vpnManager: DesktopVpnManager,
+    settingsStore: DesktopSettingsStore,
     scope: CoroutineScope,
     onShowWindow: () -> Unit,
 ) {
@@ -37,7 +39,10 @@ fun ApplicationScope.OzeroSystemTray(
             if (isConnected) {
                 Item(Strings.TRAY_DISCONNECT, onClick = { vpnManager.disconnect() })
             } else {
-                Item(Strings.TRAY_CONNECT, onClick = { scope.launch { vpnManager.toggle() } })
+                Item(
+                    Strings.TRAY_CONNECT,
+                    onClick = { scope.launch { vpnManager.toggle(settingsStore.settings.value) } },
+                )
             }
             Separator()
             Item(Strings.TRAY_QUIT, onClick = ::exitApplication)

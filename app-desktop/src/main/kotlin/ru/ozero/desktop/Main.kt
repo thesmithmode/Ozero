@@ -33,6 +33,7 @@ fun main() {
 
         OzeroSystemTray(
             vpnManager = vpnManager,
+            settingsStore = settingsStore,
             scope = scope,
             onShowWindow = { isWindowVisible = true },
         )
