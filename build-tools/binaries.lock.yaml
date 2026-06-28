@@ -1,14 +1,6 @@
 tag: byedpi-e4e9f53e
 generated_at: 2026-05-19T23:07:08Z
 artifacts:
-  - name: libxray.aar
-    engine: xray
-    destination: libs
-    download_url: https://github.com/2dust/AndroidLibXrayLite/releases/download/v26.4.25/libv2ray.aar
-    sha256: e7fcc8d9923cc6507481e03973e474325cf3aed74b0f42a3ca5101e7904150a1
-    size_bytes: 55794103
-    source_repo: https://github.com/2dust/AndroidLibXrayLite
-    source_commit: v26.4.25
   - name: libnaive-arm64-v8a.so
     engine: naive
     abi: arm64-v8a
