@@ -175,10 +175,17 @@ class ProxyWarpAutoConfig(
     }
 
     private fun isCloudflareWarpIp(host: String): Boolean {
-        val parts = host.split(".").mapNotNull { it.toIntOrNull() }
+        val parts = host.split(".")
         if (parts.size != 4) return false
-        return (parts[0] == 162 && parts[1] == 159 && parts[2] in 192..195) ||
-            (parts[0] == 188 && parts[1] == 114 && parts[2] in 96..99)
+        val octets = mutableListOf<Int>()
+        for (part in parts) {
+            if (part.isEmpty() || part.any { !it.isDigit() }) return false
+            val value = part.toIntOrNull() ?: return false
+            if (value !in 0..255) return false
+            octets += value
+        }
+        return (octets[0] == 162 && octets[1] == 159 && octets[2] in 192..195) ||
+            (octets[0] == 188 && octets[1] == 114 && octets[2] in 96..99)
     }
 
     private fun extractIniFromBody(body: String): ExtractedIni? {

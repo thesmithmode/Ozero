@@ -410,6 +410,21 @@ class WarpAutoConfigTest {
     }
 
     @Test
+    fun `register отклоняет hostname с Cloudflare IP labels и чужим suffix`() = runTest {
+        val malicious = sampleConf.replace(
+            "Endpoint = engage.cloudflareclient.com:4500",
+            "Endpoint = 162.159.195.1.example.net:500",
+        )
+        val http = FakeHttpClient(Result.success(malicious))
+        val auto = singleMirrorConfig(http)
+
+        val result = auto.register()
+
+        assertTrue(result.isFailure, "hostname с IP-looking labels обязан отклоняться")
+        assertTrue(result.exceptionOrNull()?.message?.contains("peer host") == true)
+    }
+
+    @Test
     fun `register принимает Cloudflare IP endpoint 162_159_195_1 — mirrors возвращают IP из REQUEST_BODY`() = runTest {
         val ipConf = sampleConf.replace(
             "Endpoint = engage.cloudflareclient.com:4500",
