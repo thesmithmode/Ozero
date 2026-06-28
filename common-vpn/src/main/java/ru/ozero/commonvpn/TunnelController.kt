@@ -106,19 +106,21 @@ class TunnelController(
     }
 
     fun reset() {
-        _stats.value = null
-        _rawStats.value = null
-        _stagnant.value = false
-        _killswitchActive.value = false
-        sessionStartMs = 0L
-        prevTxBytes = 0L
-        prevRxBytes = 0L
-        prevTimestampMs = 0L
-        sessionBaseline = null
-        smoothedBpsIn = 0.0
-        smoothedBpsOut = 0.0
-        stagnationMonitor.reset()
-        transition(TunnelState.Idle)
+        synchronized(lock) {
+            _stats.value = null
+            _rawStats.value = null
+            _stagnant.value = false
+            _killswitchActive.value = false
+            sessionStartMs = 0L
+            prevTxBytes = 0L
+            prevRxBytes = 0L
+            prevTimestampMs = 0L
+            sessionBaseline = null
+            smoothedBpsIn = 0.0
+            smoothedBpsOut = 0.0
+            stagnationMonitor.reset()
+            _state.value = TunnelState.Idle
+        }
     }
 
     fun updateStats(raw: TunnelStats) {

@@ -181,12 +181,12 @@ class TunnelControllerStateTest : TunnelControllerTestBase() {
     }
 
     @Test
-    fun invalidConnectedToIdleIgnored() {
+    fun resetForcesConnectedToIdle() {
         controller.onProbing()
         controller.onConnecting(EngineId.BYEDPI)
         controller.onEngineStarted(EngineId.BYEDPI, 1080)
         controller.reset()
-        assertIs<TunnelState.Connected>(controller.state.value)
+        assertIs<TunnelState.Idle>(controller.state.value)
     }
 
     @Test
