@@ -133,4 +133,21 @@ class ByeDpiEngineConcurrencyContractTest {
                 "каскад длинных таймаутов ухудшает restart latency.",
         )
     }
+
+    @Test
+    fun `stop marks native wedge before clearing observable job`() {
+        val pattern = Regex(
+            """val\s+job\s*=\s*proxyJobRef\.getAndSet\(null\)\s*""" +
+                """proxyGeneration\.incrementAndGet\(\)\s*""" +
+                """if\s*\(job\s*!=\s*null\)\s*\{\s*""" +
+                """nativeMayBeWedged\.set\(true\)""",
+            RegexOption.DOT_MATCHES_ALL,
+        )
+        assertTrue(
+            pattern.containsMatchIn(engineSource),
+            "stop() обязан пометить possible wedge сразу после удаления proxyJobRef. " +
+                "Если stop() отменят во время join, следующий start() увидит oldJob == null " +
+                "и должен ротировать lane через nativeMayBeWedged, а не вставать за orphan JNI.",
+        )
+    }
 }
