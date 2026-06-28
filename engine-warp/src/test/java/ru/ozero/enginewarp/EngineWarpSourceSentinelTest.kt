@@ -130,13 +130,17 @@ class EngineWarpSourceSentinelTest {
     }
 
     @Test
-    fun `resolveEndpointHost оборачивает InetAddress getByName в withContext IO`() {
+    fun `resolveEndpointHost не использует system DNS для hostname endpoint`() {
         val body = source.substringAfter("private suspend fun resolveEndpointHost")
             .substringBefore("private fun resolveViaDoH")
+        assertFalse(
+            body.contains("InetAddress.getByName"),
+            "Endpoint hostname resolve не должен использовать system DNS до establish, " +
+                "иначе hostname уходит plaintext-запросом во внешнюю сеть.",
+        )
         assertTrue(
             body.contains("withContext(Dispatchers.IO)"),
-            "InetAddress.getByName — blocking call, обязан быть в withContext(Dispatchers.IO). " +
-                "Без этого блокирует Dispatchers.Default при system DNS lookup.",
+            "DoH lookup обязан выполняться в Dispatchers.IO.",
         )
     }
 
