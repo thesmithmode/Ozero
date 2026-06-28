@@ -14,10 +14,10 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
+import ru.ozero.engineurnetwork.UrnetworkConfig
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkDefaults
 import ru.ozero.engineurnetwork.UrnetworkJwtBootstrapper
-import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.byClientJwt
 import ru.ozero.engineurnetwork.provideNetworkMode
@@ -101,25 +101,28 @@ class UrnetworkRelayCoordinator(
         if (result is UrnetworkSdkBridge.StartResult.Success) {
             relayOwned.set(true)
             attachDummyIoLoop()
-            runCatching { bridge.setProvidePaused(false) }
+            val provideConfig = runCatching { configStore.config().first() }
+                .getOrDefault(UrnetworkConfig())
+            runCatching { bridge.setProvidePaused(!provideConfig.provideEnabled) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: worker pause toggle threw: ${it.message}") }
-            val controlMode = runCatching { configStore.config().first().provideControlMode }
-                .getOrDefault(UrnetworkProvideControlMode.ALWAYS)
+            val controlMode = provideConfig.provideControlMode
             runCatching { bridge.setProvideControlMode(controlMode) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: setProvideControlMode threw: ${it.message}") }
             val networkMode = runCatching { configStore.provideNetworkMode().first() }
                 .getOrDefault(UrnetworkProvideNetworkMode.WIFI)
             runCatching { bridge.setProvideNetworkMode(networkMode) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: setProvideNetworkMode threw: ${it.message}") }
-            runCatching { networkMonitor?.start(networkMode) }
-                .onFailure { PersistentLoggers.warn(TAG, "mesh session: networkMonitor threw: ${it.message}") }
-            runCatching { relayLockManager?.acquire() }
-                .onFailure { PersistentLoggers.warn(TAG, "mesh session: lockManager threw: ${it.message}") }
+            if (provideConfig.provideEnabled) {
+                runCatching { networkMonitor?.start(networkMode) }
+                    .onFailure { PersistentLoggers.warn(TAG, "mesh session: networkMonitor threw: ${it.message}") }
+                runCatching { relayLockManager?.acquire() }
+                    .onFailure { PersistentLoggers.warn(TAG, "mesh session: lockManager threw: ${it.message}") }
+            }
             val diag = runCatching { bridge.relayDiagnostics() }.getOrDefault("unavailable")
             PersistentLoggers.debug(
                 TAG,
                 "mesh session: worker started alongside ${tunnelState.engineId} " +
-                    "(provideEnabled=true controlMode=${controlMode.rawValue} " +
+                    "(provideEnabled=${provideConfig.provideEnabled} controlMode=${controlMode.rawValue} " +
                     "networkMode=${networkMode.rawValue}) diag=[$diag]",
             )
             startWatchdog()

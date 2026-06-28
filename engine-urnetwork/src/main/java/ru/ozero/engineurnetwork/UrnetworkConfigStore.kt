@@ -120,6 +120,19 @@ suspend fun UrnetworkConfigStore.setAllowDirect(value: Boolean) {
     update { it.copy(allowDirect = value) }
 }
 
+fun UrnetworkConfigStore.provideEnabled(): Flow<Boolean> = config().map { it.provideEnabled }
+
+suspend fun UrnetworkConfigStore.setProvideEnabled(value: Boolean) {
+    update { it.copy(provideEnabled = value) }
+}
+
+fun UrnetworkConfigStore.provideControlMode(): Flow<UrnetworkProvideControlMode> =
+    config().map { it.provideControlMode }
+
+suspend fun UrnetworkConfigStore.setProvideControlMode(value: UrnetworkProvideControlMode) {
+    update { it.copy(provideControlMode = value) }
+}
+
 fun UrnetworkConfigStore.provideNetworkMode(): Flow<UrnetworkProvideNetworkMode> =
     config().map { it.provideNetworkMode }
 
@@ -159,18 +172,13 @@ suspend fun UrnetworkConfigStore.setCachedLocations(
 }
 
 class InMemoryUrnetworkConfigStore(initial: UrnetworkConfig = UrnetworkConfig()) : UrnetworkConfigStore {
-    private val state = MutableStateFlow(initial.normalizedProvideState())
+    private val state = MutableStateFlow(initial)
     val snapshot: UrnetworkConfig get() = state.value
     fun inject(transform: (UrnetworkConfig) -> UrnetworkConfig) {
-        state.value = transform(state.value).normalizedProvideState()
+        state.value = transform(state.value)
     }
     override fun config(): Flow<UrnetworkConfig> = state
     override suspend fun update(transform: (UrnetworkConfig) -> UrnetworkConfig) {
-        state.value = transform(state.value).normalizedProvideState()
+        state.value = transform(state.value)
     }
-
-    private fun UrnetworkConfig.normalizedProvideState(): UrnetworkConfig = copy(
-        provideEnabled = true,
-        provideControlMode = UrnetworkProvideControlMode.ALWAYS,
-    )
 }
