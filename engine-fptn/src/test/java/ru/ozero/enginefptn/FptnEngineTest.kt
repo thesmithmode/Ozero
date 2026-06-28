@@ -548,13 +548,19 @@ class FptnEngineTest {
     @Test
     fun `attachTun maps native create exception to attach failure`() = runTest {
         val ws = FakeWebSocketClient(createFailure = IllegalStateException("create boom"))
+        var outputClosed = false
+        val output = object : ByteArrayOutputStream() {
+            override fun close() {
+                outputClosed = true
+            }
+        }
         engine = FptnEngine(
             store,
             wsClient = ws,
             httpsClient = FakeHttpsClient(
                 postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
             ),
-            tunIo = fakeTunIo(),
+            tunIo = fakeTunIo(output = output),
         )
         assertIs<StartResult.Success>(
             engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
@@ -565,18 +571,25 @@ class FptnEngineTest {
         val failure = assertIs<TunAttachResult.Failure>(attach)
         assertTrue(failure.reason.contains("nativeCreate failed"))
         assertEquals(emptyList(), ws.destroyedHandles)
+        assertFalse(outputClosed)
     }
 
     @Test
     fun `attachTun destroys handle when native run throws`() = runTest {
         val ws = FakeWebSocketClient(runFailure = IllegalStateException("run boom"))
+        var outputClosed = false
+        val output = object : ByteArrayOutputStream() {
+            override fun close() {
+                outputClosed = true
+            }
+        }
         engine = FptnEngine(
             store,
             wsClient = ws,
             httpsClient = FakeHttpsClient(
                 postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
             ),
-            tunIo = fakeTunIo(),
+            tunIo = fakeTunIo(output = output),
         )
         assertIs<StartResult.Success>(
             engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
@@ -587,6 +600,7 @@ class FptnEngineTest {
         val failure = assertIs<TunAttachResult.Failure>(attach)
         assertTrue(failure.reason.contains("nativeRun failed"))
         assertEquals(listOf(11L), ws.destroyedHandles)
+        assertFalse(outputClosed)
     }
 
     @Test
