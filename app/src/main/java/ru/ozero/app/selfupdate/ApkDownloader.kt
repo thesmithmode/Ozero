@@ -5,8 +5,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import java.io.File
 import java.io.IOException
 
@@ -70,15 +72,35 @@ open class ApkDownloader(
         sizeLimit: Long,
         onProgress: suspend (Int) -> Unit,
     ) {
-        val req = Request.Builder().url(url).build()
-        client.newCall(req).execute().use { resp ->
+        executeFollowingAllowedRedirects(url).use { resp ->
             val body = ensureSuccessfulBody(resp, url)
             val total = headerSize(body, sizeLimit)
             streamWithProgress(body, out, total, sizeLimit, onProgress)
         }
     }
 
-    private fun ensureSuccessfulBody(resp: okhttp3.Response, url: String): okhttp3.ResponseBody {
+    private fun executeFollowingAllowedRedirects(url: String): Response {
+        var currentUrl = url
+        repeat(MAX_REDIRECTS + 1) { redirectCount ->
+            val req = Request.Builder().url(currentUrl).build()
+            val resp = client.newCall(req).execute()
+            if (!resp.isRedirect) return resp
+            val nextUrl = resp.use { redirectTarget(req.url, it) }
+            if (redirectCount == MAX_REDIRECTS) throw IOException("too many redirects for $url")
+            currentUrl = nextUrl.toString()
+        }
+        throw IOException("too many redirects for $url")
+    }
+
+    private fun redirectTarget(source: HttpUrl, resp: Response): HttpUrl {
+        val location = resp.header("Location") ?: throw IOException("redirect without Location for $source")
+        val target = source.resolve(location) ?: throw IOException("invalid redirect for $source")
+        if (target.scheme != "https") throw IOException("non-https redirect for $source")
+        if (target.host !in ALLOWED_DOWNLOAD_HOSTS) throw IOException("unexpected redirect host for $source")
+        return target
+    }
+
+    private fun ensureSuccessfulBody(resp: Response, url: String): okhttp3.ResponseBody {
         if (!resp.isSuccessful) throw IOException("HTTP ${resp.code} for $url")
         return resp.body ?: throw IOException("empty body")
     }
@@ -140,8 +162,7 @@ open class ApkDownloader(
     }
 
     private fun downloadFlat(url: String, out: File, sizeLimit: Long) {
-        val req = Request.Builder().url(url).build()
-        client.newCall(req).execute().use { resp ->
+        executeFollowingAllowedRedirects(url).use { resp ->
             val body = ensureSuccessfulBody(resp, url)
             if (body.contentLength() > sizeLimit) {
                 throw SizeLimitException("sig size ${body.contentLength()} > limit $sizeLimit")
@@ -163,5 +184,7 @@ open class ApkDownloader(
         const val DEFAULT_MAX_APK_BYTES: Long = 200L * 1024 * 1024
         const val DEFAULT_MAX_SIG_BYTES: Long = 4096L
         private const val BUFFER = 64 * 1024
+        private const val MAX_REDIRECTS = 5
+        private val ALLOWED_DOWNLOAD_HOSTS = setOf("github.com", "release-assets.githubusercontent.com")
     }
 }
