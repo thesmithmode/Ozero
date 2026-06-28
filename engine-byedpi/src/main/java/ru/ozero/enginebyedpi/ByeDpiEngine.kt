@@ -261,6 +261,7 @@ class ByeDpiEngine(
             val job = proxyJobRef.getAndSet(null)
             proxyGeneration.incrementAndGet()
             if (job != null) {
+                nativeMayBeWedged.set(true)
                 val completed = withTimeoutOrNull(STOP_GRACE_MS) {
                     job.join()
                     true
@@ -270,7 +271,6 @@ class ByeDpiEngine(
                         TAG,
                         "proxyJob не завершился за ${STOP_GRACE_MS}ms — cancel and defer lane drain",
                     )
-                    nativeMayBeWedged.set(true)
                     job.cancel()
                     rotateProxyLane("stop: proxyJob did not finish within ${STOP_GRACE_MS}ms")
                 } else {
