@@ -244,7 +244,7 @@ class EngineUrnetwork(
         return if (reached != null) {
             EnginePlugin.ReadyResult.Ready
         } else {
-            val reason = "URnetwork: TUN attached, but SDK did not confirm tunnel/connect within " +
+            val reason = "URnetwork: TUN attached, but SDK did not confirm provider, peers, or connected status within " +
                 "${startupReadyTimeoutMs}ms"
             PersistentLoggers.warn(TAG, "awaitReady timeout - $reason")
             EnginePlugin.ReadyResult.Timeout(reason)
@@ -252,8 +252,7 @@ class EngineUrnetwork(
     }
 
     private fun isStartupReady(snapshot: UrnetworkSdkBridge.RuntimeSnapshot): Boolean =
-        (snapshot.tunnelStarted && snapshot.connectIssued) ||
-            snapshot.providerStateAdded > 0L ||
+        snapshot.providerStateAdded > 0L ||
             snapshot.peers > 0 ||
             isConnectedStatus(snapshot.connectionStatus)
 
