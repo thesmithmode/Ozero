@@ -16,7 +16,6 @@ import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkDefaults
-import ru.ozero.engineurnetwork.UrnetworkJwtBootstrapper
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.byClientJwt
@@ -34,7 +33,6 @@ class UrnetworkRelayCoordinator(
     private val bridge: UrnetworkSdkBridge,
     private val configStore: UrnetworkConfigStore,
     private val tunnelController: TunnelController,
-    private val jwtBootstrapper: UrnetworkJwtBootstrapper,
     private val networkMonitor: RelayNetworkMonitor? = null,
     private val relayLockManager: RelayLockManager? = null,
     private val pipeFactory: DummyPipeFactory = AndroidDummyPipeFactory,
@@ -44,7 +42,6 @@ class UrnetworkRelayCoordinator(
     private val jobRef = AtomicReference<Job?>(null)
     private val watchdogRef = AtomicReference<Job?>(null)
     private val relayOwned = AtomicBoolean(false)
-    private val bootstrapAttemptedThisSession = AtomicBoolean(false)
     private val pipeWriteEndRef = AtomicReference<AutoCloseable?>(null)
 
     fun start() {
@@ -69,7 +66,6 @@ class UrnetworkRelayCoordinator(
         walletAddress: String,
     ) {
         if (tunnelState !is TunnelState.Connected) {
-            bootstrapAttemptedThisSession.set(false)
             if (relayOwned.compareAndSet(true, false)) {
                 PersistentLoggers.debug(TAG, "mesh session: tunnel offline — releasing worker")
                 stopWatchdog()
@@ -85,18 +81,10 @@ class UrnetworkRelayCoordinator(
             return
         }
         if (byClientJwt == null) {
-            if (bootstrapAttemptedThisSession.compareAndSet(false, true)) {
-                PersistentLoggers.debug(
-                    TAG,
-                    "mesh session: credential missing while ${tunnelState.engineId} active — acquiring",
-                )
-                val r = jwtBootstrapper.ensureClientJwt()
-                if (r is UrnetworkJwtBootstrapper.Result.Failed) {
-                    PersistentLoggers.warn(TAG, "mesh session: credential acquisition failed: ${r.reason}")
-                } else {
-                    PersistentLoggers.debug(TAG, "mesh session: credential acquired (${r.javaClass.simpleName})")
-                }
-            }
+            PersistentLoggers.debug(
+                TAG,
+                "mesh session: credential missing for ${tunnelState.engineId} — relay disabled",
+            )
             return
         }
         val result = startBridgeWithRetry(walletAddress, byClientJwt)
