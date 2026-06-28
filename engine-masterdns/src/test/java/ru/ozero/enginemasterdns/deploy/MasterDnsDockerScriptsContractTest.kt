@@ -277,11 +277,11 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
-    fun `removeAll does NOT delete named volume - key persist for redeploy`() {
-        assertFalse(
-            MasterDnsDockerScripts.removeAll.contains("docker volume rm"),
-            "removeAll НЕ должен удалять masterdns-key volume — иначе redeploy = новый key = " +
-                "клиенты со старым toml ломаются. Полный wipe — отдельный flow если нужен.",
+    fun `removeAll deletes named key volume during full server removal`() {
+        val cmd = MasterDnsDockerScripts.removeAll
+        assertTrue(
+            cmd.contains("sudo docker volume rm masterdns-key 2>/dev/null || true"),
+            "removeAll должен удалять masterdns-key volume — user-facing remove обязан стирать secret material.",
         )
     }
 
