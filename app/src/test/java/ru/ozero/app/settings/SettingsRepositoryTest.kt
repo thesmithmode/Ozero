@@ -163,7 +163,7 @@ class SettingsRepositoryTest {
         val current = repository.settings.first()
         assertEquals(
             listOf(
-                EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
+                EngineId.WARP, EngineId.BYEDPI, EngineId.URNETWORK,
                 EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
             ),
             current.engineAutoPriority,
@@ -175,7 +175,7 @@ class SettingsRepositoryTest {
         repository.setEngineAutoPriority(listOf(EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI))
         assertEquals(
             listOf(
-                EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
+                EngineId.WARP, EngineId.BYEDPI, EngineId.URNETWORK,
                 EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
             ),
             repository.settings.first().engineAutoPriority,

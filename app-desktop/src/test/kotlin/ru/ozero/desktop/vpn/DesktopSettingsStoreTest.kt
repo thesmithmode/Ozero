@@ -49,7 +49,7 @@ class DesktopSettingsStoreTest {
         @Test
         fun `should have default engine priority`() {
             val expected = listOf(
-                EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
+                EngineId.WARP, EngineId.BYEDPI, EngineId.URNETWORK,
                 EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
             )
             assertEquals(expected, SettingsModel.DEFAULT.engineAutoPriority)

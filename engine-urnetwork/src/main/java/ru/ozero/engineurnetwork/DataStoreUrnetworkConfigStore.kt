@@ -34,7 +34,7 @@ class DataStoreUrnetworkConfigStore(
         windowType = UrnetworkWindowType.fromRaw(prefs[KEY_WINDOW_TYPE]),
         fixedIpSize = prefs[KEY_FIXED_IP_SIZE] == true,
         allowDirect = prefs[KEY_ALLOW_DIRECT] != false,
-        provideEnabled = prefs[KEY_PROVIDE_ENABLED] != false,
+        provideEnabled = prefs[KEY_PROVIDE_ENABLED] == true,
         provideControlMode = UrnetworkProvideControlMode.fromRaw(prefs[KEY_PROVIDE_CONTROL_MODE]),
         provideNetworkMode = UrnetworkProvideNetworkMode.fromRaw(prefs[KEY_PROVIDE_NETWORK_MODE]),
         selectedLocation = UrnetworkLocationSelection(

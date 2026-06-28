@@ -159,9 +159,9 @@ class UrnetworkConfigStoreTest {
     }
 
     @Test
-    fun `provideEnabled по умолчанию true`() = runTest {
+    fun `provideEnabled по умолчанию false`() = runTest {
         val (store, _) = newStore()
-        assertEquals(true, store.provideEnabled().first())
+        assertEquals(false, store.provideEnabled().first())
     }
 
     @Test
