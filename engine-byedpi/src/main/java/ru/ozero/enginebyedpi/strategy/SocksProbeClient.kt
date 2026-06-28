@@ -1,6 +1,8 @@
 package ru.ozero.enginebyedpi.strategy
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -80,15 +82,15 @@ class HttpSocksProbeClient(
         }
     }
 
-    private fun readUntilLimit(connection: HttpURLConnection, responseCode: Int): Long {
+    private suspend fun readUntilLimit(connection: HttpURLConnection, responseCode: Int): Long {
         val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
         if (stream == null) return 0L
         val declaredLength = connection.contentLengthLong
-        val limit = if (declaredLength > 0L) declaredLength else maxBytesToRead
+        val limit = if (declaredLength > 0L) minOf(declaredLength, maxBytesToRead) else maxBytesToRead
         val buffer = ByteArray(BUFFER_SIZE)
         var actualLength = 0L
         try {
-            while (actualLength < limit) {
+            while (actualLength < limit && currentCoroutineContext().isActive) {
                 val remaining = limit - actualLength
                 val toRead = minOf(remaining, buffer.size.toLong()).toInt()
                 val bytesRead = stream.read(buffer, 0, toRead)
