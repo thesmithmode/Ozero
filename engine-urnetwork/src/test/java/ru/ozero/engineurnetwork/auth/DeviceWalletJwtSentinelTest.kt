@@ -24,12 +24,14 @@ class DeviceWalletJwtSentinelTest {
     }
 
     @Test
-    fun `acquireDeviceWalletJwt подписывает префиксованное сообщение - replay-safe для конкретного pubkey`() {
+    fun `acquireDeviceWalletJwt подписывает fresh action-bound message`() {
         assertTrue(
             authSource.contains("WALLET_MESSAGE_PREFIX") &&
-                authSource.contains("\"ozero-auth-v1:\""),
-            "сообщение для подписи обязано начинаться с ozero-auth-v1: — иначе captured signature от другой " +
-                "версии Ozero replay-able. Не менять prefix без миграции keypairs.",
+                authSource.contains("\"ozero-auth-v2\"") &&
+                authSource.contains("issuedAtMs") &&
+                authSource.contains("nonce=") &&
+                authSource.contains("WalletAuthAction"),
+            "walletAuth message обязан включать version, action, issuedAtMs и nonce — иначе captured signature replay-able.",
         )
     }
 
@@ -44,8 +46,8 @@ class DeviceWalletJwtSentinelTest {
 
     @Test
     fun `authLogin вызывается перед networkCreate - returning user получает существующий byJwt`() {
-        val loginIdx = authSource.indexOf("authLoginWithWallet(api, walletAuth)")
-        val createIdx = authSource.indexOf("networkCreateWithWallet(api, walletAuth, networkName)")
+        val loginIdx = authSource.indexOf("authLoginWithWallet(api, loginWalletAuth)")
+        val createIdx = authSource.indexOf("networkCreateWithWallet(api, createWalletAuth, networkName)")
         assertTrue(loginIdx > 0, "authLoginWithWallet не вызывается — flow не реализован")
         assertTrue(createIdx > loginIdx, "networkCreateWithWallet обязан идти ПОСЛЕ authLoginWithWallet в orchestrator")
     }
