@@ -131,7 +131,7 @@ class FptnEngine(
             PersistentLoggers.error(
                 TAG,
                 "start: no server available - token contained ${tokenData.servers.size} server(s), " +
-                    "selected=${fptn.selectedServerName ?: "<auto>"}",
+                    "autoSelect=${fptn.autoSelect}",
             )
             return StartResult.Failure(FPTN_NO_SERVER_AVAILABLE)
         }
@@ -139,8 +139,7 @@ class FptnEngine(
         val firstServer = candidates.first()
         PersistentLoggers.debug(
             TAG,
-            "start: server=${firstServer.name} port=${firstServer.port} bypass=${fptn.bypassMethod} " +
-                "sniDomain=${fptn.sniDomain} tokenServers=${tokenData.servers.size} " +
+            "start: candidate selected tokenServers=${tokenData.servers.size} " +
                 "candidates=${candidates.size} autoSelect=${fptn.autoSelect}",
         )
         Log.d(
@@ -386,7 +385,7 @@ class FptnEngine(
                         return FptnAuthResult.Success(AuthenticatedServer(server, serverIp, auth.accessToken))
                     }
                     failures += FPTN_DNS_FAILED
-                    PersistentLoggers.warn(TAG, "authenticate: resolved IP missing server=${server.name}")
+                    PersistentLoggers.warn(TAG, "authenticate: resolved IP missing")
                 }
                 is ServerAuthResult.Failure -> {
                     failures += auth.reason
@@ -428,18 +427,13 @@ class FptnEngine(
             val reason = classifyFptnAuthFailure(error = e.message, exceptionName = e.javaClass.simpleName)
             PersistentLoggers.error(
                 TAG,
-                "authenticate: create exception ${e.javaClass.simpleName}: ${e.message} " +
-                    "server=${server.name}:${server.port} sni=$sniDomain bypass=$bypassMethod reason=$reason",
+                "authenticate: create exception ${e.javaClass.simpleName} reason=$reason",
             )
             return ServerAuthResult.Failure(reason)
         }
         return try {
             currentCoroutineContext().ensureActive()
-            PersistentLoggers.debug(
-                TAG,
-                "authenticate: POST /api/v1/login server=${server.name}:${server.port} " +
-                    "sni=$sniDomain bypass=$bypassMethod timeout=${timeoutS}s",
-            )
+            PersistentLoggers.debug(TAG, "authenticate: POST $API_LOGIN_PATH timeout=${timeoutS}s")
             val body = JSONObject().apply {
                 put("username", data.username)
                 put("password", data.password)
@@ -449,7 +443,7 @@ class FptnEngine(
             if (resp.code == 200) {
                 val token = JSONObject(resp.body).optString("access_token").takeIf { it.isNotBlank() }
                 if (token != null) {
-                    PersistentLoggers.debug(TAG, "authenticate: success server=${server.name}")
+                    PersistentLoggers.debug(TAG, "authenticate: success")
                 } else {
                     PersistentLoggers.error(TAG, "authenticate: 200 but no access_token in response")
                 }
@@ -458,8 +452,7 @@ class FptnEngine(
                 val reason = classifyFptnAuthFailure(resp)
                 PersistentLoggers.error(
                     TAG,
-                    "authenticate: HTTP ${resp.code} error=${resp.error} " +
-                        "server=${server.name}:${server.port} sni=$sniDomain bypass=$bypassMethod reason=$reason",
+                    "authenticate: HTTP ${resp.code} reason=$reason",
                 )
                 ServerAuthResult.Failure(reason, terminal = reason == FPTN_TOKEN_REJECTED)
             }
@@ -469,8 +462,7 @@ class FptnEngine(
             val reason = classifyFptnAuthFailure(error = e.message, exceptionName = e.javaClass.simpleName)
             PersistentLoggers.error(
                 TAG,
-                "authenticate: exception ${e.javaClass.simpleName}: ${e.message} " +
-                    "server=${server.name}:${server.port} sni=$sniDomain bypass=$bypassMethod reason=$reason",
+                "authenticate: exception ${e.javaClass.simpleName} reason=$reason",
             )
             ServerAuthResult.Failure(reason)
         } finally {
@@ -487,7 +479,7 @@ class FptnEngine(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            PersistentLoggers.warn(TAG, "resolve: failed server=${server.name} ${e.javaClass.simpleName}")
+            PersistentLoggers.warn(TAG, "resolve: failed ${e.javaClass.simpleName}")
             null
         }
     }
