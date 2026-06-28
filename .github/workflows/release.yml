@@ -210,7 +210,8 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber -R "${{ github.repository }}"
+          .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs singbox-core/libs-stubs /tmp/go-stubs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
