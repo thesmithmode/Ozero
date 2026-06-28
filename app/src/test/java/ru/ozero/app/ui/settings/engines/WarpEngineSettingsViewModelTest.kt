@@ -68,46 +68,25 @@ class WarpEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `init с пустым store — auto-trigger register ровно один раз`() = runTest {
+    fun `init с пустым store — НЕ запускает register без действия пользователя`() = runTest {
         auto.setConfig(SAMPLE)
         advanceUntilIdle()
-        assertEquals(1, auto.callCount, "При пустом store auto-register срабатывает (Bug #3)")
+        assertEquals(0, auto.callCount, "Пустой store не должен запускать register без клика")
+        assertTrue(vm.uiState.value.slots.isEmpty())
     }
 
     @Test
-    fun `init с непустым store — auto-trigger НЕ срабатывает`() = runTest {
+    fun `init с непустым store — НЕ запускает register`() = runTest {
         store.addSlot("Existing", SAMPLE)
         val freshAuto = FakeAutoConfig()
         val freshVm = WarpEngineSettingsViewModel(store, freshAuto, FakeFileImporter())
         advanceUntilIdle()
-        assertEquals(0, freshAuto.callCount, "Непустой store не должен триггерить auto-register")
+        assertEquals(0, freshAuto.callCount, "Непустой store не должен запускать register")
         assertEquals(1, freshVm.uiState.value.slots.size)
     }
 
     @Test
-    fun `auto-trigger respects cooldown — НЕ срабатывает пока active`() = runTest {
-        val freshStore = FakeWarpStore()
-        val freshAuto = FakeAutoConfig().apply { cooldownMs = 30_000L }
-        WarpEngineSettingsViewModel(freshStore, freshAuto, FakeFileImporter())
-        advanceUntilIdle()
-        assertEquals(0, freshAuto.callCount, "Активный cooldown блокирует auto-trigger")
-    }
-
-    @Test
-    fun `auto-trigger один раз — после fail повторное empty НЕ регистрит снова`() = runTest {
-        auto.result = Result.failure<RegisteredWarpConfig>(IllegalStateException("network down"))
-        advanceUntilIdle()
-        assertEquals(1, auto.callCount, "Первый auto-trigger сработал и упал")
-        val id = store.addSlot("Manual", SAMPLE)
-        advanceUntilIdle()
-        store.delete(id)
-        advanceUntilIdle()
-        assertTrue(vm.uiState.value.slots.isEmpty())
-        assertEquals(1, auto.callCount, "Повторное empty не должно повторять register")
-    }
-
-    @Test
-    fun `migration fail — auto-trigger НЕ срабатывает`() = runTest {
+    fun `migration fail — register НЕ запускается`() = runTest {
         val throwingStore = object : FakeWarpStore() {
             override suspend fun migrateIfNeeded() = error("migration boom")
         }
@@ -116,19 +95,8 @@ class WarpEngineSettingsViewModelTest {
             throwingStore, freshAuto, FakeFileImporter(),
         )
         advanceUntilIdle()
-        assertEquals(0, freshAuto.callCount, "Migration fail блокирует auto-trigger")
+        assertEquals(0, freshAuto.callCount, "Migration fail не должен запускать register")
         assertEquals("migration boom", freshVm.uiState.value.errorMessage)
-    }
-
-    @Test
-    fun `auto-trigger при isRegistering=true (manual onGenerate уже идёт) — НЕ дублирует`() = runTest {
-        auto.delayMs = 60_000L
-        auto.setConfig(SAMPLE)
-        vm.onGenerate()
-        runCurrent()
-        assertTrue(vm.uiState.value.isRegistering)
-        advanceUntilIdle()
-        assertEquals(1, auto.callCount, "isRegistering=true должно блокировать auto-trigger")
     }
 
     @Test
