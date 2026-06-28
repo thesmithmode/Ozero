@@ -50,21 +50,21 @@ class EngineUrnetworkContractTest {
     }
 
     @Test
-    fun `start без override вызывает bridge с PRESET_WALLET`() = runTest {
+    fun `start не передает payout wallet в bridge`() = runTest {
         val (e, bridge, _) = engine(byJwt = "j", byClientJwt = "cj")
         val result = e.start(baseConfig, Upstream.None)
         assertIs<StartResult.Success>(result)
-        assertEquals(UrnetworkDefaults.PRESET_WALLET, bridge.lastWallet)
+        assertEquals("", bridge.lastWallet)
         assertEquals(1, bridge.startCalls)
     }
 
     @Test
-    fun `start с override вызывает bridge с override адресом`() = runTest {
+    fun `start с wallet override не передает payout wallet в bridge`() = runTest {
         val custom = "AAAAbbbbCCCCdddd1111222233334444555566667777"
         val (e, bridge, _) = engine(override = custom, byJwt = "j", byClientJwt = "cj")
         val result = e.start(baseConfig, Upstream.None)
         assertIs<StartResult.Success>(result)
-        assertEquals(custom, bridge.lastWallet)
+        assertEquals("", bridge.lastWallet)
     }
 
     @Test

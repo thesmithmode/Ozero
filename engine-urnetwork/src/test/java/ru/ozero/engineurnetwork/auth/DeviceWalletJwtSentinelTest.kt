@@ -139,7 +139,7 @@ class DeviceWalletJwtSentinelTest {
         assertTrue(
             ensureBlock.contains("devicePubkey") && ensureBlock.contains("isNullOrBlank"),
             "ensureGuestJwt должен проверять devicePubkey != null — без этого existing guests останутся " +
-                "на shared PRESET_WALLET и не получат свой traffic limit",
+                "на shared identity и не получат свой traffic limit",
         )
     }
 

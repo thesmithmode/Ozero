@@ -28,7 +28,7 @@ data class UrnetworkConfig(
     val cachedBestMatches: List<UrnetworkCachedLocation> = emptyList(),
 ) {
     val walletAddress: String
-        get() = walletOverride?.takeIf { it.isNotBlank() } ?: UrnetworkDefaults.PRESET_WALLET
+        get() = walletOverride?.takeIf { it.isNotBlank() }.orEmpty()
 }
 
 data class UrnetworkCachedLocation(

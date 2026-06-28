@@ -84,6 +84,7 @@ class UrnetworkRelayCoordinatorTest {
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
         assertEquals(1, bridge.startCalls)
+        assertEquals("", bridge.lastWallet)
         assertEquals(false, bridge.lastProvidePaused)
     }
 
@@ -317,6 +318,7 @@ class UrnetworkRelayCoordinatorTest {
         var startResult: UrnetworkSdkBridge.StartResult = UrnetworkSdkBridge.StartResult.Success
         var attachTunCalls = 0
         var diagnosticsResult: String = "running=true"
+        var lastWallet: String? = null
 
         override suspend fun start(
             walletAddress: String,
@@ -325,6 +327,7 @@ class UrnetworkRelayCoordinatorTest {
             byClientJwt: String,
         ): UrnetworkSdkBridge.StartResult {
             startCalls++
+            lastWallet = walletAddress
             return startResult
         }
 

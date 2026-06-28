@@ -36,7 +36,6 @@ import ru.ozero.engineurnetwork.byClientJwt
 import ru.ozero.engineurnetwork.setProvideEnabled
 import ru.ozero.engineurnetwork.setCachedLocations
 import ru.ozero.engineurnetwork.setSelectedLocation
-import ru.ozero.engineurnetwork.walletAddress
 import java.util.Locale
 import javax.inject.Inject
 
@@ -114,9 +113,8 @@ class UrnetworkLocationsViewModel @Inject constructor(
         }
         bootstrapJob = viewModelScope.launch {
             val byClientJwt = configStore.byClientJwt().first()
-            val wallet = configStore.walletAddress().first()
             if (!byClientJwt.isNullOrBlank()) {
-                val ready = bridge.initDeviceForLocations(byClientJwt, wallet)
+                val ready = bridge.initDeviceForLocations(byClientJwt, "")
                 if (ready && _uiState.value !is UrnetworkSettingsUiState.Ready) {
                     refreshOnce()
                 }

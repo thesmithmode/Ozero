@@ -398,18 +398,12 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `payoutWalletSetup configure вызывается после walletVc start с walletAddress`() {
+    fun `start не меняет payout wallet автоматически`() {
         val startBlock = source.substringAfter("private suspend fun runStartOnMain")
             .substringBefore("override suspend fun stop")
-        assertTrue(
-            startBlock.contains("payoutWalletSetup.configure("),
-            "runStartOnMain обязан вызвать payoutWalletSetup.configure(...) после walletVc.start()",
-        )
-        assertTrue(
-            source.contains("private val payoutWalletSetup = UrnetworkPayoutWalletSetup()"),
-            "Bridge обязан держать UrnetworkPayoutWalletSetup helper — иначе single-source-of-truth " +
-                "для payout wallet setup ломается (детали в UrnetworkPayoutWalletSetup.kt).",
-        )
+        assertTrue(!startBlock.contains("updatePayout" + "Wallet"))
+        assertTrue(!startBlock.contains("addExternal" + "Wallet"))
+        assertTrue(!startBlock.contains("payoutWallet" + "Setup.configure("))
     }
 
     @Test

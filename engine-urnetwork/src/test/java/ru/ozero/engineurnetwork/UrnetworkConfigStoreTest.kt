@@ -19,10 +19,10 @@ class UrnetworkConfigStoreTest {
     }
 
     @Test
-    fun `walletAddress по умолчанию равен PRESET_WALLET если override null`() = runTest {
+    fun `walletAddress по умолчанию пустой если override null`() = runTest {
         val (store, _) = newStore()
         val addr = store.walletAddress().first()
-        assertEquals(UrnetworkDefaults.PRESET_WALLET, addr)
+        assertEquals("", addr)
     }
 
     @Test
@@ -35,11 +35,11 @@ class UrnetworkConfigStoreTest {
     }
 
     @Test
-    fun `setWalletOverride(null) очищает override и возвращает PRESET_WALLET`() = runTest {
+    fun `setWalletOverride null очищает override и возвращает пустой walletAddress`() = runTest {
         val (store, _) = newStore()
         store.setWalletOverride("EFGHabcd1111111111111111111111111111111111")
         store.setWalletOverride(null)
-        assertEquals(UrnetworkDefaults.PRESET_WALLET, store.walletAddress().first())
+        assertEquals("", store.walletAddress().first())
         assertNull(store.walletOverride().first())
     }
 
@@ -113,7 +113,7 @@ class UrnetworkConfigStoreTest {
     @Test
     fun `setDevicePubkey persist и devicePubkey возвращает значение`() = runTest {
         val (store, _) = newStore()
-        val pk = "27wAThHKVpd8c4r4GXNzMAev8byGUozA6RVayeZ7vHMM"
+        val pk = "device-pubkey"
         store.setDevicePubkey(pk)
         assertEquals(pk, store.devicePubkey().first())
     }

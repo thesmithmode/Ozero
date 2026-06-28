@@ -59,7 +59,6 @@ class RealUrnetworkSdkBridge(
     private val preferredLocationRef = AtomicReference<UrnetworkLocationSelection?>(null)
     private val bridgeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val contractStatusListener = UrnetworkContractStatusListener()
-    private val payoutWalletSetup = UrnetworkPayoutWalletSetup()
     private val preferredLocationConnector = UrnetworkPreferredLocationConnector(bridgeScope)
     private val apiHelper = UrnetworkApiHelper(deviceRef, running)
     private val subscriptionBalanceRef =
@@ -88,7 +87,7 @@ class RealUrnetworkSdkBridge(
             try {
                 withTimeoutOrNull(SDK_INIT_TIMEOUT_MS) {
                     withContext(Dispatchers.Main.immediate) {
-                        runStartOnMain(byClientJwt, walletAddress)
+                        runStartOnMain(byClientJwt)
                     }
                 } ?: run {
                     PersistentLoggers.error(TAG, "SDK init timed out after ${SDK_INIT_TIMEOUT_MS}ms")
@@ -101,10 +100,7 @@ class RealUrnetworkSdkBridge(
         }
     }
 
-    private suspend fun runStartOnMain(
-        byClientJwt: String,
-        walletAddress: String,
-    ): UrnetworkSdkBridge.StartResult {
+    private suspend fun runStartOnMain(byClientJwt: String): UrnetworkSdkBridge.StartResult {
         val existingDevice = deviceRef.get()
         val device: DeviceLocal = if (existingDevice != null) {
             PersistentLoggers.debug(TAG, "node start: reusing existing node from prior session")
@@ -204,14 +200,14 @@ class RealUrnetworkSdkBridge(
         PersistentLoggers.info(TAG, "node start: ready — awaiting attach(fd)")
         bridgeScope.launch {
             withContext(Dispatchers.Main.immediate) {
-                setupWalletControllerAndPipeline(device, walletAddress)
+                setupWalletControllerAndPipeline(device)
             }
         }
         return UrnetworkSdkBridge.StartResult.Success
     }
 
-    private suspend fun setupWalletControllerAndPipeline(device: DeviceLocal, walletAddress: String) {
-        val walletVcStarted = runCatching {
+    private suspend fun setupWalletControllerAndPipeline(device: DeviceLocal) {
+        runCatching {
             val walletVc = device.openWalletViewController()
             walletVcRef.set(walletVc)
             walletVc?.addUnpaidByteCountListener { ubc ->
@@ -227,22 +223,8 @@ class RealUrnetworkSdkBridge(
             walletVc?.start()
             walletVc?.fetchTransferStats()
             PersistentLoggers.debug(TAG, "node start: account controller opened — metrics listener attached")
-            walletVc
         }.onFailure {
             PersistentLoggers.warn(TAG, "node start: account controller init threw: ${it.message}")
-        }.getOrNull() ?: return
-        val bound = payoutWalletSetup.configure(walletVcStarted, walletAddress)
-        if (bound) {
-            PersistentLoggers.debug(
-                TAG,
-                "relay sharing: endpoint bound — accumulator armed, traffic-forwarding ready",
-            )
-        } else {
-            PersistentLoggers.warn(
-                TAG,
-                "relay sharing: endpoint deferred — accumulator pending registration, " +
-                    "retry on next start (relay продолжит работу, привязка повторится)",
-            )
         }
     }
 

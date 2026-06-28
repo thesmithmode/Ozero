@@ -23,7 +23,6 @@ import ru.ozero.engineurnetwork.byClientJwt
 import ru.ozero.engineurnetwork.provideControlMode
 import ru.ozero.engineurnetwork.provideEnabled
 import ru.ozero.engineurnetwork.provideNetworkMode
-import ru.ozero.engineurnetwork.walletAddress
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.PersistentLoggers
@@ -51,13 +50,12 @@ class UrnetworkRelayCoordinator(
         val newJob = combine(
             tunnelController.state,
             configStore.byClientJwt(),
-            configStore.walletAddress(),
-        ) { tunnelState, byClientJwt, walletAddress ->
-            Triple(tunnelState, byClientJwt, walletAddress)
+        ) { tunnelState, byClientJwt ->
+            tunnelState to byClientJwt
         }
             .distinctUntilChanged()
-            .onEach { (tunnelState, byClientJwt, walletAddress) ->
-                handleState(tunnelState, byClientJwt, walletAddress)
+            .onEach { (tunnelState, byClientJwt) ->
+                handleState(tunnelState, byClientJwt)
             }
             .launchIn(scope)
         jobRef.getAndSet(newJob)?.cancel()
@@ -66,7 +64,6 @@ class UrnetworkRelayCoordinator(
     private suspend fun handleState(
         tunnelState: TunnelState,
         byClientJwt: String?,
-        walletAddress: String,
     ) {
         if (tunnelState !is TunnelState.Connected) {
             bootstrapAttemptedThisSession.set(false)
@@ -99,7 +96,7 @@ class UrnetworkRelayCoordinator(
             }
             return
         }
-        val result = startBridgeWithRetry(walletAddress, byClientJwt)
+        val result = startBridgeWithRetry(byClientJwt)
         if (result is UrnetworkSdkBridge.StartResult.Success) {
             relayOwned.set(true)
             attachDummyIoLoop()
@@ -184,14 +181,11 @@ class UrnetworkRelayCoordinator(
         watchdogRef.getAndSet(null)?.cancel()
     }
 
-    private suspend fun startBridgeWithRetry(
-        walletAddress: String,
-        byClientJwt: String,
-    ): UrnetworkSdkBridge.StartResult? {
+    private suspend fun startBridgeWithRetry(byClientJwt: String): UrnetworkSdkBridge.StartResult? {
         RETRY_BACKOFF_MS.forEachIndexed { attempt, delayMs ->
             val result = runCatching {
                 bridge.start(
-                    walletAddress = walletAddress,
+                    walletAddress = "",
                     apiUrl = UrnetworkDefaults.DEFAULT_API_URL,
                     connectUrl = UrnetworkDefaults.DEFAULT_CONNECT_URL,
                     byClientJwt = byClientJwt,

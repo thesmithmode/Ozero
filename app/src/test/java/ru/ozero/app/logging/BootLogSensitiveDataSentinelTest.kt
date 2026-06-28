@@ -22,18 +22,6 @@ class BootLogSensitiveDataSentinelTest {
     }
 
     @Test
-    fun `UrnetworkPayoutWalletSetup не логирует payout wallet адрес`() {
-        val src = readSource("engine-urnetwork/src/main/java/ru/ozero/engineurnetwork/UrnetworkPayoutWalletSetup.kt")
-        assertNoForbidden(
-            src,
-            "UrnetworkPayoutWalletSetup.kt",
-            listOf("walletAddress.take(", "walletAddress.take ("),
-            reason = "PRESET_WALLET — общий payout адрес, не должен попадать в логи даже truncated " +
-                "(commit 644004f8). Регрессия = утечка инфраструктуры в boot.log",
-        )
-    }
-
-    @Test
     fun `ProxyWarpAutoConfig использует mirrorTag и НЕ логирует mirror URL plaintext`() {
         val rel = "engine-warp/src/main/java/ru/ozero/enginewarp/ProxyWarpAutoConfig.kt"
         val src = readSource(rel)
@@ -53,29 +41,6 @@ class BootLogSensitiveDataSentinelTest {
             ),
             reason = "mirror URL — внутренняя инфра-деталь Cloudflare WARP, не должна попадать в публичный " +
                 "boot.log. Логировать только через mirrorTag (см. commit 644004f8)",
-        )
-    }
-
-    @Test
-    fun `UrnetworkPayoutWalletSetup использует нейтральный TAG UrnAccountSync`() {
-        val src = readSource("engine-urnetwork/src/main/java/ru/ozero/engineurnetwork/UrnetworkPayoutWalletSetup.kt")
-        assertTrue(
-            src.contains("const val TAG = \"UrnAccountSync\""),
-            "UrnetworkPayoutWalletSetup TAG обязан быть нейтральный 'UrnAccountSync' — " +
-                "TAG 'UrnetworkPayoutWallet' раскрывает payout-механику в публичных логах",
-        )
-        assertNoForbidden(
-            src,
-            "UrnetworkPayoutWalletSetup.kt",
-            listOf(
-                "payout wallet set",
-                "payout wallet setup",
-                "walletId not found",
-                "setupPayoutWallet",
-            ),
-            reason = "log-строки с 'payout wallet'/'walletId' раскрывают монетизационную архитектуру — " +
-                "юзер из логов поймёт что трафик раздаётся в чей-то кошелёк. Использовать disguise: " +
-                "'endpoint sync', 'registry id'",
         )
     }
 

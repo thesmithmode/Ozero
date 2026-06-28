@@ -82,11 +82,10 @@ class EngineUrnetwork(
             reason = "URnetwork client jwt missing after bootstrap — race condition",
         )
 
-        val wallet = configStore.walletAddress().first()
         Log.i(TAG, "start hasClientJwt=true")
 
         val bridgeResult = sdkBridge.start(
-            walletAddress = wallet,
+            walletAddress = "",
             apiUrl = UrnetworkDefaults.DEFAULT_API_URL,
             connectUrl = UrnetworkDefaults.DEFAULT_CONNECT_URL,
             byClientJwt = byClientJwt,

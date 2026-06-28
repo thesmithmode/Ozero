@@ -13,7 +13,7 @@ URnetwork P2P bandwidth-sharing engine (F7). Использует **два** Go-
 
 ## Bridge layer
 
-`UrnetworkSdkBridge` — контракт `start(walletAddress, apiUrl, connectUrl) →
+`UrnetworkSdkBridge` — контракт `start(apiUrl, connectUrl, byClientJwt) →
 StartResult / stop() / isRunning()`.
 
 Реализации:
@@ -22,9 +22,9 @@ StartResult / stop() / isRunning()`.
   `start()` возвращает `Failed("URnetwork SDK AAR not yet built ...")`.
 - `RealUrnetworkSdkBridge` — TBD когда оба AAR доступны. Должен:
   - инициализировать `URnetworkSdk` (Java package `com.bringyour`),
-  - получить connect URL по walletAddress,
-  - построить inline INI config для userwireguard,
-  - вызвать `userwgbind.StartUserWg(configIni)`.
+  - открыть SDK device и routing controllers,
+  - подключить TUN fd через SDK IoLoop,
+  - отдавать peer, balance и location state через bridge API.
 
 ## Сборка AAR
 

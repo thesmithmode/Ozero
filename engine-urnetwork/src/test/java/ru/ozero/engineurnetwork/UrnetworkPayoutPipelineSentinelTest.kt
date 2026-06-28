@@ -6,13 +6,6 @@ import kotlin.test.assertTrue
 
 class UrnetworkPayoutPipelineSentinelTest {
 
-    private val setupSource by lazy {
-        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
-        val f = File(moduleRoot, "src/main/java/ru/ozero/engineurnetwork/UrnetworkPayoutWalletSetup.kt")
-        assertTrue(f.exists(), "UrnetworkPayoutWalletSetup.kt не найден: $f")
-        f.readText()
-    }
-
     private val bridgeSource by lazy {
         val moduleRoot = File(System.getProperty("user.dir") ?: ".")
         val f = File(moduleRoot, "src/main/java/ru/ozero/engineurnetwork/RealUrnetworkSdkBridge.kt")
@@ -21,44 +14,23 @@ class UrnetworkPayoutPipelineSentinelTest {
     }
 
     @Test
-    fun `WALLET_ADD_TIMEOUT_MS равен 30 секундам — backend race на регистрацию external wallet`() {
-        val regex = Regex("WALLET_ADD_TIMEOUT_MS\\s*=\\s*(\\d[\\d_]*)L")
-        val m = regex.find(setupSource) ?: error("WALLET_ADD_TIMEOUT_MS не найден")
-        val ms = m.groupValues[1].replace("_", "").toLong()
-        assertTrue(
-            ms == 30_000L,
-            "WALLET_ADD_TIMEOUT_MS обязан быть 30_000L — backend URnetwork race при addExternalWallet " +
-                "ловит 10s timeout у части устройств → registry id not resolved → device не привязал endpoint. " +
-                "30s покрывает большинство backend-задержек. Fact=$ms",
-        )
+    fun `bridge не регистрирует и не выбирает payout wallet на start`() {
+        val startBlock = bridgeSource.substringAfter("private suspend fun runStartOnMain")
+            .substringBefore("override suspend fun stop")
+        assertTrue(!startBlock.contains("addExternal" + "Wallet"))
+        assertTrue(!startBlock.contains("updatePayout" + "Wallet"))
+        assertTrue(!startBlock.contains("UrnetworkPayout" + "WalletSetup"))
     }
 
     @Test
-    fun `configure возвращает Boolean — caller должен знать bound или deferred`() {
-        val pattern = Regex("suspend fun configure\\([^)]+\\)\\s*:\\s*Boolean\\s*\\{")
-        assertTrue(
-            pattern.containsMatchIn(setupSource),
-            "configure(walletVc, walletAddress) обязан возвращать Boolean — bridge должен " +
-                "различать success/blocked для telemetry 'relay sharing: endpoint bound/deferred'.",
-        )
-    }
-
-    @Test
-    fun `bridge логирует relay sharing endpoint bound — telemetry готовности pipeline`() {
-        assertTrue(
-            bridgeSource.contains("relay sharing: endpoint bound"),
-            "bridge обязан логировать 'relay sharing: endpoint bound — accumulator armed' " +
-                "после успешного configure() — иначе юзер не видит подтверждения что routing подключён.",
-        )
-    }
-
-    @Test
-    fun `bridge логирует relay sharing endpoint deferred — telemetry deferred-state`() {
-        assertTrue(
-            bridgeSource.contains("relay sharing: endpoint deferred"),
-            "bridge обязан логировать 'relay sharing: endpoint deferred' когда configure вернул false — " +
-                "юзер видит что регистрация отложена + автоматически retry на следующем старте.",
-        )
+    fun `bridge открывает wallet controller только для metrics pipeline`() {
+        val body = bridgeSource.substringAfter("private suspend fun setupWalletControllerAndPipeline")
+            .substringBefore("override suspend fun stop")
+        assertTrue(body.contains("openWalletViewController"))
+        assertTrue(body.contains("addUnpaidByteCountListener"))
+        assertTrue(body.contains("fetchTransferStats"))
+        assertTrue(!body.contains("addExternal" + "Wallet"))
+        assertTrue(!body.contains("updatePayout" + "Wallet"))
     }
 
     @Test
