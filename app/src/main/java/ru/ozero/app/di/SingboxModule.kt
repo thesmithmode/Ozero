@@ -98,7 +98,6 @@ object SingboxModule {
             okHttpClient = SubscriptionTrustClientFactory.createSystem(),
             groupDao = groupDao,
             profileDao = profileDao,
-            userCaOkHttpClient = SubscriptionTrustClientFactory.create(),
         )
 
     @Provides
