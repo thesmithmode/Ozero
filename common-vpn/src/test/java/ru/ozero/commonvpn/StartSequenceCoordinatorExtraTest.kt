@@ -40,6 +40,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertFalse
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 @Suppress("LargeClass")
@@ -973,7 +974,8 @@ class StartSequenceCoordinatorExtraTest {
             ),
         )
         val tun = mockTunFd(rawFd = 47, dupFd = 48)
-        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns mockTunBuilder(fd = tun)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns
+            mockTunBuilder(fd = tun)
 
         fixture.coordinator.run()
 
@@ -997,7 +999,8 @@ class StartSequenceCoordinatorExtraTest {
             ),
         )
         val tun = mockTunFd(rawFd = 53, dupFd = 54)
-        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns mockTunBuilder(fd = tun)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns
+            mockTunBuilder(fd = tun)
 
         fixture.coordinator.run()
 
@@ -1035,7 +1038,73 @@ class StartSequenceCoordinatorExtraTest {
         assertEquals(1, engine.stopCalls)
         verify(exactly = 1) { tun.close() }
         verify(exactly = 1) {
-            fixture.engineWatchdog.handleEngineFailure(EngineId.WARP, "attachTun: attach denied")
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.WARP,
+                "attachTun: attach denied",
+            )
+        }
+    }
+
+    @Test
+    fun `custom tun attach throw keeps tun open when failure handler enters killswitch`() = runTest {
+        val engine = FakeTunEnginePlugin(
+            id = EngineId.WARP,
+            attachResult = TunAttachResult.Success,
+            attachThrows = true,
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.WARP,
+                killswitchEnabled = true,
+            ),
+            failureHandled = true,
+        )
+        val tun = mockTunFd(rawFd = 83, dupFd = 84)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns
+            mockTunBuilder(fd = tun)
+
+        fixture.coordinator.run()
+
+        assertSame(tun, fixture.state.tunFdRef.get())
+        verify(exactly = 0) { tun.close() }
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.WARP,
+                "attachTun threw: attach down",
+            )
+        }
+    }
+
+    @Test
+    fun `custom tun attach failure keeps tun open when failure handler enters killswitch`() = runTest {
+        val engine = FakeTunEnginePlugin(
+            id = EngineId.WARP,
+            attachResult = TunAttachResult.Failure("attach denied"),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.WARP,
+                killswitchEnabled = true,
+            ),
+            failureHandled = true,
+        )
+        val tun = mockTunFd(rawFd = 93, dupFd = 94)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns
+            mockTunBuilder(fd = tun)
+
+        fixture.coordinator.run()
+
+        assertSame(tun, fixture.state.tunFdRef.get())
+        verify(exactly = 0) { tun.close() }
+        verify(exactly = 1) {
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.WARP,
+                "attachTun: attach denied",
+            )
         }
     }
 
@@ -1054,7 +1123,8 @@ class StartSequenceCoordinatorExtraTest {
             ),
         )
         val tun = mockTunFd(rawFd = 75, dupFd = 175, closeThrows = true)
-        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns mockTunBuilder(fd = tun)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns
+            mockTunBuilder(fd = tun)
 
         fixture.coordinator.run()
 
@@ -1083,7 +1153,8 @@ class StartSequenceCoordinatorExtraTest {
             ),
         )
         val tun = mockTunFd(rawFd = 76, dupFd = 176, closeThrows = true)
-        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns mockTunBuilder(fd = tun)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns
+            mockTunBuilder(fd = tun)
 
         fixture.coordinator.run()
 
@@ -1091,7 +1162,10 @@ class StartSequenceCoordinatorExtraTest {
         assertEquals(1, engine.stopCalls)
         verify(exactly = 1) { tun.close() }
         verify(exactly = 1) {
-            fixture.engineWatchdog.handleEngineFailure(EngineId.WARP, "attachTun: attach denied")
+            fixture.engineWatchdog.handleEngineFailure(
+                EngineId.WARP,
+                "attachTun: attach denied",
+            )
         }
     }
 
@@ -1138,7 +1212,8 @@ class StartSequenceCoordinatorExtraTest {
         val lockdownFd = mockk<ParcelFileDescriptor>(relaxed = true)
         val tun = mockTunFd(rawFd = 49, dupFd = 50)
         fixture.state.lockdownStartupFdRef.set(lockdownFd)
-        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns mockTunBuilder(fd = tun)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns
+            mockTunBuilder(fd = tun)
 
         fixture.coordinator.run()
 

@@ -507,20 +507,32 @@ class StartSequenceCoordinator(
                 engine.attachTun(rawDupFd)
             } catch (t: Throwable) {
                 runCatching { ParcelFileDescriptor.adoptFd(rawDupFd).close() }
-                runCatching { state.tunFdRef.getAndSet(null)?.close() }
                 PersistentLoggers.error(TAG, "attachTun threw, fd closed: ${t.message}")
                 runCatching { deps.chainOrchestrator.stop() }
-                reportEngineFailure(engineId, "attachTun threw: ${t.message}", notifyFailure)
+                val failureHandled = reportEngineFailure(
+                    engineId,
+                    "attachTun threw: ${t.message}",
+                    notifyFailure,
+                )
+                if (!failureHandled) {
+                    runCatching { state.tunFdRef.getAndSet(null)?.close() }
+                }
                 return false
             }
             return when (result) {
                 TunAttachResult.Success -> true
                 is TunAttachResult.Failure -> {
                     runCatching { ParcelFileDescriptor.adoptFd(rawDupFd).close() }
-                    runCatching { state.tunFdRef.getAndSet(null)?.close() }
                     PersistentLoggers.error(TAG, "attachTun failed: ${result.reason}")
                     runCatching { deps.chainOrchestrator.stop() }
-                    reportEngineFailure(engineId, "attachTun: ${result.reason}", notifyFailure)
+                    val failureHandled = reportEngineFailure(
+                        engineId,
+                        "attachTun: ${result.reason}",
+                        notifyFailure,
+                    )
+                    if (!failureHandled) {
+                        runCatching { state.tunFdRef.getAndSet(null)?.close() }
+                    }
                     false
                 }
             }
@@ -557,11 +569,12 @@ class StartSequenceCoordinator(
         engineId: EngineId,
         reason: String,
         notifyFailure: Boolean,
-    ) {
-        if (notifyFailure) {
+    ): Boolean {
+        return if (notifyFailure) {
             deps.engineWatchdog.handleEngineFailure(engineId, reason)
         } else {
             PersistentLoggers.warn(TAG, "auto-mode candidate failed engine=$engineId reason=$reason")
+            false
         }
     }
 

@@ -190,8 +190,8 @@ class StartSequenceCoordinatorDecisionCoverageTest {
         val watchdog = mockk<EngineWatchdogCoordinator>(relaxed = true)
         val coordinator = coordinator(watchdog = watchdog)
 
-        coordinator.reportEngineFailure(EngineId.BYEDPI, "candidate failed", notifyFailure = false)
-        coordinator.reportEngineFailure(EngineId.BYEDPI, "terminal failed", notifyFailure = true)
+        assertFalse(coordinator.reportEngineFailure(EngineId.BYEDPI, "candidate failed", notifyFailure = false))
+        assertFalse(coordinator.reportEngineFailure(EngineId.BYEDPI, "terminal failed", notifyFailure = true))
 
         io.mockk.verify(exactly = 1) { watchdog.handleEngineFailure(EngineId.BYEDPI, "terminal failed") }
     }
@@ -252,9 +252,7 @@ class StartSequenceCoordinatorDecisionCoverageTest {
         engineId: EngineId,
         reason: String,
         notifyFailure: Boolean,
-    ) {
-        callPrivate<Unit>("reportEngineFailure", engineId, reason, notifyFailure)
-    }
+    ): Boolean = callPrivate("reportEngineFailure", engineId, reason, notifyFailure)
 
     @Suppress("UNCHECKED_CAST")
     private fun <T> StartSequenceCoordinator.callPrivate(name: String, vararg args: Any?): T {
