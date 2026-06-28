@@ -277,6 +277,8 @@ class ByeDpiEngine(
                     nativeMayBeWedged.set(false)
                 }
             }
+            runCatching { proxy.forceClose() }
+                .onFailure { PersistentLoggers.warn(TAG, "jniForceClose финальная очистка исключение: ${it.message}") }
             activeSocksPort = 0
         }
     }
