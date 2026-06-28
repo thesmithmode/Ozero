@@ -284,15 +284,13 @@ class EngineWarpContractTest {
     }
 
     @Test
-    fun `ipProbeRoute не возвращает Default — иначе fetch покажет реальный IP вместо WARP`() = runTest {
+    fun `ipProbeRoute не возвращает Default — иначе fetch может обойти engine policy`() = runTest {
         val (e, _, _) = engine(activeConfig = sampleConfig)
         e.start(EngineConfig.Warp, Upstream.None)
         val route = e.ipProbeRoute(socksPort = 0)
         assertFalse(
             route is IpProbeRoute.Default,
-            "WARP обязан override'ить ipProbeRoute — Default → fetch() из main app → реальный IP " +
-                "устройства (с excludeSelf=true). Регрессия защиты: возврат к Default ввёл бы UX обман " +
-                "пользователю.",
+            "WARP обязан override'ить ipProbeRoute, чтобы UI не запускал общий direct fetch вместо engine policy.",
         )
     }
 
@@ -302,6 +300,7 @@ class EngineWarpContractTest {
         val spec = e.tunSpec()
         assertNotNull(spec)
         assertEquals(1, auto.registerCalls)
+        assertFalse(spec.excludeSelf)
     }
 
     @Test

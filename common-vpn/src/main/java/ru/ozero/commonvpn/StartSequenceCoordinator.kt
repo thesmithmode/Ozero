@@ -389,7 +389,7 @@ class StartSequenceCoordinator(
         val plugin = deps.enginePlugins.first { it.id == engineId }
         val spec = plugin.tunSpec() ?: return null
         val builder = deps.tunBuilderHelper.applyEngineTunSpec(spec, ipv6Enabled)
-        TunBuilderConfigurator(packageName).apply(builder, splitConfig, excludeSelf = true)
+        TunBuilderConfigurator(packageName).apply(builder, splitConfig, excludeSelf = spec.excludeSelf)
         PersistentLoggers.debug(
             TAG,
             "engineTUN params: engine=$engineId mode=${splitConfig.mode} " +
@@ -397,7 +397,7 @@ class StartSequenceCoordinator(
                 "allowlist=${splitConfig.allowlist.size} " +
                 "allowFamilyV4=${spec.allowFamilyV4} allowFamilyV6=${spec.allowFamilyV6} " +
                 "routeAllV4=${spec.routeAllV4} routeAllV6=${spec.routeAllV6} " +
-                "dns=${spec.dnsServers} ipv6Enabled=$ipv6Enabled",
+                "dns=${spec.dnsServers} ipv6Enabled=$ipv6Enabled excludeSelf=${spec.excludeSelf}",
         )
         val before = TunInterfaceStats.snapshotTunInterfaces()
         val pfd = try {

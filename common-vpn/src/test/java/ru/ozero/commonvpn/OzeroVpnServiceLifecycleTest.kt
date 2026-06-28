@@ -595,25 +595,17 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `establishTunForEngine excludeSelf true для всех движков без исключений`() {
+    fun `establishTunForEngine uses TunSpec excludeSelf without engineId branches`() {
         val body = startSequenceSource
             .substringAfter("private suspend fun establishTunForEngine(")
             .substringBefore("private fun captureTunIfaceName(")
         assertTrue(
-            body.contains("excludeSelf = true"),
-            "excludeSelf обязан быть true для ВСЕХ движков (включая WARP). " +
-                "Причины: (1) ByeDPI/URnetwork outbound через TUN → loop без excludeSelf; " +
-                "(2) WARP без addDisallowedApplication → Android не активирует per-app VPN mode → " +
-                "self-traffic в TUN мешает AWG init → канал 'запустился' но трафик мёртв. " +
-                "Регрессия 5a8089dd: excludeSelf=(engineId != WARP) ради IP-probe через TUN " +
-                "сломал split tunnel ALL для всех движков (через auto-mode — WARP первый, " +
-                "не fallback на ByeDPI/URnetwork при traffic-fail).",
+            body.contains("excludeSelf = spec.excludeSelf"),
+            "excludeSelf должен идти из TunSpec: common-vpn применяет контракт движка без знания конкретных EngineId.",
         )
         assertFalse(
             body.contains("engineId == ") || body.contains("engineId != "),
-            "establishTunForEngine не должен ветвиться по engineId — common-vpn не знает про движки. " +
-                "Engine-specific поведение (IP-probe) выражается через EnginePlugin contract " +
-                "(см. EngineWarp.ipProbeRoute override).",
+            "establishTunForEngine не должен ветвиться по engineId — common-vpn не знает про движки.",
         )
     }
 

@@ -94,14 +94,10 @@ class SplitTunnelVpnServiceSentinelTest {
     }
 
     @Test
-    fun `establishTunForEngine использует excludeSelf = true для всех движков`() {
+    fun `establishTunForEngine использует excludeSelf из TunSpec`() {
         assertTrue(
-            tunBlock.contains("excludeSelf = true"),
-            "excludeSelf обязан быть true для всех движков без исключений — " +
-                "без addDisallowedApplication Android не активирует per-app VPN mode " +
-                "и трафик самого приложения попадает в TUN, ломая инициализацию движков " +
-                "(особенно WARP AWG). Регрессия commit 5a8089dd: условный excludeSelf для WARP " +
-                "ради IP-probe сломал split tunnel ALL mode.",
+            tunBlock.contains("excludeSelf = spec.excludeSelf"),
+            "excludeSelf обязан приходить из TunSpec, чтобы full-TUN движки могли объявлять безопасную маршрутизацию self-трафика.",
         )
     }
 
