@@ -69,32 +69,34 @@ jobs:
         with:
           cache-read-only: true
 
-      - name: Cache libhev-ozero-socks5-tunnel.so jniLibs
-        id: libhev-cache
-        uses: actions/cache@v5
-        with:
-          path: common-vpn/src/main/jniLibs/arm64-v8a/libhev-ozero-socks5-tunnel.so
-          key: libhev-ozero-2.7.0-ndk-r27c-platform-android-24-pkgname-hev-16kb-arm64-v1
-
       - name: Setup Android NDK
         id: ndk
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r27c
           add-to-path: false
 
-      - name: Clone hev-socks5-tunnel (pinned)
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
+      - name: Clone hev-socks5-tunnel at verified commit
         env:
+          HEV_REPO: https://github.com/heiher/hev-socks5-tunnel.git
           HEV_VERSION: '2.7.0'
+          HEV_COMMIT_SHA: 54eab54ab4e6e9a708229a89a05578e52074fc6f
         run: |
-          git clone --depth 1 --recursive --branch "$HEV_VERSION" \
-            https://github.com/heiher/hev-socks5-tunnel.git \
-            "$RUNNER_TEMP/hev-socks5-tunnel"
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/hev-socks5-tunnel"
+          git init "$SRC"
+          git -C "$SRC" remote add origin "$HEV_REPO"
+          git -C "$SRC" fetch --no-tags --depth 1 origin "$HEV_COMMIT_SHA"
+          git -C "$SRC" checkout --detach FETCH_HEAD
+          ACTUAL_SHA=$(git -C "$SRC" rev-parse HEAD)
+          if [ "$ACTUAL_SHA" != "$HEV_COMMIT_SHA" ]; then
+            echo "::error::hev-socks5-tunnel $HEV_VERSION resolved to $ACTUAL_SHA, expected $HEV_COMMIT_SHA"
+            exit 1
+          fi
+          git -C "$SRC" submodule update --init --recursive --depth 1
+          echo "hev-socks5-tunnel $HEV_VERSION verified at $ACTUAL_SHA"
 
       - name: Build libhev-ozero-socks5-tunnel.so (arm64-v8a via ndk-build)
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
         run: |
@@ -128,7 +130,6 @@ jobs:
           ls -la "$OUT/arm64-v8a/libhev-ozero-socks5-tunnel.so"
 
       - name: Assert JNI symbols в libhev-ozero-socks5-tunnel.so
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
         run: |
@@ -143,7 +144,6 @@ jobs:
           echo "JNI symbols OK (arm64-v8a)"
 
       - name: Assert PKGNAME=hev зашит в libhev-ozero-socks5-tunnel.so
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           SO="common-vpn/src/main/jniLibs/arm64-v8a/libhev-ozero-socks5-tunnel.so"
@@ -155,7 +155,6 @@ jobs:
           echo "PKGNAME=hev зашит корректно"
 
       - name: Assert 16KB page-size alignment в arm64-v8a libhev
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
         run: |
