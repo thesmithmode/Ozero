@@ -88,8 +88,10 @@ fun WarpEngineSettingsScreen(
 
     if (state.editDraft != null) {
         BackHandler { viewModel.onEditCancel() }
+        val resolvedError = state.errorMessageRes?.let { stringResource(it) } ?: state.errorMessage
         WarpEditScreen(
             draft = state.editDraft!!,
+            errorMessage = resolvedError,
             onDraftChange = viewModel::onEditDraftChange,
             onSave = viewModel::onSaveEdit,
             onCancel = viewModel::onEditCancel,
@@ -256,6 +258,7 @@ private const val IMPORT_OVERLAY_ICON_DP = 96
 @Composable
 private fun WarpEditScreen(
     draft: WarpEditDraft,
+    errorMessage: String?,
     onDraftChange: (WarpEditDraft) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
@@ -284,6 +287,14 @@ private fun WarpEditScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
             WarpTextField(
                 label = stringResource(R.string.warp_field_name),
                 value = draft.name,
@@ -673,17 +684,17 @@ private fun SlotListContent(
     onStartEdit: (String) -> Unit,
     onDeleteSlot: (String) -> Unit,
 ) {
+    val resolvedError = state.errorMessageRes?.let { stringResource(it) } ?: state.errorMessage
     LazyColumn(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
             start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val errorMessage = state.errorMessage
-        if (errorMessage != null) {
+        if (resolvedError != null) {
             item {
                 Text(
-                    text = errorMessage,
+                    text = resolvedError,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 4.dp),
