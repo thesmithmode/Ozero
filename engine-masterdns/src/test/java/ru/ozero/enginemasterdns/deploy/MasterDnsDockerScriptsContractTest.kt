@@ -79,18 +79,15 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
-    fun `installDocker uses official get-docker-com installer as primary path`() {
+    fun `installDocker uses distro packages without running fetched installer scripts`() {
         val cmd = MasterDnsDockerScripts.installDocker
         assertTrue(
-            cmd.contains("https://get.docker.com"),
-            "installDocker обязан использовать https://get.docker.com primary — " +
-                "distro docker.io пакет фейлит 'Не удалось получить информацию о пакете' на " +
-                "минимальных Debian/Ubuntu без universe репа. Official installer Docker Inc " +
-                "сам подключает docker-ce репо на любом distro.",
+            cmd.contains("apt-get") && cmd.contains("docker.io"),
+            "installDocker должен использовать distro package manager для Docker без root-запуска remote installer.",
         )
-        assertTrue(
-            cmd.contains("curl -fsSL") || cmd.contains("wget -qO"),
-            "Должен быть curl или wget fetcher для get.docker.com installer.",
+        assertFalse(
+            cmd.contains("get.docker.com") || cmd.contains("sudo sh /tmp/get-docker.sh"),
+            "installDocker не должен скачивать и запускать installer script под sudo без signature или checksum.",
         )
     }
 
