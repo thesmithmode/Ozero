@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.enginescore.ByeDpiArgs
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
@@ -257,6 +258,28 @@ class ByeDpiEngineTest {
             listOf("--ip", "127.0.0.1", "-p", "1080", "-Ku", "-a1", "-An", "-H:ads.example.com", "-An"),
             args,
         )
+    }
+
+    @Test
+    fun buildArgs_rejectsTooManyTokens() {
+        assertFailsWith<IllegalArgumentException> {
+            engine.buildArgs(
+                EngineConfig.ByeDpi(
+                    args = (1..ByeDpiArgs.MAX_TOKENS + 1).joinToString(" ") { "-x" },
+                    socksPort = 1080,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun startRejectsOversizedArgsBeforeNativeLaunch() = runTest {
+        val result = engine.start(
+            EngineConfig.ByeDpi(args = "x".repeat(ByeDpiArgs.MAX_LENGTH + 1), socksPort = 1080),
+        )
+
+        assertIs<StartResult.Failure>(result)
+        verify(exactly = 0) { proxy.startProxy(any()) }
     }
 
     @Test

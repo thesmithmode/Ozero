@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import ru.ozero.enginescore.ByeDpiArgs
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -72,7 +73,7 @@ class ByeDpiEngine(
         val args = when {
             settings?.byedpiUseUiMode == true ->
                 ByeDpiUiArgsBuilder.buildArgsOnly(settings.byedpiUiSettings).joinToString(" ")
-            !settings?.byedpiWinningArgs.isNullOrBlank() ->
+            !settings?.byedpiWinningArgs.isNullOrBlank() && ByeDpiArgs.validate(settings.byedpiWinningArgs!!) ->
                 settings.byedpiWinningArgs!!.trim() // CMD mode is verbatim; suffix injection changes strategy topology.
             else -> EngineConfig.ByeDpi().args
         }
@@ -97,7 +98,10 @@ class ByeDpiEngine(
         }
         val resolvedPort = if (config.socksPort > 0) config.socksPort else nextRotatedPort()
         val resolvedConfig = if (config.socksPort > 0) config else config.copy(socksPort = resolvedPort)
-        Log.i(TAG, "start socksPort=$resolvedPort args=${resolvedConfig.args}")
+        if (!ByeDpiArgs.validate(resolvedConfig.args)) {
+            return StartResult.Failure(reason = "ByeDPI args are too long")
+        }
+        Log.i(TAG, "start socksPort=$resolvedPort argsLength=${resolvedConfig.args.length}")
         val oldJob = proxyJobRef.getAndSet(null)
         val hadKnownWedge = nativeMayBeWedged.getAndSet(false)
         var rotateBeforeLaunch = hadKnownWedge
@@ -313,11 +317,7 @@ class ByeDpiEngine(
 
     // Native inserts argv[0]="byedpi"; Kotlin prepending program-name makes getopt drop --ip.
     internal fun buildArgs(config: EngineConfig.ByeDpi): Array<String> {
-        val extra =
-            config.args.trim()
-                .takeIf { it.isNotEmpty() }
-                ?.split("\\s+".toRegex())
-                .orEmpty()
+        val extra = ByeDpiArgs.tokens(config.args)
         val hostsArgs = buildHostsArgs(config)
         return (listOf("--ip", "127.0.0.1", "-p", config.socksPort.toString()) + extra + hostsArgs)
             .toTypedArray()

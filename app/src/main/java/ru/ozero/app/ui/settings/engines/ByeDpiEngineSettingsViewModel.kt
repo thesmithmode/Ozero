@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import ru.ozero.enginescore.ByeDpiArgs
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -92,6 +93,7 @@ class ByeDpiEngineSettingsViewModel @Inject constructor(
 
     fun onArgsChange(text: String) {
         val state = _uiState.value as? ByeDpiSettingsUiState.Content ?: return
+        if (text.length > ByeDpiArgs.MAX_LENGTH) return
         _uiState.value = state.copy(args = text)
     }
 
@@ -118,7 +120,8 @@ class ByeDpiEngineSettingsViewModel @Inject constructor(
     fun onSave() {
         val state = _uiState.value as? ByeDpiSettingsUiState.Content ?: return
         viewModelScope.launch {
-            val toSave = state.args.takeIf { it.isNotBlank() && it != defaultArgs }
+            val toSave = state.args.trim().takeIf { it.isNotBlank() && it != defaultArgs }
+                ?.takeIf(ByeDpiArgs::validate)
             repository.setByedpiWinningArgs(toSave)
             if (toSave == null) repository.setByedpiDefaultAccepted(true)
             val dns = state.dnsText.split(",").map { it.trim() }.filter { it.isNotEmpty() }
