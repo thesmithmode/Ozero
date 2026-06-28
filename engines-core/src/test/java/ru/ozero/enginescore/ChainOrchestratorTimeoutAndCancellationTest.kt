@@ -1,7 +1,7 @@
 package ru.ozero.enginescore
 
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -13,7 +13,7 @@ import kotlin.test.assertFailsWith
 class ChainOrchestratorTimeoutAndCancellationTest {
 
     @Test
-    fun `stop timeout keeps orchestrator usable for future starts`() = runTest {
+    fun `completed slow stop keeps orchestrator usable for future starts`() = runTest {
         val slow = SlowStopPlugin(EngineId.BYEDPI)
         val next = SimplePlugin(EngineId.FPTN)
         val orch = ChainOrchestrator(setOf(slow, next))
@@ -30,7 +30,7 @@ class ChainOrchestratorTimeoutAndCancellationTest {
     }
 
     @Test
-    fun `cancellation during stop is propagated`() = runTest {
+    fun `cancellation during stop is propagated and keeps active engine for retry`() = runTest {
         val plugin = CancellableStopPlugin(EngineId.BYEDPI)
         val orch = ChainOrchestrator(setOf(plugin))
         orch.start(listOf(ChainStep(EngineId.BYEDPI, EngineConfig.ByeDpi(socksPort = 1080))))
@@ -38,6 +38,8 @@ class ChainOrchestratorTimeoutAndCancellationTest {
         assertFailsWith<CancellationException> {
             orch.stop()
         }
+
+        assertEquals(listOf(plugin), orch.activeEngines())
     }
 
     @Test
@@ -93,11 +95,10 @@ class ChainOrchestratorTimeoutAndCancellationTest {
     ) : EnginePlugin {
         override val capabilities = EngineCapabilities(true, false, false, false, false, true)
         var stopCount = 0
-        override fun stopTimeoutMs(): Long = 1
         override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult = StartResult.Success(1080)
         override suspend fun stop() {
             stopCount++
-            awaitCancellation()
+            delay(1)
         }
         override suspend fun probe(): ProbeResult = ProbeResult.Failure("n/a")
         override fun stats(): Flow<EngineStats> = flowOf(EngineStats())

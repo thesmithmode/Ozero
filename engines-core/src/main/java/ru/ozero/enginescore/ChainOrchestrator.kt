@@ -3,7 +3,6 @@ package ru.ozero.enginescore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withTimeoutOrNull
 
 class ChainOrchestrator(
     private val engines: Set<EnginePlugin>,
@@ -86,22 +85,15 @@ class ChainOrchestrator(
     }
 
     private suspend fun stopInternal() {
-        val snapshot = synchronized(started) {
-            started.toList().asReversed().also { started.clear() }
-        }
+        val snapshot = synchronized(started) { started.toList().asReversed() }
         snapshot.forEach { plugin ->
             try {
-                val timeoutMs = plugin.stopTimeoutMs()
-                val completed = withTimeoutOrNull(timeoutMs) { plugin.stop() }
-                if (completed == null) {
-                    PersistentLoggers.warn(
-                        TAG,
-                        "stop ${plugin.id} timed out after ${timeoutMs}ms — mutex освобождён",
-                    )
-                }
+                plugin.stop()
+                synchronized(started) { started.remove(plugin) }
             } catch (ce: CancellationException) {
                 throw ce
             } catch (t: Throwable) {
+                synchronized(started) { started.remove(plugin) }
                 PersistentLoggers.warn(TAG, "stop ${plugin.id} threw: ${t.message}")
             }
         }
