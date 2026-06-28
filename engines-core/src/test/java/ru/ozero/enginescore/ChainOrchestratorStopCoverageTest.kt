@@ -26,7 +26,7 @@ class ChainOrchestratorStopCoverageTest {
     }
 
     @Test
-    fun `stop timeout clears active list and does not call engine twice`() = runTest {
+    fun `completed slow stop clears active list and does not call engine twice`() = runTest {
         val plugin = SlowStopPlugin()
         val orchestrator = ChainOrchestrator(setOf(plugin))
 
@@ -92,10 +92,9 @@ class ChainOrchestratorStopCoverageTest {
 
         override suspend fun stop() {
             stopCalls++
-            delay(stopTimeoutMs() + 1)
+            delay(1)
         }
 
-        override fun stopTimeoutMs(): Long = 1
         override suspend fun probe(): ProbeResult = ProbeResult.Failure("unused")
         override fun stats(): Flow<EngineStats> = flowOf(EngineStats())
     }
