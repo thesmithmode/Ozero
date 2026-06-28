@@ -122,7 +122,7 @@ class V2RayFmtCoverageTest {
         assertEquals("grpc", trojan.type)
         assertEquals("svc", trojan.grpcServiceName)
         assertEquals("tls", trojan.security)
-        assertTrue(trojan.allowInsecure)
+        assertFalse(trojan.allowInsecure)
 
         val userInfo = Base64.getUrlEncoder().withoutPadding().encodeToString("aes-256-gcm:pwd".toByteArray())
         val ss = V2RayFmt.parseShadowsocks("ss://$userInfo@ss.example.com:8388?plugin=v2ray-plugin#SS")

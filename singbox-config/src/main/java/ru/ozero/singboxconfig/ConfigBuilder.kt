@@ -420,6 +420,7 @@ private fun vmessOutbound(bean: VMessBean, tag: String, detour: String? = null):
 }
 
 private fun trojanOutbound(bean: TrojanBean, tag: String, detour: String? = null): String {
+    bean.initializeDefaultValues()
     val sb = StringBuilder()
     sb.append("""{"type":"trojan","tag":${jsonString(tag)},""")
     sb.append(""""server":${jsonString(bean.serverAddress)},""")

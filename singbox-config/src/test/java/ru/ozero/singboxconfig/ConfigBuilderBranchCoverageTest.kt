@@ -43,6 +43,19 @@ class ConfigBuilderBranchCoverageTest {
     }
 
     @Test
+    fun `trojan outbound enforces authenticated tls`() {
+        val bean = trojan().apply {
+            security = "none"
+            allowInsecure = true
+        }
+
+        val json = ConfigBuilder.buildSingboxConfig(bean)
+
+        assertContains(json, "\"tls\":{\"enabled\":true")
+        assertFalse(json.contains("\"insecure\":true"))
+    }
+
+    @Test
     fun `tls block uses explicit sni before server and never transport host`() {
         val json = ConfigBuilder.buildSingboxConfig(
             vless().apply {
@@ -329,7 +342,7 @@ class ConfigBuilderBranchCoverageTest {
         assertFalse(vmessJson.contains("\"listen_port\":0"))
         assertContains(trojanJson, "\"type\":\"trojan\"")
         assertFalse(trojanJson.contains("\"packet_encoding\""))
-        assertFalse(trojanJson.contains("\"tls\""))
+        assertContains(trojanJson, "\"tls\":{\"enabled\":true")
         assertContains(shadowsocksJson, "\"plugin\":\"v2ray-plugin\"")
         assertContains(shadowsocksJson, "\"plugin_opts\":\"mode=websocket\"")
         assertContains(shadowsocksJson, "\"detour\":\"upstream\"")
