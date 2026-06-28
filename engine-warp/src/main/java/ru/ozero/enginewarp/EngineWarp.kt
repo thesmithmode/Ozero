@@ -580,13 +580,7 @@ class EngineWarp(
         val provider = cfg.doHProvider
         Log.i(TAG, "resolveEndpointHost host=$host provider=${provider.name}")
         for (attempt in 0..2) {
-            val resolved = if (provider.isSystem) {
-                withContext(Dispatchers.IO) {
-                    runCatching { java.net.InetAddress.getByName(host).hostAddress }.getOrNull()
-                }
-            } else {
-                withContext(Dispatchers.IO) { resolveViaDoH(host, bootstrapSafeDohUrl(provider)) }
-            }
+            val resolved = withContext(Dispatchers.IO) { resolveViaDoH(host, bootstrapSafeDohUrl(provider)) }
             if (!resolved.isNullOrBlank()) {
                 Log.i(TAG, "endpoint resolved $host -> $resolved via ${provider.name} (attempt ${attempt + 1})")
                 return cfg.copy(peerEndpoint = "$resolved:$port")
