@@ -2,6 +2,7 @@ package ru.ozero.app.logging
 
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import java.io.ByteArrayInputStream
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -137,5 +138,27 @@ class BootDiagnosticsRuntimeTest {
         assertEquals("SIGPIPE", BootDiagnostics.signalToString(13))
         assertEquals("SIGTERM", BootDiagnostics.signalToString(15))
         assertEquals("SIGSTOP", BootDiagnostics.signalToString(19))
+    }
+
+    @Test
+    fun `readTraceText redacts secrets and caps materialized text`() {
+        val secret = "token=AbCdEfGhIjKlMnOpQrStUvWxYz123456 vless://secret@example/path "
+        val raw = (secret + "x".repeat(70_000)).toByteArray()
+
+        val text = BootDiagnostics.readTraceText(ByteArrayInputStream(raw))
+
+        assertTrue(text.length <= 64 * 1024)
+        assertFalse(text.contains("AbCdEfGhIjKlMnOpQrStUvWxYz123456"))
+        assertFalse(text.contains("vless://secret@example/path"))
+        assertTrue(text.contains("token=<redacted-token>"))
+    }
+
+    @Test
+    fun `readAtMost caps binary trace bytes before string extraction`() {
+        val raw = ByteArray(70_000) { 0x41 }
+
+        val bytes = BootDiagnostics.readAtMost(ByteArrayInputStream(raw), 64 * 1024)
+
+        assertEquals(64 * 1024, bytes.size)
     }
 }
