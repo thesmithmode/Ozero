@@ -100,5 +100,6 @@ object MasterDnsModule {
         portAllocator = MasterDnsPortAllocator(),
         resolversProvider = { resolversCache.snapshot() },
         configTomlProvider = { resolversCache.configTomlSnapshot() },
+        enabledProvider = { resolversCache.enabledSnapshot() },
     )
 }

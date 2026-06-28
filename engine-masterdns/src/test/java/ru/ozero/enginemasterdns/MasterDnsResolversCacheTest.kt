@@ -40,6 +40,16 @@ class MasterDnsResolversCacheTest {
     }
 
     @Test
+    fun `enabled snapshot tracks latest config`() = runTest {
+        val flow = MutableStateFlow(MasterDnsPersistedConfig(enabled = false))
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val cache = MasterDnsResolversCache(config = flow, scope = scope)
+        assertEquals(false, cache.enabledSnapshot())
+        flow.value = MasterDnsPersistedConfig(enabled = true)
+        assertEquals(true, cache.enabledSnapshot())
+    }
+
+    @Test
     fun `snapshot empty before first emit collected`() = runTest {
         val flow = MutableStateFlow(MasterDnsPersistedConfig(resolvers = listOf("8.8.8.8")))
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
