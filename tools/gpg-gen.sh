@@ -4,6 +4,15 @@ set -euo pipefail
 umask 077
 
 OUT="${1:?Usage: gpg-gen.sh <out-dir>}"
+GIT_ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -n "$GIT_ROOT" ]]; then
+  OUT_ABS="$(realpath -m "$OUT")"
+  GIT_ROOT_ABS="$(realpath -m "$GIT_ROOT")"
+  if [[ "$OUT_ABS" == "$GIT_ROOT_ABS" || "$OUT_ABS" == "$GIT_ROOT_ABS"/* ]]; then
+    echo "Refusing to write release secrets inside the git worktree: $OUT_ABS" >&2
+    exit 1
+  fi
+fi
 mkdir -p "$OUT"
 chmod 700 "$OUT"
 
