@@ -28,7 +28,6 @@ class RawUpdater(
     private val okHttpClient: OkHttpClient,
     private val groupDao: SubscriptionGroupDao,
     private val profileDao: ProxyProfileDao,
-    private val userCaOkHttpClient: OkHttpClient = okHttpClient,
 ) {
     suspend fun refresh(group: SubscriptionGroup): Result<Int> = withContext(Dispatchers.IO) {
         runCatching<Int> {
@@ -37,7 +36,7 @@ class RawUpdater(
                 .header("User-Agent", USER_AGENT)
                 .header("Accept", "text/plain, application/json, application/yaml, text/yaml, */*")
                 .build()
-            httpClientFor(group).newCall(request).execute().use { response ->
+            okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     error("Subscription HTTP ${response.code}")
                 }
@@ -106,9 +105,6 @@ class RawUpdater(
             Log.w(TAG, "refresh failed groupId=${group.id}: ${e.message}")
         }
     }
-
-    private fun httpClientFor(group: SubscriptionGroup): OkHttpClient =
-        if (group.isBuiltin) okHttpClient else userCaOkHttpClient
 
     companion object {
         private const val TAG = "RawUpdater"
