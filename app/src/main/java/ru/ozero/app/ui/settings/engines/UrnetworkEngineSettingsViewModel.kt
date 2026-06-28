@@ -79,7 +79,7 @@ class UrnetworkEngineSettingsViewModel @Inject constructor(
     val providePaused: StateFlow<Boolean> = configStore.provideEnabled()
         .map { !it }
         .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     val insufficientBalance: StateFlow<Boolean> = bridge.contractStatus()
         .map { it.insufficientBalance && !it.premium }
