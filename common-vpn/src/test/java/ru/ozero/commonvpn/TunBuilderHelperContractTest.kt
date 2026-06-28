@@ -133,16 +133,15 @@ class TunBuilderHelperContractTest {
     }
 
     @Test
-    fun `applyEngineTunSpec IPv6 routing по spec_allowFamilyV6 не ipv6Enabled — regression sentinel`() {
+    fun `applyEngineTunSpec IPv6 routing требует user setting spec flag и route`() {
         val body = source.substringAfter("fun applyEngineTunSpec(").substringBefore("fun buildTunBuilder(")
         assertTrue(
-            body.contains("if (spec.allowFamilyV6 && v6 != null)"),
-            "IPv6 routing обязан базироваться на spec.allowFamilyV6 (из конфига), " +
-                "а не на ipv6Enabled — иначе WARP blackhole-ит IPv6 по умолчанию и часть сервисов недоступна",
+            body.contains("ipv6Enabled && spec.allowFamilyV6 && spec.routeAllV6 && v6 != null"),
+            "IPv6 default route разрешён только когда user setting, spec family и routeAllV6 включены",
         )
         assertTrue(
-            !body.contains("ipv6Enabled && spec.allowFamilyV6"),
-            "ipv6Enabled НЕ должен стоять перед spec.allowFamilyV6 — это регрессия",
+            body.contains("blackholeIpv6(builder, \"applyEngineTunSpec\")"),
+            "Если IPv6 route не установлен, applyEngineTunSpec обязан blackhole IPv6 вместо bypass",
         )
     }
 
