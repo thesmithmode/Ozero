@@ -35,10 +35,12 @@ class DataStoreWarpConfigStore(
             ?.filter { it.isNotEmpty() }
             ?.takeIf { it.isNotEmpty() }
             ?: WarpConfig.DEFAULT_ALLOWED_IPS
+        val awgJmin = prefs[KEY_AWG_JMIN] ?: AwgParams.DEFAULT_JMIN
+        val awgJmax = prefs[KEY_AWG_JMAX] ?: AwgParams.DEFAULT_JMAX
         val awgParams = AwgParams(
             junkPacketCount = prefs[KEY_AWG_JC] ?: AwgParams.DEFAULT_JC,
-            junkPacketMinSize = prefs[KEY_AWG_JMIN] ?: AwgParams.DEFAULT_JMIN,
-            junkPacketMaxSize = prefs[KEY_AWG_JMAX] ?: AwgParams.DEFAULT_JMAX,
+            junkPacketMinSize = validAwgJmin(awgJmin, awgJmax),
+            junkPacketMaxSize = validAwgJmax(awgJmin, awgJmax),
             initPacketJunkSize = prefs[KEY_AWG_S1] ?: AwgParams.DEFAULT_S1,
             responsePacketJunkSize = prefs[KEY_AWG_S2] ?: AwgParams.DEFAULT_S2,
             initPacketMagicHeader = parseLongPref(prefs[KEY_AWG_H1], "H1", AwgParams.DEFAULT_H1),
@@ -119,6 +121,19 @@ class DataStoreWarpConfigStore(
             PersistentLoggers.warn(TAG, "AWG $key parse failed ($raw), using default $default")
             default
         }
+    }
+
+    private fun validAwgJmin(jmin: Int, jmax: Int): Int = if (jmin <= jmax) {
+        jmin
+    } else {
+        PersistentLoggers.warn(TAG, "AWG Jmin/Jmax invalid, using defaults")
+        AwgParams.DEFAULT_JMIN
+    }
+
+    private fun validAwgJmax(jmin: Int, jmax: Int): Int = if (jmin <= jmax) {
+        jmax
+    } else {
+        AwgParams.DEFAULT_JMAX
     }
 
     private companion object {
