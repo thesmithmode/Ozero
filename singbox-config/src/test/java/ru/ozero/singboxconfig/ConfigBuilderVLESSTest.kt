@@ -126,6 +126,7 @@ class ConfigBuilderVLESSTest {
 
         assertContains(json, "\"type\":\"udp\"")
         assertContains(json, "\"server\":\"1.1.1.1\"")
+        assertContains(json, "\"detour\":\"proxy\"")
     }
 
     @Test

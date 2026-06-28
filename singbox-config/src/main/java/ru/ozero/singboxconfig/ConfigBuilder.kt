@@ -125,7 +125,7 @@ object ConfigBuilder {
         sb.append(""",{"type":"direct","tag":"direct"}""")
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
-        sb.append(""""dns":{"servers":[{"type":"udp","tag":"dns-direct","server":"1.1.1.1"}]},""")
+        sb.append(""""dns":{"servers":[{"type":"udp","tag":"dns-direct","server":"1.1.1.1","detour":"proxy"}]},""")
         sb.append(""""route":{""")
         sb.append(""""final":"proxy",""")
         sb.append(""""auto_detect_interface":true,""")
