@@ -97,6 +97,8 @@ class ShutdownCoordinator(
                 Log.i(TAG, "native tunnel stop completed")
             }
 
+            runCatching { state.lockdownStartupFdRef.getAndSet(null)?.close() }
+                .onFailure { PersistentLoggers.warn(TAG, "lockdownStartupFd.close threw: ${it.message}") }
             runCatching { state.tunFdRef.getAndSet(null)?.close() }
                 .onFailure { PersistentLoggers.warn(TAG, "tunFd.close threw: ${it.message}") }
         } finally {
