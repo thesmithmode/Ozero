@@ -276,8 +276,8 @@ jobs:
             echo "::error::APK versionCode=$VC ≠ VERSION_CODE=$VC_EXPECTED в gradle.properties"
             exit 1
           fi
-          if [ "$VC" -lt 2211 ]; then
-            echo "::error::APK versionCode=$VC < floor 2211 (v0.2.1 baseline)"
+          if [ "$VC" -lt 2713 ]; then
+            echo "::error::APK versionCode=$VC < floor 2713 (legacy monotonic baseline)"
             exit 1
           fi
           echo "APK versionCode=$VC OK"
