@@ -296,6 +296,7 @@ class MasterDnsEngineTest {
             portAllocator = StubAllocator(18000),
             resolversProvider = { listOf("1.1.1.1", "8.8.8.8") },
             configTomlProvider = { "DOMAINS = [\"v.x\"]\n" },
+            enabledProvider = { true },
         )
         val cfg = engine.buildManualConfig(null)
         assertNotNull(cfg)
@@ -312,6 +313,7 @@ class MasterDnsEngineTest {
             portAllocator = StubAllocator(18000),
             resolversProvider = { listOf("1.1.1.1") },
             configTomlProvider = { "" },
+            enabledProvider = { true },
         )
         assertEquals(null, engine.buildManualConfig(null))
     }
@@ -323,6 +325,19 @@ class MasterDnsEngineTest {
             portAllocator = StubAllocator(18000),
             resolversProvider = { emptyList() },
             configTomlProvider = { "   \n  \t\n" },
+            enabledProvider = { true },
+        )
+        assertEquals(null, engine.buildManualConfig(null))
+    }
+
+    @Test
+    fun `buildManualConfig with disabled MasterDNS returns null even with toml`() {
+        val engine = MasterDnsEngine(
+            serviceFactory = { FakeService() },
+            portAllocator = StubAllocator(18000),
+            resolversProvider = { listOf("1.1.1.1") },
+            configTomlProvider = { "DOMAINS = [\"v.x\"]\n" },
+            enabledProvider = { false },
         )
         assertEquals(null, engine.buildManualConfig(null))
     }
