@@ -176,6 +176,20 @@ class ShutdownCoordinatorExtraTest {
     }
 
     @Test
+    fun `performShutdown closes startup lockdown fd on direct lifecycle shutdown`() = runTest {
+        val lockdownFd = mockk<ParcelFileDescriptor>(relaxed = true)
+        val fixture = shutdownFixture(this, sessionId = -1L, lockdownFd = lockdownFd)
+        fixture.state.stopping.set(true)
+
+        fixture.coordinator.performShutdown(callStopSelf = false)
+
+        verify(exactly = 1) { lockdownFd.close() }
+        assertEquals(null, fixture.state.lockdownStartupFdRef.get())
+        verify(exactly = 0) { fixture.stopSelfRequest.invoke(any()) }
+        assertFalse(fixture.state.stopping.get())
+    }
+
+    @Test
     fun `performShutdown with callStopSelf true uses latest start id`() = runTest {
         val fixture = shutdownFixture(this, sessionId = -1L)
 

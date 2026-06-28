@@ -372,6 +372,17 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
+    fun `lockdownStartupFdRef очищается в performShutdown`() {
+        val body = shutdownSource
+            .substringAfter("suspend fun performShutdown(")
+            .substringBefore("private fun recordSessionEnd(")
+        assertTrue(
+            body.contains("lockdownStartupFdRef.getAndSet(null)"),
+            "performShutdown обязан закрывать lockdownStartupFdRef — direct onDestroy path обходит stopVpn.",
+        )
+    }
+
+    @Test
     fun `lockdownStartupFdRef очищается в stopVpn`() {
         val body = shutdownSource
             .substringAfter("fun stopVpn(")
