@@ -24,7 +24,7 @@ class EngineUrnetworkContractTest {
         override: String? = null,
         byJwt: String? = null,
         byClientJwt: String? = null,
-        provideEnabled: Boolean = true,
+        provideEnabled: Boolean = false,
         bridge: FakeUrnetworkSdkBridge = FakeUrnetworkSdkBridge(),
         authService: FakeAuthService = FakeAuthService(),
     ): Triple<EngineUrnetwork, FakeUrnetworkSdkBridge, InMemoryUrnetworkConfigStore> {

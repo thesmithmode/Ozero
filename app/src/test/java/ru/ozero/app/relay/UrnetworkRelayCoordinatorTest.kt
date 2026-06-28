@@ -84,7 +84,7 @@ class UrnetworkRelayCoordinatorTest {
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
         assertEquals(1, bridge.startCalls)
-        assertEquals(false, bridge.lastProvidePaused)
+        assertEquals(true, bridge.lastProvidePaused)
     }
 
     @Test
@@ -93,7 +93,7 @@ class UrnetworkRelayCoordinatorTest {
         tunnelStateFlow.value = TunnelState.Connected(EngineId.WARP, socksPort = 0)
 
         assertEquals(1, bridge.startCalls)
-        assertEquals(false, bridge.lastProvidePaused)
+        assertEquals(true, bridge.lastProvidePaused)
     }
 
     @Test

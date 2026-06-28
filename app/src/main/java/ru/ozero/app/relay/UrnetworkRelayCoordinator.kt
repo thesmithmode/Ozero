@@ -103,7 +103,7 @@ class UrnetworkRelayCoordinator(
         if (result is UrnetworkSdkBridge.StartResult.Success) {
             relayOwned.set(true)
             attachDummyIoLoop()
-            val provideEnabled = runCatching { configStore.provideEnabled().first() }.getOrDefault(true)
+            val provideEnabled = runCatching { configStore.provideEnabled().first() }.getOrDefault(false)
             runCatching { bridge.setProvidePaused(!provideEnabled) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: worker pause toggle threw: ${it.message}") }
             val controlMode = runCatching { configStore.provideControlMode().first() }
