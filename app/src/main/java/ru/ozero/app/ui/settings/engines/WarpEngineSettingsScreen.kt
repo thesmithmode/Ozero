@@ -65,7 +65,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import java.io.ByteArrayInputStream
 import ru.ozero.app.R
 import ru.ozero.app.ui.theme.OzeroPalette
 import androidx.compose.ui.text.font.FontFamily
@@ -119,12 +118,15 @@ fun WarpEngineSettingsScreen(
         val displayName = context.contentResolver.query(
             uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null,
         )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null } ?: "import"
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            ?: return@rememberLauncherForActivityResult
         if (displayName.endsWith(".yaml", ignoreCase = true) || displayName.endsWith(".yml", ignoreCase = true)) {
             viewModel.onClashYamlRejected()
         } else {
-            viewModel.onImportFile(ByteArrayInputStream(bytes), displayName)
+            runCatching { context.contentResolver.openInputStream(uri) }
+                .onSuccess { stream ->
+                    stream ?: return@onSuccess
+                    viewModel.onImportFile(stream, displayName)
+                }
+                .onFailure(viewModel::onImportOpenFailed)
         }
     }
     Scaffold(
