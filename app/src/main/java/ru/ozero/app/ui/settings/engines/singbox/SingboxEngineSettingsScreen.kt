@@ -527,16 +527,20 @@ private fun ProfileItem(
     }
 }
 
-private data class SingboxProfileDisplay(
+private const val MAX_SINGBOX_PROFILE_DISPLAY_NAME_CHARS = 512
+private const val MAX_SINGBOX_PROFILE_DISPLAY_PARTS = 8
+
+internal data class SingboxProfileDisplay(
     val title: String,
     val subtitle: String,
 )
 
-private fun String.toSingboxProfileDisplay(): SingboxProfileDisplay {
-    val parts = split("|")
+internal fun String.toSingboxProfileDisplay(): SingboxProfileDisplay {
+    val boundedName = take(MAX_SINGBOX_PROFILE_DISPLAY_NAME_CHARS)
+    val parts = boundedName.split("|", limit = MAX_SINGBOX_PROFILE_DISPLAY_PARTS)
         .map { it.trim() }
         .filter { it.isNotEmpty() }
-    if (parts.size < 2) return SingboxProfileDisplay(trim(), "")
+    if (parts.size < 2) return SingboxProfileDisplay(boundedName.trim(), "")
     val sniPart = parts.firstOrNull { it.contains("SNI:", ignoreCase = true) }
     val host = sniPart
         ?.substringAfter("SNI:", "")
