@@ -321,6 +321,7 @@ private fun ModeSegment(
 private val VISIBLE_MODES = listOf(
     SplitTunnelMode.ALLOWLIST,
     SplitTunnelMode.ALL,
+    SplitTunnelMode.BYPASS_LAN,
     SplitTunnelMode.BLOCKLIST,
 )
 

@@ -42,12 +42,6 @@ class SplitTunnelViewModel @Inject constructor(
         appListProvider.packageChanges
             .onEach { refreshApps() }
             .launchIn(viewModelScope)
-        viewModelScope.launch {
-            val current = settingsRepository.settings.map { it.splitMode }.first()
-            if (current == SplitTunnelMode.BYPASS_LAN) {
-                settingsRepository.setSplitMode(SplitTunnelMode.ALL)
-            }
-        }
         combine(
             apps.filterNotNull(),
             dao.observeAll(),
@@ -55,7 +49,7 @@ class SplitTunnelViewModel @Inject constructor(
             query,
             tunnelController.state.map { it is TunnelState.Idle },
         ) { appsList, rules, persistedMode, q, editable ->
-            val mode = if (persistedMode == SplitTunnelMode.BYPASS_LAN) SplitTunnelMode.ALL else persistedMode
+            val mode = persistedMode
             val isBlocklist = mode == SplitTunnelMode.BLOCKLIST
             val included = rules.filter { it.isExcluded == isBlocklist }.map { it.packageName }.toSet()
             val filtered = if (q.isBlank()) appsList else appsList.filter { it.matches(q) }
@@ -82,7 +76,6 @@ class SplitTunnelViewModel @Inject constructor(
     }
 
     fun onModeChange(mode: SplitTunnelMode) {
-        if (mode == SplitTunnelMode.BYPASS_LAN) return
         if (tunnelController.state.value !is TunnelState.Idle) return
         viewModelScope.launch { settingsRepository.setSplitMode(mode) }
     }
