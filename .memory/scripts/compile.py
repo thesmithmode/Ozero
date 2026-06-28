@@ -104,10 +104,10 @@ Read the daily log above and compile it into wiki articles following the schema 
    ```
 
 ### File paths:
-- Write concept articles to: {CONCEPTS_DIR}
-- Write connection articles to: {CONNECTIONS_DIR}
-- Update index at: {KNOWLEDGE_DIR / 'index.md'}
-- Append log at: {KNOWLEDGE_DIR / 'log.md'}
+- Write concept articles to: knowledge/concepts/
+- Write connection articles to: knowledge/connections/
+- Update index at: knowledge/index.md
+- Append log at: knowledge/log.md
 
 ### Quality standards:
 - Every article must have complete YAML frontmatter
