@@ -408,8 +408,6 @@ class EngineWarp(
     private fun startStatsPoll(uapiPath: String) {
         statsJobRef.getAndSet(null)?.cancel()
         val job = ownedScope.launch {
-            var prevRx = 0L
-            var prevTx = 0L
             var tick = 0
             var consecutiveNullReads = 0
             try {
@@ -432,15 +430,10 @@ class EngineWarp(
                         )
                         tick += 1
                         if (tick % STATS_LOG_EVERY == 0) {
-                            val dRx = state.rxBytes - prevRx
-                            val dTx = state.txBytes - prevTx
                             PersistentLoggers.trace(
                                 TAG,
-                                "warp stats tx=${state.txBytes}B rx=${state.rxBytes}B " +
-                                    "deltaTx=${dTx}B deltaRx=${dRx}B hsAge=${ageS ?: "never"}s",
+                                "warp stats handshakeRecent=$handshakeRecent activeConnections=${_stats.value.activeConnections}",
                             )
-                            prevRx = state.rxBytes
-                            prevTx = state.txBytes
                         }
                     } else {
                         consecutiveNullReads += 1
