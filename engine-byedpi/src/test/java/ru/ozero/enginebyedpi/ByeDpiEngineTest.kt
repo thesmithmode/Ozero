@@ -389,7 +389,7 @@ class ByeDpiEngineTest {
     }
 
     @Test
-    fun `stop forceClose before waiting native job — server_fd reset guarantees clean next start`() = runTest {
+    fun `stop forceClose before and after native job wait — server_fd reset guarantees clean next start`() = runTest {
         every { proxy.startProxy(any()) } returns 0
         engine.start(EngineConfig.ByeDpi(socksPort = 1080))
         engine.stop()
@@ -397,6 +397,7 @@ class ByeDpiEngineTest {
             proxy.stopProxy()
             proxy.forceClose()
         }
+        coVerify(exactly = 2) { proxy.forceClose() }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
