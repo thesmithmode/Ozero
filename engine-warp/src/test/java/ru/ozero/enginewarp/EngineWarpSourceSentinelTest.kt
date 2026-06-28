@@ -89,6 +89,24 @@ class EngineWarpSourceSentinelTest {
     }
 
     @Test
+    fun `attachTun failure persistent log does not include raw INI`() {
+        val body = source.substringAfter("override suspend fun attachTun(tunFd: Int)")
+            .substringBefore("private fun registerNetworkCallback")
+        assertTrue(
+            body.contains("attachTun failed: ${r.reason}; iniBytes="),
+            "attachTun failure log must keep failure reason and non-secret size diagnostics.",
+        )
+        assertFalse(
+            body.contains("\nini:\n"),
+            "Persistent attachTun failure logs must not include raw or partially redacted INI.",
+        )
+        assertFalse(
+            body.contains("maskedIni"),
+            "Partial INI masking is unsafe for raw imported configs with extra secret fields.",
+        )
+    }
+
+    @Test
     fun `sentinel awaitReady при Ready ставит activeConnections=1 — amber flash fix`() {
         val awaitBody = source.substringAfter("override suspend fun awaitReady()")
             .substringBefore("override suspend fun recover()")
