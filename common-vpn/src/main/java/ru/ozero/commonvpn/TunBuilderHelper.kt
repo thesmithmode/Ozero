@@ -66,7 +66,10 @@ class TunBuilderHelper(
             addCidrRoutes(builder, spec.routeCidrsV4, "v4")
         }
         val v6 = spec.ipv6Address
-        if (spec.allowFamilyV6 && v6 != null) {
+        if (ipv6Enabled) {
+            builder.addAddress(v6 ?: TUN_ADDRESS_V6, if (v6 == null) TUN_PREFIX_LENGTH_V6 else spec.ipv6PrefixLength)
+            builder.addRoute("::", 0)
+        } else if (spec.allowFamilyV6 && v6 != null) {
             builder.addAddress(v6, spec.ipv6PrefixLength)
             if (spec.routeAllV6) {
                 builder.addRoute("::", 0)
