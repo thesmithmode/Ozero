@@ -2,6 +2,7 @@ package ru.ozero.commonvpn
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -180,12 +181,12 @@ class StartSequenceCoordinatorContractTest {
     }
 
     @Test
-    fun `establishTunForEngine использует excludeSelf = true`() {
+    fun `establishTunForEngine не исключает self package`() {
         val body = source.substringAfter("private suspend fun establishTunForEngine(")
             .substringBefore("private fun captureTunIfaceName(")
-        assertTrue(
-            body.contains("excludeSelf = true"),
-            "establishTunForEngine обязан использовать excludeSelf=true для всех движков.",
+        assertFalse(
+            body.contains("excludeSelf") || body.contains("addDisallowedApplication(packageName)"),
+            "self package нельзя исключать из VPN: app-originated HTTP/DNS должен оставаться в TUN.",
         )
     }
 

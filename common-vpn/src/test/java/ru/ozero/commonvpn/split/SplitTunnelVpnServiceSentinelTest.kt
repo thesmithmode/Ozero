@@ -2,6 +2,7 @@ package ru.ozero.commonvpn.split
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SplitTunnelVpnServiceSentinelTest {
@@ -94,14 +95,10 @@ class SplitTunnelVpnServiceSentinelTest {
     }
 
     @Test
-    fun `establishTunForEngine использует excludeSelf = true для всех движков`() {
-        assertTrue(
-            tunBlock.contains("excludeSelf = true"),
-            "excludeSelf обязан быть true для всех движков без исключений — " +
-                "без addDisallowedApplication Android не активирует per-app VPN mode " +
-                "и трафик самого приложения попадает в TUN, ломая инициализацию движков " +
-                "(особенно WARP AWG). Регрессия commit 5a8089dd: условный excludeSelf для WARP " +
-                "ради IP-probe сломал split tunnel ALL mode.",
+    fun `establishTunForEngine не исключает self package из TUN`() {
+        assertFalse(
+            tunBlock.contains("excludeSelf") || tunBlock.contains("addDisallowedApplication(packageName)"),
+            "self package нельзя добавлять в disallowed VPN applications: app-originated HTTP/DNS должен оставаться в TUN.",
         )
     }
 
@@ -119,22 +116,21 @@ class SplitTunnelVpnServiceSentinelTest {
     }
 
     @Test
-    fun `buildTunBuilder не имеет параметра engineId — excludeSelf всегда true`() {
+    fun `buildTunBuilder не имеет параметра engineId`() {
         val sig = helperSource.substringAfter("fun buildTunBuilder(")
             .substringBefore("): VpnService.Builder")
         assertTrue(
             !sig.contains("engineId"),
-            "buildTunBuilder не должен принимать engineId — вызывается только для не-TunFdAcceptor движков " +
-                "и killswitch TUN; excludeSelf = true там постоянен и не зависит от движка",
+            "buildTunBuilder не должен принимать engineId — вызывается только для не-TunFdAcceptor движков и killswitch TUN",
         )
     }
 
     @Test
-    fun `buildTunBuilder использует excludeSelf = true для не-WARP движков`() {
-        assertTrue(
-            buildTunBlock.contains("excludeSelf = true"),
-            "buildTunBuilder обязан использовать excludeSelf = true — не-TunFdAcceptor движки " +
-                "не вызывают protect() на outbound сокетах, иначе routing loop через TUN",
+    fun `buildTunBuilder не исключает self package для не-WARP движков`() {
+        assertFalse(
+            buildTunBlock.contains("excludeSelf") ||
+                buildTunBlock.contains("addDisallowedApplication(service.packageName)"),
+            "self package нельзя исключать из VPN: app-originated HTTP/DNS должен оставаться в TUN.",
         )
     }
 }

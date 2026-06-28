@@ -194,9 +194,8 @@ class EngineWarpContractTest {
         val route = e.ipProbeRoute(socksPort = 0)
         assertFalse(
             route is IpProbeRoute.Default,
-            "WARP обязан override'ить ipProbeRoute — Default → fetch() из main app → реальный IP " +
-                "устройства (с excludeSelf=true). Регрессия защиты: возврат к Default ввёл бы UX обман " +
-                "пользователю.",
+            "WARP обязан override'ить ipProbeRoute — Default fetch() из main app для socksPort=0 " +
+                "не подтверждает WARP location и вводит пользователя в заблуждение.",
         )
     }
 

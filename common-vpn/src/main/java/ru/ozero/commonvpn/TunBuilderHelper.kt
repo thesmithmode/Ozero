@@ -90,7 +90,7 @@ class TunBuilderHelper(private val service: VpnService) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching { builder.setMetered(false) }
         }
-        TunBuilderConfigurator(service.packageName).apply(builder, splitConfig, excludeSelf = true)
+        TunBuilderConfigurator(service.packageName).apply(builder, splitConfig)
         return builder
     }
 

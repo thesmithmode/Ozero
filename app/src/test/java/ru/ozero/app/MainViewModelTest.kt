@@ -496,10 +496,7 @@ class MainViewModelTest {
         val loaded = assertIs<IpInfoState.Loaded>(
             s,
             "WARP — ipProbeRoute=StaticLocation('Cloudflare WARP') → IpInfoState.Loaded без HTTP fetch. " +
-                "Архитектура: excludeSelf=true для всех движков (split tunnel ALL должен работать) → " +
-                "self-fetch бы вернул реальный IP устройства, поэтому WARP override'ит ipProbeRoute " +
-                "на StaticLocation вместо Default. Регрессия commit 5a8089dd: WARP полагался на " +
-                "excludeSelf=false для self-traffic через TUN → ломал per-app VPN mode.",
+                "Default self-fetch из main app не должен использоваться для WARP, где socksPort=0.",
         )
         assertEquals("Cloudflare WARP", loaded.info.country)
         assertEquals(0, ipInfoProvider.fetchCalls)

@@ -2,6 +2,7 @@ package ru.ozero.commonvpn
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -110,13 +111,16 @@ class TunBuilderHelperContractTest {
     }
 
     @Test
-    fun `buildTunBuilder вызывает TunBuilderConfigurator с excludeSelf=true и service packageName`() {
+    fun `buildTunBuilder вызывает TunBuilderConfigurator без self disallow`() {
         val body = source.substringAfter("fun buildTunBuilder(").substringBefore("private fun applyLockdown")
         assertTrue(
             body.contains("TunBuilderConfigurator(service.packageName)"),
-            "configurator обязан брать packageName из переданного VpnService — иначе self-исключение не сработает",
+            "configurator обязан брать packageName из переданного VpnService для allowlist self-traffic",
         )
-        assertTrue(body.contains("excludeSelf = true"), "excludeSelf=true для всех движков")
+        assertFalse(
+            body.contains("excludeSelf") || body.contains("addDisallowedApplication(service.packageName)"),
+            "self package нельзя добавлять в disallowed VPN applications: app-originated HTTP/DNS должен оставаться в TUN.",
+        )
     }
 
     @Test

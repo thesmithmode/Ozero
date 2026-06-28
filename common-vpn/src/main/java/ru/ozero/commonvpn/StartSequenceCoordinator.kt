@@ -387,7 +387,7 @@ class StartSequenceCoordinator(
         val plugin = deps.enginePlugins.firstOrNull { it.id == engineId } ?: return null
         val spec = plugin.tunSpec() ?: return null
         val builder = deps.tunBuilderHelper.applyEngineTunSpec(spec, ipv6Enabled)
-        TunBuilderConfigurator(packageName).apply(builder, splitConfig, excludeSelf = true)
+        TunBuilderConfigurator(packageName).apply(builder, splitConfig)
         PersistentLoggers.debug(
             TAG,
             "engineTUN params: engine=$engineId mode=${splitConfig.mode} " +

@@ -113,51 +113,6 @@ class TunBuilderConfiguratorTest {
     }
 
     @Test
-    fun allowlistExcludeSelfTrueSkipsSelf() {
-        val b = mockBuilder()
-        every { b.addAllowedApplication(any()) } returns b
-        configurator.apply(
-            b,
-            SplitTunnelConfig(
-                mode = SplitTunnelMode.ALLOWLIST,
-                allowlist = setOf("ru.ozero.app", "com.example.x"),
-            ),
-            excludeSelf = true,
-        )
-        verify(exactly = 0) { b.addAllowedApplication("ru.ozero.app") }
-        verify(exactly = 1) { b.addAllowedApplication("com.example.x") }
-    }
-
-    @Test
-    fun allModeExcludeSelfTrueAddsDisallowed() {
-        val b = mockBuilder()
-        every { b.addDisallowedApplication(any()) } returns b
-        configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.ALL), excludeSelf = true)
-        verify(exactly = 1) { b.addDisallowedApplication("ru.ozero.app") }
-    }
-
-    @Test
-    fun bypassLanExcludeSelfTrueAddsDisallowed() {
-        val b = mockBuilder()
-        every { b.addDisallowedApplication(any()) } returns b
-        configurator.apply(b, SplitTunnelConfig(mode = SplitTunnelMode.BYPASS_LAN), excludeSelf = true)
-        verify(exactly = 1) { b.addDisallowedApplication("ru.ozero.app") }
-    }
-
-    @Test
-    fun blocklistExcludeSelfTrueAddsSelfToDisallowed() {
-        val b = mockBuilder()
-        every { b.addDisallowedApplication(any()) } returns b
-        configurator.apply(
-            b,
-            SplitTunnelConfig(mode = SplitTunnelMode.BLOCKLIST, blocklist = setOf("com.bank.app")),
-            excludeSelf = true,
-        )
-        verify { b.addDisallowedApplication("ru.ozero.app") }
-        verify { b.addDisallowedApplication("com.bank.app") }
-    }
-
-    @Test
     fun gracefullyIgnoresPackageNotFound() {
         val b = mockBuilder()
         every {
