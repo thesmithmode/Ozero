@@ -139,6 +139,43 @@ class EngineWarpStartAttachTest {
     }
 
     @Test
+    fun `tunSpec rejects malformed tun values before builder sees them`() = runTest {
+        val invalid = sampleConfig.copy(
+            interfaceAddressV4 = "not-an-ip/99",
+            mtu = -1,
+            dnsServers = listOf("1.1.1.1"),
+        )
+        val engine = newEngine(
+            bridge = FakeBridge(),
+            reader = FixedReader(null),
+            scope = backgroundScope,
+            activeConfig = invalid,
+        )
+
+        val spec = engine.tunSpec()
+
+        assertEquals(null, spec)
+    }
+
+    @Test
+    fun `tunSpec drops malformed route cidrs`() = runTest {
+        val invalidRoutes = sampleConfig.copy(
+            allowedIps = listOf("0.0.0.0/33", "not-a-route/24", "172.16.0.0/12", "::/129"),
+        )
+        val engine = newEngine(
+            bridge = FakeBridge(),
+            reader = FixedReader(null),
+            scope = backgroundScope,
+            activeConfig = invalidRoutes,
+        )
+
+        val spec = engine.tunSpec()
+
+        assertEquals(false, spec?.routeAllV4)
+        assertEquals(listOf("172.16.0.0/12"), spec?.routeCidrsV4)
+    }
+
+    @Test
     fun `system resolver rewrites hostname endpoints before attach`() = runTest {
         val bridge = FakeBridge()
         val hostConfig = sampleConfig.copy(

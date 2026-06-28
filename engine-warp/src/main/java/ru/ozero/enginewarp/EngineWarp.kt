@@ -17,6 +17,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.net.Inet6Address
+import java.net.InetAddress
 import java.util.concurrent.atomic.AtomicReference
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
@@ -337,20 +339,26 @@ class EngineWarp(
                 resolvedIni = it.ini
             }?.config
             ?: return null
-        val v4Addr = cfg.interfaceAddressV4.substringBefore('/').takeIf { it.isNotBlank() }
+        val v4Addr = cfg.interfaceAddressV4.substringBefore('/').takeIf { it.isValidIpv4Address() }
             ?: return null
         val v4Prefix = cfg.interfaceAddressV4.substringAfter('/', missingDelimiterValue = "32")
-            .toIntOrNull() ?: 32
+            .toIntOrNull()?.takeIf { it in IPV4_PREFIX_RANGE } ?: return null
+        if (cfg.mtu <= 0) return null
         val ipv6Allowed = cfg.interfaceAddressV6.isNotBlank() && ipv6EnabledProvider()
         val v6Addr = if (ipv6Allowed) {
-            cfg.interfaceAddressV6.substringBefore('/').takeIf { it.isNotBlank() }
+            cfg.interfaceAddressV6.substringBefore('/').takeIf { it.isValidIpv6Address() }
+                ?: return null
         } else {
             WARP_IPV6_BLACKHOLE_ADDRESS
         }
-        val v6Prefix = cfg.interfaceAddressV6.substringAfter('/', missingDelimiterValue = "128")
-            .toIntOrNull() ?: 128
-        val allowedV4 = cfg.allowedIps.filter { it.isIpv4Cidr() }
-        val allowedV6 = cfg.allowedIps.filter { it.isIpv6Cidr() && ipv6Allowed }
+        val v6Prefix = if (ipv6Allowed) {
+            cfg.interfaceAddressV6.substringAfter('/', missingDelimiterValue = "128")
+                .toIntOrNull()?.takeIf { it in IPV6_PREFIX_RANGE } ?: return null
+        } else {
+            WARP_IPV6_BLACKHOLE_PREFIX
+        }
+        val allowedV4 = cfg.allowedIps.filter { it.isValidIpv4Cidr() }
+        val allowedV6 = cfg.allowedIps.filter { it.isValidIpv6Cidr() && ipv6Allowed }
         val routeAllV4 = allowedV4.any { it.isFullTunnelV4() }
         val routeAllV6 = v6Addr != null && (!ipv6Allowed || allowedV6.any { it.isFullTunnelV6() })
         return TunSpec(
@@ -648,9 +656,28 @@ class EngineWarp(
         return "$trimmed\n\n[Socks5]\nBindAddress = 127.0.0.1:$socksPort\n"
     }
 
-    private fun String.isIpv4Cidr(): Boolean = '/' in this && ':' !in this
+    private fun String.isValidIpv4Cidr(): Boolean {
+        val address = substringBefore('/')
+        val prefix = substringAfter('/', missingDelimiterValue = "").toIntOrNull()
+        return address.isValidIpv4Address() && prefix in IPV4_PREFIX_RANGE
+    }
 
-    private fun String.isIpv6Cidr(): Boolean = '/' in this && ':' in this
+    private fun String.isValidIpv6Cidr(): Boolean {
+        val address = substringBefore('/')
+        val prefix = substringAfter('/', missingDelimiterValue = "").toIntOrNull()
+        return address.isValidIpv6Address() && prefix in IPV6_PREFIX_RANGE
+    }
+
+    private fun String.isValidIpv4Address(): Boolean {
+        val parts = split('.')
+        return parts.size == 4 && parts.all { part ->
+            part.isNotEmpty() && part.all(Char::isDigit) && part.toIntOrNull() in 0..255
+        }
+    }
+
+    private fun String.isValidIpv6Address(): Boolean = runCatching {
+        InetAddress.getByName(this) is Inet6Address
+    }.getOrDefault(false)
 
     private fun String.isFullTunnelV4(): Boolean = trim() == "0.0.0.0/0"
 
@@ -671,6 +698,8 @@ class EngineWarp(
         const val BOOTSTRAP_DOH_URL = "https://1.1.1.1/dns-query"
         const val WARP_IPV6_BLACKHOLE_ADDRESS = "fd00::1"
         const val WARP_IPV6_BLACKHOLE_PREFIX = 128
+        private val IPV4_PREFIX_RANGE = 0..32
+        private val IPV6_PREFIX_RANGE = 0..128
         const val WARP_READY_TIMEOUT_MS = 30_000L
         const val WARP_PEER_WATCHDOG_TIMEOUT_MS = 30_000L
         const val WARP_READY_POLL_MS = 100L
