@@ -137,17 +137,13 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SingboxSettingsUiState())
 
     fun onGroupExpand(groupId: Long) {
-        if (_uiState.value.expandedGroupId == groupId) {
-            _uiState.update { it.copy(expandedGroupId = null) }
-            return
-        }
+        val isCollapsing = _uiState.value.expandedGroupId == groupId
+        _uiState.update { it.copy(expandedGroupId = if (isCollapsing) null else groupId) }
+        if (isCollapsing) return
         viewModelScope.launch {
             val profiles = profileDao.getByGroupIdLimited(groupId, MAX_VISIBLE_PROFILES)
             _uiState.update {
-                it.copy(
-                    expandedGroupId = groupId,
-                    groupProfiles = it.groupProfiles + (groupId to profiles),
-                )
+                it.copy(groupProfiles = it.groupProfiles + (groupId to profiles))
             }
             if (profiles.isEmpty()) {
                 refreshGroupInternal(groupId)
