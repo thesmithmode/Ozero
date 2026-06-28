@@ -134,14 +134,6 @@ internal object MasterDnsDockerScripts {
             " locked=1; sleep 10; done;" +
             " if [ \"\$locked\" = \"1\" ]; then echo ERR_DPKG_LOCKED; exit 0; fi; fi;" +
             " if [ \"\$docker_already\" = \"0\" ];" +
-            " then if command -v curl >/dev/null 2>&1;" +
-            " then curl -fsSL https://get.docker.com -o /tmp/get-docker.sh 2>/dev/null" +
-            " && sudo sh /tmp/get-docker.sh >/tmp/docker-install.log 2>&1;" +
-            " elif command -v wget >/dev/null 2>&1;" +
-            " then wget -qO /tmp/get-docker.sh https://get.docker.com 2>/dev/null" +
-            " && sudo sh /tmp/get-docker.sh >/tmp/docker-install.log 2>&1;" +
-            " else echo INSTALLER_NO_FETCH >/tmp/docker-install.log; fi;" +
-            " if ! command -v docker >/dev/null 2>&1;" +
             " then if which apt-get >/dev/null 2>&1;" +
             " then pm=apt-get; si='-yq install'; su='-yq update'; dp='docker.io';" +
             " elif which dnf >/dev/null 2>&1;" +
