@@ -2,7 +2,6 @@ package ru.ozero.commonvpn
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.PersistentLoggers
@@ -17,7 +16,7 @@ internal class OzeroVpnServiceStartCoordinator(
         deps.stopSignal.set(false)
         deps.runtimeConfigRestartCancelled.set(false)
         PersistentLoggers.info(TAG, "startVpn entry")
-        val externalVpnActive = deps.logActiveExternalVpn()
+        deps.logActiveExternalVpn()
         deps.closeStaleTun()
         deps.onKillswitchReleased()
         deps.loadTunnelLibrary()
@@ -35,13 +34,6 @@ internal class OzeroVpnServiceStartCoordinator(
                 if (deps.stopping.get()) {
                     PersistentLoggers.warn(TAG, "startVpn: stopping still active after shutdown join")
                     return@launch
-                }
-                if (externalVpnActive) {
-                    PersistentLoggers.warn(
-                        TAG,
-                        "external VPN was active, delaying ${deps.externalVpnReleaseDelayMs}ms before establish",
-                    )
-                    runCatching { delay(deps.externalVpnReleaseDelayMs) }
                 }
                 deps.startSequence()
             } finally {
@@ -62,7 +54,6 @@ internal class OzeroVpnServiceStartCoordinator(
         val runtimeConfigRestartCancelled: AtomicBoolean,
         val runtimeConfigRestartInProgress: AtomicBoolean,
         val shutdownJoinTimeoutMs: Long,
-        val externalVpnReleaseDelayMs: Long,
         val closeStaleTun: () -> Unit,
         val onKillswitchReleased: () -> Unit,
         val logActiveExternalVpn: () -> Boolean,
