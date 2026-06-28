@@ -542,7 +542,7 @@ private fun CheckIpRow() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { uriHandler.openUri("https://ur.io/ip") }
+            .clickable { runCatching { uriHandler.openUri("https://ur.io/ip") } }
             .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
