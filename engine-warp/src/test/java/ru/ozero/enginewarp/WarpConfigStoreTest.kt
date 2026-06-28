@@ -3,6 +3,7 @@ package ru.ozero.enginewarp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
@@ -101,6 +102,26 @@ class WarpConfigStoreTest {
         val store = DataStoreWarpConfigStore(ds)
         val read = assertNotNull(store.current().first())
         assertEquals(AwgParams(), read.awgParams)
+    }
+
+    @Test
+    fun `legacy invalid AWG Jmin Jmax falls back to defaults`() = runTest {
+        val ds = FakePreferencesDataStore()
+        ds.updateData {
+            mutablePreferencesOf(
+                stringPreferencesKey("warp_priv") to "p",
+                stringPreferencesKey("warp_peer_pub") to "pp",
+                stringPreferencesKey("warp_peer_endpoint") to "h:1",
+                stringPreferencesKey("warp_iface_v4") to "1.2.3.4/32",
+                stringPreferencesKey("warp_iface_v6") to "::1/128",
+                intPreferencesKey("awg_jmin") to 200,
+                intPreferencesKey("awg_jmax") to 100,
+            )
+        }
+        val store = DataStoreWarpConfigStore(ds)
+        val read = assertNotNull(store.current().first())
+        assertEquals(AwgParams.DEFAULT_JMIN, read.awgParams.junkPacketMinSize)
+        assertEquals(AwgParams.DEFAULT_JMAX, read.awgParams.junkPacketMaxSize)
     }
 
     @Test
