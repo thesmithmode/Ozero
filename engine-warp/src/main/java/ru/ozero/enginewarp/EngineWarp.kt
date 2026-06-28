@@ -617,12 +617,26 @@ class EngineWarp(
             conn.connectTimeout = DOH_CONNECT_TIMEOUT_MS
             conn.readTimeout = DOH_READ_TIMEOUT_MS
             if (conn.responseCode != 200) return@runCatching null
-            val body = conn.inputStream.bufferedReader().readText()
+            val contentLength = conn.contentLengthLong
+            if (contentLength > DOH_MAX_RESPONSE_BYTES) return@runCatching null
+            val body = conn.inputStream.bufferedReader().use { it.readBounded(DOH_MAX_RESPONSE_BYTES) }
+                ?: return@runCatching null
             Regex("\"data\"\\s*:\\s*\"([0-9]{1,3}(?:\\.[0-9]{1,3}){3})\"").find(body)?.groupValues?.get(1)
         } finally {
             conn.disconnect()
         }
     }.getOrNull()
+
+    private fun java.io.Reader.readBounded(maxChars: Int): String? {
+        val out = StringBuilder()
+        val buffer = CharArray(1024)
+        while (true) {
+            val read = read(buffer)
+            if (read < 0) return out.toString()
+            if (out.length + read > maxChars) return null
+            out.append(buffer, 0, read)
+        }
+    }
 
     private fun applyEndpointToRawIni(rawIni: String, resolvedEndpoint: String): String =
         rawIni.lineSequence().joinToString("\n") { line ->
@@ -668,6 +682,7 @@ class EngineWarp(
         const val TUNNEL_NAME = "ozero-warp"
         const val DOH_CONNECT_TIMEOUT_MS = 3_000
         const val DOH_READ_TIMEOUT_MS = 3_000
+        const val DOH_MAX_RESPONSE_BYTES = 65_536
         const val BOOTSTRAP_DOH_URL = "https://1.1.1.1/dns-query"
         const val WARP_IPV6_BLACKHOLE_ADDRESS = "fd00::1"
         const val WARP_IPV6_BLACKHOLE_PREFIX = 128
