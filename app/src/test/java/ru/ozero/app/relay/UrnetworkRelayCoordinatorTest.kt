@@ -239,11 +239,11 @@ class UrnetworkRelayCoordinatorTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        advanceTimeBy(35_000L)
+        advanceTimeBy(125_000L)
         runCurrent()
 
         assertEquals(0, bridge.connectBestAvailableCalls)
-        assertEquals(3, bridge.startCalls, "retry 3 attempts")
+        assertEquals(4, bridge.startCalls, "retry after each configured backoff")
     }
 
     @Test
@@ -293,7 +293,7 @@ class UrnetworkRelayCoordinatorTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        advanceTimeBy(35_000L)
+        advanceTimeBy(125_000L)
         runCurrent()
 
         assertEquals(0, bridge.attachRelayTunCalls)
