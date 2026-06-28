@@ -117,6 +117,7 @@ class StartSequenceCoordinator(
         }
         picks.forEachIndexed { index, pick ->
             val isLast = index == picks.lastIndex
+            val preserveTunOnFailure = shouldPreserveTunOnAutoRetry(manualEngine, isLast, trafficMode, killswitch)
             val success = startSingleEngineCandidate(
                 activeEngineId = pick.first,
                 activeConfig = pick.second,
@@ -124,9 +125,10 @@ class StartSequenceCoordinator(
                 splitConfig = splitConfig,
                 trafficMode = trafficMode,
                 notifyFailure = manualEngine != null || isLast,
+                preserveTunOnFailure = preserveTunOnFailure,
             )
             if (success || state.stopping.get()) return
-            if (!isLast) resetAfterAutoCandidateFailure(pick.first)
+            if (!isLast) resetAfterAutoCandidateFailure(pick.first, preserveTunOnFailure)
         }
     }
 
@@ -137,6 +139,7 @@ class StartSequenceCoordinator(
         splitConfig: SplitTunnelConfig,
         trafficMode: TrafficMode,
         notifyFailure: Boolean,
+        preserveTunOnFailure: Boolean,
     ): Boolean {
         deps.tunnelController.onProbing(activeEngineId)
         if (state.stopping.get()) return false
@@ -156,7 +159,17 @@ class StartSequenceCoordinator(
         ) ?: return false
         val fd = established.first
         val chainResult = established.second
-        if (!routeTrafficForEngine(activeEngineId, fd, chainResult.finalSocksPort, notifyFailure)) return false
+        if (
+            !routeTrafficForEngine(
+                activeEngineId,
+                fd,
+                chainResult.finalSocksPort,
+                notifyFailure,
+                preserveTunOnFailure,
+            )
+        ) {
+            return false
+        }
 
         if (!awaitEngineReady(activeEngineId)) {
             runCatching { deps.chainOrchestrator.stop() }
@@ -326,6 +339,13 @@ class StartSequenceCoordinator(
         ?: settings?.engineAutoPriority?.firstOrNull()
         ?: deps.enginePlugins.firstOrNull()?.id
 
+    private fun shouldPreserveTunOnAutoRetry(
+        manualEngine: EngineId?,
+        isLast: Boolean,
+        trafficMode: TrafficMode,
+        killswitch: Boolean,
+    ): Boolean = manualEngine == null && !isLast && trafficMode == TrafficMode.TUN && killswitch
+
     private fun autoCandidates(settings: SettingsModel?, trafficMode: TrafficMode): List<Pair<EngineId, EngineConfig>> {
         val priority = settings?.engineAutoPriority ?: SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
         return priority.mapNotNull { id ->
@@ -415,8 +435,9 @@ class StartSequenceCoordinator(
             stopVpnRequest()
             return null
         }
-        state.tunFdRef.set(pfd)
+        val previousFd = state.tunFdRef.getAndSet(pfd)
         captureTunIfaceName(before)
+        runCatching { previousFd?.close() }
         val iface = state.tunIfaceNameRef.get()
         Log.i(TAG, "engine TUN established fd=${pfd.fd} engineId=$engineId mtu=${spec.mtu} iface=$iface")
         return pfd
@@ -456,8 +477,9 @@ class StartSequenceCoordinator(
             stopVpnRequest()
             return null
         }
-        state.tunFdRef.set(fd)
+        val previousFd = state.tunFdRef.getAndSet(fd)
         captureTunIfaceName(before)
+        runCatching { previousFd?.close() }
         Log.i(TAG, "TUN established fd=${fd.fd} iface=${state.tunIfaceNameRef.get()}")
         return fd
     }
@@ -491,6 +513,7 @@ class StartSequenceCoordinator(
         fd: ParcelFileDescriptor,
         socksPort: Int,
         notifyFailure: Boolean = true,
+        preserveTunOnFailure: Boolean = false,
     ): Boolean {
         val engine = deps.enginePlugins.firstOrNull { it.id == engineId }
         if (engine is TunFdAcceptor) {
@@ -499,8 +522,8 @@ class StartSequenceCoordinator(
                 engine.attachTun(rawDupFd)
             } catch (t: Throwable) {
                 runCatching { ParcelFileDescriptor.adoptFd(rawDupFd).close() }
-                runCatching { state.tunFdRef.getAndSet(null)?.close() }
-                PersistentLoggers.error(TAG, "attachTun threw, fd closed: ${t.message}")
+                if (!preserveTunOnFailure) runCatching { state.tunFdRef.getAndSet(null)?.close() }
+                PersistentLoggers.error(TAG, "attachTun threw: ${t.message}")
                 runCatching { deps.chainOrchestrator.stop() }
                 reportEngineFailure(engineId, "attachTun threw: ${t.message}", notifyFailure)
                 return false
@@ -509,7 +532,7 @@ class StartSequenceCoordinator(
                 TunAttachResult.Success -> true
                 is TunAttachResult.Failure -> {
                     runCatching { ParcelFileDescriptor.adoptFd(rawDupFd).close() }
-                    runCatching { state.tunFdRef.getAndSet(null)?.close() }
+                    if (!preserveTunOnFailure) runCatching { state.tunFdRef.getAndSet(null)?.close() }
                     PersistentLoggers.error(TAG, "attachTun failed: ${result.reason}")
                     runCatching { deps.chainOrchestrator.stop() }
                     reportEngineFailure(engineId, "attachTun: ${result.reason}", notifyFailure)
@@ -557,9 +580,12 @@ class StartSequenceCoordinator(
         }
     }
 
-    private suspend fun resetAfterAutoCandidateFailure(engineId: EngineId) {
+    private suspend fun resetAfterAutoCandidateFailure(
+        engineId: EngineId,
+        preserveTunOnFailure: Boolean,
+    ) {
         PersistentLoggers.warn(TAG, "auto-mode: retry next candidate after $engineId failure")
-        runCatching { state.tunFdRef.getAndSet(null)?.close() }
+        if (!preserveTunOnFailure) runCatching { state.tunFdRef.getAndSet(null)?.close() }
         runCatching { deps.chainOrchestrator.stop() }
         deps.tunnelController.onDisconnecting()
         deps.tunnelController.reset()
