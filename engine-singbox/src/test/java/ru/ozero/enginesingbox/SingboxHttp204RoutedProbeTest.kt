@@ -34,10 +34,9 @@ class SingboxHttp204RoutedProbeTest {
     }
 
     @Test
-    fun `default routed probe tries plain http before https endpoints`() {
-        assertTrue(SingboxHttp204RoutedProbe.PROBE_URL.startsWith("http://"))
-        assertTrue(SingboxHttp204RoutedProbe.FALLBACK_PROBE_URLS.first().startsWith("http://"))
-        assertTrue(SingboxHttp204RoutedProbe.FALLBACK_PROBE_URLS.any { it.startsWith("https://") })
+    fun `default routed probe uses only https endpoints`() {
+        assertTrue(SingboxHttp204RoutedProbe.PROBE_URL.startsWith("https://"))
+        assertTrue(SingboxHttp204RoutedProbe.FALLBACK_PROBE_URLS.all { it.startsWith("https://") })
     }
 
     @Test
