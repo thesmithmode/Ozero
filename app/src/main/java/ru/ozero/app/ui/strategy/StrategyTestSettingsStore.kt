@@ -11,20 +11,24 @@ class SharedPrefsStrategyTestSettingsStore(context: Context) : StrategyTestSetti
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    override fun load(): StrategyTestSettings = StrategyTestSettings(
-        requestsPerDomain = prefs.getInt(KEY_REQUESTS_PER_DOMAIN, 1),
-        concurrentLimit = prefs.getInt(KEY_CONCURRENT_LIMIT, 20),
-        timeoutSeconds = prefs.getInt(KEY_TIMEOUT_SECONDS, 5),
-        delayBetweenMs = prefs.getLong(KEY_DELAY_BETWEEN_MS, 500L),
-        useCustomStrategies = prefs.getBoolean(KEY_USE_CUSTOM, false),
-        customStrategies = (prefs.getString(KEY_CUSTOM_STRATEGIES, "") ?: "").take(MAX_CUSTOM_STRATEGIES_LEN),
-        evolutionMode = prefs.getBoolean(KEY_EVOLUTION_MODE, true),
-        evolutionPopulationSize = prefs.getInt(KEY_EVOLUTION_POPULATION_SIZE, 25),
-        evolutionMaxGenerations = prefs.getInt(KEY_EVOLUTION_MAX_GENERATIONS, 10),
-        evolutionMutationRate = prefs.getFloat(KEY_EVOLUTION_MUTATION_RATE, 0.2f),
-        evolutionEliteCount = prefs.getInt(KEY_EVOLUTION_ELITE_COUNT, 5),
-        evolutionTargetFitness = prefs.getFloat(KEY_EVOLUTION_TARGET_FITNESS, 0.85f),
-    )
+    override fun load(): StrategyTestSettings {
+        val defaults = StrategyTestSettings()
+        return StrategyTestSettings(
+            requestsPerDomain = prefs.getInt(KEY_REQUESTS_PER_DOMAIN, defaults.requestsPerDomain),
+            concurrentLimit = prefs.getInt(KEY_CONCURRENT_LIMIT, defaults.concurrentLimit),
+            timeoutSeconds = prefs.getInt(KEY_TIMEOUT_SECONDS, defaults.timeoutSeconds),
+            delayBetweenMs = prefs.getLong(KEY_DELAY_BETWEEN_MS, defaults.delayBetweenMs),
+            useCustomStrategies = prefs.getBoolean(KEY_USE_CUSTOM, defaults.useCustomStrategies),
+            customStrategies = (prefs.getString(KEY_CUSTOM_STRATEGIES, defaults.customStrategies) ?: defaults.customStrategies)
+                .take(MAX_CUSTOM_STRATEGIES_LEN),
+            evolutionMode = prefs.getBoolean(KEY_EVOLUTION_MODE, defaults.evolutionMode),
+            evolutionPopulationSize = prefs.getInt(KEY_EVOLUTION_POPULATION_SIZE, defaults.evolutionPopulationSize),
+            evolutionMaxGenerations = prefs.getInt(KEY_EVOLUTION_MAX_GENERATIONS, defaults.evolutionMaxGenerations),
+            evolutionMutationRate = prefs.getFloat(KEY_EVOLUTION_MUTATION_RATE, defaults.evolutionMutationRate),
+            evolutionEliteCount = prefs.getInt(KEY_EVOLUTION_ELITE_COUNT, defaults.evolutionEliteCount),
+            evolutionTargetFitness = prefs.getFloat(KEY_EVOLUTION_TARGET_FITNESS, defaults.evolutionTargetFitness),
+        )
+    }
 
     override fun save(settings: StrategyTestSettings) {
         prefs.edit()
