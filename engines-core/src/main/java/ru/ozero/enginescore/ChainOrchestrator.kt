@@ -16,6 +16,8 @@ class ChainOrchestrator(
 
         var upstream: Upstream = Upstream.None
         var lastSocksPort = 0
+        var lastSocksUsername: String? = null
+        var lastSocksPassword: String? = null
 
         steps.forEachIndexed { idx, step ->
             val plugin = engines.firstOrNull { it.id == step.engineId }
@@ -65,12 +67,23 @@ class ChainOrchestrator(
                         )
                     }
                     lastSocksPort = r.socksPort
-                    upstream = Upstream.Socks5(host = LOOPBACK, port = r.socksPort)
+                    lastSocksUsername = r.socksUsername
+                    lastSocksPassword = r.socksPassword
+                    upstream = Upstream.Socks5(
+                        host = LOOPBACK,
+                        port = r.socksPort,
+                        username = r.socksUsername,
+                        password = r.socksPassword,
+                    )
                     PersistentLoggers.info(TAG, "step[$idx] ${step.engineId} success socksPort=${r.socksPort}")
                 }
             }
         }
-        ChainResult.Success(finalSocksPort = lastSocksPort)
+        ChainResult.Success(
+            finalSocksPort = lastSocksPort,
+            finalSocksUsername = lastSocksUsername,
+            finalSocksPassword = lastSocksPassword,
+        )
     }
 
     suspend fun stop() = mutex.withLock {

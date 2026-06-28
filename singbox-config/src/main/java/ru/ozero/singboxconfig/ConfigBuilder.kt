@@ -64,17 +64,19 @@ object ConfigBuilder {
         bean: AbstractBean,
         socksPort: Int,
         upstream: Upstream? = null,
+        inboundAuth: SocksAuth? = null,
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
         val outbound = beanOutbound(bean, "proxy", detour = upstream?.let { "upstream" })
-        return buildChainFullConfig(socksPort, listOf(outbound), upstream, dnsServers, ipv6Enabled)
+        return buildChainFullConfig(socksPort, listOf(outbound), upstream, dnsServers, ipv6Enabled, inboundAuth)
     }
 
     fun buildAutoChainConfig(
         beans: List<AbstractBean>,
         socksPort: Int,
         upstream: Upstream? = null,
+        inboundAuth: SocksAuth? = null,
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
@@ -92,18 +94,26 @@ object ConfigBuilder {
             append(""""interval":"3m","tolerance":50,""")
             append(""""interrupt_exist_connections":true,"idle_timeout":"30m"}""")
         }
-        return buildChainFullConfig(socksPort, listOf(urltest) + proxyOutbounds, upstream, dnsServers, ipv6Enabled)
+        return buildChainFullConfig(
+            socksPort,
+            listOf(urltest) + proxyOutbounds,
+            upstream,
+            dnsServers,
+            ipv6Enabled,
+            inboundAuth,
+        )
     }
 
     fun buildWireGuardChainConfig(
         wg: WireGuardOutboundConfig,
         socksPort: Int,
         upstream: Upstream? = null,
+        inboundAuth: SocksAuth? = null,
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
         val outbound = wireGuardOutbound(wg, "proxy", detour = upstream?.let { "upstream" })
-        return buildChainFullConfig(socksPort, listOf(outbound), upstream, dnsServers, ipv6Enabled)
+        return buildChainFullConfig(socksPort, listOf(outbound), upstream, dnsServers, ipv6Enabled, inboundAuth)
     }
 
     fun buildProfileChainConfig(
@@ -121,6 +131,7 @@ object ConfigBuilder {
         selected: AbstractBean,
         wrappers: List<AbstractBean>,
         socksPort: Int,
+        inboundAuth: SocksAuth? = null,
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
@@ -131,10 +142,18 @@ object ConfigBuilder {
             upstream = null,
             dnsServers = dnsServers,
             ipv6Enabled = ipv6Enabled,
+            inboundAuth = inboundAuth,
         )
     }
 
-    data class Upstream(val host: String, val port: Int)
+    data class Upstream(
+        val host: String,
+        val port: Int,
+        val username: String? = null,
+        val password: String? = null,
+    )
+
+    data class SocksAuth(val username: String, val password: String)
 
     private fun profileChainOutbounds(
         selected: AbstractBean,
@@ -199,12 +218,13 @@ object ConfigBuilder {
         upstream: Upstream?,
         dnsServers: List<String>,
         ipv6Enabled: Boolean,
+        inboundAuth: SocksAuth? = null,
     ): String {
         val sb = StringBuilder()
         sb.append('{')
         sb.append(""""log":{"level":"warn","timestamp":true},""")
         sb.append(""""inbounds":[""")
-        sb.append(socksInbound(socksPort))
+        sb.append(socksInbound(socksPort, inboundAuth))
         sb.append("""],""")
         sb.append(""""outbounds":[""")
         proxyOutbounds.forEachIndexed { i, outbound ->
@@ -213,7 +233,7 @@ object ConfigBuilder {
         }
         if (upstream != null) {
             sb.append(',')
-            sb.append(socksOutbound("upstream", upstream.host, upstream.port))
+            sb.append(socksOutbound("upstream", upstream.host, upstream.port, upstream.username, upstream.password))
         }
         sb.append(""",{"type":"direct","tag":"direct"}""")
         sb.append(""",{"type":"block","tag":"block"}""")
@@ -321,14 +341,31 @@ object ConfigBuilder {
         return sb.toString()
     }
 
-    private fun socksInbound(port: Int): String = buildString {
+    private fun socksInbound(port: Int, auth: SocksAuth? = null): String = buildString {
         append("""{"type":"socks","tag":"socks-in",""")
-        append(""""listen":"127.0.0.1","listen_port":$port}""")
+        append(""""listen":"127.0.0.1","listen_port":$port""")
+        if (auth != null) {
+            append(""","users":[{""")
+            append(""""username":${jsonString(auth.username)},""")
+            append(""""password":${jsonString(auth.password)}}]""")
+        }
+        append('}')
     }
 
-    private fun socksOutbound(tag: String, host: String, port: Int): String = buildString {
+    private fun socksOutbound(
+        tag: String,
+        host: String,
+        port: Int,
+        username: String? = null,
+        password: String? = null,
+    ): String = buildString {
         append("""{"type":"socks","tag":${jsonString(tag)},""")
-        append(""""server":${jsonString(host)},"server_port":$port}""")
+        append(""""server":${jsonString(host)},"server_port":$port""")
+        if (username != null && password != null) {
+            append(""","username":${jsonString(username)},""")
+            append(""""password":${jsonString(password)}""")
+        }
+        append('}')
     }
 
     private fun wireGuardOutbound(wg: WireGuardOutboundConfig, tag: String, detour: String? = null): String =

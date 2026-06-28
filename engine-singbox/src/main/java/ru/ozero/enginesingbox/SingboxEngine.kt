@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import java.net.ServerSocket
+import java.security.SecureRandom
 import kotlinx.coroutines.runBlocking
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
@@ -265,7 +267,12 @@ class SingboxEngine @Inject constructor(
     }
 
     private suspend fun startChainMode(config: EngineConfig.Singbox, upstream: Upstream.Socks5): StartResult {
-        val configUpstream = ConfigBuilder.Upstream(upstream.host, upstream.port)
+        val configUpstream = ConfigBuilder.Upstream(
+            host = upstream.host,
+            port = upstream.port,
+            username = upstream.username,
+            password = upstream.password,
+        )
         return startProxyMode(config, configUpstream)
     }
 
@@ -280,6 +287,7 @@ class SingboxEngine @Inject constructor(
         pendingSocksPort = 0
         pendingConfig = null
         val port = allocateChainPort()
+        val inboundAuth = chainSocksAuth()
         val json = if (config.autoSelectBeanBlobs.isNotEmpty()) {
             val beans = supportedBeans(config.autoSelectBeanBlobs.take(MAX_AUTO_SELECT_OUTBOUNDS))
             if (beans.isEmpty()) return StartResult.Failure("chain auto-select: no valid beans")
@@ -288,6 +296,7 @@ class SingboxEngine @Inject constructor(
                     beans,
                     port,
                     upstream,
+                    inboundAuth,
                     config.dnsServers,
                     config.ipv6Enabled,
                 )
@@ -300,6 +309,7 @@ class SingboxEngine @Inject constructor(
                     wgConfig,
                     port,
                     upstream,
+                    inboundAuth,
                     config.dnsServers,
                     config.ipv6Enabled,
                 )
@@ -316,6 +326,7 @@ class SingboxEngine @Inject constructor(
                         fallbackBeans,
                         port,
                         upstream,
+                        inboundAuth,
                         config.dnsServers,
                         config.ipv6Enabled,
                     )
@@ -329,6 +340,7 @@ class SingboxEngine @Inject constructor(
                             bean,
                             wrappers,
                             port,
+                            inboundAuth,
                             config.dnsServers,
                             config.ipv6Enabled,
                         )
@@ -337,6 +349,7 @@ class SingboxEngine @Inject constructor(
                             bean,
                             port,
                             upstream,
+                            inboundAuth,
                             config.dnsServers,
                             config.ipv6Enabled,
                         )
@@ -373,7 +386,11 @@ class SingboxEngine @Inject constructor(
             }
             activeSocksPort = port
             PersistentLoggers.info(TAG, "startProxyMode sent over AIDL port=$port")
-            StartResult.Success(socksPort = port)
+            StartResult.Success(
+                socksPort = port,
+                socksUsername = inboundAuth.username,
+                socksPassword = inboundAuth.password,
+            )
         }.getOrElse {
             activeSocksPort = 0
             if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)
@@ -794,9 +811,17 @@ class SingboxEngine @Inject constructor(
         deathRecipient = null
     }
 
-    private fun allocateChainPort(): Int {
-        val offset = chainPortCounter.getAndIncrement() % CHAIN_PORT_RANGE
-        return CHAIN_PORT_BASE + offset
+    private fun allocateChainPort(): Int = ServerSocket(0).use { it.localPort }
+
+    private fun chainSocksAuth(): ConfigBuilder.SocksAuth = ConfigBuilder.SocksAuth(
+        username = randomToken(),
+        password = randomToken(),
+    )
+
+    private fun randomToken(): String {
+        val bytes = ByteArray(SOCKS_AUTH_BYTES)
+        secureRandom.nextBytes(bytes)
+        return bytes.joinToString("") { TOKEN_ALPHABET[(it.toInt() and 0xFF) shr TOKEN_ALPHABET_SHIFT].toString() }
     }
 
     companion object {
@@ -809,9 +834,10 @@ class SingboxEngine @Inject constructor(
         private const val READY_PROBE_RETRY_MS = 500L
         private const val MAX_AUTO_SELECT_OUTBOUNDS = 50
         private const val MAX_AUTO_PROFILE_SCAN = 2_000
-        private const val CHAIN_PORT_BASE = 49408
-        private const val CHAIN_PORT_RANGE = 256
-        private val chainPortCounter = java.util.concurrent.atomic.AtomicInteger(0)
+        private const val SOCKS_AUTH_BYTES = 24
+        private const val TOKEN_ALPHABET_SHIFT = 2
+        private const val TOKEN_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        private val secureRandom = SecureRandom()
         private val BEAN_KEY = byteArrayPreferencesKey("singbox_vless_bean")
         private val SELECTED_PROFILE_KEY = longPreferencesKey("singbox_selected_profile_id")
         val SINGBOX_DNS_SERVERS_KEY = stringSetPreferencesKey("singbox_dns_servers")

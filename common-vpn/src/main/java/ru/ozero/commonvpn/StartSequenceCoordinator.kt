@@ -156,7 +156,18 @@ class StartSequenceCoordinator(
         ) ?: return false
         val fd = established.first
         val chainResult = established.second
-        if (!routeTrafficForEngine(activeEngineId, fd, chainResult.finalSocksPort, notifyFailure)) return false
+        if (
+            !routeTrafficForEngine(
+                activeEngineId,
+                fd,
+                chainResult.finalSocksPort,
+                chainResult.finalSocksUsername,
+                chainResult.finalSocksPassword,
+                notifyFailure,
+            )
+        ) {
+            return false
+        }
 
         if (!awaitEngineReady(activeEngineId)) {
             runCatching { deps.chainOrchestrator.stop() }
@@ -498,6 +509,8 @@ class StartSequenceCoordinator(
         engineId: EngineId,
         fd: ParcelFileDescriptor,
         socksPort: Int,
+        socksUsername: String? = null,
+        socksPassword: String? = null,
         notifyFailure: Boolean = true,
     ): Boolean {
         val engine = deps.enginePlugins.firstOrNull { it.id == engineId }
@@ -525,18 +538,26 @@ class StartSequenceCoordinator(
                 }
             }
         }
-        return startNativeTunnel(engineId, fd, socksPort, notifyFailure)
+        return startNativeTunnel(engineId, fd, socksPort, socksUsername, socksPassword, notifyFailure)
     }
 
     private suspend fun startNativeTunnel(
         engineId: EngineId,
         fd: ParcelFileDescriptor,
         socksPort: Int,
+        socksUsername: String? = null,
+        socksPassword: String? = null,
         notifyFailure: Boolean = true,
     ): Boolean {
         val code = try {
             deps.tunnelGateway.start(
-                HevTunnelConfig(tunPfd = fd, socksAddress = "127.0.0.1", socksPort = socksPort),
+                HevTunnelConfig(
+                    tunPfd = fd,
+                    socksAddress = "127.0.0.1",
+                    socksPort = socksPort,
+                    socksUsername = socksUsername,
+                    socksPassword = socksPassword,
+                ),
             )
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "tunnelGateway.start threw: ${t.message}")
