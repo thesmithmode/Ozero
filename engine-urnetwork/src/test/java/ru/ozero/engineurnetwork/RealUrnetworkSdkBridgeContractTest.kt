@@ -481,6 +481,20 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
+    fun `stopUnderLock финально сбрасывает running после cleanup`() {
+        val stopUnderLockBlock = source.substringAfter("private suspend fun stopUnderLock()")
+            .substringBefore("private fun closeDevice")
+        val cleanupIdx = stopUnderLockBlock.indexOf("withTimeoutOrNull(STOP_TIMEOUT_MS)")
+        val finallyIdx = stopUnderLockBlock.indexOf("finally")
+        val runningSetFalseIdx = stopUnderLockBlock.lastIndexOf("running.set(false)")
+        assertTrue(
+            cleanupIdx >= 0 && finallyIdx > cleanupIdx && runningSetFalseIdx > finallyIdx,
+            "stopUnderLock обязан финально сбрасывать running=false после cleanup под lifecycleMutex — " +
+                "иначе late running=true из non-cancellable start переживает очистку refs.",
+        )
+    }
+
+    @Test
     fun `все JNI-методы гейтятся через running get() — SIGABRT guard на UI poll vs teardown race`() {
         val gatedMethods = listOf(
             "connectTo", "connectBestAvailable",
