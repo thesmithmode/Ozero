@@ -62,6 +62,46 @@ class VpnServiceLifecycleContractTest {
     }
 
     @Test
+    fun `performShutdown cancels start job before engine stop pass`() {
+        val coordinator = File(
+            File(System.getProperty("user.dir") ?: "."),
+            "src/main/java/ru/ozero/commonvpn/ShutdownCoordinator.kt",
+        ).readText()
+        val performShutdownBody = coordinator.substringAfter("suspend fun performShutdown")
+            .substringBefore("    private fun recordSessionEnd")
+        val cancelIdx = performShutdownBody.indexOf("cancelStartBeforeStopPass()")
+        val stopIdx = performShutdownBody.indexOf("chainOrchestrator.stop()")
+        assertTrue(
+            cancelIdx > 0 && stopIdx > 0 && cancelIdx < stopIdx,
+            "performShutdown обязан cancel/join startJobRef до chainOrchestrator.stop, иначе attachTun " +
+                "может завершиться после единственного stop pass.",
+        )
+        assertTrue(
+            coordinator.contains("state.startJobRef.getAndSet(null)") &&
+                coordinator.contains("cancelAndJoin"),
+            "shutdown path должен забирать startJobRef и ждать отмену старта до stop pass.",
+        )
+    }
+
+    @Test
+    fun `attachTun success during stopping rolls back custom tun engine`() {
+        val coordinator = File(
+            File(System.getProperty("user.dir") ?: "."),
+            "src/main/java/ru/ozero/commonvpn/StartSequenceCoordinator.kt",
+        ).readText()
+        val successBody = coordinator.substringAfter("TunAttachResult.Success ->")
+            .substringBefore("is TunAttachResult.Failure")
+        assertTrue(
+            successBody.contains("state.stopping.get()") &&
+                successBody.contains("deps.chainOrchestrator.stop()") &&
+                successBody.contains("state.tunFdRef.getAndSet(null)?.close()") &&
+                successBody.contains("false"),
+            "attachTun Success обязан проверять stopping и откатывать custom TUN engine, " +
+                "если shutdown начался во время attachTun.",
+        )
+    }
+
+    @Test
     fun `logActiveExternalVpn пропускает собственный VPN через ownerUid guard — no self-false-positive`() {
         assertTrue(
             source.contains("isOwnVpnNetwork(caps, myUid)") && source.contains("caps.ownerUid"),
