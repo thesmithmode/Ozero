@@ -111,6 +111,7 @@ class OzeroVpnService : android.net.VpnService() {
             enginePlugins = enginePlugins,
             tunnelController = tunnelController,
             chainOrchestrator = chainOrchestrator,
+            tunnelGateway = tunnelGateway,
             notificationFactory = notificationFactory,
             tunFdRef = tunFdRef,
             lockdownStartupFdRef = lockdownStartupFdRef,

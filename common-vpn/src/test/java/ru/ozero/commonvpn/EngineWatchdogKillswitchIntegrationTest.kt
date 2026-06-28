@@ -42,6 +42,7 @@ class EngineWatchdogKillswitchIntegrationTest {
             enginePlugins = emptySet(),
             tunnelController = controller,
             chainOrchestrator = chainOrchestrator,
+            tunnelGateway = mockk(relaxed = true),
             notificationFactory = notificationFactory,
             tunFdRef = tunFdRef,
             lockdownStartupFdRef = AtomicReference(lockdownStartupFd),
