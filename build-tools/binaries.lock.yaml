@@ -203,3 +203,13 @@ artifacts:
     size_bytes: 340928
     source_repo: https://github.com/hufrea/byedpi
     source_commit: ba532298de7b28cfe854aea83d061369d13ca290
+  - name: libfptn_native_lib-arm64-v8a.so
+    engine: fptn
+    abi: arm64-v8a
+    destination: jniLibs
+    target_filename: libfptn_native_lib.so
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/fptn-322fa498/libfptn_native_lib-arm64-v8a.so
+    sha256: 0d1ea7fc3d5c39e0cd6edf0af70f2ac3d25e2c9a05e089283d71f57feb17e389
+    size_bytes: 18737384
+    source_repo: https://github.com/fptn-project/FptnClient-Android.git
+    source_commit: d2ca1ff2cd3090d0b191ba320d1bca4a03452dea

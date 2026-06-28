@@ -65,6 +65,11 @@ ENGINE_CONFIGS = {
         "destination": "jniLibs",
         "target_filename": "libmtg.so",
     },
+    "fptn": {
+        "filename_re": re.compile(r"^libfptn_native_lib-(?P<abi>[a-z0-9_-]+)\.so$"),
+        "destination": "jniLibs",
+        "target_filename": "libfptn_native_lib.so",
+    },
 }
 
 
