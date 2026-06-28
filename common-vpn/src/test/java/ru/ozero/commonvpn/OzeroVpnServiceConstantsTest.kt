@@ -35,19 +35,8 @@ class OzeroVpnServiceConstantsTest {
     }
 
     @Test
-    fun tunDnsServersAllReachableNonLoopback() {
-        val servers = OzeroVpnService.TUN_DNS_SERVERS
-        assert(servers.isNotEmpty()) { "TUN_DNS_SERVERS must contain at least one DNS" }
-        for (s in servers) {
-            val addr = java.net.InetAddress.getByName(s)
-            assert(!addr.isLoopbackAddress()) { "DNS '$s' must not be a loopback address" }
-            assert(!addr.isAnyLocalAddress()) { "DNS '$s' must not be 0.0.0.0/::" }
-        }
-    }
-
-    @Test
-    fun tunDnsServersAreFromPublicDnsServers() {
-        assertEquals(ru.ozero.commondns.PublicDnsServers.IPV4, OzeroVpnService.TUN_DNS_SERVERS)
+    fun tunDnsServersUsePrivateTunResolver() {
+        assertEquals(listOf("100.64.0.1"), OzeroVpnService.TUN_DNS_SERVERS)
     }
 
     @Test

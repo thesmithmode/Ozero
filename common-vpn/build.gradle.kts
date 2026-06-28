@@ -16,7 +16,6 @@ android {
 
 dependencies {
     implementation(project(":engines-core"))
-    implementation(project(":common-dns"))
     implementation(libs.bundles.coroutines)
 
     implementation(libs.hilt.android)
