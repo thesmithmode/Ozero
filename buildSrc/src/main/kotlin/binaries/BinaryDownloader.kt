@@ -26,6 +26,13 @@ class BinaryDownloader(
         Sha256Verifier.withFileLock(cacheDir.resolve("$expectedSha256.lock")) {
             if (!Files.exists(cached)) {
                 fetchToCache(url, cached, expectedSha256)
+            } else {
+                try {
+                    Sha256Verifier.verify(cached, expectedSha256)
+                } catch (_: IntegrityException) {
+                    Files.deleteIfExists(cached)
+                    fetchToCache(url, cached, expectedSha256)
+                }
             }
             Files.createDirectories(finalDst.parent)
             Files.copy(cached, finalDst, StandardCopyOption.REPLACE_EXISTING)
