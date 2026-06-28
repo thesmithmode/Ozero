@@ -3,6 +3,7 @@ package ru.ozero.engineurnetwork
 import org.junit.jupiter.api.Test
 import java.io.File
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -35,8 +36,8 @@ class SubscriptionBalanceContractTest {
     @Test
     fun `RealBridge формула used = startBalance - balance - pending`() {
         val block = source
-            .substringAfter("override suspend fun fetchSubscriptionBalance")
-            .substringBefore("private fun cleanupOnFailure")
+            .substringAfter("subscriptionBalance SDK raw:")
+            .substringBefore("if (startBalance > DOUBLE_QUOTA_THRESHOLD_BYTES)")
         assertTrue(
             block.contains("startBalance - balance - pending"),
             "Формула used должна быть startBalance - balance - pending — иначе UI покажет неверный consumed bytes",
@@ -50,16 +51,16 @@ class SubscriptionBalanceContractTest {
             "Timeout subscriptionBalance обязан быть 10s — без него callback может никогда не resume",
         )
         val block = source
-            .substringAfter("override suspend fun fetchSubscriptionBalance")
-            .substringBefore("private fun cleanupOnFailure")
+            .substringAfter("subscriptionBalance SDK raw:")
+            .substringBefore("if (startBalance > DOUBLE_QUOTA_THRESHOLD_BYTES)")
         assertTrue(block.contains("withTimeoutOrNull(SUBSCRIPTION_BALANCE_TIMEOUT_MS)"))
     }
 
     @Test
     fun `RealBridge fetchSubscriptionBalance возвращает null при отсутствии device`() {
         val block = source
-            .substringAfter("override suspend fun fetchSubscriptionBalance")
-            .substringBefore("private fun cleanupOnFailure")
+            .substringAfter("subscriptionBalance SDK raw:")
+            .substringBefore("if (startBalance > DOUBLE_QUOTA_THRESHOLD_BYTES)")
         assertTrue(
             block.contains("deviceRef.get() ?: return null"),
             "Без device subscriptionBalance не должна крашить — возвращать null",
@@ -69,8 +70,8 @@ class SubscriptionBalanceContractTest {
     @Test
     fun `RealBridge fetchSubscriptionBalance защищает callback от двойного resume`() {
         val block = source
-            .substringAfter("override suspend fun fetchSubscriptionBalance")
-            .substringBefore("private fun cleanupOnFailure")
+            .substringAfter("subscriptionBalance SDK raw:")
+            .substringBefore("if (startBalance > DOUBLE_QUOTA_THRESHOLD_BYTES)")
         assertTrue(
             block.contains("AtomicBoolean") && block.contains("compareAndSet(false, true)"),
             "Callback может вызваться + timeout одновременно — guard через AtomicBoolean обязателен",
@@ -80,8 +81,8 @@ class SubscriptionBalanceContractTest {
     @Test
     fun `RealBridge fetchSubscriptionBalance кеширует последний снимок`() {
         val block = source
-            .substringAfter("override suspend fun fetchSubscriptionBalance")
-            .substringBefore("private fun cleanupOnFailure")
+            .substringAfter("subscriptionBalance SDK raw:")
+            .substringBefore("if (startBalance > DOUBLE_QUOTA_THRESHOLD_BYTES)")
         assertTrue(
             block.contains("subscriptionBalanceRef.set"),
             "Snapshot должен кешироваться — на timeout вернётся последний известный, не null",
@@ -140,23 +141,15 @@ class SubscriptionBalanceContractTest {
     }
 
     @Test
-    fun `RealBridge subscriptionBalance логирует clientId loc providePaused — diagnostic для x2 traffic`() {
+    fun `RealBridge subscriptionBalance raw log omits account metadata`() {
         val block = source
-            .substringAfter("override suspend fun fetchSubscriptionBalance")
-            .substringBefore("private fun cleanupOnFailure")
-        assertTrue(
-            block.contains("clientId="),
-            "raw лог обязан содержать clientId — для диагностики откуда x2 расхождение баланса " +
-                "vs оригинальный URnetwork-app (разный аккаунт vs одинаковый аккаунт)",
-        )
-        assertTrue(
-            block.contains("providePaused="),
-            "raw лог обязан содержать providePaused — provide bonus может удваивать quota",
-        )
-        assertTrue(
-            block.contains("loc="),
-            "raw лог обязан содержать activeLocation — bonus может зависеть от выбранной локации",
-        )
+            .substringAfter("subscriptionBalance SDK raw:")
+            .substringBefore("if (startBalance > DOUBLE_QUOTA_THRESHOLD_BYTES)")
+        assertFalse(block.contains("clientId="))
+        assertFalse(block.contains("providePaused="))
+        assertFalse(block.contains("loc="))
+        assertFalse(block.contains("store="))
+        assertTrue(block.contains("balance/start="))
     }
 
     @Test
