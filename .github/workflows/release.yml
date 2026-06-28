@@ -455,6 +455,28 @@ jobs:
             sha256sum "$apk" > "${apk}.sha256"
           done
 
+      - name: Ed25519-sign APKs for self-update
+        env:
+          UPDATE_PRIVATE_KEY_PEM: ${{ secrets.UPDATE_PRIVATE_KEY_PEM }}
+        run: |
+          set -euo pipefail
+          if [ -z "$UPDATE_PRIVATE_KEY_PEM" ]; then
+            echo "::error::Secret UPDATE_PRIVATE_KEY_PEM is required for .apk.sig self-update signatures"
+            exit 1
+          fi
+          key_file="$(mktemp)"
+          trap 'rm -f "$key_file"' EXIT
+          printf '%s' "$UPDATE_PRIVATE_KEY_PEM" > "$key_file"
+          cd release-out
+          for apk in *.apk; do
+            openssl pkeyutl -sign -rawin -inkey "$key_file" -in "$apk" -out "${apk}.sig"
+            sig_size=$(wc -c < "${apk}.sig" | tr -d ' ')
+            if [ "$sig_size" != "64" ]; then
+              echo "::error::${apk}.sig must be 64-byte raw Ed25519 signature, got ${sig_size}"
+              exit 1
+            fi
+          done
+
       - name: Import GPG key
         env:
           GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
