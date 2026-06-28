@@ -636,7 +636,7 @@ class SingboxEngine @Inject constructor(
     private fun chainWrapperBlobs(selectedProfileId: Long?): List<ByteArray> {
         val selected = selectedProfileId ?: return emptyList()
         if (selected == SELECTED_AUTO) return emptyList()
-        return cachedChainProfileIds
+        return chainProfileIdsBlocking()
             .filter { it != selected }
             .mapNotNull { id -> cachedProfilesById[id]?.beanBlob ?: resolveProfileByIdBlocking(id)?.beanBlob }
     }
@@ -671,6 +671,13 @@ class SingboxEngine @Inject constructor(
 
     private fun resolveProfileByIdBlocking(id: Long): ProxyProfile? =
         runBlocking(Dispatchers.IO) { profileDao.getById(id) }
+
+    private fun chainProfileIdsBlocking(): List<Long> =
+        cachedChainProfileIds.ifEmpty {
+            runBlocking(Dispatchers.IO) {
+                proxyChainDao.getAll().map { it.profileId }
+            }
+        }
 
     private fun AbstractBean.hasRoutableServerAddress(): Boolean {
         val host = serverAddress.trim().trim('[', ']').lowercase()
