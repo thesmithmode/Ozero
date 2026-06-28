@@ -577,6 +577,16 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
+    fun `removeAll reports failure when required cleanup commands fail`() {
+        val cmd = MasterDnsDockerScripts.removeAll
+        assertTrue(cmd.contains(MasterDnsDockerScripts.MARKER_REMOVE_FAILED))
+        assertTrue(cmd.contains("sudo docker ps -a"))
+        assertTrue(cmd.contains("docker rm -f masterdns-ozero >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }"))
+        assertTrue(cmd.contains("docker rmi masterdns-ozero >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }"))
+        assertTrue(cmd.contains("sudo rm -rf /tmp/mdns_build >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }"))
+    }
+
+    @Test
     fun `openFirewallPort53 writes marker file to track ownership`() {
         val script = MasterDnsDockerScripts.openFirewallPort53
         val hasMarker = script.contains("/var/lib/masterdns-ozero/fw_opened")
