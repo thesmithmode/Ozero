@@ -79,18 +79,23 @@ class MasterDnsDockerScriptsContractTest {
     }
 
     @Test
-    fun `installDocker uses official get-docker-com installer as primary path`() {
+    fun `installDocker uses signed Docker apt repository instead of root shell installer`() {
         val cmd = MasterDnsDockerScripts.installDocker
-        assertTrue(
-            cmd.contains("https://get.docker.com"),
-            "installDocker обязан использовать https://get.docker.com primary — " +
-                "distro docker.io пакет фейлит 'Не удалось получить информацию о пакете' на " +
-                "минимальных Debian/Ubuntu без universe репа. Official installer Docker Inc " +
-                "сам подключает docker-ce репо на любом distro.",
+        assertFalse(
+            cmd.contains("https://get." + "docker.com") || cmd.contains("get-" + "docker.sh"),
+            "installDocker не должен выполнять convenience script — это непроверенный shell под root.",
         )
         assertTrue(
-            cmd.contains("curl -fsSL") || cmd.contains("wget -qO"),
-            "Должен быть curl или wget fetcher для get.docker.com installer.",
+            cmd.contains("https://download.docker.com/linux/"),
+            "Минимальные Debian/Ubuntu без universe должны получать Docker из official apt repository.",
+        )
+        assertTrue(
+            cmd.contains("signed-by=/etc/apt/keyrings/docker.gpg"),
+            "Docker apt repository должен быть привязан к отдельному keyring через signed-by.",
+        )
+        assertTrue(
+            cmd.contains("9DC858229FC7DD38854AE2D88D81803C0EBFCD88"),
+            "Docker apt GPG key fingerprint должен проверяться перед trust/import.",
         )
     }
 
@@ -98,12 +103,12 @@ class MasterDnsDockerScriptsContractTest {
     fun `installDocker captures install log to surface real failure reason`() {
         val cmd = MasterDnsDockerScripts.installDocker
         assertTrue(
-            cmd.contains("/tmp/docker-install.log"),
+            cmd.contains("docker-install"),
             "При ERR_DOCKER юзер должен видеть конкретную причину (apt fail / no universe / network) — " +
                 "лог tail обязателен для диагностики без угадывания.",
         )
         assertTrue(
-            cmd.contains("tail -30 /tmp/docker-install.log") || cmd.contains("tail -n 30"),
+            cmd.contains("tail -30 \$install_log") || cmd.contains("tail -n 30"),
             "Tail последних строк лога должен попадать в stdout response для UI/PersistentLoggers.",
         )
     }
