@@ -585,11 +585,11 @@ private fun WarpScreenContent(
     onDeleteSlot: (String) -> Unit,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
+        val resolvedError = state.errorMessageRes?.let { stringResource(it) } ?: state.errorMessage
         if (state.slots.isEmpty()) {
             val progressLabel = state.progressMirror?.let {
                 stringResource(R.string.warp_progress_mirror_fmt, it)
             }
-            val resolvedError = state.errorMessageRes?.let { stringResource(it) } ?: state.errorMessage
             EmptyConfigCard(
                 isRegistering = state.isRegistering,
                 progressText = progressLabel,
@@ -605,6 +605,7 @@ private fun WarpScreenContent(
         } else {
             SlotListContent(
                 state = state,
+                errorMessage = resolvedError,
                 onSetActive = onSetActive,
                 onStartEdit = onStartEdit,
                 onDeleteSlot = onDeleteSlot,
@@ -669,6 +670,7 @@ private fun WarpProgressCard(
 @Composable
 private fun SlotListContent(
     state: WarpSettingsUiState,
+    errorMessage: String?,
     onSetActive: (String) -> Unit,
     onStartEdit: (String) -> Unit,
     onDeleteSlot: (String) -> Unit,
@@ -679,7 +681,6 @@ private fun SlotListContent(
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val errorMessage = state.errorMessage
         if (errorMessage != null) {
             item {
                 Text(
