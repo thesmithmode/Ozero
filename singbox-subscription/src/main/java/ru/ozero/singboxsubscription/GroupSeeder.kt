@@ -9,15 +9,19 @@ class GroupSeeder(private val dao: SubscriptionGroupDao) {
 
     suspend fun seedPresets(presets: List<PresetGroup>) {
         presets.forEachIndexed { index, preset ->
-            if (dao.getByUrl(preset.url) == null) {
+            val existing = dao.getByUrl(preset.url)
+            if (existing == null) {
                 dao.insert(
                     SubscriptionGroup(
                         name = preset.name,
                         subscriptionUrl = preset.url,
                         isBuiltin = true,
+                        autoUpdate = false,
                         userOrder = index,
                     ),
                 )
+            } else if (existing.isBuiltin && existing.autoUpdate) {
+                dao.update(existing.copy(autoUpdate = false))
             }
         }
     }

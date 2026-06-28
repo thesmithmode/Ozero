@@ -2,6 +2,7 @@ package ru.ozero.singboxsubscription
 
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -39,6 +40,49 @@ class GroupSeederTest {
         seeder.seedPresets(presets)
 
         assertTrue(fakeDao.groups.all { it.isBuiltin })
+    }
+
+    @Test
+    fun `should disable auto update for inserted presets`() = runBlocking {
+        seeder.seedPresets(listOf(GroupSeeder.PresetGroup("Preset", "https://preset.example.com/sub")))
+
+        assertFalse(fakeDao.groups.first().autoUpdate)
+    }
+
+    @Test
+    fun `should disable auto update for existing builtin preset`() = runBlocking {
+        fakeDao.groups.add(
+            SubscriptionGroup(
+                id = 1L,
+                name = "Existing",
+                subscriptionUrl = "https://preset.example.com/sub",
+                isBuiltin = true,
+                autoUpdate = true,
+            ),
+        )
+
+        seeder.seedPresets(listOf(GroupSeeder.PresetGroup("Preset", "https://preset.example.com/sub")))
+
+        assertEquals(1, fakeDao.groups.size)
+        assertFalse(fakeDao.groups.first().autoUpdate)
+    }
+
+    @Test
+    fun `should preserve auto update for existing user group`() = runBlocking {
+        fakeDao.groups.add(
+            SubscriptionGroup(
+                id = 1L,
+                name = "Existing",
+                subscriptionUrl = "https://preset.example.com/sub",
+                isBuiltin = false,
+                autoUpdate = true,
+            ),
+        )
+
+        seeder.seedPresets(listOf(GroupSeeder.PresetGroup("Preset", "https://preset.example.com/sub")))
+
+        assertEquals(1, fakeDao.groups.size)
+        assertTrue(fakeDao.groups.first().autoUpdate)
     }
 
     @Test
