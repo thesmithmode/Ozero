@@ -21,6 +21,7 @@ import ru.ozero.engineurnetwork.UrnetworkLocationSelection
 import ru.ozero.engineurnetwork.selectedLocation
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -58,28 +59,29 @@ class UrnetworkLocationsViewModelTest {
     }
 
     @Test
-    fun `initDeviceForLocations вызывается если byClientJwt задан в configStore`() = runTest {
+    fun `initDeviceForLocations не вызывается без активного URnetwork`() = runTest {
         val bridge = FakeUrnetworkBridge(deviceAvailable = false)
         vm(bridge = bridge, store = fakeUrnetworkConfigStoreWithJwt())
         advanceUntilIdle()
-        assertTrue(
-            bridge.initDeviceCallCount.get() > 0,
-            "initDeviceForLocations должен вызываться при byClientJwt != null",
+        assertEquals(
+            0,
+            bridge.initDeviceCallCount.get(),
+            "initDeviceForLocations не должен стартовать SDK из settings без активного URnetwork",
         )
     }
 
     @Test
-    fun `uiState переходит в Ready без VPN если initDeviceForLocations успешен`() = runTest {
+    fun `uiState не переходит в Ready без VPN если initDeviceForLocations возможен`() = runTest {
         val v = vm(
             bridge = FakeUrnetworkBridge(deviceAvailable = true),
             store = fakeUrnetworkConfigStoreWithJwt(),
         )
         advanceUntilIdle()
-        assertIs<UrnetworkSettingsUiState.Ready>(awaitReadyState(v))
+        assertIs<UrnetworkSettingsUiState.NotConnected>(v.uiState.value)
     }
 
     @Test
-    fun `uiState остаётся Ready при остановке VPN если isDeviceAvailable true`() = runTest {
+    fun `uiState не остаётся Ready при остановке VPN если нет cache`() = runTest {
         val tc = activeTunnel()
         val v = vm(
             bridge = FakeUrnetworkBridge(connected = true, deviceAvailable = true),
@@ -89,7 +91,7 @@ class UrnetworkLocationsViewModelTest {
         advanceUntilIdle()
         tc.onDisconnecting()
         advanceUntilIdle()
-        assertIs<UrnetworkSettingsUiState.Ready>(awaitReadyState(v))
+        assertIs<UrnetworkSettingsUiState.NotConnected>(v.uiState.value)
     }
 
     @Test
@@ -133,7 +135,7 @@ class UrnetworkLocationsViewModelTest {
             initBlock.contains("collectLatest"),
             "init обязан использовать collectLatest для cancel semantics при active=false",
         )
-        kotlin.test.assertFalse(
+        assertFalse(
             initBlock.contains(".collect {"),
             "init не должен использовать .collect — только collectLatest",
         )
@@ -148,7 +150,7 @@ class UrnetworkLocationsViewModelTest {
         val selectBody = source
             .substringAfter("fun selectLocation(")
             .substringBefore("private fun startSwitchingIndicator")
-        kotlin.test.assertFalse(
+        assertFalse(
             selectBody.contains("_uiState.value = current.copy"),
             "selectLocation не должен использовать read-modify-write через value=copy — race condition",
         )
@@ -157,7 +159,7 @@ class UrnetworkLocationsViewModelTest {
             "selectLocation обязан использовать _uiState.update для атомарного обновления",
         )
         val pauseBody = source.substringAfter("fun setProvidePaused(").substringBefore("private fun updateLocations")
-        kotlin.test.assertFalse(
+        assertFalse(
             pauseBody.contains("_uiState.value = current.copy"),
             "setProvidePaused не должен использовать read-modify-write через value=copy — race condition",
         )
@@ -168,7 +170,7 @@ class UrnetworkLocationsViewModelTest {
         val filterBody = source
             .substringAfter("private fun applyFilter(")
             .substringBefore("private fun teardownLocationsVc")
-        kotlin.test.assertFalse(
+        assertFalse(
             filterBody.contains("_uiState.value = UrnetworkSettingsUiState.Ready"),
             "applyFilter не должен использовать _uiState.value = Ready — race condition",
         )
@@ -353,9 +355,9 @@ class UrnetworkLocationsViewModelTest {
             }
         }
         advanceUntilIdle()
-        kotlin.test.assertFalse(
+        assertTrue(
             sawNotConnected,
-            "uiState не должен переходить в NotConnected если JWT есть и initDeviceForLocations успешен",
+            "uiState должен оставаться offline без прямого SDK bootstrap вне активного URnetwork",
         )
     }
 
@@ -368,14 +370,14 @@ class UrnetworkLocationsViewModelTest {
         val settingsCardSignature = source
             .substringAfter("private fun SettingsCard(")
             .substringBefore(") {")
-        kotlin.test.assertFalse(
+        assertFalse(
             settingsCardSignature.contains("showProvide"),
             "SettingsCard не должен иметь параметр showProvide — ProvideSection показывается всегда",
         )
         val settingsCardBody = source
             .substringAfter("private fun SettingsCard(")
             .substringBefore("private fun SectionDivider(")
-        kotlin.test.assertFalse(
+        assertFalse(
             settingsCardBody.contains("if (showProvide)"),
             "SettingsCard не должен содержать if(showProvide) — ProvideSection показывается всегда",
         )

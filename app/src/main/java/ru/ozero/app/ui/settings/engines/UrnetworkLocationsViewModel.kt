@@ -145,7 +145,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
         bootstrapJob = viewModelScope.launch {
             val byClientJwt = configStore.byClientJwt().first()
             val wallet = configStore.walletAddress().first()
-            if (!byClientJwt.isNullOrBlank()) {
+            if (!byClientJwt.isNullOrBlank() && isUrnetworkActive.value) {
                 val ready = bridge.initDeviceForLocations(byClientJwt, wallet)
                 if (ready && _uiState.value !is UrnetworkSettingsUiState.Ready) {
                     refreshOnce()
@@ -168,27 +168,17 @@ class UrnetworkLocationsViewModel @Inject constructor(
                         if (attempt < REFRESH_RETRY_ATTEMPTS) delay(REFRESH_RETRY_DELAY_MS)
                     }
                 } else {
-                    if (bridge.isDeviceAvailable()) {
+                    teardownLocationsVc()
+                    if (hasCachedLocations(allCountries, allRegions, allCities, allBestMatches)) {
                         _uiState.update { current ->
                             if (current is UrnetworkSettingsUiState.Ready) {
                                 current.copy(providePaused = true)
                             } else {
-                                buildEmptyReady().copy(providePaused = true)
+                                buildCachedReady()
                             }
                         }
                     } else {
-                        teardownLocationsVc()
-                        if (hasCachedLocations(allCountries, allRegions, allCities, allBestMatches)) {
-                            _uiState.update { current ->
-                                if (current is UrnetworkSettingsUiState.Ready) {
-                                    current.copy(providePaused = true)
-                                } else {
-                                    buildCachedReady()
-                                }
-                            }
-                        } else {
-                            _uiState.value = UrnetworkSettingsUiState.NotConnected
-                        }
+                        _uiState.value = UrnetworkSettingsUiState.NotConnected
                     }
                 }
             }
@@ -400,10 +390,11 @@ class UrnetworkLocationsViewModel @Inject constructor(
         return s is UrnetworkSettingsUiState.Ready && s.countries.isNotEmpty()
     }
 
-    private fun isDeviceUnavailable(): Boolean = !bridge.isDeviceAvailable() && !bridge.isRunning()
+    private fun isDeviceUnavailable(): Boolean =
+        !isUrnetworkActive.value || (!bridge.isDeviceAvailable() && !bridge.isRunning())
 
     private fun shouldKeepReadyWithoutConfigCache(current: UrnetworkSettingsUiState.Ready): Boolean {
-        if (bridge.isDeviceAvailable() || bridge.isRunning()) return true
+        if (isUrnetworkActive.value && (bridge.isDeviceAvailable() || bridge.isRunning())) return true
         return shouldKeepPausedReadyWithoutConfigCache(current)
     }
 

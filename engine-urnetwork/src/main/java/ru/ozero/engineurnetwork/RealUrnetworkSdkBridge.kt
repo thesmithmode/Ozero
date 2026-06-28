@@ -449,19 +449,20 @@ class RealUrnetworkSdkBridge(
     }
 
     override fun openLocationsViewController(): LocationsViewController? {
-        if (!running.get() && deviceRef.get() == null) return null
+        if (!running.get() || deviceRef.get() == null) return null
         return runCatching { deviceRef.get()?.openLocationsViewController() }.getOrElse {
             PersistentLoggers.warn(TAG, "openLocationsViewController threw: ${it.message}")
             null
         }
     }
 
-    override fun isDeviceAvailable(): Boolean = deviceRef.get() != null
+    override fun isDeviceAvailable(): Boolean = running.get() && deviceRef.get() != null
 
     override suspend fun initDeviceForLocations(byClientJwt: String, walletAddress: String): Boolean {
-        if (byClientJwt.isBlank()) return false
+        if (byClientJwt.isBlank() || !running.get()) return false
         if (deviceRef.get() != null) return true
         return lifecycleMutex.withLock {
+            if (!running.get()) return@withLock false
             if (deviceRef.get() != null) return@withLock true
             withContext(Dispatchers.Main.immediate) {
                 ensureDeviceOnMain(byClientJwt)
