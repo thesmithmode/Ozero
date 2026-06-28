@@ -16,17 +16,18 @@ API_LEVEL="${ANDROID_API:-24}"
 BUILD_DIR="$REPO_ROOT/build/fptn-$ABI"
 
 FPTN_REPO="https://github.com/fptn-project/FptnClient-Android.git"
+FPTN_SOURCE_COMMIT="d2ca1ff2cd3090d0b191ba320d1bca4a03452dea"
 FPTN_CLONE_DIR="$REPO_ROOT/build/fptn-android-src"
 
-# ---------------------------------------------------------------------------
-# 1. Clone FptnClient-Android (source of truth for fptn C++ lib + deps)
-# ---------------------------------------------------------------------------
 if [[ ! -d "$FPTN_CLONE_DIR/.git" ]]; then
-    git clone --depth 1 --recurse-submodules --shallow-submodules \
-        "$FPTN_REPO" "$FPTN_CLONE_DIR"
+    git init "$FPTN_CLONE_DIR"
+    git -C "$FPTN_CLONE_DIR" remote add origin "$FPTN_REPO"
 else
     echo "Using cached clone at $FPTN_CLONE_DIR"
 fi
+git -C "$FPTN_CLONE_DIR" fetch --depth 1 origin "$FPTN_SOURCE_COMMIT"
+git -C "$FPTN_CLONE_DIR" checkout --detach FETCH_HEAD
+git -C "$FPTN_CLONE_DIR" submodule update --init --recursive --depth 1
 
 FPTN_LIB_DIR="$FPTN_CLONE_DIR/app/src/main/cpp/libs/fptn"
 if [[ ! -d "$FPTN_LIB_DIR" ]] || [[ -z "$(ls -A "$FPTN_LIB_DIR" 2>/dev/null)" ]]; then
@@ -135,6 +136,10 @@ cp "$BUILD_DIR/cmake-build/libfptn_native_lib.so" "$OUT_DIR/libfptn_native_lib-$
 # 7. Manifest
 # ---------------------------------------------------------------------------
 FPTN_COMMIT="$(cd "$FPTN_CLONE_DIR" && git rev-parse HEAD)"
+if [[ "$FPTN_COMMIT" != "$FPTN_SOURCE_COMMIT" ]]; then
+    echo "ERROR: expected FPTN commit $FPTN_SOURCE_COMMIT, got $FPTN_COMMIT" >&2
+    exit 1
+fi
 {
     echo "# build_fptn manifest"
     echo "source_repo=$FPTN_REPO"

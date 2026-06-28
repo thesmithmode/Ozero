@@ -232,22 +232,69 @@ jobs:
         run: |
           set -euo pipefail
           DST="engine-fptn/src/main/jniLibs/arm64-v8a/libfptn_native_lib.so"
-          if [ -f "$DST" ] && [ "$(stat -c%s "$DST")" -gt 1000 ]; then
-            echo "libfptn_native_lib.so already in repo — skipping download"
-            exit 0
+          eval "$(python3 - <<'PY'
+          import shlex
+          from pathlib import Path
+
+          current = None
+          result = None
+          for raw in Path('build-tools/binaries.lock.yaml').read_text().splitlines():
+              if raw.startswith('  - '):
+                  if current and current.get('engine') == 'fptn' and current.get('name') == 'libfptn_native_lib-arm64-v8a.so':
+                      result = current
+                  current = {}
+                  raw = '    ' + raw[4:]
+              if current is not None and raw.startswith('    ') and ': ' in raw:
+                  key, value = raw.strip().split(': ', 1)
+                  current[key] = value
+          if current and current.get('engine') == 'fptn' and current.get('name') == 'libfptn_native_lib-arm64-v8a.so':
+              result = current
+          if result is None:
+              raise SystemExit('missing fptn lock entry')
+          for key in ('download_url', 'sha256', 'size_bytes', 'source_repo', 'source_commit'):
+              print(f'LOCK_{key.upper()}={shlex.quote(result[key])}')
+          PY
+          )"
+          ASSET="${LOCK_DOWNLOAD_URL##*/}"
+          TAG=$(printf '%s\n' "$LOCK_DOWNLOAD_URL" | sed -E 's#^https://github.com/[^/]+/[^/]+/releases/download/([^/]+)/.*#\1#')
+          if ! printf '%s\n' "$TAG" | grep -Eq '^fptn-[a-f0-9]{8}$'; then
+            echo "::error::invalid fptn lock tag: $TAG"
+            exit 1
           fi
-          TAG=$(gh release list --limit 100 --json tagName \
-            | grep -oE '"fptn-[a-f0-9]{8}"' \
-            | head -n1 | tr -d '"')
-          if [ -z "$TAG" ]; then
-            echo "::error::no fptn release found — run binaries.yml with artifact=fptn first"
+          if [ -f "$DST" ]; then
+            EXISTING_SHA=$(sha256sum "$DST" | awk '{print $1}')
+            if [ "$EXISTING_SHA" = "$LOCK_SHA256" ]; then
+              echo "libfptn_native_lib.so matches lock"
+              exit 0
+            fi
+          fi
+          TMPDIR=$(mktemp -d)
+          gh release download "$TAG" -p "$ASSET" -p "manifest.txt" -D "$TMPDIR" --clobber
+          if ! grep -qx "source_repo=$LOCK_SOURCE_REPO" "$TMPDIR/manifest.txt"; then
+            echo "::error::FPTN manifest source_repo mismatch"
+            exit 1
+          fi
+          if ! grep -qx "source_commit=$LOCK_SOURCE_COMMIT" "$TMPDIR/manifest.txt"; then
+            echo "::error::FPTN manifest source_commit mismatch"
+            exit 1
+          fi
+          if ! grep -qx "$LOCK_SHA256  $ASSET" "$TMPDIR/manifest.txt"; then
+            echo "::error::FPTN manifest sha256 mismatch"
+            exit 1
+          fi
+          ACTUAL_SHA=$(sha256sum "$TMPDIR/$ASSET" | awk '{print $1}')
+          ACTUAL_SIZE=$(stat -c%s "$TMPDIR/$ASSET")
+          if [ "$ACTUAL_SHA" != "$LOCK_SHA256" ]; then
+            echo "::error::FPTN binary sha256 mismatch"
+            exit 1
+          fi
+          if [ "$ACTUAL_SIZE" != "$LOCK_SIZE_BYTES" ]; then
+            echo "::error::FPTN binary size mismatch"
             exit 1
           fi
           mkdir -p "$(dirname "$DST")"
-          gh release download "$TAG" -p "libfptn_native_lib-arm64-v8a.so" \
-            -D /tmp/fptn-dl --clobber
-          cp /tmp/fptn-dl/libfptn_native_lib-arm64-v8a.so "$DST"
-          echo "Downloaded $DST from $TAG"
+          cp "$TMPDIR/$ASSET" "$DST"
+          echo "Downloaded verified $DST from $TAG"
 
       - name: Build signed release APK
         env:
