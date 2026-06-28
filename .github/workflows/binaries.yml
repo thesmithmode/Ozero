@@ -74,6 +74,9 @@ jobs:
             tor)
               FILES="build-tools/build_tor.sh build-tools/regen_lock.py"
               ;;
+            xray)
+              FILES="build-tools/Dockerfile build-tools/build_xray.sh build-tools/regen_lock.py"
+              ;;
             userwireguard)
               FILES="build-tools/Dockerfile scripts/build_wireguard_android.sh"
               ;;
@@ -162,6 +165,22 @@ jobs:
             -e ANDROID_TARGETS="android/arm64,android/arm,android/386,android/amd64" \
             ozero-xray \
             bash build-tools/build_hysteria2.sh
+
+      - name: Build xray Docker image
+        if: env.ARTIFACT == 'xray'
+        run: docker build -t ozero-xray -f build-tools/Dockerfile build-tools/
+
+      - name: Build xray AAR (multi-ABI)
+        if: env.ARTIFACT == 'xray'
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            -e REPO_ROOT=/src \
+            -e OUTPUT_DIR=/src/out/xray \
+            -e ANDROID_TARGETS="android/arm64,android/arm,android/amd64" \
+            ozero-xray \
+            bash build-tools/build_xray.sh
 
       # ---------------------------------------------------------------------
       # userwireguard build (Go + gomobile bind → AAR, multi-ABI)
@@ -321,6 +340,26 @@ jobs:
           files: |
             out/hysteria2/libhysteria2.aar
             out/hysteria2/manifest.txt
+          fail_on_unmatched_files: true
+          prerelease: true
+
+      - name: Upload xray assets
+        if: env.ARTIFACT == 'xray' && github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v3
+        env:
+          GH_TAG: ${{ steps.tag.outputs.tag }}
+        with:
+          tag_name: ${{ env.GH_TAG }}
+          name: Native binaries ${{ env.GH_TAG }}
+          body: |
+            Auto-built native binaries.
+
+            Engine: xray
+            Commit: ${{ github.sha }}
+          files: |
+            out/xray/libxray.aar
+            out/xray/libxray.aar.sha256
+            out/xray/manifest.txt
           fail_on_unmatched_files: true
           prerelease: true
 

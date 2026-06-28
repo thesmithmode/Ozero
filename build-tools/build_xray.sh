@@ -79,8 +79,18 @@ gomobile bind \
 log "AAR built : $OUTPUT_ABS"
 log "Size      : $(du -h "$OUTPUT_ABS" | cut -f1)"
 
+SOURCE_COMMIT="$(git rev-parse HEAD)"
+
 cd "$REPO_ROOT/$OUTPUT_DIR"
 sha256sum libxray.aar > libxray.aar.sha256
+cat > manifest.txt <<EOF
+source_repo=https://$GO_MODULE
+source_commit=$SOURCE_COMMIT
+xray_version=$XRAY_VERSION
+
+# SHA256:
+$(cat libxray.aar.sha256)
+EOF
 log "SHA256    : $(cat libxray.aar.sha256)"
 
 log "=== build_xray.sh COMPLETE ==="
