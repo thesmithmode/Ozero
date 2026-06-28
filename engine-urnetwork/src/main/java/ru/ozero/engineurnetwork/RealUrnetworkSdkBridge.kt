@@ -796,11 +796,7 @@ class RealUrnetworkSdkBridge(
                     val startBalance = runCatching { result.startBalanceByteCount }.getOrDefault(0L)
                     val sub = runCatching { result.currentSubscription }.getOrNull()
                     val plan = runCatching { sub?.plan }.getOrNull()
-                    val store = runCatching { sub?.store }.getOrNull()
                     val used = startBalance - balance - pending
-                    val clientId = runCatching { device.clientId?.toString() }.getOrNull()
-                    val activeLocation = runCatching { device.connectLocation?.name }.getOrNull()
-                    val providePaused = runCatching { device.providePaused }.getOrNull()
                     val balanceGb = balance / 1_000_000_000.0
                     val startGb = startBalance / 1_000_000_000.0
                     val ratio = if (startBalance > 0) balance.toDouble() / startBalance else 0.0
@@ -808,8 +804,7 @@ class RealUrnetworkSdkBridge(
                         TAG,
                         "subscriptionBalance SDK raw: start=$startBalance(${"%.1f".format(startGb)}GB) " +
                             "balance=$balance(${"%.1f".format(balanceGb)}GB) pending=$pending used=$used " +
-                            "plan=$plan store=$store clientId=$clientId loc=$activeLocation " +
-                            "providePaused=$providePaused balance/start=${"%.2f".format(ratio)}",
+                            "plan=$plan balance/start=${"%.2f".format(ratio)}",
                     )
                     if (startBalance > DOUBLE_QUOTA_THRESHOLD_BYTES) {
                         PersistentLoggers.warn(
