@@ -424,6 +424,24 @@ class EngineWarpAdditionalCoverageTest {
     }
 
     @Test
+    fun `resolveViaDoH rejects oversized dns json response`() = runTest {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setBody("x".repeat(EngineWarp.DOH_MAX_RESPONSE_BYTES + 1)),
+            )
+            val engine = newEngine(bridge = FakeBridge(), store = FakeStore(emptyList()))
+            val resolved = engine.resolveViaDoH("engage.cloudflareclient.com", "${server.url("/dns-query")}")
+            assertEquals(null, resolved)
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
     fun `bootstrapSafeDohUrl uses bootstrap for non-literal provider urls`() = runTest {
         val engine = newEngine(bridge = FakeBridge(), store = FakeStore(emptyList()))
         assertEquals("https://1.1.1.1/dns-query", engine.bootstrapSafeDohUrl(DoHProvider.CLOUDFLARE_1111))
