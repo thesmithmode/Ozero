@@ -565,6 +565,20 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
+    fun `consume restore error clears restore error`() = runTest {
+        val harness = Harness()
+        every { harness.appContext.assets.open("singbox/preset_groups.json") } throws IllegalStateException("missing")
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+
+        harness.viewModel.onRestoreDefaults()
+        advanceUntilIdle()
+        harness.viewModel.consumeRestoreError()
+
+        assertNull(harness.viewModel.state.value.restoreError)
+    }
+
+    @Test
     fun `import from file with invalid text opens manual dialog with filename default`() = runTest {
         val harness = Harness()
         harness.startStateCollection(backgroundScope)
