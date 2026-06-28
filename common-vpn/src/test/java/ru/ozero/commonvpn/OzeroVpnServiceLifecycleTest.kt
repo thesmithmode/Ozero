@@ -353,13 +353,20 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `StartSequenceCoordinator run в auto-mode идёт через autoCandidatesWithPreflight`() {
+    fun `StartSequenceCoordinator run в TUN auto-mode не делает preflight до TUN`() {
         val body = startSequenceSource.substringAfter("suspend fun run()")
             .substringBefore("suspend fun engineNeedsCustomTun")
         assertTrue(
-            body.contains("autoCandidatesWithPreflight("),
-            "run обязан звать autoCandidatesWithPreflight в auto-mode — " +
-                "fallback по priority + TCP-probe",
+            body.contains("if (trafficMode == TrafficMode.TUN)"),
+            "TUN auto-mode обязан выбирать кандидатов без TCP preflight до establishTun",
+        )
+        assertTrue(
+            body.contains("autoCandidates(settings, trafficMode)"),
+            "TUN auto-mode обязан идти через priority/config без network probe",
+        )
+        assertTrue(
+            body.contains("autoCandidatesWithPreflight(settings, trafficMode)"),
+            "PROXY auto-mode сохраняет preflight, потому что Android TUN не используется",
         )
         val hasShortFallback = body.contains("?: EngineId.BYEDPI")
         val hasDiagnosticIfElse = body.contains(
@@ -372,7 +379,7 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `autoCandidatesWithPreflight вызывает plugin preflight с no-op protector`() {
+    fun `PROXY autoCandidatesWithPreflight вызывает plugin preflight с no-op protector`() {
         assertTrue(
             startSequenceSource.contains("plugin?.preflight()"),
             "autoCandidatesWithPreflight обязан брать EnginePreflight через plugin.preflight()",
@@ -381,12 +388,11 @@ class OzeroVpnServiceLifecycleTest {
             .substringBefore("private suspend fun establishTunForEngine")
         assertTrue(
             preflightFn.contains("SocketProtector { _ -> true }"),
-            "preflight использует no-op protector: TUN ещё не создан при preflight — " +
-                "VpnService.protect() вернёт false и заблокирует все движки",
+            "PROXY preflight использует no-op protector, потому что Android TUN не участвует",
         )
         assertFalse(
             preflightFn.contains("protect(socket)"),
-            "protect(socket) запрещён в preflight — TUN не создан, protect() вернёт false",
+            "protect(socket) запрещён в PROXY preflight",
         )
     }
 
@@ -435,8 +441,8 @@ class OzeroVpnServiceLifecycleTest {
             "manual-mode идёт прямым путём через buildEngineConfig — без preflight",
         )
         assertTrue(
-            body.contains("autoCandidatesWithPreflight(settings, trafficMode)"),
-            "auto-mode (manualEngine == null) идёт через autoCandidatesWithPreflight",
+            body.contains("if (trafficMode == TrafficMode.TUN)"),
+            "auto-mode обязан разделять TUN и PROXY: TUN без preflight, PROXY с preflight",
         )
     }
 

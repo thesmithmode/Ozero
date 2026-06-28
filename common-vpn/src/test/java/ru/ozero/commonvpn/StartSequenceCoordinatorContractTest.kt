@@ -105,8 +105,8 @@ class StartSequenceCoordinatorContractTest {
     fun `run ветка killswitch строит instant lockdown TUN ДО pickAuto`() {
         val body = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
         val killswitchIdx = body.indexOf("if (trafficMode == TrafficMode.TUN && killswitch) {")
-        val pickIdx = body.indexOf("autoCandidatesWithPreflight(")
-        assertTrue(killswitchIdx in 0 until pickIdx, "Killswitch lockdown TUN строится ДО pickAuto.")
+        val pickIdx = body.indexOf("val autoPicks =")
+        assertTrue(killswitchIdx in 0 until pickIdx, "Killswitch lockdown TUN строится ДО auto pick.")
         assertTrue(
             body.contains("state.lockdownStartupFdRef.set(fd)"),
             "Killswitch ветка обязана сохранять lockdownStartupFdRef.",
@@ -152,13 +152,14 @@ class StartSequenceCoordinatorContractTest {
     }
 
     @Test
-    fun `autoCandidatesWithPreflight использует no-op SocketProtector`() {
-        val body = source.substringAfter("private suspend fun autoCandidatesWithPreflight(")
-            .substringBefore("private suspend fun establishTunForEngine(")
-        assertTrue(
-            body.contains("SocketProtector { _ -> true }"),
-            "preflight обязан использовать no-op protector — TUN ещё не создан на момент preflight.",
-        )
+    fun `autoCandidatesWithPreflight используется только в PROXY auto-mode`() {
+        val runBody = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
+        val tunGateIdx = runBody.indexOf("if (trafficMode == TrafficMode.TUN)")
+        val plainAutoIdx = runBody.indexOf("autoCandidates(settings, trafficMode)")
+        val preflightIdx = runBody.indexOf("autoCandidatesWithPreflight(settings, trafficMode)")
+        assertTrue(tunGateIdx >= 0, "TUN/PROXY gate не найден в run.")
+        assertTrue(plainAutoIdx in tunGateIdx until preflightIdx, "TUN auto-mode должен идти без preflight.")
+        assertTrue(preflightIdx > plainAutoIdx, "Preflight должен остаться только в PROXY ветке.")
     }
 
     @Test

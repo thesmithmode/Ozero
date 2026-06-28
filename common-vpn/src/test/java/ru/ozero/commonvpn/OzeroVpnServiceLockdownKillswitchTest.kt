@@ -235,15 +235,15 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `lockdownStartupTun устанавливается до выбора движка в StartSequenceCoordinator run`() {
+    fun `lockdownStartupTun устанавливается до auto candidate selection в StartSequenceCoordinator run`() {
         val lockdownIdx = runBody.indexOf("lockdownStartupFdRef.set")
-        val pickIdx = runBody.indexOf("autoCandidatesWithPreflight")
+        val pickIdx = runBody.indexOf("val autoPicks =")
         assertTrue(lockdownIdx >= 0, "lockdownStartupFdRef.set не найден в run. Body:\n$runBody")
-        assertTrue(pickIdx >= 0, "autoCandidatesWithPreflight не найден в run. Body:\n$runBody")
+        assertTrue(pickIdx >= 0, "val autoPicks не найден в run. Body:\n$runBody")
         assertTrue(
             lockdownIdx < pickIdx,
-            "lockdownStartupFdRef.set обязан быть РАНЬШЕ autoCandidatesWithPreflight — " +
-                "иначе startup gap не закрыт. lockdownIdx=$lockdownIdx pickIdx=$pickIdx",
+            "lockdownStartupFdRef.set обязан быть РАНЬШЕ auto candidate selection. " +
+                "lockdownIdx=$lockdownIdx pickIdx=$pickIdx",
         )
     }
 
@@ -261,7 +261,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `usesCustomTun branch — establishTunForEngine выполняется ДО startChain (P35 — WARP, URnetwork)`() {
+    fun `usesCustomTun branch — establishTunForEngine выполняется ДО startChain`() {
         val establishIdx = customTunBranchBody.indexOf("establishTunForEngine(activeEngineId")
         val startChainIdx = customTunBranchBody.indexOf("startChain(activeEngineId")
         assertTrue(
@@ -281,28 +281,26 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `not usesCustomTun branch — startChain выполняется ДО establishTun (ByeDPI, MasterDNS QUIC drop-window)`() {
-        val startChainIdx = regularTunBranchBody.indexOf("startChain(activeEngineId")
+    fun `not usesCustomTun branch — establishTun выполняется ДО startChain`() {
         val establishIdx = regularTunBranchBody.indexOf("establishTun(")
-        assertTrue(
-            startChainIdx >= 0,
-            "startChain не найден в !usesCustomTun branch — anchor сломан. Body:\n$regularTunBranchBody",
-        )
+        val startChainIdx = regularTunBranchBody.indexOf("startChain(activeEngineId")
         assertTrue(
             establishIdx >= 0,
             "establishTun не найден в !usesCustomTun branch — anchor сломан. Body:\n$regularTunBranchBody",
         )
         assertTrue(
-            startChainIdx >= 0 && (startChainIdx < establishIdx || establishIdx < 0),
-            "Для !usesCustomTun (ByeDPI, MasterDNS): startChain (запуск hev/byedpi proxy chain) " +
-                "обязан выполняться ДО establishTun — иначе TUN установлен раньше, чем proxy готов " +
-                "принимать, и QUIC пакеты дропаются в startup gap (YouTube hypothesis #2). " +
-                "startChainIdx=$startChainIdx establishIdx=$establishIdx",
+            startChainIdx >= 0,
+            "startChain не найден в !usesCustomTun branch — anchor сломан. Body:\n$regularTunBranchBody",
+        )
+        assertTrue(
+            establishIdx < startChainIdx,
+            "Для !usesCustomTun TUN обязан быть установлен ДО startChain, чтобы startup " +
+                "оставался fail-closed. establishIdx=$establishIdx startChainIdx=$startChainIdx",
         )
     }
 
     @Test
-    fun `routeTrafficForEngine вызывается ПОСЛЕ establishTunAndChain — порядок lockdown→engine→route (P35)`() {
+    fun `routeTrafficForEngine вызывается ПОСЛЕ establishTunAndChain — порядок lockdown→engine→route`() {
         val helperCallIdx = runBody.indexOf("establishTunAndChain(")
         val routeIdx = runBody.indexOf("routeTrafficForEngine(")
         assertTrue(helperCallIdx >= 0 && routeIdx >= 0, "anchors сломаны: $runBody")
@@ -314,9 +312,9 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `killswitch=on lockdownStartupTun establish выполняется ДО pickAutoCandidate (P35)`() {
+    fun `killswitch=on lockdownStartupTun establish выполняется ДО pickAutoCandidate`() {
         val lockdownEstablishIdx = runBody.indexOf("lockdownStartupFdRef.set")
-        val pickIdx = runBody.indexOf("autoCandidatesWithPreflight")
+        val pickIdx = runBody.indexOf("val autoPicks =")
         val manualIdx = runBody.indexOf("settings?.manualEngine")
         val anyPickIdx = listOf(pickIdx, manualIdx).filter { it >= 0 }.minOrNull() ?: -1
         assertTrue(
@@ -326,8 +324,8 @@ class OzeroVpnServiceLockdownKillswitchTest {
         assertTrue(
             lockdownEstablishIdx < anyPickIdx,
             "lockdownStartupFdRef.set (instant lockdown TUN) обязан случаться ДО выбора движка — " +
-                "иначе preflight probe (network call) при killswitch=on проходит без активного TUN " +
-                "и трафик утекает на этапе probe. lockdownIdx=$lockdownEstablishIdx pickIdx=$anyPickIdx",
+                "иначе startup selection начнётся до lockdown. " +
+                "lockdownIdx=$lockdownEstablishIdx pickIdx=$anyPickIdx",
         )
     }
 

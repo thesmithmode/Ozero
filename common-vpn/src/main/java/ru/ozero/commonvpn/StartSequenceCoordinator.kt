@@ -88,7 +88,11 @@ class StartSequenceCoordinator(
 
         val manualEngine = settings?.manualEngine
         val autoPicks = if (manualEngine == null) {
-            autoCandidatesWithPreflight(settings, trafficMode)
+            if (trafficMode == TrafficMode.TUN) {
+                autoCandidates(settings, trafficMode)
+            } else {
+                autoCandidatesWithPreflight(settings, trafficMode)
+            }
         } else {
             emptyList()
         }
@@ -253,21 +257,16 @@ class StartSequenceCoordinator(
             val chain = startChain(activeEngineId, activeConfig, notifyFailure) ?: return null
             return tun to chain
         }
-        val chain = startChain(activeEngineId, activeConfig, notifyFailure) ?: return null
-        val tun = establishTun(splitConfig, ipv6 = ipv6Enabled, customDns = customDns) ?: run {
-            runCatching { deps.chainOrchestrator.stop() }
-            reportEngineFailure(
-                activeEngineId,
-                "establishTun fail после startChain — UI не должен застрять в Connecting",
-                notifyFailure,
-            )
-            return null
-        }
+        val tun = establishTun(splitConfig, ipv6 = ipv6Enabled, customDns = customDns) ?: return null
         state.lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
         if (state.stopping.get()) {
             runCatching { tun.close() }
             state.tunFdRef.compareAndSet(tun, null)
-            runCatching { deps.chainOrchestrator.stop() }
+            return null
+        }
+        val chain = startChain(activeEngineId, activeConfig, notifyFailure) ?: run {
+            runCatching { tun.close() }
+            state.tunFdRef.compareAndSet(tun, null)
             return null
         }
         return tun to chain
