@@ -83,6 +83,7 @@ class TrafficStatsViewModelTest {
             val dayMs = 24L * 3_600_000L
             assertTrue(dao.lastObserveFromSince >= beforeCall - dayMs - 1_000L)
             assertTrue(dao.lastObserveFromSince <= beforeCall)
+            assertEquals(2_000, dao.lastObserveFromLimit)
         }
 
         @Test
@@ -92,6 +93,7 @@ class TrafficStatsViewModelTest {
             vm.setTimeframe(TrafficTimeframe.ALL)
             advanceUntilIdle()
             assertTrue(dao.observeAllCalled)
+            assertEquals(2_000, dao.lastObserveAllLimit)
         }
 
         @Test
@@ -515,18 +517,22 @@ class TrafficStatsViewModelTest {
         val flow = MutableStateFlow<List<SessionStatsEntity>>(emptyList())
         var lastObserveFromSince: Long = -1L
         var observeAllCalled: Boolean = false
+        var lastObserveFromLimit: Int = -1
+        var lastObserveAllLimit: Int = -1
         val deletedIds = mutableListOf<Long>()
         var clearCompletedCalls: Int = 0
 
         override fun observeRecent(limit: Int): Flow<List<SessionStatsEntity>> = flow
 
-        override fun observeFrom(since: Long): Flow<List<SessionStatsEntity>> {
+        override fun observeFrom(since: Long, limit: Int): Flow<List<SessionStatsEntity>> {
             lastObserveFromSince = since
+            lastObserveFromLimit = limit
             return flow
         }
 
-        override fun observeAll(): Flow<List<SessionStatsEntity>> {
+        override fun observeAll(limit: Int): Flow<List<SessionStatsEntity>> {
             observeAllCalled = true
+            lastObserveAllLimit = limit
             return flow
         }
 
