@@ -537,12 +537,7 @@ class RealUrnetworkSdkBridge(
         localState: LocalState,
         deviceInitMode: DeviceInitMode,
     ) {
-        val normalizedControlMode = UrnetworkProvideControlMode.ALWAYS.rawValue
-        val effectiveProvideMode = Sdk.ProvideModePublic
-        runCatching { localState.provideControlMode = normalizedControlMode }
-            .onFailure { PersistentLoggers.warn(TAG, "localState provideControlMode threw: ${it.message}") }
-        runCatching { localState.provideMode = effectiveProvideMode }
-            .onFailure { PersistentLoggers.warn(TAG, "localState provideMode threw: ${it.message}") }
+        val effectiveControlMode = UrnetworkProvideControlMode.fromRaw(localState.provideControlMode).rawValue
         val connectLocation = runCatching { localState.connectLocation }.getOrNull()
             ?.takeIf { it.isMeaningfulConnectLocation() }
             ?: bestAvailableConnectLocation()
@@ -553,13 +548,13 @@ class RealUrnetworkSdkBridge(
         runCatching { device.providePaused = deviceInitMode.providePaused }
             .onFailure { PersistentLoggers.warn(TAG, "providePaused threw: ${it.message}") }
         runCatching { device.routeLocal = localState.routeLocal }
-        runCatching { device.provideMode = effectiveProvideMode }
+        runCatching { device.provideMode = localState.provideMode }
         runCatching { localState.connectLocation = connectLocation }
         runCatching { localState.defaultLocation = defaultLocation }
         runCatching { device.connectLocation = connectLocation }
         runCatching { device.defaultLocation = defaultLocation }
         runCatching { device.canShowRatingDialog = localState.canShowRatingDialog }
-        runCatching { device.provideControlMode = normalizedControlMode }
+        runCatching { device.provideControlMode = effectiveControlMode }
         runCatching { device.vpnInterfaceWhileOffline = localState.vpnInterfaceWhileOffline }
         runCatching { device.canRefer = localState.canRefer }
         runCatching { device.allowForeground = localState.allowForeground }

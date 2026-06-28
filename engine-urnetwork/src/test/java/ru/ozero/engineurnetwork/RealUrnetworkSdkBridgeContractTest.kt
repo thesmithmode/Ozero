@@ -161,26 +161,20 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `applyDeviceFields мигрирует provider mode до открытия SDK controllers`() {
+    fun `applyDeviceFields preserves persisted provider mode`() {
         val block = source.substringAfter("private fun applyDeviceFields(")
             .substringBefore("private inline fun guardedRun")
         assertTrue(
-            block.contains("val normalizedControlMode = UrnetworkProvideControlMode.ALWAYS.rawValue"),
-            "applyDeviceFields обязан принудительно мигрировать localState.provideControlMode в ALWAYS " +
-                "до открытия controllers — старый persisted auto оставляет SDK в non-provider mode.",
+            block.contains("UrnetworkProvideControlMode.fromRaw(localState.provideControlMode)"),
+            "applyDeviceFields должен читать persisted provideControlMode, а не принудительно включать ALWAYS.",
         )
         assertTrue(
-            block.contains("val effectiveProvideMode = Sdk.ProvideModePublic"),
-            "applyDeviceFields обязан принудительно выставлять ProvideModePublic — иначе старый " +
-                "localState.provideMode=None переживает DataStore migration.",
+            block.contains("localState.provideMode"),
+            "applyDeviceFields должен сохранять SDK provideMode из localState.",
         )
         assertTrue(
-            block.contains("localState.provideControlMode = normalizedControlMode"),
-            "applyDeviceFields обязан сохранять migrated provideControlMode обратно в SDK localState.",
-        )
-        assertTrue(
-            block.contains("localState.provideMode = effectiveProvideMode"),
-            "applyDeviceFields обязан сохранять migrated provideMode обратно в SDK localState.",
+            !block.contains("localState.provideControlMode ="),
+            "applyDeviceFields не должен перезаписывать persisted provideControlMode при инициализации.",
         )
     }
 

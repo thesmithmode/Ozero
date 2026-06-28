@@ -7,22 +7,22 @@ import kotlin.test.assertTrue
 class UrnetworkRelayArchitectureSentinelTest {
 
     @Test
-    fun `relay coordinator always starts monitor with enabled sharing`() {
+    fun `relay coordinator gates monitor and lock on provide setting`() {
         val coordinator = source("src/main/java/ru/ozero/app/relay/UrnetworkRelayCoordinator.kt")
         val monitor = source("src/main/java/ru/ozero/app/relay/RelayNetworkMonitor.kt")
 
         assertTrue(
-            coordinator.contains("networkMonitor?.start(networkMode)"),
-            "RelayCoordinator обязан запускать RelayNetworkMonitor без legacy provideEnabled state.",
+            coordinator.contains("if (provideConfig.provideEnabled)") &&
+                coordinator.contains("networkMonitor?.start(networkMode)"),
+            "RelayCoordinator обязан запускать RelayNetworkMonitor только при enabled provide state.",
         )
         assertTrue(
-            coordinator.contains("relayLockManager?.acquire()") && !coordinator.contains("if (provideEnabled)"),
-            "RelayCoordinator обязан брать relay lock без legacy provideEnabled branch.",
+            coordinator.contains("relayLockManager?.acquire()"),
+            "RelayCoordinator обязан брать relay lock при enabled provide state.",
         )
         assertTrue(
-            monitor.contains("fun start(networkMode: UrnetworkProvideNetworkMode)") &&
-                !monitor.contains("provideEnabled"),
-            "RelayNetworkMonitor не должен принимать legacy provideEnabled state.",
+            monitor.contains("fun start(networkMode: UrnetworkProvideNetworkMode)"),
+            "RelayNetworkMonitor должен оставаться ответственным только за network mode runtime pause.",
         )
     }
 

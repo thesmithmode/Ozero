@@ -1,5 +1,6 @@
 package ru.ozero.app.relay
 
+import io.mockk.any
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -124,13 +125,13 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay передаёт setProvidePaused false даже когда configStore был выключен`() = relayTest {
+    fun `relay передаёт setProvidePaused true когда configStore был выключен`() = relayTest {
         setByClientJwt("test-jwt")
         configStore.update { it.copy(provideEnabled = false) }
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
         assertEquals(1, bridge.startCalls)
-        assertEquals(false, bridge.lastProvidePaused)
+        assertEquals(true, bridge.lastProvidePaused)
     }
 
     @Test
@@ -306,7 +307,7 @@ class UrnetworkRelayCoordinatorTest {
         configStore.setProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        assertEquals(UrnetworkProvideControlMode.ALWAYS, bridge.lastControlMode)
+        assertEquals(UrnetworkProvideControlMode.AUTO, bridge.lastControlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, bridge.lastNetworkMode)
     }
 
@@ -326,7 +327,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay starts monitor and acquires lock when config tried to disable provide`() {
+    fun `relay skips monitor and lock when config disables provide`() {
         val monitor = mockk<RelayNetworkMonitor>(relaxed = true)
         val locks = mockk<RelayLockManager>(relaxed = true)
         relayTest(networkMonitor = monitor, relayLockManager = locks) {
@@ -334,8 +335,8 @@ class UrnetworkRelayCoordinatorTest {
             configStore.update { it.copy(provideEnabled = false) }
             tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-            verify { monitor.start(UrnetworkProvideNetworkMode.WIFI) }
-            verify { locks.acquire() }
+            verify(exactly = 0) { monitor.start(any()) }
+            verify(exactly = 0) { locks.acquire() }
         }
     }
 
