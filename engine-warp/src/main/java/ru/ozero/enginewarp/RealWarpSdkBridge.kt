@@ -251,9 +251,12 @@ class RealWarpSdkBridge(
         }
         var anyProtected = false
         if (v4 > 0) {
-            val ok = protector.protect(v4)
+            val ok = try {
+                protector.protect(v4)
+            } finally {
+                closeRawFd(v4, "v4")
+            }
             Log.i(TAG, "protect v4 sock=$v4 ok=$ok")
-            closeRawFd(v4, "v4")
             if (!ok) {
                 PersistentLoggers.error(TAG, "protect v4 returned false — VpnService binding lost")
                 closeRawFd(v6, "v6")
@@ -262,9 +265,12 @@ class RealWarpSdkBridge(
             anyProtected = true
         }
         if (v6 > 0) {
-            val ok = protector.protect(v6)
+            val ok = try {
+                protector.protect(v6)
+            } finally {
+                closeRawFd(v6, "v6")
+            }
             Log.i(TAG, "protect v6 sock=$v6 ok=$ok")
-            closeRawFd(v6, "v6")
             if (!ok) {
                 PersistentLoggers.warn(TAG, "protect v6 returned false — continuing v4-only")
             } else {
