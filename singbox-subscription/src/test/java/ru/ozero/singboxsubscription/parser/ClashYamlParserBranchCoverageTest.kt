@@ -223,4 +223,39 @@ class ClashYamlParserBranchCoverageTest {
         val trojan = parsed[1] as TrojanBean
         assertEquals("tls", trojan.security)
     }
+
+    @Test
+    fun `parse rejects yaml aliases and nested collection scalar fields`() {
+        val aliased = """
+            shared: &shared
+              - nested
+              - values
+            proxies:
+              - name: *shared
+                type: ss
+                server: alias.example.com
+                port: 8388
+                cipher: chacha20-ietf-poly1305
+                password: secret
+        """.trimIndent()
+
+        assertTrue(ClashYamlParser.parse(aliased).isEmpty())
+
+        val nestedCollection = """
+            proxies:
+              - name:
+                  - nested
+                  - - rejected
+                type: ss
+                server: nested.example.com
+                port: 8388
+                cipher: chacha20-ietf-poly1305
+                password: secret
+        """.trimIndent()
+
+        val parsed = ClashYamlParser.parse(nestedCollection)
+
+        assertEquals(1, parsed.size)
+        assertEquals("", parsed.first().name)
+    }
 }
