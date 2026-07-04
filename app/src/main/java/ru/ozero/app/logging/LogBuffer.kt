@@ -22,6 +22,18 @@ class LogBuffer(private val capacity: Int = DEFAULT_CAPACITY) {
         _entries.value = snapshot
     }
 
+    fun appendAll(entries: List<LogEntry>) {
+        if (entries.isEmpty()) return
+        val snapshot = synchronized(lock) {
+            for (entry in entries) {
+                if (deque.size >= capacity) deque.pollFirst()
+                deque.addLast(entry)
+            }
+            deque.toList()
+        }
+        _entries.value = snapshot
+    }
+
     fun clear() {
         synchronized(lock) { deque.clear() }
         _entries.value = emptyList()
