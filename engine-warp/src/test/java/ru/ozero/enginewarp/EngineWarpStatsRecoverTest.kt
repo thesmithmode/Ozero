@@ -209,7 +209,7 @@ class EngineWarpStatsRecoverTest {
     }
 
     @Test
-    fun `recover reattach stays success even when handshake never succeeds`() = runTest {
+    fun `recover reattach reports failed when handshake never succeeds`() = runTest {
         val bridge = FakeBridge()
         val e = newEngine(
             bridge = bridge,
@@ -221,12 +221,13 @@ class EngineWarpStatsRecoverTest {
         e.start(EngineConfig.Warp, Upstream.None)
         e.attachTun(tunFd = 11)
         assertIs<EnginePlugin.RecoverResult.Failed>(e.recover())
-        assertIs<EnginePlugin.RecoverResult.Success>(e.recover())
+        val second = assertIs<EnginePlugin.RecoverResult.Failed>(e.recover())
+        assertEquals("reattach handshake pending", second.reason)
         assertEquals(2, bridge.attachCalls)
     }
 
     @Test
-    fun `recover second stale returns success when handshakeChecker throws during reattach wait`() = runTest {
+    fun `recover second stale reports failed when handshakeChecker throws during reattach wait`() = runTest {
         val bridge = FakeBridge()
         val reader = FixedReader(WarpUapiState(handshakeAgeSeconds = 999L, rxBytes = 1L, txBytes = 2L, peersSeen = 1))
         val e = newEngine(
@@ -241,7 +242,8 @@ class EngineWarpStatsRecoverTest {
         assertIs<EnginePlugin.RecoverResult.Failed>(e.recover())
         val second = e.recover()
 
-        assertIs<EnginePlugin.RecoverResult.Success>(second)
+        val failed = assertIs<EnginePlugin.RecoverResult.Failed>(second)
+        assertEquals("reattach handshake pending", failed.reason)
         assertEquals(2, bridge.attachCalls)
         assertEquals(1, bridge.detachCalls)
     }

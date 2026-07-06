@@ -240,13 +240,18 @@ class EngineWarp(
             @Suppress("UNREACHABLE_CODE")
             false
         } ?: false
-        consecutiveRecoverFails = 0
         return if (handshakeOk) {
+            consecutiveRecoverFails = 0
             PersistentLoggers.info(TAG, "recover: reattach success - handshake established")
             EnginePlugin.RecoverResult.Success
         } else {
-            PersistentLoggers.warn(TAG, "recover: reattach done but handshake pending")
-            EnginePlugin.RecoverResult.Success
+            val pendingState = runCatching { uapiStateReader(uapiPath, TUNNEL_NAME) }.getOrNull()
+            PersistentLoggers.warn(
+                TAG,
+                "recover: reattach done but handshake pending " +
+                    "state=${pendingState?.toDiagString() ?: "unavailable"}",
+            )
+            EnginePlugin.RecoverResult.Failed("reattach handshake pending")
         }
     }
 
