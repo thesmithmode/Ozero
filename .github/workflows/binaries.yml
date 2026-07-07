@@ -418,6 +418,32 @@ jobs:
           ENGINE_NAME: ${{ env.ARTIFACT }}
         run: |
           set -euo pipefail
+          protected_tags="$(mktemp)"
+          python3 - <<'PY' > "$protected_tags"
+          import re
+          import subprocess
+
+          repo = "${{ github.repository }}"
+          pattern = re.compile(r"github\.com/" + re.escape(repo) + r"/releases/download/([^/]+)")
+          refs = ["HEAD"]
+          remote_refs = subprocess.check_output(
+              ["git", "for-each-ref", "--format=%(refname:short)", "refs/remotes/origin"],
+              text=True,
+          ).splitlines()
+          refs.extend(ref for ref in remote_refs if ref != "origin/HEAD")
+          tags = set()
+          for ref in refs:
+              blob = subprocess.run(
+                  ["git", "show", f"{ref}:build-tools/binaries.lock.yaml"],
+                  check=False,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.DEVNULL,
+                  text=True,
+              ).stdout
+              tags.update(pattern.findall(blob))
+          print("\n".join(sorted(tags)))
+          PY
+
           gh release list --limit 100 --json tagName,isPrerelease,createdAt \
             -R "${{ github.repository }}" \
             | jq -r --arg e "$ENGINE_NAME" '
@@ -425,6 +451,10 @@ jobs:
                 | sort_by(.createdAt) | reverse | .[3:] | .[].tagName' \
             | while read -r old; do
                 [ -z "$old" ] && continue
+                if grep -Fxq "$old" "$protected_tags"; then
+                  echo "Preserving locked prerelease: $old"
+                  continue
+                fi
                 echo "Deleting old prerelease: $old"
                 gh release delete "$old" --yes --cleanup-tag -R "${{ github.repository }}" || true
               done
