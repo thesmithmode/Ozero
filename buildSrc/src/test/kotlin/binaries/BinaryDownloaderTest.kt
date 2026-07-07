@@ -65,6 +65,26 @@ class BinaryDownloaderTest {
     }
 
     @Test
+    fun `poisoned cache hit is discarded and refetched before copy`() {
+        val data = "byedpi-binary".toByteArray()
+        val poisoned = "poisoned-binary".toByteArray()
+        val sha = sha256(data)
+        server.enqueue(bodyResponse(data))
+        val cache = tmp.resolve("cache")
+        val cached = cache.resolve(sha).resolve("libbyedpi.so")
+        val dst = tmp.resolve("out/libbyedpi.so")
+        Files.createDirectories(cached.parent)
+        Files.write(cached, poisoned)
+        val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = listOf(0, 0, 0))
+
+        downloader.download(server.url("/x.so").toString(), sha, dst)
+
+        assertThat(Files.readAllBytes(dst)).isEqualTo(data)
+        assertThat(Files.readAllBytes(cached)).isEqualTo(data)
+        assertThat(server.requestCount).isEqualTo(1)
+    }
+
+    @Test
     fun `503 503 200 — retries succeed`() {
         val data = "byedpi-binary".toByteArray()
         server.enqueue(MockResponse().setResponseCode(503))
