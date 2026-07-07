@@ -2,11 +2,15 @@ package ru.ozero.app.selfupdate
 
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody
+import okio.BufferedSource
+import okio.buffer
+import okio.source
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -72,6 +76,25 @@ class ApkDownloaderTest {
     }
 
     @Test
+    fun `signature with unknown length is streamed with size limit`() = runTest {
+        val dest = tempDir.toFile()
+        val downloader = ApkDownloader(
+            client = clientOf(
+                "https://x/a.apk" to ResponseSpec(200, ByteArray(4) { 1 }),
+                "https://x/a.sig" to ResponseSpec(200, ByteArray(1024 * 1024) { 2 }, declaredLength = -1),
+            ),
+            maxSigBytes = 4,
+        )
+
+        val events = downloader.download("https://x/a.apk", "https://x/a.sig", dest).toList()
+
+        val failed = assertIs<ApkDownloader.Event.Failed>(events.last())
+        assertTrue(failed.reason.contains("limit"))
+        assertTrue(File(dest, ApkDownloader.APK_NAME).notExists())
+        assertTrue(File(dest, ApkDownloader.SIG_NAME).notExists())
+    }
+
+    @Test
     fun `mkdirs failure emits failed`() = runTest {
         val blockedParent = File(tempDir.toFile(), "blocked-parent").apply { writeText("x") }
         val blocked = File(blockedParent, "child")
@@ -83,7 +106,11 @@ class ApkDownloaderTest {
         assertTrue(failed.reason.contains("недоступен"))
     }
 
-    private data class ResponseSpec(val code: Int, val bodyBytes: ByteArray)
+    private data class ResponseSpec(
+        val code: Int,
+        val bodyBytes: ByteArray,
+        val declaredLength: Long = bodyBytes.size.toLong(),
+    )
 
     private fun clientOf(vararg specs: Pair<String, ResponseSpec>): OkHttpClient {
         val map = specs.toMap()
@@ -96,10 +123,18 @@ class ApkDownloaderTest {
                     .protocol(Protocol.HTTP_1_1)
                     .code(spec.code)
                     .message("ok")
-                    .body(ResponseBody.create("application/octet-stream".toMediaType(), spec.bodyBytes))
+                    .body(responseBodyOf(spec))
                     .build()
             }
             .build()
+    }
+
+    private fun responseBodyOf(spec: ResponseSpec): ResponseBody = object : ResponseBody() {
+        override fun contentType(): MediaType = "application/octet-stream".toMediaType()
+
+        override fun contentLength(): Long = spec.declaredLength
+
+        override fun source(): BufferedSource = spec.bodyBytes.inputStream().source().buffer()
     }
 
     private fun File.notExists(): Boolean = !exists()

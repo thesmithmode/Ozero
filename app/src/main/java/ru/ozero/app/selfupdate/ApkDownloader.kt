@@ -143,15 +143,35 @@ open class ApkDownloader(
         val req = Request.Builder().url(url).build()
         client.newCall(req).execute().use { resp ->
             val body = ensureSuccessfulBody(resp, url)
-            if (body.contentLength() > sizeLimit) {
-                throw SizeLimitException("sig size ${body.contentLength()} > limit $sizeLimit")
-            }
-            val bytes = body.bytes()
-            if (bytes.size.toLong() > sizeLimit) {
-                throw SizeLimitException("sig actual ${bytes.size} > limit $sizeLimit")
-            }
-            out.writeBytes(bytes)
+            val total = headerSize(body, sizeLimit)
+            streamFlat(body, out, total, sizeLimit)
         }
+    }
+
+    private fun streamFlat(body: okhttp3.ResponseBody, out: File, total: Long, sizeLimit: Long) {
+        body.byteStream().use { src ->
+            out.outputStream().use { sink ->
+                copyLimited(src, sink, total, sizeLimit)
+            }
+        }
+    }
+
+    private fun copyLimited(
+        src: java.io.InputStream,
+        sink: java.io.OutputStream,
+        total: Long,
+        sizeLimit: Long,
+    ) {
+        val buf = ByteArray(minOf(BUFFER.toLong(), sizeLimit.coerceAtLeast(1L)).toInt())
+        var copied = 0L
+        while (true) {
+            val n = src.read(buf)
+            if (n < 0) break
+            copied += n
+            if (copied > sizeLimit) throw SizeLimitException("copied $copied > limit $sizeLimit")
+            sink.write(buf, 0, n)
+        }
+        if (total >= 0 && copied != total) throw IOException("incomplete body")
     }
 
     private class SizeLimitException(msg: String) : IOException(msg)
