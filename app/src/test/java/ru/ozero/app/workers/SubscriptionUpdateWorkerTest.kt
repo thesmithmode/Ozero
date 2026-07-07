@@ -2,6 +2,7 @@ package ru.ozero.app.workers
 
 import org.junit.jupiter.api.Test
 import ru.ozero.singboxroom.entity.SubscriptionGroup
+import java.io.File
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -31,5 +32,17 @@ class SubscriptionUpdateWorkerTest {
         )
 
         assertTrue(group.shouldRunSingboxSubscriptionUpdate(now = due))
+    }
+
+    @Test
+    fun `subscription update worker does not run background singbox probes`() {
+        val source = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/workers/SubscriptionUpdateWorker.kt",
+        ).readText()
+
+        assertFalse(source.contains("SingboxProbeService"))
+        assertFalse(source.contains("probeAndAutoSelect"))
+        assertFalse(source.contains("getAutoCandidatesByGroupId"))
     }
 }

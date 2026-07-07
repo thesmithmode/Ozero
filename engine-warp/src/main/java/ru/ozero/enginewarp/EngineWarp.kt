@@ -240,13 +240,18 @@ class EngineWarp(
             @Suppress("UNREACHABLE_CODE")
             false
         } ?: false
-        consecutiveRecoverFails = 0
         return if (handshakeOk) {
+            consecutiveRecoverFails = 0
             PersistentLoggers.info(TAG, "recover: reattach success - handshake established")
             EnginePlugin.RecoverResult.Success
         } else {
-            PersistentLoggers.warn(TAG, "recover: reattach done but handshake pending")
-            EnginePlugin.RecoverResult.Success
+            val pendingState = runCatching { uapiStateReader(uapiPath, TUNNEL_NAME) }.getOrNull()
+            PersistentLoggers.warn(
+                TAG,
+                "recover: reattach done but handshake pending " +
+                    "state=${pendingState?.toDiagString() ?: "unavailable"}",
+            )
+            EnginePlugin.RecoverResult.Failed("reattach handshake pending")
         }
     }
 
@@ -386,8 +391,7 @@ class EngineWarp(
                 TunAttachResult.Success
             }
             is WarpSdkBridge.AttachResult.Failed -> {
-                val maskedIni = ini.replace(Regex("(?m)^(PrivateKey\\s*=\\s*)(.+)$"), "$1<masked>")
-                PersistentLoggers.error(TAG, "attachTun failed: ${r.reason}\nini:\n$maskedIni")
+                PersistentLoggers.error(TAG, "attachTun failed: ${r.reason}")
                 TunAttachResult.Failure(r.reason)
             }
         }

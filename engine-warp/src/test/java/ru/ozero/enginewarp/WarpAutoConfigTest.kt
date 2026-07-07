@@ -108,6 +108,7 @@ class WarpAutoConfigTest {
             mirrors = listOf("https://only-mirror.example/api/warp"),
             concurrency = 1,
             shuffler = { it },
+            base64Decoder = { Base64.getDecoder().decode(it) },
         )
 
         auto.register()
@@ -645,6 +646,7 @@ class WarpAutoConfigTest {
             mirrors = listOf("https://test-mirror/api/warp"),
             concurrency = 1,
             shuffler = { it },
+            base64Decoder = { Base64.getDecoder().decode(it) },
         )
 
     private fun escape(s: String): String {

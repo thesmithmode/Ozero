@@ -138,4 +138,14 @@ class BootDiagnosticsRuntimeTest {
         assertEquals("SIGTERM", BootDiagnostics.signalToString(15))
         assertEquals("SIGSTOP", BootDiagnostics.signalToString(19))
     }
+
+    @Test
+    fun `heapSummary includes bounded heap counters for crash diagnostics`() {
+        val summary = BootDiagnostics.heapSummary()
+
+        assertTrue(summary.contains("used="))
+        assertTrue(summary.contains("total="))
+        assertTrue(summary.contains("free="))
+        assertTrue(summary.contains("max="))
+    }
 }

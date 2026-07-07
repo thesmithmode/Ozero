@@ -1,5 +1,6 @@
 package ru.ozero.enginewarp
 
+import android.util.Base64
 import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -11,7 +12,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import ru.ozero.enginescore.PersistentLoggers
 import java.io.IOException
-import java.util.Base64
 
 class ProxyWarpAutoConfig(
     private val httpClient: HttpClient,
@@ -21,6 +21,7 @@ class ProxyWarpAutoConfig(
     private val userAgent: String = DEFAULT_USER_AGENT,
     private val ranker: MirrorRanker = NoopMirrorRanker,
     private val shuffler: ((List<String>) -> List<String>)? = null,
+    private val base64Decoder: (String) -> ByteArray = { Base64.decode(it, Base64.DEFAULT) },
 ) : WarpAutoConfig {
 
     @Volatile private var lastSuccessMs: Long = 0L
@@ -206,7 +207,7 @@ class ProxyWarpAutoConfig(
             val b64 = content.optString("configBase64", "")
             if (b64.isNotBlank()) {
                 return runCatching {
-                    String(Base64.getDecoder().decode(b64), Charsets.UTF_8)
+                    String(base64Decoder(b64), Charsets.UTF_8)
                 }.getOrNull()?.let { decoded ->
                     val ini = findInterfaceBlock(decoded) ?: decoded
                     ExtractedIni(ini, "configBase64")

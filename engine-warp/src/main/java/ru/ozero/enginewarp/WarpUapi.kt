@@ -12,6 +12,9 @@ data class WarpUapiState(
     val peersSeen: Int,
 )
 
+internal fun WarpUapiState.toDiagString(): String =
+    "peers=$peersSeen rx=$rxBytes tx=$txBytes hsAge=${handshakeAgeSeconds ?: "never"}"
+
 internal object WarpUapi {
 
     fun readState(uapiPath: String, tunnelName: String): WarpUapiState? {

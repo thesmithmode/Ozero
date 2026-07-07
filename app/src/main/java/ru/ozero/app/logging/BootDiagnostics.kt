@@ -49,7 +49,8 @@ object BootDiagnostics {
             runCatching {
                 BootFileLogger.error(
                     TAG,
-                    "uncaught thread=${thread.name} tid=${thread.id} type=${throwable.javaClass.name}",
+                    "uncaught thread=${thread.name} tid=${thread.id} type=${throwable.javaClass.name} " +
+                        "heap=${heapSummary()}",
                     throwable,
                 )
             }
@@ -166,5 +167,16 @@ object BootDiagnostics {
         else -> "signal=$signal"
     }
 
+    internal fun heapSummary(): String = runCatching {
+        val runtime = Runtime.getRuntime()
+        val max = runtime.maxMemory()
+        val total = runtime.totalMemory()
+        val free = runtime.freeMemory()
+        val used = total - free
+        "used=${used / BYTES_IN_MIB}MiB total=${total / BYTES_IN_MIB}MiB " +
+            "free=${free / BYTES_IN_MIB}MiB max=${max / BYTES_IN_MIB}MiB"
+    }.getOrDefault("unavailable")
+
+    private const val BYTES_IN_MIB = 1024L * 1024L
     private const val MAX_REASONS = 10
 }
