@@ -51,25 +51,30 @@ jobs:
       - name: Download URnetwork AAR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          URNETWORK_SDK_TAG: urnetwork-sdk-b35b0ec5
+          URNETWORK_SDK_SHA256: f3f28bcbe36e9c9cf82793e440ce1fd0abf59196af0d8408df0153449bd33f2f
         run: |
           set -euo pipefail
           mkdir -p engine-urnetwork/libs
-          TAG=$(gh release list --limit 100 --json tagName \
-            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
-            | head -n1 | tr -d '"')
-          if [ -z "$TAG" ]; then
-            echo "::error::no urnetwork-sdk release found"
+          rm -f engine-urnetwork/libs/*.aar engine-urnetwork/libs/*.jar engine-urnetwork/libs/*.sha256
+          gh release download "$URNETWORK_SDK_TAG" -p "URnetworkSdk.aar" -D engine-urnetwork/libs --clobber
+          gh release download "$URNETWORK_SDK_TAG" -p "URnetworkSdk.aar.sha256" -D engine-urnetwork/libs --clobber
+          PUBLISHED_SHA256=$(awk '{print $1}' engine-urnetwork/libs/URnetworkSdk.aar.sha256)
+          if [ "$PUBLISHED_SHA256" != "$URNETWORK_SDK_SHA256" ]; then
+            echo "::error::URnetworkSdk.aar.sha256 does not match pinned digest"
             exit 1
           fi
-          gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
-          for aar in engine-urnetwork/libs/*.aar; do
-            [ -f "$aar" ] || continue
-            tmpdir=$(mktemp -d)
-            unzip -o "$aar" -d "$tmpdir/aar-exploded"
-            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
-            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
-            rm -rf "$tmpdir"
-          done
+          printf '%s  %s\n' "$URNETWORK_SDK_SHA256" engine-urnetwork/libs/URnetworkSdk.aar | sha256sum -c -
+          find engine-urnetwork/libs -maxdepth 1 -type f \( -name '*.aar' -o -name '*.jar' \) ! -name 'URnetworkSdk.aar' -print -quit | grep -q . && {
+            echo "::error::unexpected URnetwork classpath artifact"
+            exit 1
+          }
+          aar=engine-urnetwork/libs/URnetworkSdk.aar
+          tmpdir=$(mktemp -d)
+          unzip -o "$aar" -d "$tmpdir/aar-exploded"
+          zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
+          (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
+          rm -rf "$tmpdir"
 
       - name: Download and explode Singbox AAR
         env:
