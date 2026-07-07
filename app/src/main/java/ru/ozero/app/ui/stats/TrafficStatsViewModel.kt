@@ -110,7 +110,7 @@ class TrafficStatsViewModel @Inject constructor(
 
     val sessions: StateFlow<List<SessionStatsEntity>> =
         combine(filteredSessions, sessionSortRef) { sessions, sort ->
-            applySortForDrillDown(sessions, sort)
+            applySortForDrillDown(sessions, sort).take(DRILLDOWN_SESSION_LIMIT)
         }.distinctUntilChanged()
             .stateIn(
                 scope = viewModelScope,
@@ -153,7 +153,8 @@ class TrafficStatsViewModel @Inject constructor(
         }
     }
 
-    private companion object {
+    internal companion object {
+        const val DRILLDOWN_SESSION_LIMIT = 200
 
         fun buildChartData(
             sessions: List<SessionStatsEntity>,

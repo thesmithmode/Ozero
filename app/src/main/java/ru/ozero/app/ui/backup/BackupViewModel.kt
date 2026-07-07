@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import ru.ozero.app.util.readBytesBounded
 import ru.ozero.corebackup.AppBackupData
 import ru.ozero.corebackup.AppBackupManager
 import ru.ozero.corebackup.AppBackupSerializer
@@ -50,7 +51,9 @@ class BackupViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = BackupUiState.InProgress
             runCatching {
-                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                val bytes = context.contentResolver.openInputStream(uri)?.use {
+                    it.readBytesBounded(MAX_IMPORT_BYTES)
+                }
                     ?: throw IOException("Cannot open input stream for $uri")
                 AppBackupSerializer.deserializeAuto(bytes)
             }.fold(
@@ -95,8 +98,9 @@ class BackupViewModel @Inject constructor(
         _uiState.value = BackupUiState.Idle
     }
 
-    private companion object {
+    internal companion object {
         const val TAG = "BackupViewModel"
+        const val MAX_IMPORT_BYTES = 10 * 1024 * 1024
     }
 }
 

@@ -122,6 +122,7 @@ brotli-dec = { module = "org.brotli:dec", version.ref = "brotliDec" }
 # BouncyCastle
 bouncycastle-prov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
+bouncycastle-util = { module = "org.bouncycastle:bcutil-jdk18on", version.ref = "bouncycastle" }
 
 relinker = { module = "com.getkeepsafe.relinker:relinker", version.ref = "relinker" }
 
@@ -191,7 +192,7 @@ compose = ["compose-ui", "compose-ui-graphics", "compose-ui-tooling-preview", "c
 room = ["room-runtime", "room-ktx"]
 coroutines = ["coroutines-core", "coroutines-android"]
 okhttp = ["okhttp-core", "okhttp-logging"]
-bouncycastle = ["bouncycastle-prov", "bouncycastle-pkix"]
+bouncycastle = ["bouncycastle-prov", "bouncycastle-pkix", "bouncycastle-util"]
 junit5 = ["junit-jupiter-api", "junit-jupiter-params"]
 testing-unit = ["mockk-core", "coroutines-test", "kotlin-test"]
 testing-android = ["espresso-core", "test-ext-junit", "mockk-android"]

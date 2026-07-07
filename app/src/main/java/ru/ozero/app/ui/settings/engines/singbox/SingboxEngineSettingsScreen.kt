@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
+import ru.ozero.app.util.readTextBounded
 import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 
@@ -76,7 +77,9 @@ fun SingboxEngineSettingsScreen(
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         val text = runCatching {
-            context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() }
+            context.contentResolver.openInputStream(uri)?.use {
+                it.readTextBounded(MAX_SINGBOX_IMPORT_BYTES)
+            }
         }.getOrNull() ?: return@rememberLauncherForActivityResult
         val fileName = uri.lastPathSegment
         viewModel.onImportFromFile(text, fileName)
@@ -785,3 +788,5 @@ private fun lerpColor(start: Color, end: Color, fraction: Float): Color = Color(
     blue = start.blue + (end.blue - start.blue) * fraction,
     alpha = start.alpha + (end.alpha - start.alpha) * fraction,
 )
+
+private const val MAX_SINGBOX_IMPORT_BYTES = 2 * 1024 * 1024

@@ -2,7 +2,9 @@ package ru.ozero.app.logging
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import java.io.BufferedReader
 import java.io.File
+import java.io.StringReader
 import java.nio.file.Path
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -75,6 +77,26 @@ class BootDiagnosticsTombstoneTest {
 
         assertTrue(debugDir.isDirectory)
         assertTrue(saved.exists())
+    }
+
+    @Test
+    fun `readBytesTruncated caps payload and marks truncation`() {
+        val payload = byteArrayOf(1, 2, 3, 4, 5)
+
+        val result = BootDiagnostics.readBytesTruncated(payload.inputStream(), maxBytes = 3)
+
+        assertEquals(listOf<Byte>(1, 2, 3), result.bytes.toList())
+        assertTrue(result.truncated)
+    }
+
+    @Test
+    fun `readTextTruncated caps payload and marks truncation`() {
+        val reader = BufferedReader(StringReader("abcdef"))
+
+        val result = BootDiagnostics.readTextTruncated(reader, maxChars = 4)
+
+        assertEquals("abcd", result.text)
+        assertTrue(result.truncated)
     }
 
     @Test

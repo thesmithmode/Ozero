@@ -467,6 +467,21 @@ class TrafficStatsViewModelTest {
             advanceUntilIdle()
             assertFalse(vm.sessionsExpanded.value)
         }
+
+        @Test
+        fun `sessions drilldown is capped while summary keeps full count`() = runTest {
+            val vm = vm()
+            advanceUntilIdle()
+            val total = TrafficStatsViewModel.DRILLDOWN_SESSION_LIMIT + 25
+            dao.flow.value = (1..total).map { id ->
+                sample(id = id.toLong(), startedAt = id.toLong())
+            }
+            advanceUntilIdle()
+
+            assertEquals(total, vm.summary.value.sessionCount)
+            assertEquals(TrafficStatsViewModel.DRILLDOWN_SESSION_LIMIT, vm.sessions.value.size)
+            assertEquals(total.toLong(), vm.sessions.value.first().id)
+        }
     }
 
     @Nested
