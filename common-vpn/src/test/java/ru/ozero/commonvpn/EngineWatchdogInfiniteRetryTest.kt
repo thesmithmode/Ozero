@@ -74,6 +74,7 @@ class EngineWatchdogInfiniteRetryTest {
             enginePlugins = setOf(plugin),
             tunnelController = controller,
             chainOrchestrator = mockk<ChainOrchestrator>(relaxed = true),
+            tunnelGateway = mockk(relaxed = true),
             notificationFactory = mockk<OzeroNotificationFactory>(relaxed = true),
             tunFdRef = AtomicReference<ParcelFileDescriptor?>(mockk<ParcelFileDescriptor>(relaxed = true)),
             lockdownStartupFdRef = AtomicReference<ParcelFileDescriptor?>(null),

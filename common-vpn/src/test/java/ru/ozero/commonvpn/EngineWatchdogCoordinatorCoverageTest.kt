@@ -25,6 +25,8 @@ import ru.ozero.enginescore.EngineStats
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
@@ -545,6 +547,29 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
+    fun `handleEngineFailure active with killswitch stops native tunnel gateway`() = runTest {
+        val stopLatch = CountDownLatch(1)
+        val tunnelGateway = mockk<HevTunnelGateway>()
+        every { tunnelGateway.stop() } answers {
+            stopLatch.countDown()
+            Unit
+        }
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            controller = connectedController(EngineId.BYEDPI),
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+            tunnelGateway = tunnelGateway,
+        )
+
+        val handled = watchdog.handleEngineFailure(EngineId.BYEDPI, "fatal")
+
+        assertTrue(handled)
+        assertTrue(stopLatch.await(1, TimeUnit.SECONDS))
+        verify(exactly = 1) { tunnelGateway.stop() }
+    }
+
+    @Test
     fun `handleEngineFailure for failed state with same engine enters killswitch`() = runTest {
         val controller = TunnelController().apply {
             onProbing(EngineId.BYEDPI)
@@ -994,6 +1019,7 @@ class EngineWatchdogCoordinatorCoverageTest {
         killswitch: Boolean,
         stopping: Boolean = false,
         stopCount: AtomicReference<Int> = AtomicReference(0),
+        tunnelGateway: HevTunnelGateway = mockk(relaxed = true),
     ): EngineWatchdogCoordinator {
         coEvery { chain.stop() } returns Unit
         every { notificationFactory.notifyStats(any()) } returns Unit
@@ -1003,6 +1029,7 @@ class EngineWatchdogCoordinatorCoverageTest {
             enginePlugins = plugins,
             tunnelController = controller,
             chainOrchestrator = chain,
+            tunnelGateway = tunnelGateway,
             notificationFactory = notificationFactory,
             tunFdRef = AtomicReference(tunFd),
             lockdownStartupFdRef = AtomicReference(lockdownFd),

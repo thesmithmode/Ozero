@@ -22,6 +22,7 @@ class EngineWatchdogCoordinator(
     private val enginePlugins: Set<EnginePlugin>,
     private val tunnelController: TunnelController,
     private val chainOrchestrator: ChainOrchestrator,
+    private val tunnelGateway: HevTunnelGateway,
     private val notificationFactory: OzeroNotificationFactory,
     private val tunFdRef: AtomicReference<ParcelFileDescriptor?>,
     private val lockdownStartupFdRef: AtomicReference<ParcelFileDescriptor?>,
@@ -207,6 +208,15 @@ class EngineWatchdogCoordinator(
                 .onFailure { t ->
                     PersistentLoggers.warn(TAG, "killswitch: chainOrchestrator.stop threw: ${t.message}")
                 }
+        }
+        Thread({
+            runCatching { tunnelGateway.stop() }
+                .onFailure { t ->
+                    PersistentLoggers.warn(TAG, "killswitch: tunnelGateway.stop threw: ${t.message}")
+                }
+        }, "ozero-killswitch-native-stop").also {
+            it.isDaemon = true
+            it.start()
         }
         runCatching { healthMonitor.stop() }
         notificationFactory.notifyStats("Killswitch активен — трафик заблокирован")
