@@ -435,6 +435,7 @@
     <string name="logs_empty">(vazio — o registro ainda não foi escrito)</string>
     <string name="logs_share_chooser_title">Compartilhar ozero.log</string>
     <string name="logs_copy_empty_toast">Vazio — nada para copiar</string>
+    <string name="logs_copy_done_private_toast_fmt">Copiado com segredos ocultos (%1$d caracteres). A área de transferência será limpa em um minuto.</string>
     <string name="logs_copy_done_toast_fmt">Copiado (%1$d caracteres)</string>
     <string name="logs_export">Exportar .log</string>
     <string name="logs_export_level_title">Nível mínimo</string>
