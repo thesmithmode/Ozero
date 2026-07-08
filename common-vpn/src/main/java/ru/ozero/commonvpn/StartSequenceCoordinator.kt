@@ -393,11 +393,11 @@ class StartSequenceCoordinator(
         PersistentLoggers.debug(
             TAG,
             "engineTUN params: engine=$engineId mode=${splitConfig.mode} " +
-                "blocklist=${splitConfig.blocklist.size}[${splitConfig.blocklist.joinToString(",")}] " +
+                "blocklist=${splitConfig.blocklist.size} " +
                 "allowlist=${splitConfig.allowlist.size} " +
                 "allowFamilyV4=${spec.allowFamilyV4} allowFamilyV6=${spec.allowFamilyV6} " +
                 "routeAllV4=${spec.routeAllV4} routeAllV6=${spec.routeAllV6} " +
-                "dns=${spec.dnsServers} ipv6Enabled=$ipv6Enabled",
+                "dns=${spec.dnsServers.size} ipv6Enabled=$ipv6Enabled",
         )
         val before = TunInterfaceStats.snapshotTunInterfaces()
         val pfd = try {
