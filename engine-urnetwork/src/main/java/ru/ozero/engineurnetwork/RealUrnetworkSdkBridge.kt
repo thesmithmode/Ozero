@@ -289,65 +289,69 @@ class RealUrnetworkSdkBridge(
     }
 
     private suspend fun stopUnderLock() {
-        runCatching { bridgeScope.coroutineContext.cancelChildren() }
-        contractStatusListener.detach()
-        detachConnectionStatusListener()
-        detachSelectedLocationListener()
-        tunnelStartedRef.set(false)
-        connectIssuedRef.set(false)
-        sharingTrafficLogged.set(false)
-        val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
-            withContext(Dispatchers.Main.immediate) {
-                walletVcRef.getAndSet(null)?.also { vc ->
-                    runCatching { vc.close() }
-                        .onFailure { PersistentLoggers.warn(TAG, "walletVc.close threw: ${it.message}") }
-                }
-                connectVcRef.getAndSet(null)?.also { vc ->
-                    runCatching { vc.disconnect() }
-                        .onFailure { PersistentLoggers.warn(TAG, "connectVc.disconnect threw: ${it.message}") }
-                    runCatching { vc.close() }
-                        .onFailure { PersistentLoggers.warn(TAG, "connectVc.close threw: ${it.message}") }
-                }
-                val hadLoop = ioLoopRef.getAndSet(null)?.also { loop ->
-                    runCatching { loop.close() }
-                        .onFailure { PersistentLoggers.warn(TAG, "ioLoop.close threw: ${it.message}") }
-                } != null
-                if (!hadLoop) {
-                    deviceRef.getAndSet(null)?.also { device -> closeDevice(device) }
-                } else {
-                    deviceRef.set(null)
+        try {
+            runCatching { bridgeScope.coroutineContext.cancelChildren() }
+            contractStatusListener.detach()
+            detachConnectionStatusListener()
+            detachSelectedLocationListener()
+            tunnelStartedRef.set(false)
+            connectIssuedRef.set(false)
+            sharingTrafficLogged.set(false)
+            val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
+                withContext(Dispatchers.Main.immediate) {
+                    walletVcRef.getAndSet(null)?.also { vc ->
+                        runCatching { vc.close() }
+                            .onFailure { PersistentLoggers.warn(TAG, "walletVc.close threw: ${it.message}") }
+                    }
+                    connectVcRef.getAndSet(null)?.also { vc ->
+                        runCatching { vc.disconnect() }
+                            .onFailure { PersistentLoggers.warn(TAG, "connectVc.disconnect threw: ${it.message}") }
+                        runCatching { vc.close() }
+                            .onFailure { PersistentLoggers.warn(TAG, "connectVc.close threw: ${it.message}") }
+                    }
+                    val hadLoop = ioLoopRef.getAndSet(null)?.also { loop ->
+                        runCatching { loop.close() }
+                            .onFailure { PersistentLoggers.warn(TAG, "ioLoop.close threw: ${it.message}") }
+                    } != null
+                    if (!hadLoop) {
+                        deviceRef.getAndSet(null)?.also { device -> closeDevice(device) }
+                    } else {
+                        deviceRef.set(null)
+                    }
                 }
             }
-        }
-        if (completed == null) {
-            PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms - refs cleared")
-        }
-        val releaseOutcome = runCatching {
-            withTimeoutOrNull(RUNTIME_RELEASE_TIMEOUT_MS) { UrnetworkRuntime.release() }
-        }
-        val released = when {
-            releaseOutcome.isFailure -> {
-                PersistentLoggers.warn(
-                    TAG,
-                    "runtime release threw: ${releaseOutcome.exceptionOrNull()?.message} - " +
-                        "Go runtime may hold UDP/file handles, URnetwork app may crash",
-                )
-                false
+            if (completed == null) {
+                PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms - refs cleared")
             }
-            releaseOutcome.getOrNull() == null -> {
-                PersistentLoggers.warn(
-                    TAG,
-                    "runtime release timed out after ${RUNTIME_RELEASE_TIMEOUT_MS}ms - " +
-                        "Sdk.freeMemory hung, Go-runtime resources may leak",
-                )
-                false
+            val releaseOutcome = runCatching {
+                withTimeoutOrNull(RUNTIME_RELEASE_TIMEOUT_MS) { UrnetworkRuntime.release() }
             }
-            else -> true
-        }
-        if (released) {
-            Log.i(TAG, "stop complete - runtime released")
-        } else {
-            PersistentLoggers.warn(TAG, "stop complete - runtime release not confirmed")
+            val released = when {
+                releaseOutcome.isFailure -> {
+                    PersistentLoggers.warn(
+                        TAG,
+                        "runtime release threw: ${releaseOutcome.exceptionOrNull()?.message} - " +
+                            "Go runtime may hold UDP/file handles, URnetwork app may crash",
+                    )
+                    false
+                }
+                releaseOutcome.getOrNull() == null -> {
+                    PersistentLoggers.warn(
+                        TAG,
+                        "runtime release timed out after ${RUNTIME_RELEASE_TIMEOUT_MS}ms - " +
+                            "Sdk.freeMemory hung, Go-runtime resources may leak",
+                    )
+                    false
+                }
+                else -> true
+            }
+            if (released) {
+                Log.i(TAG, "stop complete - runtime released")
+            } else {
+                PersistentLoggers.warn(TAG, "stop complete - runtime release not confirmed")
+            }
+        } finally {
+            running.set(false)
         }
     }
 
