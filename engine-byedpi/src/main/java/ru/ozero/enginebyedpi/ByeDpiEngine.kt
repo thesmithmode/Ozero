@@ -97,7 +97,7 @@ class ByeDpiEngine(
         }
         val resolvedPort = if (config.socksPort > 0) config.socksPort else nextRotatedPort()
         val resolvedConfig = if (config.socksPort > 0) config else config.copy(socksPort = resolvedPort)
-        Log.i(TAG, "start socksPort=$resolvedPort args=${resolvedConfig.args}")
+        Log.i(TAG, "start socksPort=$resolvedPort argsLength=${resolvedConfig.args.length}")
         val oldJob = proxyJobRef.getAndSet(null)
         val hadKnownWedge = nativeMayBeWedged.getAndSet(false)
         var rotateBeforeLaunch = hadKnownWedge
@@ -126,10 +126,7 @@ class ByeDpiEngine(
             drainOrRotateProxyLane()
         }
         val args = buildArgs(resolvedConfig)
-        PersistentLoggers.debug(
-            TAG,
-            "jniStartProxy argv=[${args.joinToString(" ")}] (native префиксует argv[0]=\"byedpi\")",
-        )
+        PersistentLoggers.debug(TAG, "jniStartProxy argvCount=${args.size}")
         val generation = proxyGeneration.incrementAndGet()
         val proxyJob = proxyScope.launch {
             PersistentLoggers.debug(TAG, "launch entered port=$resolvedPort")
