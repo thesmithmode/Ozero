@@ -10,8 +10,6 @@ object GithubPinnedClient {
 
     private val PINS = listOf(
         "sha256/tt9RksdSBGiieTiyWkU8g3MOmCrfMcvXDGC4ZALs9rg=",
-        "sha256/ZSagvDzjltLkewXEBuDxIzpW/dpVw1Juvvmd0hhkzdY=",
-        "sha256/sLVjNUaFYfW7n6EtgBeEpjOlcnBdNPMrZDRF36iwBdE=",
     )
 
     fun create(): OkHttpClient {

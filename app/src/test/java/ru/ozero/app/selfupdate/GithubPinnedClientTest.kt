@@ -30,9 +30,9 @@ class GithubPinnedClientTest {
     }
 
     @Test
-    fun pinsAreSha256Format() {
+    fun pinsAreLeafOnlySha256Format() {
         val pins = GithubPinnedClient.pins()
-        assertTrue(pins.size >= 3, "минимум 3 pins (leaf + intermediates) для ротационной устойчивости")
+        assertEquals(listOf("sha256/tt9RksdSBGiieTiyWkU8g3MOmCrfMcvXDGC4ZALs9rg="), pins)
         for (pin in pins) {
             assertTrue(pin.startsWith("sha256/"), "pin должен быть в формате sha256/<base64>: $pin")
             val b64 = pin.removePrefix("sha256/")
