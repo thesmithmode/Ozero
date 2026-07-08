@@ -226,6 +226,22 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
+    fun `killswitch startup TUN игнорирует split tunnel bypass rules`() {
+        val block = runBody
+            .substringAfter("if (trafficMode == TrafficMode.TUN && killswitch)")
+            .substringBefore("val manualEngine")
+        assertTrue(
+            block.contains("splitConfig = SplitTunnelConfig()"),
+            "killswitch startup TUN обязан использовать catch-all SplitTunnelConfig(), а не user splitConfig " +
+                "из allowlist blocklist BYPASS_LAN. Block:\n$block",
+        )
+        assertTrue(
+            !block.contains("splitConfig = splitConfig"),
+            "killswitch startup TUN не должен применять пользовательские split-tunnel bypass rules. Block:\n$block",
+        )
+    }
+
+    @Test
     fun `lockdownStartupFdRef объявлен в сервисе`() {
         assertTrue(
             serviceSource.contains("lockdownStartupFdRef"),

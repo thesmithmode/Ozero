@@ -70,7 +70,7 @@ class StartSequenceCoordinator(
         if (trafficMode == TrafficMode.TUN && killswitch) {
             runCatching {
                 deps.tunBuilderHelper.buildTunBuilder(
-                    splitConfig = splitConfig,
+                    splitConfig = SplitTunnelConfig(),
                     ipv6Enabled = effectiveSettings.ipv6Enabled,
                     customDnsServers = effectiveSettings.customDnsServers,
                     applyUnderlying = false,
