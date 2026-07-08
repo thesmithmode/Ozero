@@ -29,6 +29,12 @@ set -euo pipefail
 
 log() { echo "[build_tor] $*" >&2; }
 die() { log "ERROR: $*"; exit 1; }
+require_regular_file() {
+    local path="$1"
+    local name="$2"
+    [[ ! -L "$path" ]] || die "$name is a symlink"
+    [[ -f "$path" ]] || die "$name missing or not a regular file"
+}
 
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 OUT_DIR="${OUT_DIR:-$REPO_ROOT/out/tor}"
@@ -69,9 +75,9 @@ unzip -q -o "$TOR_AAR_PATH" -d "$TOR_EXTRACT"
 
 for ABI in $ABIS; do
     SRC="$TOR_EXTRACT/jni/$ABI/libtor.so"
-    [[ -f "$SRC" ]] || die "libtor.so missing for $ABI in tor-android AAR"
+    require_regular_file "$SRC" "libtor.so for $ABI in tor-android AAR"
     DEST="$OUT_DIR/libtor-$ABI.so"
-    cp "$SRC" "$DEST"
+    cp --no-dereference "$SRC" "$DEST"
     chmod +x "$DEST"
     log "  $DEST ($(stat -c%s "$DEST") bytes)"
 done
@@ -92,9 +98,9 @@ unzip -q -o "$IPT_AAR_PATH" -d "$IPT_EXTRACT"
 
 for ABI in $ABIS; do
     SRC="$IPT_EXTRACT/jni/$ABI/libgojni.so"
-    [[ -f "$SRC" ]] || die "libgojni.so missing for $ABI in IPtProxy AAR"
+    require_regular_file "$SRC" "libgojni.so for $ABI in IPtProxy AAR"
     DEST="$OUT_DIR/libiptproxy-$ABI.so"
-    cp "$SRC" "$DEST"
+    cp --no-dereference "$SRC" "$DEST"
     chmod +x "$DEST"
     log "  $DEST ($(stat -c%s "$DEST") bytes)"
 done
