@@ -47,7 +47,7 @@ class WarpEngineServiceLoadOnceSentinelTest {
     fun `WarpEngineService foreground использует основной VPN notification id`() {
         assertTrue(
             source.contains("startForegroundSession()") &&
-                source.contains("OzeroNotificationFactory(this, OzeroVpnService::class.java).enterForeground(this)"),
+                source.contains("OzeroNotificationFactory(this).enterForeground(this)"),
             "WARP engine process обязан оставаться foreground в фоне, но через основной VPN notification id, " +
                 "чтобы не показывать второе уведомление.",
         )
