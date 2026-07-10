@@ -1,4 +1,4 @@
-﻿package ru.ozero.app.ui.settings.engines
+package ru.ozero.app.ui.settings.engines
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.enginescore.ByeDpiArgs
 import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -80,6 +81,28 @@ class ByeDpiEngineSettingsViewModelTest {
         vm.onSave()
         advanceUntilIdle()
         assertEquals(listOf<String?>("-Ku -An -d4"), repo.byedpiUpdates)
+    }
+
+    @Test
+    fun `onArgsChange ignores text over max length`() = runTest(dispatcher) {
+        advanceUntilIdle()
+        val initial = (vm.uiState.value as ByeDpiSettingsUiState.Content).args
+
+        vm.onArgsChange("x".repeat(ByeDpiArgs.MAX_LENGTH + 1))
+
+        val state = vm.uiState.value as ByeDpiSettingsUiState.Content
+        assertEquals(initial, state.args)
+    }
+
+    @Test
+    fun `onSave does not persist args over token limit`() = runTest(dispatcher) {
+        advanceUntilIdle()
+        vm.onArgsChange((1..ByeDpiArgs.MAX_TOKENS + 1).joinToString(" ") { "-x" })
+
+        vm.onSave()
+        advanceUntilIdle()
+
+        assertEquals(listOf<String?>(null), repo.byedpiUpdates)
     }
 
     @Test
