@@ -181,7 +181,8 @@ class UrnetworkRelayCoordinator(
         walletAddress: String,
         byClientJwt: String,
     ): UrnetworkSdkBridge.StartResult? {
-        RETRY_BACKOFF_MS.forEachIndexed { attempt, delayMs ->
+        val maxAttempts = RETRY_BACKOFF_MS.size + 1
+        repeat(maxAttempts) { attempt ->
             val result = runCatching {
                 bridge.start(
                     walletAddress = walletAddress,
@@ -191,13 +192,14 @@ class UrnetworkRelayCoordinator(
                 )
             }.getOrNull()
             if (result is UrnetworkSdkBridge.StartResult.Success) return result
-            val isLast = attempt == RETRY_BACKOFF_MS.lastIndex
+            val isLast = attempt == maxAttempts - 1
+            val delayMs = RETRY_BACKOFF_MS.getOrNull(attempt)
             PersistentLoggers.warn(
                 TAG,
-                "mesh session: start attempt ${attempt + 1}/${RETRY_BACKOFF_MS.size} failed: $result" +
-                    if (isLast) " — giving up" else " — retry in ${delayMs / 1000}s",
+                "mesh session: start attempt ${attempt + 1}/$maxAttempts failed: $result" +
+                    if (isLast || delayMs == null) " — giving up" else " — retry in ${delayMs / 1000}s",
             )
-            if (!isLast) {
+            if (!isLast && delayMs != null) {
                 delay(delayMs)
                 if (!scope.isActive) return null
             }
