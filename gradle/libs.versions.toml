@@ -44,7 +44,7 @@ slf4j = "2.0.16"
 bouncycastle = "1.80"
 
 # WorkManager + Hilt-Work (E16.1 PublicProxyHarvester periodic job)
-work = "2.9.1"
+work = "2.11.2"
 hiltWork = "1.2.0"
 
 # Testing
