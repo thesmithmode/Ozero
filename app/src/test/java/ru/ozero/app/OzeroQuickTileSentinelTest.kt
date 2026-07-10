@@ -25,28 +25,27 @@ class OzeroQuickTileSentinelTest {
     }
 
     @Test
-    fun `syncTileState маппит Connected Connecting Probing в STATE_ACTIVE`() {
+    fun `syncTileState маппит только Connected в STATE_ACTIVE`() {
         val source = locateTile().readText()
         assertTrue(
-            source.contains("TunnelState.Connected") &&
-                source.contains("TunnelState.Connecting") &&
-                source.contains("TunnelState.Probing") &&
-                source.contains("Tile.STATE_ACTIVE"),
-            "syncTileState обязан маппить Connected/Connecting/Probing в STATE_ACTIVE — " +
-                "тайл должен подсвечиваться пока VPN включён или подключается",
+            source.contains("is TunnelState.Connected -> Tile.STATE_ACTIVE"),
+            "syncTileState обязан маппить только Connected в STATE_ACTIVE — " +
+                "тайл не должен показывать защиту до готовности VPN",
         )
     }
 
     @Test
-    fun `syncTileState маппит Idle Failed Disconnecting в STATE_INACTIVE`() {
+    fun `syncTileState маппит неготовые состояния в STATE_INACTIVE`() {
         val source = locateTile().readText()
         assertTrue(
             source.contains("TunnelState.Idle") &&
+                source.contains("TunnelState.Connecting") &&
+                source.contains("TunnelState.Probing") &&
                 source.contains("TunnelState.Failed") &&
                 source.contains("TunnelState.Disconnecting") &&
                 source.contains("Tile.STATE_INACTIVE"),
-            "syncTileState обязан маппить Idle/Failed/Disconnecting в STATE_INACTIVE — " +
-                "тайл должен быть серым когда VPN не работает",
+            "syncTileState обязан маппить Idle/Connecting/Probing/Failed/Disconnecting в STATE_INACTIVE — " +
+                "тайл должен быть серым пока VPN не защищает трафик",
         )
     }
 
@@ -66,6 +65,18 @@ class OzeroQuickTileSentinelTest {
         assertTrue(
             source.contains("onDestroy") && source.contains("scope.cancel()"),
             "OzeroQuickTile обязан отменять scope в onDestroy — утечка coroutine",
+        )
+    }
+
+    @Test
+    fun `startVpn не подсвечивает тайл до Connected`() {
+        val source = locateTile().readText()
+        val startVpnBody = source
+            .substringAfter("private fun startVpn()")
+            .substringBefore("private fun stopVpn()")
+        assertTrue(
+            !startVpnBody.contains("Tile.STATE_ACTIVE"),
+            "startVpn не должен оптимистично включать STATE_ACTIVE до Connected",
         )
     }
 
