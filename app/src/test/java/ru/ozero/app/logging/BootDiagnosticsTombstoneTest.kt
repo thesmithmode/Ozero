@@ -113,6 +113,16 @@ class BootDiagnosticsTombstoneTest {
     }
 
     @Test
+    fun `readBytesTruncated marks truncation when cap is reached without probing past it`() {
+        val payload = byteArrayOf(1, 2, 3)
+
+        val result = BootDiagnostics.readBytesTruncated(payload.inputStream(), maxBytes = 3)
+
+        assertEquals(payload.toList(), result.bytes.toList())
+        assertTrue(result.truncated)
+    }
+
+    @Test
     fun `readTextTruncated caps payload and marks truncation`() {
         val reader = BufferedReader(StringReader("abcdef"))
 
@@ -141,6 +151,16 @@ class BootDiagnosticsTombstoneTest {
 
         assertEquals("abc", result.text)
         assertFalse(result.truncated)
+    }
+
+    @Test
+    fun `readTextTruncated marks truncation when cap is reached without probing past it`() {
+        val reader = BufferedReader(StringReader("abc"))
+
+        val result = BootDiagnostics.readTextTruncated(reader, maxChars = 3)
+
+        assertEquals("abc", result.text)
+        assertTrue(result.truncated)
     }
 
     @Test
