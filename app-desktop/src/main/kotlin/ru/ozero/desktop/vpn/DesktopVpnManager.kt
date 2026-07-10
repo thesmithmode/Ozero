@@ -84,7 +84,7 @@ class DesktopVpnManager(
 
     private suspend fun connectTun(id: EngineId, engine: DesktopEngine) {
         when (id) {
-            EngineId.SINGBOX -> connectSingboxTun(id, engine)
+            EngineId.SINGBOX -> connectSingboxTun(id)
             EngineId.WARP -> connectWarpTun(id, engine)
             EngineId.BYEDPI -> connectWithTunFrontend(id, engine)
             else -> {
@@ -95,11 +95,8 @@ class DesktopVpnManager(
         }
     }
 
-    private suspend fun connectSingboxTun(id: EngineId, engine: DesktopEngine) {
-        val tunJson = SingboxDesktopEngine.buildTunConfig()
-        val config = EngineConfig(singboxJson = tunJson)
-        val result = engine.start(config)
-        handleStartResult(id, engine, result)
+    private suspend fun connectSingboxTun(id: EngineId) {
+        handleFailedResult(id, EngineStartResult.Failed(SingboxDesktopEngine.PROTECTED_CONFIG_REQUIRED))
     }
 
     private suspend fun connectWarpTun(id: EngineId, engine: DesktopEngine) {

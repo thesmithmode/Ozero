@@ -1,5 +1,6 @@
 package ru.ozero.desktop.engine
 
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -11,6 +12,10 @@ import org.junit.jupiter.params.provider.ValueSource
 class SingboxDesktopEngineTest {
 
     private val engine = SingboxDesktopEngine()
+
+    private companion object {
+        const val PROXY_OUTBOUND = """{"type":"socks","tag":"proxy","server":"127.0.0.1","server_port":1080}"""
+    }
 
     @Test
     fun `should have SINGBOX id`() {
@@ -62,15 +67,16 @@ class SingboxDesktopEngineTest {
         }
 
         @Test
-        fun `should use specified dns server`() {
+        fun `should refuse dns without protected outbound`() {
             val config = SingboxDesktopEngine.buildProxyConfig(dnsServer = "8.8.8.8")
-            assertTrue(config.contains(""""server":"8.8.8.8""""))
+            assertTrue(config.contains(""""type":"rcode""""))
+            assertFalse(config.contains(""""server":"8.8.8.8""""))
         }
 
         @Test
-        fun `should contain direct outbound`() {
+        fun `should not contain direct outbound`() {
             val config = SingboxDesktopEngine.buildProxyConfig()
-            assertTrue(config.contains(""""type":"direct""""))
+            assertFalse(config.contains(""""type":"direct""""))
         }
 
         @Test
@@ -80,9 +86,9 @@ class SingboxDesktopEngineTest {
         }
 
         @Test
-        fun `should contain dns outbound`() {
+        fun `should not contain dns outbound`() {
             val config = SingboxDesktopEngine.buildProxyConfig()
-            assertTrue(config.contains(""""type":"dns""""))
+            assertFalse(config.contains(""""type":"dns""""))
         }
 
         @Test
@@ -130,62 +136,62 @@ class SingboxDesktopEngineTest {
 
         @Test
         fun `should contain tun inbound`() {
-            val config = SingboxDesktopEngine.buildTunConfig()
+            val config = SingboxDesktopEngine.buildTunConfig(PROXY_OUTBOUND)
             assertTrue(config.contains(""""type":"tun""""))
         }
 
         @Test
         fun `should use ozero-tun interface`() {
-            val config = SingboxDesktopEngine.buildTunConfig()
+            val config = SingboxDesktopEngine.buildTunConfig(PROXY_OUTBOUND)
             assertTrue(config.contains(""""interface_name":"ozero-tun""""))
         }
 
         @Test
         fun `should configure ipv4 address`() {
-            val config = SingboxDesktopEngine.buildTunConfig()
+            val config = SingboxDesktopEngine.buildTunConfig(PROXY_OUTBOUND)
             assertTrue(config.contains(""""inet4_address":"172.19.0.1/30""""))
         }
 
         @Test
         fun `should enable auto_route`() {
-            val config = SingboxDesktopEngine.buildTunConfig()
+            val config = SingboxDesktopEngine.buildTunConfig(PROXY_OUTBOUND)
             assertTrue(config.contains(""""auto_route":true"""))
         }
 
         @Test
         fun `should enable strict_route`() {
-            val config = SingboxDesktopEngine.buildTunConfig()
+            val config = SingboxDesktopEngine.buildTunConfig(PROXY_OUTBOUND)
             assertTrue(config.contains(""""strict_route":false"""))
         }
 
         @Test
         fun `should use gvisor stack`() {
-            val config = SingboxDesktopEngine.buildTunConfig()
+            val config = SingboxDesktopEngine.buildTunConfig(PROXY_OUTBOUND)
             assertTrue(config.contains(""""stack":"gvisor""""))
         }
 
         @Test
         fun `should enable sniff`() {
-            val config = SingboxDesktopEngine.buildTunConfig()
+            val config = SingboxDesktopEngine.buildTunConfig(PROXY_OUTBOUND)
             assertTrue(config.contains(""""sniff":true"""))
             assertTrue(config.contains(""""sniff_override_destination":true"""))
         }
 
         @Test
-        fun `should route final to direct`() {
-            val config = SingboxDesktopEngine.buildTunConfig()
-            assertTrue(config.contains(""""final":"direct""""))
+        fun `should route final to proxy`() {
+            val config = SingboxDesktopEngine.buildTunConfig(PROXY_OUTBOUND)
+            assertTrue(config.contains(""""final":"proxy""""))
         }
 
         @Test
         fun `should use specified dns`() {
-            val config = SingboxDesktopEngine.buildTunConfig(dnsServer = "9.9.9.9")
+            val config = SingboxDesktopEngine.buildTunConfig(PROXY_OUTBOUND, dnsServer = "9.9.9.9")
             assertTrue(config.contains(""""server":"9.9.9.9""""))
         }
 
         @Test
         fun `should produce balanced json`() {
-            val config = SingboxDesktopEngine.buildTunConfig()
+            val config = SingboxDesktopEngine.buildTunConfig(PROXY_OUTBOUND)
             assertEquals(config.count { it == '{' }, config.count { it == '}' })
             assertEquals(config.count { it == '[' }, config.count { it == ']' })
         }
@@ -256,6 +262,17 @@ class SingboxDesktopEngineTest {
             val proxyOutbound = """{"type":"vless","tag":"proxy","server":"example.com","server_port":443}"""
             val config = SingboxDesktopEngine.buildFullTunConfig(proxyOutbound)
             assertTrue(config.contains(""""final":"proxy""""))
+        }
+    }
+
+    @Nested
+    inner class Start {
+
+        @Test
+        fun `should fail without protected singbox config`() = runTest {
+            val result = engine.start(EngineConfig())
+
+            assertEquals(EngineStartResult.Failed(SingboxDesktopEngine.PROTECTED_CONFIG_REQUIRED), result)
         }
     }
 
