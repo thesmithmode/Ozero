@@ -817,6 +817,16 @@ class MasterDnsDeployerTest {
     }
 
     @Test
+    fun `should return Error when undeploy script reports remove failure`() = runTest {
+        transport.setResponse("docker rm -f", MasterDnsDockerScripts.MARKER_REMOVE_FAILED)
+
+        val states = deployer.undeploy(credentials()).toList()
+
+        val error = states.last() as MasterDnsDeployState.Error
+        assertEquals("remove_failed", error.message)
+    }
+
+    @Test
     fun `deploy clears credentials password when connect fails`() = runTest {
         transport.connectShouldFail = true
         val creds = credentials("super_secret_p@ssw0rd")
