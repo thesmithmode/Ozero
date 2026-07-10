@@ -37,7 +37,7 @@ snakeyaml = "2.3"
 relinker = "1.4.5"
 
 # SSH
-sshj = "0.38.0"
+sshj = "0.40.0"
 slf4j = "2.0.16"
 
 # Crypto
