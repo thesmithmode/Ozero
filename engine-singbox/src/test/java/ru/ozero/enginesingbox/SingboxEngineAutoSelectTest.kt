@@ -409,6 +409,26 @@ class SingboxEngineAutoSelectTest {
     }
 
     @Test
+    fun `auto mode skips oversized blobs before deserialization`() {
+        val validProfile = makeProfile(1L, 1L, "remote.example.com", 443)
+        val oversizedProfile = validProfile.copy(
+            id = 2L,
+            beanBlob = ByteArray(65 * 1024) { 1 },
+            latencyMs = 1,
+        )
+        val prefs = mutablePreferencesOf(selectedProfileKey to SingboxEngine.SELECTED_AUTO)
+        val engine = buildEngine(prefs = prefs, profilesByGroup = mapOf(1L to listOf(oversizedProfile, validProfile)))
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNotNull(result)
+        assertTrue(result is EngineConfig.Singbox)
+        assertEquals(1, result.autoSelectBeanBlobs.size)
+        assertTrue(result.autoSelectBeanBlobs.single().contentEquals(validProfile.beanBlob))
+    }
+
+    @Test
     fun `buildManualConfig maps protocol type from selected bean class`() {
         val cases = listOf(
             makeVlessBlob() to SingboxEngine.PROTOCOL_VLESS,
