@@ -152,7 +152,7 @@ class RemoteAwgRuntime(
 
     override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int {
         val e = ensureConnected()
-        val pfd = ParcelFileDescriptor.fromFd(tunFd)
+        val pfd = ParcelFileDescriptor.adoptFd(tunFd)
         return try {
             e.turnOn(pfd, name, ini, uapiPath)
         } finally {
@@ -176,7 +176,7 @@ class RemoteAwgRuntime(
 
     override fun turnOnAndGetSockets(name: String, tunFd: Int, ini: String, uapiPath: String): AwgTurnOnResult {
         val e = ensureConnected()
-        val pfd = ParcelFileDescriptor.fromFd(tunFd)
+        val pfd = ParcelFileDescriptor.adoptFd(tunFd)
         val combined = try {
             e.turnOnAndGetSockets(pfd, name, ini, uapiPath)
         } finally {
