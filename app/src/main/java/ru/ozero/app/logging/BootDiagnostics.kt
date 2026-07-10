@@ -148,7 +148,7 @@ object BootDiagnostics {
             out.write(buffer, 0, read)
             total += read
         }
-        return TruncatedBytes(out.toByteArray(), truncated = total >= maxBytes)
+        return TruncatedBytes(out.toByteArray(), truncated = true)
     }
 
     internal fun readTextTruncated(reader: BufferedReader, maxChars: Int): TruncatedText {
@@ -161,7 +161,7 @@ object BootDiagnostics {
             out.append(buffer, 0, read)
             total += read
         }
-        return TruncatedText(out.toString(), truncated = total >= maxChars)
+        return TruncatedText(out.toString(), truncated = true)
     }
 
     internal class TruncatedBytes(
