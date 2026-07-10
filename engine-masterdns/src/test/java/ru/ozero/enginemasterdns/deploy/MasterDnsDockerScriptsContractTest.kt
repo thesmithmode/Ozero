@@ -279,7 +279,8 @@ class MasterDnsDockerScriptsContractTest {
     @Test
     fun `removeAll deletes named key volume during full server removal`() {
         val cmd = MasterDnsDockerScripts.removeAll
-        val volumeRemoval = "then sudo docker volume rm masterdns-key >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }; fi"
+        val volumeRemoval = "then sudo docker volume rm masterdns-key >/dev/null 2>&1 " +
+            "|| { echo REMOVE_FAILED; exit 0; }; fi"
         assertTrue(
             cmd.contains(volumeRemoval),
             "removeAll должен удалять masterdns-key volume — user-facing remove обязан стирать secret material.",
