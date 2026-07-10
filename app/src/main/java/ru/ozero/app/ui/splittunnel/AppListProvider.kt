@@ -51,6 +51,7 @@ class DefaultAppListProvider @Inject constructor(
     @Volatile private var listCache: List<InstalledApp>? = null
     private val cacheGeneration = AtomicInteger()
     private val listMutex = Mutex()
+    private val iconCacheLock = Any()
     private var iconCache = LruCache<String, ImageBitmap>(DEFAULT_ICON_CACHE_MAX_ENTRIES)
     private val missingIcons = ConcurrentHashMap.newKeySet<String>()
 
@@ -116,14 +117,14 @@ class DefaultAppListProvider @Inject constructor(
     }
 
     override suspend fun loadIcon(packageName: String): ImageBitmap? {
-        synchronized(iconCache) { iconCache.get(packageName) }?.let { return it }
+        synchronized(iconCacheLock) { iconCache.get(packageName) }?.let { return it }
         if (packageName in missingIcons) return null
         return withContext(Dispatchers.IO) {
             val pm = context.packageManager
             val drawable = runCatching { pm.getApplicationIcon(packageName) }.getOrNull()
             val bitmap = drawable?.let { drawableToImageBitmap(it) }
             if (bitmap != null) {
-                synchronized(iconCache) { iconCache.put(packageName, bitmap) }
+                synchronized(iconCacheLock) { iconCache.put(packageName, bitmap) }
                 logIconCachePressureIfNeeded()
             } else {
                 missingIcons.add(packageName)
@@ -179,18 +180,20 @@ class DefaultAppListProvider @Inject constructor(
         listCache = null
         cacheGeneration.incrementAndGet()
         if (packageName.isNullOrBlank()) return
-        synchronized(iconCache) { iconCache.remove(packageName) }
+        synchronized(iconCacheLock) { iconCache.remove(packageName) }
         missingIcons.remove(packageName)
     }
 
     private fun logIconCachePressureIfNeeded() {
-        val size = synchronized(iconCache) { iconCache.size() }
+        val size = synchronized(iconCacheLock) { iconCache.size() }
         if (size % ICON_CACHE_LOG_EVERY != 0) return
         Log.i(TAG, "icon cache size=$size heap=${heapSummary()}")
     }
 
     private fun replaceIconCacheForTest(maxEntries: Int) {
-        iconCache = LruCache(maxEntries.coerceAtLeast(1))
+        synchronized(iconCacheLock) {
+            iconCache = LruCache(maxEntries.coerceAtLeast(1))
+        }
     }
 }
 
