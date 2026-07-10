@@ -6,7 +6,9 @@ import android.content.Context
 import android.os.Build
 import kotlinx.coroutines.CoroutineExceptionHandler
 import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
 import java.io.InputStreamReader
 
 object BootDiagnostics {
@@ -76,12 +78,13 @@ object BootDiagnostics {
                 if (info.reason == ApplicationExitInfo.REASON_CRASH_NATIVE) {
                     runCatching {
                         info.traceInputStream?.use { stream ->
-                            val bytes = stream.readBytes()
+                            val result = readBytesTruncated(stream, MAX_TOMBSTONE_BYTES)
                             val debugDir = File(context.filesDir, "debug")
-                            val saved = saveTombstone(debugDir, info.pid, info.timestamp, bytes)
+                            val saved = saveTombstone(debugDir, info.pid, info.timestamp, result.bytes)
                             BootFileLogger.error(
                                 TAG,
-                                "tombstone saved pid=${info.pid} bytes=${bytes.size} path=${saved.absolutePath}",
+                                "tombstone saved pid=${info.pid} bytes=${result.bytes.size} " +
+                                    "truncated=${result.truncated} path=${saved.absolutePath}",
                             )
                         }
                     }.onFailure { BootFileLogger.warn(TAG, "tombstone read failed pid=${info.pid}", it) }
@@ -90,8 +93,12 @@ object BootDiagnostics {
                 ) {
                     runCatching {
                         info.traceInputStream?.use { stream ->
-                            val text = BufferedReader(InputStreamReader(stream)).readText()
-                            BootFileLogger.error(TAG, "trace pid=${info.pid}:\n$text")
+                            val reader = BufferedReader(InputStreamReader(stream))
+                            val result = readTextTruncated(reader, MAX_TRACE_CHARS)
+                            BootFileLogger.error(
+                                TAG,
+                                "trace pid=${info.pid} truncated=${result.truncated}:\n${result.text}",
+                            )
                         }
                     }.onFailure { BootFileLogger.warn(TAG, "trace read failed pid=${info.pid}", it) }
                 }
@@ -130,6 +137,42 @@ object BootDiagnostics {
         file.writeBytes(bytes)
         return file
     }
+
+    internal fun readBytesTruncated(input: InputStream, maxBytes: Int): TruncatedBytes {
+        val out = ByteArrayOutputStream(minOf(maxBytes, READ_BUFFER_BYTES))
+        val buffer = ByteArray(READ_BUFFER_BYTES)
+        var total = 0
+        while (total < maxBytes) {
+            val read = input.read(buffer, 0, minOf(buffer.size, maxBytes - total))
+            if (read == -1) return TruncatedBytes(out.toByteArray(), truncated = false)
+            out.write(buffer, 0, read)
+            total += read
+        }
+        return TruncatedBytes(out.toByteArray(), truncated = true)
+    }
+
+    internal fun readTextTruncated(reader: BufferedReader, maxChars: Int): TruncatedText {
+        val out = StringBuilder(minOf(maxChars, READ_BUFFER_BYTES))
+        val buffer = CharArray(READ_BUFFER_BYTES)
+        var total = 0
+        while (total < maxChars) {
+            val read = reader.read(buffer, 0, minOf(buffer.size, maxChars - total))
+            if (read == -1) return TruncatedText(out.toString(), truncated = false)
+            out.append(buffer, 0, read)
+            total += read
+        }
+        return TruncatedText(out.toString(), truncated = true)
+    }
+
+    internal class TruncatedBytes(
+        val bytes: ByteArray,
+        val truncated: Boolean,
+    )
+
+    internal data class TruncatedText(
+        val text: String,
+        val truncated: Boolean,
+    )
 
     internal fun extractAsciiStrings(bytes: ByteArray, minLen: Int = 6): String {
         val out = StringBuilder()
@@ -179,4 +222,7 @@ object BootDiagnostics {
 
     private const val BYTES_IN_MIB = 1024L * 1024L
     private const val MAX_REASONS = 10
+    private const val MAX_TOMBSTONE_BYTES = 512 * 1024
+    private const val MAX_TRACE_CHARS = 64 * 1024
+    private const val READ_BUFFER_BYTES = 8 * 1024
 }

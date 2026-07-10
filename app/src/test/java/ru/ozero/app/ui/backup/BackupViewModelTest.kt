@@ -9,6 +9,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -18,6 +19,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.io.InputStream
 import ru.ozero.corebackup.AppBackupData
 import ru.ozero.corebackup.AppBackupManager
 import ru.ozero.corebackup.AppBackupSerializer
@@ -236,6 +238,19 @@ class BackupViewModelTest {
     }
 
     @Test
+    fun `beginImport rejects oversized payload before deserializing`() = runTest(dispatcher) {
+        val context = contextWithInputStream(SizedInputStream(BackupViewModel.MAX_IMPORT_BYTES + 1))
+
+        val vm = BackupViewModel(manager)
+        vm.beginImport(context, backupUri())
+        advanceUntilIdle()
+
+        val state = assertIs<BackupUiState.Error>(vm.uiState.value)
+        assertTrue(state.message.contains("larger"))
+        verify(exactly = 0) { AppBackupSerializer.deserializeAuto(any()) }
+    }
+
+    @Test
     fun `confirmImport failure clears pending and exposes error`() = runTest(dispatcher) {
         val context = contextWithInput(byteArrayOf(9, 8, 7))
         val data = sampleBackupData()
@@ -288,10 +303,32 @@ class BackupViewModelTest {
     private fun backupUri(): Uri = mockk(relaxed = true)
 
     private fun contextWithInput(bytes: ByteArray): Context {
+        return contextWithInputStream(bytes.inputStream())
+    }
+
+    private fun contextWithInputStream(input: InputStream): Context {
         val resolver = mockk<ContentResolver>()
-        every { resolver.openInputStream(any()) } returns bytes.inputStream()
+        every { resolver.openInputStream(any()) } returns input
         return mockk {
             every { contentResolver } returns resolver
+        }
+    }
+
+    private class SizedInputStream(size: Int) : InputStream() {
+        private var remaining = size
+
+        override fun read(): Int {
+            if (remaining <= 0) return -1
+            remaining--
+            return 0
+        }
+
+        override fun read(buffer: ByteArray, off: Int, len: Int): Int {
+            if (remaining <= 0) return -1
+            val read = minOf(len, remaining)
+            buffer.fill(0, off, off + read)
+            remaining -= read
+            return read
         }
     }
 

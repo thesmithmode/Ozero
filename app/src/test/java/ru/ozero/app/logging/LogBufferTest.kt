@@ -43,4 +43,44 @@ class LogBufferTest {
         assertEquals(1, s1.size)
         assertEquals(2, s2.size)
     }
+
+    @Test
+    fun `append truncates oversized messages for live buffer`() {
+        val buf = LogBuffer(capacity = 10)
+        val longMessage = "x".repeat(LogBuffer.MAX_MESSAGE_CHARS + 100)
+
+        buf.append(
+            LogEntry(
+                timestampMs = 1L,
+                level = LogLevel.ERROR,
+                tag = "T",
+                pid = 1,
+                message = longMessage,
+            ),
+        )
+
+        val message = buf.entries.value.single().message
+        assertEquals(LogBuffer.MAX_MESSAGE_CHARS + "...[truncated]".length, message.length)
+        assertTrue(message.endsWith("...[truncated]"))
+    }
+
+    @Test
+    fun `appendAll truncates oversized messages for live buffer`() {
+        val buf = LogBuffer(capacity = 10)
+        val longMessage = "x".repeat(LogBuffer.MAX_MESSAGE_CHARS + 1)
+
+        buf.appendAll(
+            listOf(
+                LogEntry(
+                    timestampMs = 1L,
+                    level = LogLevel.ERROR,
+                    tag = "T",
+                    pid = 1,
+                    message = longMessage,
+                ),
+            ),
+        )
+
+        assertTrue(buf.entries.value.single().message.endsWith("...[truncated]"))
+    }
 }

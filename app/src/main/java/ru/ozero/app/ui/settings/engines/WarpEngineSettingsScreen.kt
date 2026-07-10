@@ -5,6 +5,8 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,8 +23,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -68,13 +69,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.io.ByteArrayInputStream
 import ru.ozero.app.R
 import ru.ozero.app.ui.theme.OzeroPalette
-import androidx.compose.ui.text.font.FontFamily
+import ru.ozero.app.util.readBytesBounded
 import ru.ozero.enginewarp.AwgPreset
 import ru.ozero.enginewarp.AwgPresets
-import ru.ozero.enginewarp.WarpEditDraft
 import ru.ozero.enginewarp.DnsPresets
 import ru.ozero.enginewarp.EndpointPresets
 import ru.ozero.enginewarp.WarpConfigSlot
+import ru.ozero.enginewarp.WarpEditDraft
 import ru.ozero.enginewarp.WarpSettingsUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -119,7 +120,9 @@ fun WarpEngineSettingsScreen(
         val displayName = context.contentResolver.query(
             uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null,
         )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null } ?: "import"
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        val bytes = context.contentResolver.openInputStream(uri)?.use {
+            it.readBytesBounded(MAX_WARP_IMPORT_BYTES)
+        }
             ?: return@rememberLauncherForActivityResult
         if (displayName.endsWith(".yaml", ignoreCase = true) || displayName.endsWith(".yml", ignoreCase = true)) {
             viewModel.onClashYamlRejected()
@@ -251,6 +254,7 @@ private const val IMPORT_OVERLAY_HOLD_MS = 900L
 private const val IMPORT_OVERLAY_FADE_MS = 600
 private const val IMPORT_OVERLAY_SIZE_DP = 120
 private const val IMPORT_OVERLAY_ICON_DP = 96
+private const val MAX_WARP_IMPORT_BYTES = 512 * 1024
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

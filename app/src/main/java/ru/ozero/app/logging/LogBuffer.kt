@@ -16,7 +16,7 @@ class LogBuffer(private val capacity: Int = DEFAULT_CAPACITY) {
     fun append(entry: LogEntry) {
         val snapshot = synchronized(lock) {
             if (deque.size >= capacity) deque.pollFirst()
-            deque.addLast(entry)
+            deque.addLast(entry.bounded())
             deque.toList()
         }
         _entries.value = snapshot
@@ -27,7 +27,7 @@ class LogBuffer(private val capacity: Int = DEFAULT_CAPACITY) {
         val snapshot = synchronized(lock) {
             for (entry in entries) {
                 if (deque.size >= capacity) deque.pollFirst()
-                deque.addLast(entry)
+                deque.addLast(entry.bounded())
             }
             deque.toList()
         }
@@ -42,6 +42,12 @@ class LogBuffer(private val capacity: Int = DEFAULT_CAPACITY) {
     fun size(): Int = synchronized(lock) { deque.size }
 
     companion object {
-        const val DEFAULT_CAPACITY: Int = 5000
+        const val DEFAULT_CAPACITY: Int = 1000
+        const val MAX_MESSAGE_CHARS: Int = 2_000
     }
+}
+
+private fun LogEntry.bounded(): LogEntry {
+    if (message.length <= LogBuffer.MAX_MESSAGE_CHARS) return this
+    return copy(message = message.take(LogBuffer.MAX_MESSAGE_CHARS) + "...[truncated]")
 }

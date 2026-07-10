@@ -1,7 +1,6 @@
 package ru.ozero.app.ui.stats
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -173,15 +173,22 @@ fun TrafficStatsScreen(
                 }
             }
             item {
-                SessionsDrillDown(
+                SessionsDrillDownHeader(
                     sessions = sessions,
                     expanded = sessionsExpanded,
                     sort = sessionSort,
                     onToggle = { viewModel.setSessionsExpanded(!sessionsExpanded) },
                     onSortSelect = viewModel::setSessionSort,
-                    onDeleteSession = viewModel::deleteSession,
                     onClearSessions = viewModel::clearSessions,
                 )
+            }
+            if (sessionsExpanded) {
+                items(sessions, key = { it.id }) { session ->
+                    SessionCard(
+                        session = session,
+                        onDelete = { viewModel.deleteSession(session.id) },
+                    )
+                }
             }
             item { Spacer(modifier = Modifier.height(16.dp)) }
         }
@@ -455,64 +462,51 @@ private fun EngineBreakdown(engineSummaries: List<EngineSummary>) {
 }
 
 @Composable
-private fun SessionsDrillDown(
+private fun SessionsDrillDownHeader(
     sessions: List<SessionStatsEntity>,
     expanded: Boolean,
     sort: SessionSort,
     onToggle: () -> Unit,
     onSortSelect: (SessionSort) -> Unit,
-    onDeleteSession: (Long) -> Unit,
     onClearSessions: () -> Unit,
 ) {
     var showClearConfirm by remember { mutableStateOf(false) }
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onToggle) {
-                Icon(
-                    imageVector = if (expanded) {
-                        Icons.Filled.KeyboardArrowUp
-                    } else {
-                        Icons.Filled.KeyboardArrowDown
-                    },
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = stringResource(R.string.stats_traffic_sessions) +
-                        if (sessions.isNotEmpty()) " (${sessions.size})" else "",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            if (expanded) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (sessions.isNotEmpty()) {
-                        IconButton(
-                            onClick = { showClearConfirm = true },
-                            modifier = Modifier.testTag("clear_sessions"),
-                        ) {
-                            Icon(
-                                Icons.Filled.Delete,
-                                contentDescription = stringResource(R.string.stats_history_clear_cd),
-                            )
-                        }
-                    }
-                    SessionSortMenu(current = sort, onSelect = onSortSelect)
-                }
-            }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(onClick = onToggle) {
+            Icon(
+                imageVector = if (expanded) {
+                    Icons.Filled.KeyboardArrowUp
+                } else {
+                    Icons.Filled.KeyboardArrowDown
+                },
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = stringResource(R.string.stats_traffic_sessions) +
+                    if (sessions.isNotEmpty()) " (${sessions.size})" else "",
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
-        AnimatedVisibility(visible = expanded) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                sessions.forEach { session ->
-                    SessionCard(
-                        session = session,
-                        onDelete = { onDeleteSession(session.id) },
-                    )
+        if (expanded) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (sessions.isNotEmpty()) {
+                    IconButton(
+                        onClick = { showClearConfirm = true },
+                        modifier = Modifier.testTag("clear_sessions"),
+                    ) {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = stringResource(R.string.stats_history_clear_cd),
+                        )
+                    }
                 }
+                SessionSortMenu(current = sort, onSelect = onSortSelect)
             }
         }
     }

@@ -11,6 +11,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.util.Log
+import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.ContextCompat
@@ -39,10 +41,18 @@ class DefaultAppListProvider @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : AppListProvider {
 
+    internal constructor(
+        context: Context,
+        iconCacheMaxEntries: Int,
+    ) : this(context) {
+        replaceIconCacheForTest(iconCacheMaxEntries)
+    }
+
     @Volatile private var listCache: List<InstalledApp>? = null
     private val cacheGeneration = AtomicInteger()
     private val listMutex = Mutex()
-    private val iconCache = ConcurrentHashMap<String, ImageBitmap>()
+    private val iconCacheLock = Any()
+    private var iconCache = LruCache<String, ImageBitmap>(DEFAULT_ICON_CACHE_MAX_ENTRIES)
     private val missingIcons = ConcurrentHashMap.newKeySet<String>()
 
     override val packageChanges: Flow<Unit> = callbackFlow {
@@ -107,14 +117,15 @@ class DefaultAppListProvider @Inject constructor(
     }
 
     override suspend fun loadIcon(packageName: String): ImageBitmap? {
-        iconCache[packageName]?.let { return it }
+        synchronized(iconCacheLock) { iconCache.get(packageName) }?.let { return it }
         if (packageName in missingIcons) return null
         return withContext(Dispatchers.IO) {
             val pm = context.packageManager
             val drawable = runCatching { pm.getApplicationIcon(packageName) }.getOrNull()
             val bitmap = drawable?.let { drawableToImageBitmap(it) }
             if (bitmap != null) {
-                iconCache[packageName] = bitmap
+                synchronized(iconCacheLock) { iconCache.put(packageName, bitmap) }
+                logIconCachePressureIfNeeded()
             } else {
                 missingIcons.add(packageName)
             }
@@ -169,8 +180,20 @@ class DefaultAppListProvider @Inject constructor(
         listCache = null
         cacheGeneration.incrementAndGet()
         if (packageName.isNullOrBlank()) return
-        iconCache.remove(packageName)
+        synchronized(iconCacheLock) { iconCache.remove(packageName) }
         missingIcons.remove(packageName)
+    }
+
+    private fun logIconCachePressureIfNeeded() {
+        val size = synchronized(iconCacheLock) { iconCache.size() }
+        if (size % ICON_CACHE_LOG_EVERY != 0) return
+        Log.i(TAG, "icon cache size=$size heap=${heapSummary()}")
+    }
+
+    private fun replaceIconCacheForTest(maxEntries: Int) {
+        synchronized(iconCacheLock) {
+            iconCache = LruCache(maxEntries.coerceAtLeast(1))
+        }
     }
 }
 
@@ -180,10 +203,10 @@ internal fun holdsInternetPermission(
 
 private fun drawableToImageBitmap(drawable: Drawable): ImageBitmap? = runCatching {
     if (drawable is BitmapDrawable) {
-        return@runCatching drawable.bitmap?.asImageBitmap()
+        return@runCatching drawable.bitmap?.scaledForIconCache()?.asImageBitmap()
     }
-    val width = drawable.intrinsicWidth.coerceAtLeast(MIN_ICON_PX)
-    val height = drawable.intrinsicHeight.coerceAtLeast(MIN_ICON_PX)
+    val width = drawable.intrinsicWidth.coerceIn(MIN_ICON_PX, MAX_ICON_PX)
+    val height = drawable.intrinsicHeight.coerceIn(MIN_ICON_PX, MAX_ICON_PX)
     val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bmp)
     drawable.setBounds(0, 0, canvas.width, canvas.height)
@@ -191,4 +214,25 @@ private fun drawableToImageBitmap(drawable: Drawable): ImageBitmap? = runCatchin
     bmp.asImageBitmap()
 }.getOrNull()
 
+private fun Bitmap.scaledForIconCache(): Bitmap {
+    val width = width.coerceAtLeast(MIN_ICON_PX)
+    val height = height.coerceAtLeast(MIN_ICON_PX)
+    if (width <= MAX_ICON_PX && height <= MAX_ICON_PX) return this
+    val scale = MAX_ICON_PX.toFloat() / maxOf(width, height).toFloat()
+    val targetWidth = (width * scale).toInt().coerceAtLeast(MIN_ICON_PX)
+    val targetHeight = (height * scale).toInt().coerceAtLeast(MIN_ICON_PX)
+    return Bitmap.createScaledBitmap(this, targetWidth, targetHeight, true)
+}
+
+private fun heapSummary(): String = runCatching {
+    val runtime = Runtime.getRuntime()
+    val used = runtime.totalMemory() - runtime.freeMemory()
+    "used=${used / BYTES_IN_MIB}MiB max=${runtime.maxMemory() / BYTES_IN_MIB}MiB"
+}.getOrDefault("unavailable")
+
 private const val MIN_ICON_PX = 1
+private const val MAX_ICON_PX = 96
+private const val DEFAULT_ICON_CACHE_MAX_ENTRIES = 128
+private const val ICON_CACHE_LOG_EVERY = 32
+private const val BYTES_IN_MIB = 1024L * 1024L
+private const val TAG = "AppListProvider"

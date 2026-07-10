@@ -115,6 +115,49 @@ class DefaultAppListProviderRuntimeTest {
     }
 
     @Test
+    fun `loadIcon evicts oldest icons when cache exceeds limit`() = runTest {
+        val context = RuntimeEnvironment.getApplication()
+        val shadowPm = packageManager()
+        listOf("pkg.one", "pkg.two", "pkg.icon").forEachIndexed { index, packageName ->
+            shadowPm.installPackage(packageInfo(packageName, packageName, system = false))
+            shadowPm.setApplicationIcon(
+                packageName,
+                BitmapDrawable(context.resources, Bitmap.createBitmap(index + 2, index + 2, Bitmap.Config.ARGB_8888)),
+            )
+        }
+        val provider = DefaultAppListProvider(context, iconCacheMaxEntries = 2)
+
+        val firstOne = provider.loadIcon("pkg.one")
+        val firstTwo = provider.loadIcon("pkg.two")
+        provider.loadIcon("pkg.icon")
+        val secondTwo = provider.loadIcon("pkg.two")
+        val secondOne = provider.loadIcon("pkg.one")
+
+        assertNotNull(firstOne)
+        assertNotNull(firstTwo)
+        assertTrue(firstTwo === secondTwo)
+        assertTrue(firstOne !== secondOne)
+    }
+
+    @Test
+    fun `loadIcon downscales oversized bitmap drawables`() = runTest {
+        val context = RuntimeEnvironment.getApplication()
+        val shadowPm = packageManager()
+        shadowPm.installPackage(packageInfo("pkg.icon", "Icon", system = false))
+        shadowPm.setApplicationIcon(
+            "pkg.icon",
+            BitmapDrawable(context.resources, Bitmap.createBitmap(512, 256, Bitmap.Config.ARGB_8888)),
+        )
+        val provider = DefaultAppListProvider(context)
+
+        val icon = provider.loadIcon("pkg.icon")
+
+        assertNotNull(icon)
+        assertTrue(icon.width <= 96)
+        assertTrue(icon.height <= 96)
+    }
+
+    @Test
     fun `loadIcon renders non bitmap drawable through canvas fallback`() = runTest {
         val context = RuntimeEnvironment.getApplication()
         val shadowPm = packageManager()

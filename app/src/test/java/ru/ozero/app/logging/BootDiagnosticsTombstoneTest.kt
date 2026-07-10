@@ -2,10 +2,14 @@ package ru.ozero.app.logging
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import java.io.BufferedReader
 import java.io.File
+import java.io.InputStream
+import java.io.StringReader
 import java.nio.file.Path
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class BootDiagnosticsTombstoneTest {
@@ -78,6 +82,88 @@ class BootDiagnosticsTombstoneTest {
     }
 
     @Test
+    fun `readBytesTruncated caps payload and marks truncation`() {
+        val payload = byteArrayOf(1, 2, 3, 4, 5)
+
+        val result = BootDiagnostics.readBytesTruncated(payload.inputStream(), maxBytes = 3)
+
+        assertEquals(listOf<Byte>(1, 2, 3), result.bytes.toList())
+        assertTrue(result.truncated)
+    }
+
+    @Test
+    fun `readBytesTruncated does not read past byte cap`() {
+        val input = CountingInputStream(byteArrayOf(1, 2, 3, 4, 5))
+
+        val result = BootDiagnostics.readBytesTruncated(input, maxBytes = 3)
+
+        assertEquals(listOf<Byte>(1, 2, 3), result.bytes.toList())
+        assertTrue(result.truncated)
+        assertEquals(1, input.readCalls)
+    }
+
+    @Test
+    fun `readBytesTruncated reports no truncation when EOF arrives before cap`() {
+        val payload = byteArrayOf(1, 2, 3)
+
+        val result = BootDiagnostics.readBytesTruncated(payload.inputStream(), maxBytes = 8)
+
+        assertEquals(payload.toList(), result.bytes.toList())
+        assertFalse(result.truncated)
+    }
+
+    @Test
+    fun `readBytesTruncated marks truncation when cap is reached without probing past it`() {
+        val payload = byteArrayOf(1, 2, 3)
+
+        val result = BootDiagnostics.readBytesTruncated(payload.inputStream(), maxBytes = 3)
+
+        assertEquals(payload.toList(), result.bytes.toList())
+        assertTrue(result.truncated)
+    }
+
+    @Test
+    fun `readTextTruncated caps payload and marks truncation`() {
+        val reader = BufferedReader(StringReader("abcdef"))
+
+        val result = BootDiagnostics.readTextTruncated(reader, maxChars = 4)
+
+        assertEquals("abcd", result.text)
+        assertTrue(result.truncated)
+    }
+
+    @Test
+    fun `readTextTruncated does not read past char cap`() {
+        val reader = CountingBufferedReader("abcdef")
+
+        val result = BootDiagnostics.readTextTruncated(reader, maxChars = 4)
+
+        assertEquals("abcd", result.text)
+        assertTrue(result.truncated)
+        assertEquals(1, reader.readCalls)
+    }
+
+    @Test
+    fun `readTextTruncated reports no truncation when EOF arrives before cap`() {
+        val reader = BufferedReader(StringReader("abc"))
+
+        val result = BootDiagnostics.readTextTruncated(reader, maxChars = 8)
+
+        assertEquals("abc", result.text)
+        assertFalse(result.truncated)
+    }
+
+    @Test
+    fun `readTextTruncated marks truncation when cap is reached without probing past it`() {
+        val reader = BufferedReader(StringReader("abc"))
+
+        val result = BootDiagnostics.readTextTruncated(reader, maxChars = 3)
+
+        assertEquals("abc", result.text)
+        assertTrue(result.truncated)
+    }
+
+    @Test
     fun `dumpExitReasons CRASH_NATIVE branch saves tombstone file without dumping symbols`() {
         val src = readSelfSource()
         val nativeBranch = src.substringAfter("REASON_CRASH_NATIVE)").substringBefore("else if (info.reason")
@@ -106,5 +192,43 @@ class BootDiagnosticsTombstoneTest {
         val f = File(moduleRoot, "src/main/java/ru/ozero/app/logging/BootDiagnostics.kt")
         check(f.exists()) { "BootDiagnostics.kt не найден: $f" }
         return f.readText()
+    }
+
+    private class CountingInputStream(
+        private val bytes: ByteArray,
+    ) : InputStream() {
+        var readCalls: Int = 0
+            private set
+        private var offset: Int = 0
+
+        override fun read(): Int {
+            readCalls += 1
+            if (offset >= bytes.size) return -1
+            return bytes[offset++].toInt() and 0xFF
+        }
+
+        override fun read(buffer: ByteArray, off: Int, len: Int): Int {
+            readCalls += 1
+            if (offset >= bytes.size) return -1
+            val count = minOf(len, bytes.size - offset)
+            bytes.copyInto(buffer, off, offset, offset + count)
+            offset += count
+            return count
+        }
+    }
+
+    private class CountingBufferedReader(text: String) : BufferedReader(StringReader(text)) {
+        var readCalls: Int = 0
+            private set
+
+        override fun read(buffer: CharArray, off: Int, len: Int): Int {
+            readCalls += 1
+            return super.read(buffer, off, len)
+        }
+
+        override fun read(): Int {
+            readCalls += 1
+            return super.read()
+        }
     }
 }
