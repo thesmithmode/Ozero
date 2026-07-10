@@ -448,6 +448,8 @@ AWK_DOMAIN_STRIP
             " sudo docker rm -f masterdns-ozero >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }; fi;" +
             " if sudo docker image inspect masterdns-ozero >/dev/null 2>&1;" +
             " then sudo docker rmi masterdns-ozero >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }; fi;" +
+            " if sudo docker volume inspect masterdns-key >/dev/null 2>&1;" +
+            " then sudo docker volume rm masterdns-key >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }; fi;" +
             " if [ -e /tmp/mdns_build ];" +
             " then sudo rm -rf /tmp/mdns_build >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }; fi;" +
             " if [ -f /var/lib/masterdns-ozero/fw_opened ];" +
