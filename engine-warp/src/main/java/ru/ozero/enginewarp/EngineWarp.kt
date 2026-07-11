@@ -391,7 +391,7 @@ class EngineWarp(
                 TunAttachResult.Success
             }
             is WarpSdkBridge.AttachResult.Failed -> {
-                PersistentLoggers.error(TAG, "attachTun failed: ${r.reason}")
+                PersistentLoggers.error(TAG, "attachTun failed: ${r.reason}; iniBytes=${ini.toByteArray().size}")
                 TunAttachResult.Failure(r.reason)
             }
         }
