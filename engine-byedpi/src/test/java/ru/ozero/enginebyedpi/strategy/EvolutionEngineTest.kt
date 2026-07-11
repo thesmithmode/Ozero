@@ -125,6 +125,32 @@ class EvolutionEngineTest {
     }
 
     @Test
+    fun `diverse generation handles empty elites`() {
+        val pool = GenePool(seeds)
+        val evolutionEngine = EvolutionEngine(
+            byeDpiEngine = AlwaysSucceedEngine(),
+            probeFactory = { _, _ -> AlwaysSucceedProbe() },
+            evolver = StrategyEvolver(pool),
+            pool = pool,
+            sites = listOf("s1.com"),
+            settings = EvolutionEngine.EvolutionSettings(
+                populationSize = 4,
+                eliteCount = 0,
+            ),
+            random = Random(7),
+        )
+        val method = EvolutionEngine::class.java.getDeclaredMethod(
+            "buildDiverseGeneration",
+            List::class.java,
+            Float::class.javaPrimitiveType,
+        )
+        method.isAccessible = true
+        val generation = method.invoke(evolutionEngine, emptyList<Chromosome>(), 0.2f) as List<*>
+        assertEquals(4, generation.size)
+        assertTrue(generation.all { it is Chromosome })
+    }
+
+    @Test
     fun `stagnationCount increments when fitness does not improve`() = runTest {
         val engine = AlwaysSucceedEngine()
         val probe = AlwaysFailProbe()
