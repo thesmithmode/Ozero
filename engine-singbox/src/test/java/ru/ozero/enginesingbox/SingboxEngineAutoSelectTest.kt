@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.settings.SettingsModel
@@ -276,6 +277,37 @@ class SingboxEngineAutoSelectTest {
         assertNotNull(result)
         assertTrue(result is EngineConfig.Singbox)
         assertEquals(1, result.chainBeanBlobs.size)
+    }
+
+    @Test
+    fun `manual profile config reads chain wrappers before chain cache emits`() {
+        val selected = makeProfile(42L, 1L, "eu.example.com", 443)
+        val wrapper = makeProfile(7L, 1L, "ru.example.com", 443)
+        val prefs = mutablePreferencesOf(beanKey to selected.beanBlob, selectedProfileKey to selected.id)
+        val chainDao = object : ProxyChainDao {
+            override fun getAllFlow(): Flow<List<ProxyChainStep>> = emptyFlow()
+            override suspend fun getAll(): List<ProxyChainStep> = listOf(
+                ProxyChainStep(profileId = wrapper.id, userOrder = 0),
+                ProxyChainStep(profileId = selected.id, userOrder = 1),
+            )
+            override suspend fun clear() = Unit
+            override suspend fun insertAll(steps: List<ProxyChainStep>) = Unit
+            override suspend fun replace(profileIds: List<Long>) = Unit
+        }
+        val engine = SingboxEngine(
+            context = mockk(relaxed = true),
+            dataStore = fakeDataStore(prefs),
+            profileDao = fakeProfileDao(mapOf(1L to listOf(wrapper, selected))),
+            proxyChainDao = chainDao,
+        )
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNotNull(result)
+        assertTrue(result is EngineConfig.Singbox)
+        assertEquals(1, result.chainBeanBlobs.size)
+        assertTrue(result.chainBeanBlobs.single().contentEquals(wrapper.beanBlob))
     }
 
     @Test
