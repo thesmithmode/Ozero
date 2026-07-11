@@ -54,6 +54,42 @@ class GroupSeederTest {
     }
 
     @Test
+    fun `should disable auto update for existing builtin preset`() = runBlocking {
+        fakeDao.groups.add(
+            SubscriptionGroup(
+                id = 1L,
+                name = "Existing",
+                subscriptionUrl = "https://preset.example.com/sub",
+                isBuiltin = true,
+                autoUpdate = true,
+            ),
+        )
+
+        seeder.seedPresets(listOf(GroupSeeder.PresetGroup("Preset", "https://preset.example.com/sub")))
+
+        assertEquals(1, fakeDao.groups.size)
+        assertFalse(fakeDao.groups.first().autoUpdate)
+    }
+
+    @Test
+    fun `should preserve auto update for existing user group`() = runBlocking {
+        fakeDao.groups.add(
+            SubscriptionGroup(
+                id = 1L,
+                name = "Existing",
+                subscriptionUrl = "https://preset.example.com/sub",
+                isBuiltin = false,
+                autoUpdate = true,
+            ),
+        )
+
+        seeder.seedPresets(listOf(GroupSeeder.PresetGroup("Preset", "https://preset.example.com/sub")))
+
+        assertEquals(1, fakeDao.groups.size)
+        assertTrue(fakeDao.groups.first().autoUpdate)
+    }
+
+    @Test
     fun `should skip preset when url already exists in db`() = runBlocking {
         fakeDao.groups.add(
             SubscriptionGroup(
