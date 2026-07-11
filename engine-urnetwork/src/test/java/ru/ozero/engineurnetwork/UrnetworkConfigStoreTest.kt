@@ -163,12 +163,15 @@ class UrnetworkConfigStoreTest {
     }
 
     @Test
-    fun `provide state defaults to always-on`() = runTest {
+    fun `provide state defaults to opt-in`() = runTest {
         val (store, _) = newStore()
         val snap = store.config().first()
 
-        assertEquals(true, snap.provideEnabled)
+        assertEquals(false, snap.provideEnabled)
         assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
+    fun `provideEnabled по умолчанию false`() = runTest {
+        val (store, _) = newStore()
+        assertEquals(false, store.provideEnabled().first())
     }
 
     @Test
@@ -183,8 +186,8 @@ class UrnetworkConfigStoreTest {
 
         val snap = DataStoreUrnetworkConfigStore(ds).config().first()
 
-        assertEquals(true, snap.provideEnabled)
-        assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
+        assertEquals(false, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
     }
 
     @Test

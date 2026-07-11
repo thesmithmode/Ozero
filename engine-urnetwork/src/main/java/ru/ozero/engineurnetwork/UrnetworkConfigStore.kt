@@ -18,7 +18,7 @@ data class UrnetworkConfig(
     val windowType: UrnetworkWindowType = UrnetworkWindowType.AUTO,
     val fixedIpSize: Boolean = false,
     val allowDirect: Boolean = true,
-    val provideEnabled: Boolean = true,
+    val provideEnabled: Boolean = false,
     val provideControlMode: UrnetworkProvideControlMode = UrnetworkProvideControlMode.ALWAYS,
     val provideNetworkMode: UrnetworkProvideNetworkMode = UrnetworkProvideNetworkMode.WIFI,
     val selectedLocation: UrnetworkLocationSelection = UrnetworkLocationSelection.EMPTY,
