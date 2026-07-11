@@ -49,6 +49,7 @@ abstract class SingboxDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `proxy_profiles` ADD COLUMN `probeError` TEXT")
                 db.execSQL("ALTER TABLE `proxy_profiles` ADD COLUMN `lastProbeAt` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE `subscription_groups` SET `autoUpdate` = 0")
             }
         }
     }

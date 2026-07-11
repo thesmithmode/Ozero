@@ -2,6 +2,7 @@ package ru.ozero.singboxsubscription
 
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -39,6 +40,17 @@ class GroupSeederTest {
         seeder.seedPresets(presets)
 
         assertTrue(fakeDao.groups.all { it.isBuiltin })
+    }
+
+    @Test
+    fun `should leave inserted presets out of automatic updates`() = runBlocking {
+        val presets = listOf(
+            GroupSeeder.PresetGroup("Preset 1", "https://preset1.example.com/sub"),
+        )
+
+        seeder.seedPresets(presets)
+
+        assertFalse(fakeDao.groups.first().autoUpdate)
     }
 
     @Test
