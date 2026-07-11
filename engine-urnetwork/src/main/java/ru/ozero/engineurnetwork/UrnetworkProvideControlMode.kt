@@ -6,6 +6,6 @@ enum class UrnetworkProvideControlMode(val rawValue: String) {
 
     companion object {
         fun fromRaw(raw: String?): UrnetworkProvideControlMode =
-            entries.firstOrNull { it.rawValue == raw } ?: ALWAYS
+            entries.firstOrNull { it.rawValue == raw } ?: AUTO
     }
 }
