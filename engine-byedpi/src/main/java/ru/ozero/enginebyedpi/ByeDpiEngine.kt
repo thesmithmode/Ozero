@@ -235,6 +235,8 @@ class ByeDpiEngine(
                     false
                 }
                 if (ok) {
+                    delay(READY_STABILITY_MS)
+                    if (proxyExitCode.get() != PROXY_EXIT_PENDING) return@withTimeoutOrNull
                     probeSuccess = true
                     return@withTimeoutOrNull
                 }
@@ -334,6 +336,7 @@ class ByeDpiEngine(
         const val JNI_GUARD_BUSY = -2
         const val READY_PROBE_TIMEOUT_MS = 500
         const val READY_RETRY_MS = 100L
+        const val READY_STABILITY_MS = 100L
         const val STOP_GRACE_MS = 1_500L
         private const val PROXY_EXIT_PENDING = Int.MIN_VALUE
 

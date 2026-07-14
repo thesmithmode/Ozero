@@ -139,6 +139,27 @@ class ByeDpiEngineTest {
     }
 
     @Test
+    fun startFailsWhenProxyExitsDuringReadinessStabilityWindow() = runTest {
+        val started = CountDownLatch(1)
+        val failEngine = ByeDpiEngine(
+            proxy,
+            socksProbe = { _, _, _ ->
+                started.await()
+                1L
+            },
+        )
+        every { proxy.startProxy(any()) } answers {
+            started.countDown()
+            Thread.sleep(20)
+            -1
+        }
+
+        val result = failEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+
+        assertIs<StartResult.Failure>(result)
+    }
+
+    @Test
     fun startArgsIncludePortFlag() {
         val args = engine.buildArgs(EngineConfig.ByeDpi(socksPort = 1080))
         assertTrue(args.contains("-p"))
