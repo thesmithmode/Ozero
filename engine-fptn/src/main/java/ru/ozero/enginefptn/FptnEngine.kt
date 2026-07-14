@@ -109,7 +109,7 @@ class FptnEngine(
         ipv6Address = "fd00::1",
         ipv6PrefixLength = 128,
         routeAllV4 = true,
-        routeAllV6 = false,
+        routeAllV6 = true,
     )
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {

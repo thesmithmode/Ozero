@@ -86,7 +86,7 @@ class FptnEngineTest {
         assertEquals("10.10.0.1", spec.ipv4Address)
         assertEquals("fd00::1", spec.ipv6Address)
         assertEquals(true, spec.routeAllV4)
-        assertEquals(false, spec.routeAllV6)
+        assertEquals(true, spec.routeAllV6)
     }
 
     @Test
@@ -139,6 +139,15 @@ class FptnEngineTest {
     fun `start with wrong config type returns failure`() = runTest {
         val result = engine.start(EngineConfig.ByeDpi(), Upstream.None)
         assertIs<StartResult.Failure>(result)
+    }
+
+    @Test
+    fun `tunSpec routes IPv6 when IPv6 family is enabled`() = runTest {
+        val spec = engine.tunSpec()
+
+        assertEquals(true, spec.allowFamilyV6)
+        assertNotNull(spec.ipv6Address)
+        assertEquals(true, spec.routeAllV6)
     }
 
     @Test
