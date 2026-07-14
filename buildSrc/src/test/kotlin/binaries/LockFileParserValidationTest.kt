@@ -292,6 +292,29 @@ class LockFileParserValidationTest {
     }
 
     @Test
+    fun `reject non https download url`() {
+        val f = write(
+            """
+            tag: binaries-x
+            generated_at: 2026-04-25T10:00:00Z
+            artifacts:
+              - name: libx.so
+                engine: x
+                abi: arm64-v8a
+                destination: jniLibs
+                download_url: http://example.com/x.so
+                sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                size_bytes: 1
+                source_repo: https://example.com
+                source_commit: 9999999999999999999999999999999999999999
+            """.trimIndent(),
+        )
+        assertThatThrownBy { LockFileParser.parse(f) }
+            .isInstanceOf(LockFileException::class.java)
+            .hasMessageContaining("HTTPS")
+    }
+
+    @Test
     fun `reject malformed download url`() {
         val f = write(
             """
