@@ -53,7 +53,7 @@ class AppBackupManager(
     private fun exportSettings(prefs: Preferences, categories: Set<BackupCategory>): BackupSettings =
         BackupSettings(
             splitMode = fromCategory(
-                BackupCategory.GENERAL_SETTINGS in categories,
+                BackupCategory.SPLIT_TUNNEL in categories,
             ) { prefs[SettingsKeys.SPLIT_MODE] },
             ipv6Enabled = fromCategory(
                 BackupCategory.GENERAL_SETTINGS in categories,
@@ -153,11 +153,10 @@ class AppBackupManager(
             warpSlotStore.replaceAll(data.warpSlots.map { it.toSlot() })
         }
         if (BackupCategory.STRATEGY in categories) data.strategy?.let { strategyProvider?.import(it) }
-        if (BackupCategory.SPLIT_TUNNEL in categories && data.splitRules.isNotEmpty()) importSplit(data.splitRules)
+        if (BackupCategory.SPLIT_TUNNEL in categories) importSplitTunnel(data)
     }
 
     private fun importGeneral(prefs: MutablePreferences, s: BackupSettings) {
-        s.splitMode?.let { prefs[SettingsKeys.SPLIT_MODE] = it }
         s.ipv6Enabled?.let { prefs[SettingsKeys.IPV6_ENABLED] = it }
         s.autoStart?.let { prefs[SettingsKeys.AUTO_START] = it }
         s.manualEngine?.let { prefs[SettingsKeys.MANUAL_ENGINE] = it }
@@ -165,6 +164,13 @@ class AppBackupManager(
         s.appMode?.let { prefs[SettingsKeys.APP_MODE] = it }
         s.engineAutoPriority?.let { prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = it }
         s.trafficMode?.let { prefs[SettingsKeys.TRAFFIC_MODE] = it }
+    }
+
+    private suspend fun importSplitTunnel(data: AppBackupData) {
+        data.settings.splitMode?.let { mode ->
+            ozeroSettings.edit { prefs -> prefs[SettingsKeys.SPLIT_MODE] = mode }
+        }
+        if (data.splitRules.isNotEmpty()) importSplit(data.splitRules)
     }
 
     private suspend fun importFptnToken(s: BackupSettings) {

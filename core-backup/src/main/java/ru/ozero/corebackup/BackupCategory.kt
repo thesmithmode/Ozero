@@ -17,7 +17,7 @@ enum class BackupCategory {
         WARP -> data.warpSlots.isNotEmpty()
         URNETWORK -> data.settings.hasUrnPrefs() || data.urnetwork.hasAny()
         STRATEGY -> data.strategy != null
-        SPLIT_TUNNEL -> data.splitRules.isNotEmpty()
+        SPLIT_TUNNEL -> data.settings.splitMode != null || data.splitRules.isNotEmpty()
     }
 
     companion object {
@@ -29,7 +29,7 @@ enum class BackupCategory {
 }
 
 private fun BackupSettings.hasGeneral(): Boolean = listOfNotNull(
-    splitMode, ipv6Enabled, autoStart, manualEngine, engineAutoPriority, trafficMode, uiLocaleTag, appMode, fptnToken,
+    ipv6Enabled, autoStart, manualEngine, engineAutoPriority, trafficMode, uiLocaleTag, appMode, fptnToken,
 ).isNotEmpty()
 
 private fun BackupSettings.hasDns(): Boolean =

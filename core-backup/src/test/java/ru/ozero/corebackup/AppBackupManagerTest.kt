@@ -213,7 +213,7 @@ class AppBackupManagerTest {
             ),
         )
 
-        assertEquals("per_app", data.settings.splitMode)
+        assertNull(data.settings.splitMode)
         assertEquals(false, data.settings.ipv6Enabled)
         assertEquals(true, data.settings.autoStart)
         assertEquals("warp", data.settings.manualEngine)
@@ -396,11 +396,38 @@ class AppBackupManagerTest {
         manager.import(data, setOf(BackupCategory.GENERAL_SETTINGS))
 
         val prefs = ozeroDs.data.first()
-        assertEquals("global", prefs[SettingsKeys.SPLIT_MODE])
+        assertNull(prefs[SettingsKeys.SPLIT_MODE])
         assertEquals("fptn", prefs[SettingsKeys.MANUAL_ENGINE])
         assertEquals("persisted-token", fptnStore.currentConfig().token)
         assertEquals("ignored", prefs[SettingsKeys.CUSTOM_DNS_SERVERS])
         assertNull(prefs[SettingsKeys.URNETWORK_ENABLED])
+    }
+
+    @Test
+    fun `import split mode only when split tunnel category is selected`() = runTest {
+        ozeroDs.edit { it[SettingsKeys.SPLIT_MODE] = "existing" }
+        val data = makeMinimalBackup().copy(
+            settings = BackupSettings(
+                splitMode = "ALLOWLIST",
+                ipv6Enabled = true,
+                autoStart = null,
+                manualEngine = null,
+                bydpiWinningArgs = null,
+                urnetworkEnabled = null,
+                urnetworkJwt = null,
+                customDnsServers = null,
+                hostsMode = null,
+                hostsList = null,
+                uiLocaleTag = null,
+                appMode = null,
+            ),
+        )
+
+        manager.import(data, setOf(BackupCategory.GENERAL_SETTINGS))
+        assertEquals("existing", ozeroDs.data.first()[SettingsKeys.SPLIT_MODE])
+
+        manager.import(data, setOf(BackupCategory.SPLIT_TUNNEL))
+        assertEquals("ALLOWLIST", ozeroDs.data.first()[SettingsKeys.SPLIT_MODE])
     }
 
     @Test
