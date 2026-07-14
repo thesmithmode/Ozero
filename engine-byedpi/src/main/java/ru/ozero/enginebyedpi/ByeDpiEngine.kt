@@ -129,12 +129,18 @@ class ByeDpiEngine(
         } else if (oldJob != null) {
             drainOrRotateProxyLane()
         }
+        if (!portFreeChecker(resolvedPort)) {
+            PersistentLoggers.error(TAG, "byedpi socks port $resolvedPort already occupied")
+            return StartResult.Failure(reason = "byedpi socks port $resolvedPort already occupied")
+        }
         val args = buildArgs(resolvedConfig)
         PersistentLoggers.debug(TAG, "jniStartProxy argvCount=${args.size}")
         val generation = proxyGeneration.incrementAndGet()
+        val proxyExitCode = AtomicInteger(PROXY_EXIT_PENDING)
         val proxyJob = proxyScope.launch {
             PersistentLoggers.debug(TAG, "launch entered port=$resolvedPort")
             val code = startProxySafely(args)
+            proxyExitCode.set(code)
             PersistentLoggers.debug(TAG, "startProxy returned code=$code port=$resolvedPort")
             when {
                 code == 0 -> Unit
@@ -148,7 +154,7 @@ class ByeDpiEngine(
         }
         proxyJobRef.set(proxyJob)
 
-        val readyAt = waitSocksReady(resolvedPort, proxyJob)
+        val readyAt = waitSocksReady(resolvedPort, proxyExitCode)
         return if (readyAt >= 0) {
             activeSocksPort = resolvedPort
             Log.i(TAG, "started socksPort=$resolvedPort readyMs=$readyAt")
@@ -214,11 +220,12 @@ class ByeDpiEngine(
         fallback
     }
 
-    private suspend fun waitSocksReady(port: Int, proxyJob: Job): Long {
+    private suspend fun waitSocksReady(port: Int, proxyExitCode: AtomicInteger): Long {
         val started = System.currentTimeMillis()
         var probeSuccess = false
         withTimeoutOrNull(readyTotalTimeoutMs) {
             while (true) {
+                if (proxyExitCode.get() != PROXY_EXIT_PENDING) return@withTimeoutOrNull
                 val ok = try {
                     socksProbe("127.0.0.1", port, readyProbeTimeoutMs)
                     true
@@ -231,7 +238,7 @@ class ByeDpiEngine(
                     probeSuccess = true
                     return@withTimeoutOrNull
                 }
-                if (!proxyJob.isActive) return@withTimeoutOrNull
+                if (proxyExitCode.get() != PROXY_EXIT_PENDING) return@withTimeoutOrNull
                 delay(READY_RETRY_MS)
             }
         }
@@ -328,6 +335,7 @@ class ByeDpiEngine(
         const val READY_PROBE_TIMEOUT_MS = 500
         const val READY_RETRY_MS = 100L
         const val STOP_GRACE_MS = 1_500L
+        private const val PROXY_EXIT_PENDING = Int.MIN_VALUE
 
         const val BYEDPI_STOP_TIMEOUT_MS = 2_500L
         const val AUTO_ROTATE_PORT = 0
