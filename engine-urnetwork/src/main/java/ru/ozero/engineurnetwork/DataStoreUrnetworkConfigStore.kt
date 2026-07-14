@@ -135,7 +135,8 @@ class DataStoreUrnetworkConfigStore(
         val KEY_FIXED_IP_SIZE = booleanPreferencesKey("urnetwork_fixed_ip_size")
         val KEY_ALLOW_DIRECT = booleanPreferencesKey("urnetwork_allow_direct")
         val KEY_PROVIDE_ENABLED = booleanPreferencesKey("urnetwork_provide_enabled")
-        val KEY_PROVIDE_CONTROL_MODE = stringPreferencesKey("urnetwork_provide_control_mode")
+        val KEY_PROVIDE_CONTROL_MODE =
+            stringPreferencesKey("urnetwork_provide_control_mode")
         val KEY_PROVIDE_NETWORK_MODE = stringPreferencesKey("urnetwork_provide_network_mode")
         val KEY_SELECTED_COUNTRY_CODE = stringPreferencesKey("urnetwork_selected_country_code")
         val KEY_SELECTED_REGION = stringPreferencesKey("urnetwork_selected_region")
