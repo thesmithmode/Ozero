@@ -5,6 +5,7 @@ import java.io.File
 
 open class ApkUpdateVerifier(
     private val publicKey: ByteArray,
+    private val maxApkBytes: Long = ApkDownloader.DEFAULT_MAX_APK_BYTES,
 ) {
 
     init {
@@ -14,9 +15,10 @@ open class ApkUpdateVerifier(
     }
 
     open fun verify(apkFile: File, signatureFile: File): Boolean {
-        if (!apkFile.exists() || !signatureFile.exists()) return false
+        if (!apkFile.isFile || !signatureFile.isFile) return false
+        if (signatureFile.length() != ED25519_SIG_LEN.toLong()) return false
+        if (apkFile.length() > maxApkBytes) return false
         val signature = signatureFile.readBytes()
-        if (signature.size != ED25519_SIG_LEN) return false
         return apkFile.inputStream().buffered().use { stream ->
             SubscriptionVerifier.verifyUpdate(stream, signature, publicKey)
         }
