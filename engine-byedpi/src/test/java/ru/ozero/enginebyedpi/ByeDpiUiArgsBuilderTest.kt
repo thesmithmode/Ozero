@@ -54,6 +54,32 @@ class ByeDpiUiArgsBuilderTest {
     }
 
     @Test
+    fun `fakeSni with whitespace is omitted`() {
+        val s = ByeDpiUiSettings.DEFAULT.copy(
+            desyncMethod = DesyncMethod.FAKE,
+            fakeSni = "example.com --ip 0.0.0.0",
+        )
+
+        val args = ByeDpiUiArgsBuilder.build(s, 1080).toList()
+
+        assertTrue(args.none { it.startsWith("-n") })
+        assertTrue("--ip" !in args)
+        assertTrue("0.0.0.0" !in args)
+    }
+
+    @Test
+    fun `fakeSni accepts trimmed hostname`() {
+        val s = ByeDpiUiSettings.DEFAULT.copy(
+            desyncMethod = DesyncMethod.FAKE,
+            fakeSni = " front.example.com ",
+        )
+
+        val args = ByeDpiUiArgsBuilder.build(s, 1080).toList()
+
+        assertTrue("-nfront.example.com" in args)
+    }
+
+    @Test
     fun `desyncMethod=NONE не добавляет split-flag`() {
         val s = ByeDpiUiSettings.DEFAULT.copy(desyncMethod = DesyncMethod.NONE, splitPosition = 1)
         val args = ByeDpiUiArgsBuilder.build(s, 1080).toList()
