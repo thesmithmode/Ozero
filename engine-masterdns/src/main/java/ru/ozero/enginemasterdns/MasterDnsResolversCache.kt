@@ -19,7 +19,13 @@ class MasterDnsResolversCache(
         .map { it.configToml }
         .stateIn(scope, SharingStarted.Eagerly, "")
 
+    private val enabled = config
+        .map { it.enabled }
+        .stateIn(scope, SharingStarted.Eagerly, false)
+
     fun snapshot(): List<String> = resolvers.value
 
     fun configTomlSnapshot(): String = configToml.value
+
+    fun enabledSnapshot(): Boolean = enabled.value
 }
