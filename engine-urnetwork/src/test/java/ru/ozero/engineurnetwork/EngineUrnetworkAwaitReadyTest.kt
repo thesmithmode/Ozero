@@ -66,7 +66,7 @@ class EngineUrnetworkAwaitReadyTest {
     }
 
     @Test
-    fun `awaitReady returns Ready after attach issued connect without waiting for peers`() = runTest {
+    fun `awaitReady times out after attach issued connect without usable runtime state`() = runTest {
         val bridge = CountableBridge(fixedPeers = 0).also {
             it.runtimeSnapshotProvider = {
                 UrnetworkSdkBridge.RuntimeSnapshot(
@@ -78,15 +78,14 @@ class EngineUrnetworkAwaitReadyTest {
                 )
             }
         }
-        val eng = engine(bridge, backgroundScope)
+        val eng = engine(bridge, backgroundScope, startupReadyTimeoutMs = 300L, startupReadyPollMs = 50L)
         eng.start(baseConfig, Upstream.None)
 
         val result = eng.awaitReady()
 
-        assertEquals(
-            EnginePlugin.ReadyResult.Ready,
+        assertIs<EnginePlugin.ReadyResult.Timeout>(
             result,
-            "startup gate must not keep URnetwork in Connecting while runtime peer watchdog owns peer grace",
+            "connectIssued without provider state, peers, or CONNECTED status must not be Ready",
         )
     }
 
