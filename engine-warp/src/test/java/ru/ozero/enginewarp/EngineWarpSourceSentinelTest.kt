@@ -93,7 +93,7 @@ class EngineWarpSourceSentinelTest {
         val body = source.substringAfter("override suspend fun attachTun(tunFd: Int)")
             .substringBefore("private fun registerNetworkCallback")
         assertTrue(
-            body.contains("attachTun failed: ${r.reason}; iniBytes="),
+            body.contains("attachTun failed: ${'$'}{r.reason}; iniBytes="),
             "attachTun failure log must keep failure reason and non-secret size diagnostics.",
         )
         assertFalse(
