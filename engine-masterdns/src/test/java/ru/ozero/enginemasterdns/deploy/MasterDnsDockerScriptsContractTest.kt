@@ -325,6 +325,10 @@ class MasterDnsDockerScriptsContractTest {
         assertFalse(
             cmd.contains("get.docker.com") || cmd.contains("sudo sh /tmp/get-docker.sh"),
             "installDocker не должен скачивать и запускать installer script под sudo без signature или checksum.",
+        )
+    }
+
+    @Test
     fun `installDocker uses signed Docker apt repository instead of root shell installer`() {
         val cmd = MasterDnsDockerScripts.installDocker
         assertFalse(

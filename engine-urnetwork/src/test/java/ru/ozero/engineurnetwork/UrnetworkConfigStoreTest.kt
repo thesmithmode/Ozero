@@ -169,6 +169,9 @@ class UrnetworkConfigStoreTest {
 
         assertEquals(false, snap.provideEnabled)
         assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
+    }
+
+    @Test
     fun `provideEnabled по умолчанию false`() = runTest {
         val (store, _) = newStore()
         assertEquals(false, store.provideEnabled().first())

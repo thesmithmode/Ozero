@@ -93,11 +93,20 @@ open class ApkDownloader(
     }
 
     private fun redirectTarget(source: HttpUrl, resp: Response): HttpUrl {
-        val location = resp.header("Location") ?: throw IOException("redirect without Location for $source")
-        val target = source.resolve(location) ?: throw IOException("invalid redirect for $source")
-        if (target.scheme != "https") throw IOException("non-https redirect for $source")
-        if (target.host !in ALLOWED_DOWNLOAD_HOSTS) throw IOException("unexpected redirect host for $source")
+        val location = resp.header("Location") ?: missingRedirectLocation(source)
+        val target = source.resolve(location) ?: invalidRedirect(source)
+        requireAllowedRedirectTarget(target)
         return target
+    }
+
+    private fun missingRedirectLocation(source: HttpUrl): Nothing =
+        throw IOException("redirect without Location for $source")
+
+    private fun invalidRedirect(source: HttpUrl): Nothing = throw IOException("invalid redirect for $source")
+
+    private fun requireAllowedRedirectTarget(target: HttpUrl) {
+        if (target.scheme != "https") throw IOException("non-https redirect for $target")
+        if (target.host !in ALLOWED_DOWNLOAD_HOSTS) throw IOException("unexpected redirect host for $target")
     }
 
     private fun ensureSuccessfulBody(resp: Response, url: String): okhttp3.ResponseBody {
