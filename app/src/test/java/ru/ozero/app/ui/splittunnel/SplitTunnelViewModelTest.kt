@@ -245,7 +245,7 @@ class SplitTunnelViewModelTest {
     }
 
     @Test
-    fun `onClearAll deletes all rules`() = runTest {
+    fun `onClearAll deletes current mode rules`() = runTest {
         dao.emit(
             listOf(
                 AppSplitRule("com.user.foo", isExcluded = false),
@@ -258,6 +258,25 @@ class SplitTunnelViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf("com.user.foo", "com.user.bar").sorted(), dao.deletes.sorted())
+    }
+
+    @Test
+    fun `onClearAll in BLOCKLIST mode preserves allowlist rules`() = runTest {
+        settings.setSplitMode(SplitTunnelMode.BLOCKLIST)
+        dao.emit(
+            listOf(
+                AppSplitRule("com.user.foo", isExcluded = false),
+                AppSplitRule("com.user.bar", isExcluded = true),
+            ),
+        )
+        val vm = SplitTunnelViewModel(apps, dao, settings, tunnelController)
+        advanceUntilIdle()
+
+        vm.onClearAll()
+        advanceUntilIdle()
+
+        assertEquals(listOf("com.user.bar"), dao.deletes)
+        assertEquals(listOf(AppSplitRule("com.user.foo", isExcluded = false)), dao.flow.value)
     }
 
     @Test

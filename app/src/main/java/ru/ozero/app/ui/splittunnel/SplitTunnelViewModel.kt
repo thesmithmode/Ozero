@@ -114,8 +114,10 @@ class SplitTunnelViewModel @Inject constructor(
     fun onClearAll() {
         if (tunnelController.state.value !is TunnelState.Idle) return
         viewModelScope.launch {
+            val mode = settingsRepository.settings.map { it.splitMode }.first()
+            val isBlocklist = mode == SplitTunnelMode.BLOCKLIST
             val snapshot = runCatching { dao.observeAll().first() }.getOrNull() ?: return@launch
-            snapshot.forEach { dao.delete(it.packageName) }
+            snapshot.filter { it.isExcluded == isBlocklist }.forEach { dao.delete(it.packageName) }
         }
     }
 
