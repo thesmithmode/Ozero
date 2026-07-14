@@ -140,6 +140,28 @@ class UrnetworkLocationsViewModelTest {
     }
 
     @Test
+    fun `sentinel — search query не пишется в logs`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkLocationsViewModel.kt",
+        ).readText()
+        val updateBody = source
+            .substringAfter("private fun updateLocations(")
+            .substringBefore("private fun applyFilter")
+        val setSearchBody = source
+            .substringAfter("fun setSearchQuery(")
+            .substringBefore("fun setProvidePaused")
+        kotlin.test.assertFalse(
+            updateBody.contains("searchQuery.value") && updateBody.contains("Log.i"),
+            "updateLocations не должен писать searchQuery.value в Log.i",
+        )
+        kotlin.test.assertFalse(
+            setSearchBody.contains("filterLocations(" + '$'),
+            "setSearchQuery не должен писать query в persistent warning logs",
+        )
+    }
+
+    @Test
     fun `sentinel — selectLocation и setProvidePaused используют update а не value assignment`() {
         val source = java.io.File(
             System.getProperty("user.dir") ?: ".",
