@@ -19,7 +19,7 @@ class SoakTest {
     companion object {
         private const val TAG = "SoakTest"
         private const val OUTPUT_FILE = "/sdcard/soak-metrics.json"
-        private const val DEFAULT_TARGET = "http://connectivitycheck.gstatic.com/generate_204"
+        private const val DEFAULT_TARGET = "https://www.gstatic.com/generate_204"
         private const val DEFAULT_REQUESTS = 100
         private const val ANR_THRESHOLD_MS = 5_000L
         private const val INTERVAL_MS = 1_000L
