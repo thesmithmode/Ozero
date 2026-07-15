@@ -8,11 +8,10 @@ import org.junit.jupiter.api.Test
 class MasterDnsDeployerLoggingSentinelTest {
     @Test
     fun `persistent deploy logs do not include server endpoints or remote command output`() {
-        val source = Files.readString(
-            Path.of(
-                "engine-masterdns/src/main/java/ru/ozero/enginemasterdns/deploy/MasterDnsDeployerImpl.kt",
-            ),
+        val sourcePath = Path.of(
+            "engine-masterdns/src/main/java/ru/ozero/enginemasterdns/deploy/MasterDnsDeployerImpl.kt",
         )
+        val source = Files.readAllBytes(sourcePath).toString(Charsets.UTF_8)
 
         val forbiddenSnippets = listOf(
             "host=\${credentials.host}",

@@ -41,9 +41,8 @@ class SingboxHttp204RoutedProbeTest {
             )
             .distinct()
 
-        assertTrue(SingboxHttp204RoutedProbe.PROBE_URL.startsWith("http://"))
-        assertTrue(urls.any { it.startsWith("http://") })
-        assertTrue(urls.any { it.startsWith("https://") })
+        assertTrue(urls.all { it.startsWith("https://") })
+        assertTrue(urls.any { it.contains("gstatic") })
         assertTrue(urls.any { it.contains("cloudflare") })
         assertEquals(3, urls.size)
     }

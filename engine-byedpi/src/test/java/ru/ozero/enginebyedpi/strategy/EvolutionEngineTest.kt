@@ -148,7 +148,11 @@ class EvolutionEngineTest {
         method.isAccessible = true
         val generation = method.invoke(evolutionEngine, emptyList<Chromosome>(), 0.2f) as List<*>
         assertEquals(4, generation.size)
-        assertTrue(generation.all { it is Chromosome })
+        assertTrue(
+            generation.all { chromosome ->
+                chromosome is List<*> && chromosome.all { it is StrategyGene }
+            },
+        )
     }
 
     @Test

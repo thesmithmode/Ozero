@@ -155,8 +155,8 @@ class StartSequenceCoordinatorContractTest {
     fun `autoCandidatesWithPreflight используется только в PROXY auto-mode`() {
         val runBody = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
         val tunGateIdx = runBody.indexOf("if (trafficMode == TrafficMode.TUN)")
-        val plainAutoIdx = runBody.indexOf("autoCandidates(settings, trafficMode)")
-        val preflightIdx = runBody.indexOf("autoCandidatesWithPreflight(settings, trafficMode)")
+        val plainAutoIdx = runBody.indexOf("autoCandidates(effectiveSettings, trafficMode)")
+        val preflightIdx = runBody.indexOf("autoCandidatesWithPreflight(effectiveSettings, trafficMode)")
         assertTrue(tunGateIdx >= 0, "TUN/PROXY gate не найден в run.")
         assertTrue(plainAutoIdx in tunGateIdx until preflightIdx, "TUN auto-mode должен идти без preflight.")
         assertTrue(preflightIdx > plainAutoIdx, "Preflight должен остаться только в PROXY ветке.")
