@@ -181,7 +181,8 @@ private fun ResponseBody.readUtf8Limited(maxBytes: Long): String {
             out.write(buffer, 0, read)
         }
     }
-    return out.toString(charset()?.name() ?: Charsets.UTF_8.name())
+    val charset = contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
+    return out.toString(charset.name())
 }
 
 private fun ProxyProfile.stableBaseIdentityKey(): String =

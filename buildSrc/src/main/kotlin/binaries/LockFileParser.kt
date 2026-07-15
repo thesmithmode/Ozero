@@ -10,7 +10,7 @@ import java.util.Date
 object LockFileParser {
     private val SHA256_REGEX = Regex("[0-9a-f]{64}")
 
-    fun parse(path: Path): LockFile {
+    fun parse(path: Path, requireHttps: Boolean = true): LockFile {
         val content = Files.readString(path)
         if (content.isBlank()) {
             throw LockFileException("Lock file is empty: $path")
@@ -44,6 +44,7 @@ object LockFileParser {
                     map.entries.associate { (key, value) -> key.toString() to value },
                     i,
                     path,
+                    requireHttps,
                 )
             }
             else -> emptyList()
@@ -57,7 +58,12 @@ object LockFileParser {
         return LockFile(tag = tag, generatedAt = generatedAt, artifacts = artifacts)
     }
 
-    private fun parseArtifact(m: Map<String, Any?>, idx: Int, path: Path): Artifact {
+    private fun parseArtifact(
+        m: Map<String, Any?>,
+        idx: Int,
+        path: Path,
+        requireHttps: Boolean,
+    ): Artifact {
         fun req(key: String): String =
             m[key]?.toString()
                 ?: throw LockFileException("Artifact #$idx missing required field '$key' in $path")
@@ -88,7 +94,7 @@ object LockFileParser {
         val downloadUrl = req("download_url")
         val uri = runCatching { java.net.URI(downloadUrl) }
             .getOrElse { throw LockFileException("Artifact '$name' has invalid download_url in $path") }
-        if (!uri.isAbsolute || uri.scheme != "https") {
+        if (!uri.isAbsolute || (requireHttps && uri.scheme != "https")) {
             throw LockFileException("Artifact '$name' download_url must be an absolute HTTPS URL in $path")
         }
         val sha256 = req("sha256")

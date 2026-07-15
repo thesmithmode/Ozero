@@ -83,6 +83,7 @@ class DownloadBinaryTaskTest {
                 moduleDir.set(testModuleDir.toFile())
                 requestedArtifacts.set(requested)
                 retryDelaysMs.set(listOf(0L, 0L, 0L))
+                lockFileParser = { LockFileParser.parse(it, requireHttps = false) }
             },
         ).get()
     }
@@ -106,6 +107,7 @@ class DownloadBinaryTaskTest {
                 moduleDir.set(testModuleDir.toFile())
                 requestedArtifacts.set(listOf("libbyedpi-arm64-v8a.so"))
                 retryDelaysMs.set(listOf(0L, 0L, 0L))
+                lockFileParser = { LockFileParser.parse(it, requireHttps = false) }
             },
         ).get()
 
@@ -134,6 +136,7 @@ class DownloadBinaryTaskTest {
                 moduleDir.set(testModuleDir.toFile())
                 requestedArtifacts.set(listOf("not-in-lock.so"))
                 retryDelaysMs.set(listOf(0L, 0L, 0L))
+                lockFileParser = { LockFileParser.parse(it, requireHttps = false) }
             },
         ).get()
 
@@ -161,6 +164,7 @@ class DownloadBinaryTaskTest {
                 moduleDir.set(testModuleDir.toFile())
                 requestedArtifacts.set(listOf("libbyedpi-arm64-v8a.so"))
                 retryDelaysMs.set(listOf(0L, 0L, 0L))
+                lockFileParser = { LockFileParser.parse(it, requireHttps = false) }
             },
         ).get()
 
