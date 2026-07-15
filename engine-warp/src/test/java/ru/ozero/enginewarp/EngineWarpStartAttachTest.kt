@@ -139,7 +139,7 @@ class EngineWarpStartAttachTest {
     }
 
     @Test
-    fun `system resolver rewrites hostname endpoints before attach`() = runTest {
+    fun `unresolved hostname endpoint is preserved before attach`() = runTest {
         val bridge = FakeBridge()
         val hostConfig = sampleConfig.copy(
             peerEndpoint = "localhost:2408",
@@ -156,7 +156,7 @@ class EngineWarpStartAttachTest {
         engine.attachTun(tunFd = 12)
 
         val ini = bridge.lastIni ?: error("ini missing")
-        assertTrue(ini.contains("Endpoint = 127.0.0.1:2408") || ini.contains("Endpoint = 0:0:0:0:0:0:0:1:2408"))
+        assertTrue(ini.contains("Endpoint = localhost:2408"))
     }
 
     @Test

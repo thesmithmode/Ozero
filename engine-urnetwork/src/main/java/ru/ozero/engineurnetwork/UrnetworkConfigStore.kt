@@ -120,6 +120,8 @@ suspend fun UrnetworkConfigStore.setAllowDirect(value: Boolean) {
     update { it.copy(allowDirect = value) }
 }
 
+fun UrnetworkConfigStore.provideEnabled(): Flow<Boolean> = config().map { it.provideEnabled }
+
 fun UrnetworkConfigStore.provideNetworkMode(): Flow<UrnetworkProvideNetworkMode> =
     config().map { it.provideNetworkMode }
 

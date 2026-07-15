@@ -138,6 +138,7 @@ class ByeDpiEngineTest {
         assertEquals(0, probeCalls)
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun startFailsWhenProxyExitsDuringReadinessStabilityWindow() = runTest {
         val started = CountDownLatch(1)
@@ -147,6 +148,7 @@ class ByeDpiEngineTest {
                 started.await()
                 1L
             },
+            testDispatcherOverride = UnconfinedTestDispatcher(testScheduler),
         )
         every { proxy.startProxy(any()) } answers {
             started.countDown()
@@ -446,28 +448,49 @@ class ByeDpiEngineTest {
     @Test
     fun `start failure clears upstream server_fd so next start can bind same port`() = runTest {
         var callCount = 0
+        val firstProxyExited = CountDownLatch(1)
+        val secondProxyStarted = CountDownLatch(1)
+        val allowSecondProxyExit = CountDownLatch(1)
         val recProxy = mockk<ByeDpiProxy>(relaxed = true)
         every { recProxy.startProxy(any()) } answers {
-            if (callCount++ == 0) -1 else 0
+            if (callCount++ == 0) {
+                firstProxyExited.countDown()
+                -1
+            } else {
+                secondProxyStarted.countDown()
+                allowSecondProxyExit.await()
+                0
+            }
         }
         val recEngine = ByeDpiEngine(
             recProxy,
             socksProbe = { _, _, _ ->
-                if (callCount == 1) throw IOException("refused") else 1L
+                if (firstProxyExited.count > 0) {
+                    firstProxyExited.await()
+                    throw IOException("refused")
+                }
+                secondProxyStarted.await()
+                1L
             },
             readyTotalTimeoutMs = 300,
-            testDispatcherOverride = UnconfinedTestDispatcher(testScheduler),
         )
-        val first = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
-        assertIs<StartResult.Failure>(first)
-        coVerify(atLeast = 1) { recProxy.forceClose() }
-        val second = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
-        assertIs<StartResult.Success>(second)
+        try {
+            val first = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+            assertIs<StartResult.Failure>(first)
+            coVerify(atLeast = 1) { recProxy.forceClose() }
+            val second = recEngine.start(EngineConfig.ByeDpi(socksPort = 1080))
+            assertIs<StartResult.Success>(second)
+        } finally {
+            allowSecondProxyExit.countDown()
+        }
     }
 
     @Test
     fun `stop forceClose before and after native job wait — server_fd reset guarantees clean next start`() = runTest {
-        every { proxy.startProxy(any()) } returns 0
+        every { proxy.startProxy(any()) } answers {
+            proxyRunning.await()
+            0
+        }
         engine.start(EngineConfig.ByeDpi(socksPort = 1080))
         engine.stop()
         coVerifyOrder {
@@ -516,13 +539,19 @@ class ByeDpiEngineTest {
     fun `start — forceClose когда stopProxy не помог + второй join ждёт нативный поток`() = runTest {
         val proxyStarted = CountDownLatch(1)
         val nativeThreadExit = CountDownLatch(1)
+        val secondNativeThreadExit = CountDownLatch(1)
+        var startCount = 0
         val orderedProxy: ByeDpiProxy = mockk(relaxed = true)
         mockkObject(ByeDpiProxy.Companion)
         every { ByeDpiProxy.loadOnce() } just runs
         every { ByeDpiProxy.libraryLoaded } returns true
         every { orderedProxy.startProxy(any()) } answers {
-            proxyStarted.countDown()
-            nativeThreadExit.await()
+            if (startCount++ == 0) {
+                proxyStarted.countDown()
+                nativeThreadExit.await()
+            } else {
+                secondNativeThreadExit.await()
+            }
             0
         }
         every { orderedProxy.forceClose() } answers {
@@ -532,11 +561,14 @@ class ByeDpiEngineTest {
         val eng = ByeDpiEngine(orderedProxy, socksProbe = { _, _, _ -> 1L })
         eng.start(EngineConfig.ByeDpi(socksPort = 1080))
         proxyStarted.await()
-        every { orderedProxy.startProxy(any()) } returns 0
-        val result = eng.start(EngineConfig.ByeDpi(socksPort = 1081))
-        assertIs<StartResult.Success>(result)
-        coVerify(atLeast = 1) { orderedProxy.forceClose() }
-        unmockkObject(ByeDpiProxy.Companion)
+        try {
+            val result = eng.start(EngineConfig.ByeDpi(socksPort = 1081))
+            assertIs<StartResult.Success>(result)
+            coVerify(atLeast = 1) { orderedProxy.forceClose() }
+        } finally {
+            secondNativeThreadExit.countDown()
+            unmockkObject(ByeDpiProxy.Companion)
+        }
     }
 
     @Test

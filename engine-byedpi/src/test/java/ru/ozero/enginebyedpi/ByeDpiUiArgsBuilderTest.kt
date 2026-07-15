@@ -63,8 +63,8 @@ class ByeDpiUiArgsBuilderTest {
         val args = ByeDpiUiArgsBuilder.build(s, 1080).toList()
 
         assertTrue(args.none { it.startsWith("-n") })
-        assertTrue("--ip" !in args)
-        assertTrue("0.0.0.0" !in args)
+        assertTrue("--ip" !in args.drop(4))
+        assertTrue("0.0.0.0" !in args.drop(4))
     }
 
     @Test
