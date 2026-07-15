@@ -244,7 +244,8 @@ class EngineUrnetwork(
         return if (reached != null) {
             EnginePlugin.ReadyResult.Ready
         } else {
-            val reason = "URnetwork: TUN attached, but SDK did not confirm provider, peers, or connected status within " +
+            val reason =
+                "URnetwork: TUN attached, but SDK did not confirm provider, peers, or connected status within " +
                 "${startupReadyTimeoutMs}ms"
             PersistentLoggers.warn(TAG, "awaitReady timeout - $reason")
             EnginePlugin.ReadyResult.Timeout(reason)
