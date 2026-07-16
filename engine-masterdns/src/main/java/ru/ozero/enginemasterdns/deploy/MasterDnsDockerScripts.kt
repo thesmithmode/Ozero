@@ -459,16 +459,18 @@ AWK_DOMAIN_STRIP
             " echo AMNEZIA_DNS_REMOVED"
 
     const val removeAll =
-        "if ! sudo docker ps -a >/dev/null 2>&1; then echo REMOVE_FAILED; exit 0; fi;" +
+        "remove_failed=0; docker_ready=0;" +
+            " if sudo docker ps -a >/dev/null 2>&1; then docker_ready=1; else remove_failed=1; fi;" +
+            " if [ \"\$docker_ready\" = \"1\" ]; then" +
             " if sudo docker inspect masterdns-ozero >/dev/null 2>&1;" +
             " then sudo docker stop masterdns-ozero 2>/dev/null || true;" +
-            " sudo docker rm -f masterdns-ozero >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }; fi;" +
+            " sudo docker rm -f masterdns-ozero >/dev/null 2>&1 || remove_failed=1; fi;" +
             " if sudo docker image inspect masterdns-ozero >/dev/null 2>&1;" +
-            " then sudo docker rmi masterdns-ozero >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }; fi;" +
+            " then sudo docker rmi masterdns-ozero >/dev/null 2>&1 || remove_failed=1; fi;" +
             " if sudo docker volume inspect masterdns-key >/dev/null 2>&1;" +
-            " then sudo docker volume rm masterdns-key >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }; fi;" +
+            " then sudo docker volume rm masterdns-key >/dev/null 2>&1 || remove_failed=1; fi; fi;" +
             " if [ -e /tmp/mdns_build ];" +
-            " then sudo rm -rf /tmp/mdns_build >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }; fi;" +
+            " then sudo rm -rf /tmp/mdns_build >/dev/null 2>&1 || remove_failed=1; fi;" +
             " if [ -f /var/lib/masterdns-ozero/fw_opened ];" +
             " then fw=\$(sudo cat /var/lib/masterdns-ozero/fw_opened 2>/dev/null);" +
             " case \"\$fw\" in" +
@@ -479,8 +481,8 @@ AWK_DOMAIN_STRIP
             " if command -v iptables-save >/dev/null 2>&1 && [ -d /etc/iptables ];" +
             " then sudo iptables-save | sudo tee /etc/iptables/rules.v4 >/dev/null 2>&1 || true; fi;;" +
             " esac;" +
-            " sudo rm -f /var/lib/masterdns-ozero/fw_opened >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }; fi;" +
-            " echo REMOVE_OK"
+            " sudo rm -f /var/lib/masterdns-ozero/fw_opened >/dev/null 2>&1 || remove_failed=1; fi;" +
+            " if [ \"\$remove_failed\" = \"0\" ]; then echo REMOVE_OK; else echo REMOVE_FAILED; fi"
 
     const val MARKER_REMOVE_OK = "REMOVE_OK"
     const val MARKER_REMOVE_FAILED = "REMOVE_FAILED"

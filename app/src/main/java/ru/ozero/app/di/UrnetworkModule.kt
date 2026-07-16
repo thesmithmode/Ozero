@@ -142,12 +142,14 @@ object UrnetworkModule {
         bridge: UrnetworkSdkBridge,
         configStore: UrnetworkConfigStore,
         tunnelController: TunnelController,
+        jwtBootstrapper: UrnetworkJwtBootstrapper,
         networkMonitor: RelayNetworkMonitor,
         lockManager: RelayLockManager,
     ): UrnetworkRelayCoordinator = UrnetworkRelayCoordinator(
         bridge = bridge,
         configStore = configStore,
         tunnelController = tunnelController,
+        jwtBootstrapper = jwtBootstrapper,
         networkMonitor = networkMonitor,
         relayLockManager = lockManager,
     )

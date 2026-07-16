@@ -16,6 +16,7 @@ import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkDefaults
+import ru.ozero.engineurnetwork.UrnetworkJwtBootstrapper
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.byClientJwt
@@ -32,6 +33,7 @@ class UrnetworkRelayCoordinator(
     private val bridge: UrnetworkSdkBridge,
     private val configStore: UrnetworkConfigStore,
     private val tunnelController: TunnelController,
+    private val jwtBootstrapper: UrnetworkJwtBootstrapper,
     private val networkMonitor: RelayNetworkMonitor? = null,
     private val relayLockManager: RelayLockManager? = null,
     private val pipeFactory: DummyPipeFactory = AndroidDummyPipeFactory,
@@ -41,6 +43,7 @@ class UrnetworkRelayCoordinator(
     private val jobRef = AtomicReference<Job?>(null)
     private val watchdogRef = AtomicReference<Job?>(null)
     private val relayOwned = AtomicBoolean(false)
+    private val bootstrapAttemptedThisSession = AtomicBoolean(false)
     private val pipeWriteEndRef = AtomicReference<AutoCloseable?>(null)
 
     fun start() {
@@ -48,23 +51,22 @@ class UrnetworkRelayCoordinator(
             tunnelController.state,
             configStore.byClientJwt(),
             configStore.walletAddress(),
-        ) { tunnelState, byClientJwt, walletAddress ->
-            Triple(tunnelState, byClientJwt, walletAddress)
+            configStore.provideEnabled(),
+        ) { tunnelState, byClientJwt, walletAddress, provideEnabled ->
+            RelayState(tunnelState, byClientJwt, walletAddress, provideEnabled)
         }
             .distinctUntilChanged()
-            .onEach { (tunnelState, byClientJwt, walletAddress) ->
-                handleState(tunnelState, byClientJwt, walletAddress)
+            .onEach { state ->
+                handleState(state)
             }
             .launchIn(scope)
         jobRef.getAndSet(newJob)?.cancel()
     }
 
-    private suspend fun handleState(
-        tunnelState: TunnelState,
-        byClientJwt: String?,
-        walletAddress: String,
-    ) {
+    private suspend fun handleState(state: RelayState) {
+        val tunnelState = state.tunnelState
         if (tunnelState !is TunnelState.Connected) {
+            bootstrapAttemptedThisSession.set(false)
             if (relayOwned.compareAndSet(true, false)) {
                 PersistentLoggers.debug(TAG, "mesh session: tunnel offline — releasing worker")
                 stopWatchdog()
@@ -79,19 +81,31 @@ class UrnetworkRelayCoordinator(
             relayOwned.set(false)
             return
         }
-        if (byClientJwt == null) {
-            PersistentLoggers.debug(
-                TAG,
-                "mesh session: credential missing for ${tunnelState.engineId} — relay disabled",
-            )
+        if (!state.provideEnabled) {
+            bootstrapAttemptedThisSession.set(false)
+            if (relayOwned.compareAndSet(true, false)) {
+                stopWatchdog()
+                runCatching { networkMonitor?.stop() }
+                runCatching { relayLockManager?.release() }
+                runCatching { bridge.stop() }
+                closeDummyPipe()
+            }
             return
         }
-        val result = startBridgeWithRetry(walletAddress, byClientJwt)
+        if (state.byClientJwt == null) {
+            if (bootstrapAttemptedThisSession.compareAndSet(false, true)) {
+                val result = jwtBootstrapper.ensureClientJwt()
+                if (result is UrnetworkJwtBootstrapper.Result.Failed) {
+                    PersistentLoggers.warn(TAG, "mesh session: credential acquisition failed: ${result.reason}")
+                }
+            }
+            return
+        }
+        val result = startBridgeWithRetry(state.walletAddress, state.byClientJwt)
         if (result is UrnetworkSdkBridge.StartResult.Success) {
             relayOwned.set(true)
             attachDummyIoLoop()
-            val provideEnabled = runCatching { configStore.provideEnabled().first() }.getOrDefault(false)
-            runCatching { bridge.setProvidePaused(!provideEnabled) }
+            runCatching { bridge.setProvidePaused(false) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: worker pause toggle threw: ${it.message}") }
             val controlMode = runCatching { configStore.config().first().provideControlMode }
                 .getOrDefault(UrnetworkProvideControlMode.ALWAYS)
@@ -206,6 +220,13 @@ class UrnetworkRelayCoordinator(
     }
 
     private companion object {
+        data class RelayState(
+            val tunnelState: TunnelState,
+            val byClientJwt: String?,
+            val walletAddress: String,
+            val provideEnabled: Boolean,
+        )
+
         const val TAG = "MeshSession"
         val RETRY_BACKOFF_MS = longArrayOf(5_000L, 30_000L, 90_000L)
         const val WATCHDOG_INTERVAL_MS = 60_000L

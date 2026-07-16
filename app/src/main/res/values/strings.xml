@@ -276,7 +276,7 @@
     <string name="urnetwork_provide_title">Раздача трафика</string>
     <string name="urnetwork_provide_subtitle">Делиться пропускной способностью с сетью URnetwork</string>
     <string name="urnetwork_provide_mode_never">Никогда</string>
-    <string name="urnetwork_provide_mode_desc">Раздача трафика всегда включена. Можно выбрать только сети, на которых она работает.</string>
+    <string name="urnetwork_provide_mode_desc">Выберите, когда устройство может делиться трафиком с сетью URnetwork.</string>
     <string name="urnetwork_provide_network_mode_title">Сеть для раздачи</string>
     <string name="urnetwork_provide_network_mode_wifi">Только Wi-Fi</string>
     <string name="urnetwork_provide_network_mode_all">Wi-Fi и мобильные</string>

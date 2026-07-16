@@ -280,7 +280,7 @@ class MasterDnsDockerScriptsContractTest {
     fun `removeAll deletes named key volume during full server removal`() {
         val cmd = MasterDnsDockerScripts.removeAll
         val volumeRemoval = "then sudo docker volume rm masterdns-key >/dev/null 2>&1 " +
-            "|| { echo REMOVE_FAILED; exit 0; }; fi"
+            "|| remove_failed=1; fi"
         assertTrue(
             cmd.contains(volumeRemoval),
             "removeAll должен удалять masterdns-key volume — user-facing remove обязан стирать secret material.",
@@ -601,9 +601,22 @@ class MasterDnsDockerScriptsContractTest {
         val cmd = MasterDnsDockerScripts.removeAll
         assertTrue(cmd.contains(MasterDnsDockerScripts.MARKER_REMOVE_FAILED))
         assertTrue(cmd.contains("sudo docker ps -a"))
-        assertTrue(cmd.contains("docker rm -f masterdns-ozero >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }"))
-        assertTrue(cmd.contains("docker rmi masterdns-ozero >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }"))
-        assertTrue(cmd.contains("sudo rm -rf /tmp/mdns_build >/dev/null 2>&1 || { echo REMOVE_FAILED; exit 0; }"))
+        assertTrue(cmd.contains("docker rm -f masterdns-ozero >/dev/null 2>&1 || remove_failed=1"))
+        assertTrue(cmd.contains("docker rmi masterdns-ozero >/dev/null 2>&1 || remove_failed=1"))
+        assertTrue(cmd.contains("sudo rm -rf /tmp/mdns_build >/dev/null 2>&1 || remove_failed=1"))
+    }
+
+    @Test
+    fun `removeAll attempts local cleanup even when Docker is unavailable`() {
+        val cmd = MasterDnsDockerScripts.removeAll
+        val dockerProbe = cmd.indexOf("sudo docker ps -a")
+        val tempCleanup = cmd.indexOf("sudo rm -rf /tmp/mdns_build")
+        val firewallCleanup = cmd.indexOf("/var/lib/masterdns-ozero/fw_opened")
+
+        assertTrue(dockerProbe >= 0)
+        assertTrue(tempCleanup > dockerProbe)
+        assertTrue(firewallCleanup > tempCleanup)
+        assertFalse(cmd.substring(dockerProbe, tempCleanup).contains("exit 0"))
     }
 
     @Test
