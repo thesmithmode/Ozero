@@ -3,6 +3,7 @@ package ru.ozero.app.logging
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayInputStream
+import java.io.InputStream
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -156,9 +157,34 @@ class BootDiagnosticsRuntimeTest {
     @Test
     fun `readAtMost caps binary trace bytes before string extraction`() {
         val raw = ByteArray(70_000) { 0x41 }
+        val input = CountingInputStream(raw)
 
-        val bytes = BootDiagnostics.readAtMost(ByteArrayInputStream(raw), 64 * 1024)
+        val bytes = BootDiagnostics.readAtMost(input, 64 * 1024)
 
         assertEquals(64 * 1024, bytes.size)
+        assertEquals(1, input.readCalls)
+    }
+
+    private class CountingInputStream(
+        private val bytes: ByteArray,
+    ) : InputStream() {
+        var readCalls: Int = 0
+            private set
+        private var offset: Int = 0
+
+        override fun read(): Int {
+            readCalls += 1
+            if (offset >= bytes.size) return -1
+            return bytes[offset++].toInt() and 0xFF
+        }
+
+        override fun read(buffer: ByteArray, off: Int, len: Int): Int {
+            readCalls += 1
+            if (offset >= bytes.size) return -1
+            val count = minOf(len, bytes.size - offset)
+            bytes.copyInto(buffer, off, offset, offset + count)
+            offset += count
+            return count
+        }
     }
 }
