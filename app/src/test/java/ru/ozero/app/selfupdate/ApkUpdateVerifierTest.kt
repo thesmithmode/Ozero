@@ -8,6 +8,7 @@ import org.bouncycastle.crypto.signers.Ed25519Signer
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.io.RandomAccessFile
 import java.nio.file.Path
 import java.security.SecureRandom
 import kotlin.io.path.div
@@ -89,7 +90,8 @@ class ApkUpdateVerifierTest {
     fun rejectsOversizedSignatureBeforeReading(@TempDir tmp: Path) {
         val (_, pub) = generateKeyPair()
         val apk = (tmp / "ozero.apk").toFile().apply { writeBytes(byteArrayOf(0x01)) }
-        val sig = (tmp / "ozero.apk.sig").toFile().apply { setLength(1024 * 1024) }
+        val sig = (tmp / "ozero.apk.sig").toFile()
+        RandomAccessFile(sig, "rw").use { it.setLength(1024L * 1024L) }
 
         assertFalse(ApkUpdateVerifier(pub).verify(apk, sig))
     }

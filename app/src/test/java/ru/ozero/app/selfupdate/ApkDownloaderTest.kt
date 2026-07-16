@@ -45,22 +45,23 @@ class ApkDownloaderTest {
     @Test
     fun `download follows allowed github asset redirects`() = runTest {
         val dest = tempDir.toFile()
+        val apkAssetUrl = "https://release-assets.githubusercontent.com/github-production-release-asset/1/ozero.apk"
+        val sigAssetUrl =
+            "https://release-assets.githubusercontent.com/github-production-release-asset/1/ozero.apk.sig"
         val downloader = ApkDownloader(
             client = clientOf(
                 "https://github.com/org/repo/releases/download/v1/ozero.apk" to ResponseSpec(
                     302,
                     ByteArray(0),
-                    "https://release-assets.githubusercontent.com/github-production-release-asset/1/ozero.apk",
+                    location = apkAssetUrl,
                 ),
-                "https://release-assets.githubusercontent.com/github-production-release-asset/1/ozero.apk" to
-                    ResponseSpec(200, ByteArray(4) { it.toByte() }),
+                apkAssetUrl to ResponseSpec(200, ByteArray(4) { it.toByte() }),
                 "https://github.com/org/repo/releases/download/v1/ozero.apk.sig" to ResponseSpec(
                     302,
                     ByteArray(0),
-                    "https://release-assets.githubusercontent.com/github-production-release-asset/1/ozero.apk.sig",
+                    location = sigAssetUrl,
                 ),
-                "https://release-assets.githubusercontent.com/github-production-release-asset/1/ozero.apk.sig" to
-                    ResponseSpec(200, ByteArray(3) { (it + 10).toByte() }),
+                sigAssetUrl to ResponseSpec(200, ByteArray(3) { (it + 10).toByte() }),
             )
         )
 
@@ -83,7 +84,7 @@ class ApkDownloaderTest {
                 "https://github.com/org/repo/releases/download/v1/ozero.apk" to ResponseSpec(
                     302,
                     ByteArray(0),
-                    "https://example.test/ozero.apk",
+                    location = "https://example.test/ozero.apk",
                 ),
             )
         )
