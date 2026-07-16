@@ -24,12 +24,14 @@ import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
+import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 import ru.ozero.engineurnetwork.allowDirect
 import ru.ozero.engineurnetwork.fixedIpSize
 import ru.ozero.engineurnetwork.provideNetworkMode
+import ru.ozero.engineurnetwork.provideControlMode
 import ru.ozero.engineurnetwork.setAllowDirect
 import ru.ozero.engineurnetwork.setFixedIpSize
 import ru.ozero.engineurnetwork.setProvideNetworkMode

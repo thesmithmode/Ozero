@@ -609,12 +609,14 @@ class ByeDpiEngineTest {
     @Test
     fun startStopsOldProxyBeforeLaunchingNew() = runTest {
         val firstLatch = CountDownLatch(1)
+        val secondLatch = CountDownLatch(1)
+        var startCount = 0
         val blockingProxy: ByeDpiProxy = mockk(relaxed = true)
         mockkObject(ByeDpiProxy.Companion)
         every { ByeDpiProxy.loadOnce() } just runs
         every { ByeDpiProxy.libraryLoaded } returns true
         every { blockingProxy.startProxy(any()) } answers {
-            firstLatch.await()
+            if (startCount++ == 0) firstLatch.await() else secondLatch.await()
             0
         }
         every { blockingProxy.stopProxy() } answers {
@@ -622,11 +624,15 @@ class ByeDpiEngineTest {
             0
         }
         val eng = ByeDpiEngine(blockingProxy, socksProbe = { _, _, _ -> 1L })
-        eng.start(EngineConfig.ByeDpi(socksPort = 1080))
-        val result = eng.start(EngineConfig.ByeDpi(socksPort = 1080))
-        assertIs<StartResult.Success>(result)
-        coVerify(atLeast = 1) { blockingProxy.stopProxy() }
-        unmockkObject(ByeDpiProxy.Companion)
+        try {
+            eng.start(EngineConfig.ByeDpi(socksPort = 1080))
+            val result = eng.start(EngineConfig.ByeDpi(socksPort = 1080))
+            assertIs<StartResult.Success>(result)
+            coVerify(atLeast = 1) { blockingProxy.stopProxy() }
+        } finally {
+            secondLatch.countDown()
+            unmockkObject(ByeDpiProxy.Companion)
+        }
     }
 
     @Test

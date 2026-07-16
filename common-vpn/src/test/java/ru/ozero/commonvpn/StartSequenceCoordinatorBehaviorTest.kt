@@ -227,7 +227,7 @@ class StartSequenceCoordinatorBehaviorTest {
             settings = SettingsModel(
                 trafficMode = TrafficMode.TUN,
                 manualEngine = null,
-                engineAutoPriority = listOf(EngineId.BYEDPI),
+                engineAutoPriority = emptyList(),
                 killswitchEnabled = true,
             ),
         )

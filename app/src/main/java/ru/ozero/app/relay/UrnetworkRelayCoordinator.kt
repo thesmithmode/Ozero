@@ -19,6 +19,7 @@ import ru.ozero.engineurnetwork.UrnetworkDefaults
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.byClientJwt
+import ru.ozero.engineurnetwork.provideEnabled
 import ru.ozero.engineurnetwork.provideNetworkMode
 import ru.ozero.engineurnetwork.walletAddress
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge

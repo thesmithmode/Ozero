@@ -45,7 +45,7 @@ class SdkLocationToken(val sdk: ConnectLocation) : UrnetworkSdkBridge.LocationTo
 }
 
 internal enum class DeviceInitMode(val providePaused: Boolean) {
-    FULL_START(providePaused = false),
+    FULL_START(providePaused = true),
     LOCATION_BROWSE(providePaused = true),
 }
 

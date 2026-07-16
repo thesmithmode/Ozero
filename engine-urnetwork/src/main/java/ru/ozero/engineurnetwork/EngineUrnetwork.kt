@@ -119,9 +119,11 @@ class EngineUrnetwork(
                 val allowDirect = configStore.allowDirect().first()
                 runCatching { sdkBridge.applyPerformanceProfile(windowType, fixedIp, allowDirect) }
                     .onFailure { PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}") }
-                runCatching { sdkBridge.setProvidePaused(false) }
+                val provideEnabled = configStore.provideEnabled().first()
+                val provideControlMode = configStore.provideControlMode().first()
+                runCatching { sdkBridge.setProvidePaused(!provideEnabled) }
                     .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused threw: ${it.message}") }
-                runCatching { sdkBridge.setProvideControlMode(UrnetworkProvideControlMode.ALWAYS) }
+                runCatching { sdkBridge.setProvideControlMode(provideControlMode) }
                     .onFailure { PersistentLoggers.warn(TAG, "setProvideControlMode threw: ${it.message}") }
                 val networkMode = configStore.provideNetworkMode().first()
                 runCatching { sdkBridge.setProvideNetworkMode(networkMode) }
@@ -129,7 +131,8 @@ class EngineUrnetwork(
                 Log.i(
                     TAG,
                     "started OK preferred=${merged.summary()} " +
-                        "windowType=${windowType.rawValue} fixedIp=$fixedIp allowDirect=$allowDirect",
+                        "windowType=${windowType.rawValue} fixedIp=$fixedIp allowDirect=$allowDirect " +
+                        "provideEnabled=$provideEnabled controlMode=${provideControlMode.rawValue}",
                 )
                 startStatsPolling()
                 StartResult.Success(socksPort = 0)
@@ -253,7 +256,8 @@ class EngineUrnetwork(
     }
 
     private fun isStartupReady(snapshot: UrnetworkSdkBridge.RuntimeSnapshot): Boolean =
-        snapshot.providerStateAdded > 0L ||
+        (snapshot.tunnelStarted && snapshot.connectIssued) ||
+            snapshot.providerStateAdded > 0L ||
             snapshot.peers > 0 ||
             isConnectedStatus(snapshot.connectionStatus)
 

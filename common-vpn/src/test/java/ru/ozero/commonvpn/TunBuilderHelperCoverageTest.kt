@@ -235,7 +235,7 @@ class TunBuilderHelperCoverageTest {
     }
 
     @Test
-    fun `buildTunBuilder defaults dns to first public v4 and skips ipv6 when disabled`() {
+    fun `buildTunBuilder defaults dns and blackholes ipv6 when disabled`() {
         val builder = builder()
 
         helper(builder).buildTunBuilder(
@@ -245,8 +245,10 @@ class TunBuilderHelperCoverageTest {
         )
 
         verify(exactly = 1) { builder.addDnsServer(TunBuilderHelper.TUN_DNS_SERVERS.first()) }
-        verify(exactly = 0) { builder.addAddress(TunBuilderHelper.TUN_ADDRESS_V6, any()) }
-        verify(exactly = 0) { builder.addRoute("::", 0) }
+        verify(exactly = 1) {
+            builder.addAddress(TunBuilderHelper.TUN_ADDRESS_V6, TunBuilderHelper.TUN_PREFIX_LENGTH_V6)
+        }
+        verify(exactly = 1) { builder.addRoute("::", 0) }
     }
 
     @Test

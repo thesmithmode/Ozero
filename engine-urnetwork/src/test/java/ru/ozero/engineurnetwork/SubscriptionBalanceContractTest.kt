@@ -140,22 +140,21 @@ class SubscriptionBalanceContractTest {
     }
 
     @Test
-    fun `RealBridge subscriptionBalance логирует clientId loc providePaused — diagnostic для x2 traffic`() {
+    fun `RealBridge subscriptionBalance does not log client or provider state`() {
         val block = source
             .substringAfter("override suspend fun fetchSubscriptionBalance")
             .substringBefore("private fun cleanupOnFailure")
         assertTrue(
-            block.contains("clientId="),
-            "raw лог обязан содержать clientId — для диагностики откуда x2 расхождение баланса " +
-                "vs оригинальный URnetwork-app (разный аккаунт vs одинаковый аккаунт)",
+            !block.contains("clientId="),
+            "subscription balance logs must not expose client identity",
         )
         assertTrue(
-            block.contains("providePaused="),
-            "raw лог обязан содержать providePaused — provide bonus может удваивать quota",
+            !block.contains("providePaused="),
+            "subscription balance logs must not expose provider state",
         )
         assertTrue(
-            block.contains("loc="),
-            "raw лог обязан содержать activeLocation — bonus может зависеть от выбранной локации",
+            !block.contains("loc="),
+            "subscription balance logs must not expose active location",
         )
     }
 

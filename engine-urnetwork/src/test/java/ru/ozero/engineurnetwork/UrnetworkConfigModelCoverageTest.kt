@@ -71,8 +71,8 @@ class UrnetworkConfigModelCoverageTest {
         assertTrue(store.fixedIpSize().first())
         assertFalse(store.allowDirect().first())
         val snap = store.config().first()
-        assertTrue(snap.provideEnabled)
-        assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
+        assertFalse(snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, store.provideNetworkMode().first())
     }
 

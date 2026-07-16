@@ -270,16 +270,21 @@ class StartSequenceCoordinator(
             val chain = startChain(activeEngineId, activeConfig, notifyFailure) ?: return null
             return tun to chain
         }
-        val tun = establishTun(splitConfig, ipv6 = ipv6Enabled, customDns = customDns) ?: return null
+        val chain = startChain(activeEngineId, activeConfig, notifyFailure) ?: return null
+        val tun = establishTun(splitConfig, ipv6 = ipv6Enabled, customDns = customDns) ?: run {
+            runCatching { deps.chainOrchestrator.stop() }
+            reportEngineFailure(
+                activeEngineId,
+                "establishTun fail after startChain",
+                notifyFailure,
+            )
+            return null
+        }
         state.lockdownStartupFdRef.getAndSet(null)?.runCatching { close() }
         if (state.stopping.get()) {
             runCatching { tun.close() }
             state.tunFdRef.compareAndSet(tun, null)
-            return null
-        }
-        val chain = startChain(activeEngineId, activeConfig, notifyFailure) ?: run {
-            runCatching { tun.close() }
-            state.tunFdRef.compareAndSet(tun, null)
+            runCatching { deps.chainOrchestrator.stop() }
             return null
         }
         return tun to chain

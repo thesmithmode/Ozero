@@ -74,7 +74,7 @@ class ShutdownCoordinator(
 
     suspend fun performShutdown(
         callStopSelf: Boolean = true,
-        stopRequestStartId: Int = latestStartIdProvider(),
+        stopRequestStartId: Int? = null,
     ) {
         PersistentLoggers.info(TAG, "performShutdown begin")
         try {
@@ -119,7 +119,7 @@ class ShutdownCoordinator(
             state.stopSignal.set(false)
             state.tunIfaceNameRef.set(null)
             stopForegroundRequest()
-            if (callStopSelf) stopSelfRequest(stopRequestStartId)
+            if (callStopSelf) stopSelfRequest(stopRequestStartId ?: latestStartIdProvider())
             PersistentLoggers.info(TAG, "performShutdown end")
         }
     }

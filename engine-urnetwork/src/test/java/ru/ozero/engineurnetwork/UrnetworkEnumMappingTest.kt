@@ -15,12 +15,12 @@ class UrnetworkEnumMappingTest {
     }
 
     @Test
-    fun `provide control mode maps every raw value and falls back to always`() {
+    fun `provide control mode maps every raw value and falls back to auto`() {
         UrnetworkProvideControlMode.entries.forEach { value ->
             assertEquals(value, UrnetworkProvideControlMode.fromRaw(value.rawValue))
         }
-        assertEquals(UrnetworkProvideControlMode.ALWAYS, UrnetworkProvideControlMode.fromRaw(null))
-        assertEquals(UrnetworkProvideControlMode.ALWAYS, UrnetworkProvideControlMode.fromRaw("missing"))
+        assertEquals(UrnetworkProvideControlMode.AUTO, UrnetworkProvideControlMode.fromRaw(null))
+        assertEquals(UrnetworkProvideControlMode.AUTO, UrnetworkProvideControlMode.fromRaw("missing"))
     }
 
     @Test

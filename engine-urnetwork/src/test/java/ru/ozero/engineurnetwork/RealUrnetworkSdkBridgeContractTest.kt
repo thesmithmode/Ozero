@@ -156,7 +156,7 @@ class RealUrnetworkSdkBridgeContractTest {
 
     @Test
     fun `browse-only init explicitly keeps provide paused`() {
-        assertEquals(false, DeviceInitMode.FULL_START.providePaused)
+        assertEquals(true, DeviceInitMode.FULL_START.providePaused)
         assertEquals(true, DeviceInitMode.LOCATION_BROWSE.providePaused)
     }
 
