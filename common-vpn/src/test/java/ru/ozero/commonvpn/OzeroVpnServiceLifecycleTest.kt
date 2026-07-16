@@ -198,7 +198,7 @@ class OzeroVpnServiceLifecycleTest {
         val body = shutdownSource.substringAfter("suspend fun performShutdown(")
             .substringBefore("private fun recordSessionEnd(")
         assertTrue(
-            body.contains("stopSelfRequest(stopRequestStartId)"),
+            body.contains("stopSelfRequest(stopRequestStartId ?: latestStartIdProvider())"),
             "performShutdown обязан вызывать stopSelfRequest(latestStartIdProvider()), а не безаргументный. " +
                 "stopSelf(startId) — no-op если пришёл новый intents, что исключает onDestroy при engine switch. " +
                 "Голый stopSelf() безусловно планирует onDestroy → ForegroundServiceDidNotStartInTimeException.",

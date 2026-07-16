@@ -297,7 +297,7 @@ class OzeroVpnServiceLockdownKillswitchTest {
     }
 
     @Test
-    fun `not usesCustomTun branch — establishTun выполняется ДО startChain`() {
+    fun `not usesCustomTun branch — startChain выполняется ДО establishTun`() {
         val establishIdx = regularTunBranchBody.indexOf("establishTun(")
         val startChainIdx = regularTunBranchBody.indexOf("startChain(activeEngineId")
         assertTrue(
@@ -309,9 +309,9 @@ class OzeroVpnServiceLockdownKillswitchTest {
             "startChain не найден в !usesCustomTun branch — anchor сломан. Body:\n$regularTunBranchBody",
         )
         assertTrue(
-            establishIdx < startChainIdx,
-            "Для !usesCustomTun TUN обязан быть установлен ДО startChain, чтобы startup " +
-                "оставался fail-closed. establishIdx=$establishIdx startChainIdx=$startChainIdx",
+            startChainIdx < establishIdx,
+            "Для !usesCustomTun SOCKS endpoint обязан быть запущен ДО TUN, иначе TUN начнет " +
+                "маршрутизировать трафик в еще не готовый proxy. establishIdx=$establishIdx startChainIdx=$startChainIdx",
         )
     }
 
