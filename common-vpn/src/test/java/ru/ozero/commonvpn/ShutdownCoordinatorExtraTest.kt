@@ -222,6 +222,7 @@ class ShutdownCoordinatorExtraTest {
         runCurrent()
         release.complete(Unit)
         shutdown.await()
+        startJob.join()
 
         assertTrue(startJob.isCompleted)
         verify(exactly = 1) { fixture.stopForegroundRequest.invoke() }

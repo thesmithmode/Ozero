@@ -865,6 +865,7 @@ class MainViewModelTest {
     @Test
     fun refreshIpInfoForcesRefetch() = runTest {
         backgroundScope.launch { viewModel.ipInfo.collect {} }
+        tunnelController.onProbing(EngineId.BYEDPI)
         tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
         advanceUntilIdle()

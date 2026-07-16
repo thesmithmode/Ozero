@@ -575,6 +575,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         harness.viewModel.onRestoreDefaults()
         advanceUntilIdle()
         harness.viewModel.consumeRestoreError()
+        advanceUntilIdle()
 
         assertNull(harness.viewModel.state.value.restoreError)
     }

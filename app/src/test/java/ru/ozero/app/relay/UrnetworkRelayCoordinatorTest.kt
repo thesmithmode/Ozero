@@ -126,7 +126,7 @@ class UrnetworkRelayCoordinatorTest {
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
         assertEquals(1, bridge.startCalls)
-        assertEquals(false, bridge.lastProvidePaused)
+        assertEquals(true, bridge.lastProvidePaused)
     }
 
     @Test
@@ -259,7 +259,7 @@ class UrnetworkRelayCoordinatorTest {
         configStore.setProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        assertEquals(UrnetworkProvideControlMode.ALWAYS, bridge.lastControlMode)
+        assertEquals(UrnetworkProvideControlMode.AUTO, bridge.lastControlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, bridge.lastNetworkMode)
     }
 

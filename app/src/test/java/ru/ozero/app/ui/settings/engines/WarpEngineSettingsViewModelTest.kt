@@ -5,6 +5,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -216,7 +217,7 @@ class WarpEngineSettingsViewModelTest {
     fun `onImportFile failure ставит errorMessage и не добавляет слот`() = runTest {
         importer.result = Result.failure<ImportedWarpConfig>(IOException("bad file"))
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
-        advanceUntilIdle()
+        vm.uiState.first { it.errorMessage == "bad file" }
         assertEquals("bad file", vm.uiState.value.errorMessage)
         assertEquals(0, store.slotCount())
     }
@@ -244,9 +245,9 @@ class WarpEngineSettingsViewModelTest {
     fun `onImportFile дубликата возвращает errorMessageRes warp_duplicate_hint`() = runTest {
         importer.setConfig(SAMPLE)
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
-        advanceUntilIdle()
+        vm.uiState.first { it.importSuccessCount == 1 }
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
-        advanceUntilIdle()
+        vm.uiState.first { it.errorMessageRes == R.string.warp_duplicate_hint }
         assertEquals(1, store.slotCount(), "дубликат не должен добавляться")
         assertEquals(1, vm.uiState.value.importSuccessCount)
         assertEquals(R.string.warp_duplicate_hint, vm.uiState.value.errorMessageRes)

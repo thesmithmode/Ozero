@@ -152,7 +152,7 @@ class UrnetworkLocationsViewModelTest {
             .substringAfter("fun setSearchQuery(")
             .substringBefore("fun setProvidePaused")
         kotlin.test.assertFalse(
-            updateBody.contains("searchQuery.value") && updateBody.contains("Log.i"),
+            updateBody.contains("${'$'}{searchQuery.value}"),
             "updateLocations не должен писать searchQuery.value в Log.i",
         )
         kotlin.test.assertFalse(

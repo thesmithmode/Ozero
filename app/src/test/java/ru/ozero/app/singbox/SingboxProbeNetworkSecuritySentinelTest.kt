@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 class SingboxProbeNetworkSecuritySentinelTest {
 
     @Test
-    fun `network security allows only routed HTTP probe hosts`() {
+    fun `network security rejects cleartext for every host`() {
         val root = locateRepoRoot()
         val config = File(root, "app/src/main/res/xml/network_security_config.xml")
         assertTrue(config.isFile, "network_security_config.xml must exist")
@@ -31,13 +31,7 @@ class SingboxProbeNetworkSecuritySentinelTest {
 
         assertEquals("false", baseConfig.getAttribute("cleartextTrafficPermitted"))
         assertEquals(setOf("system"), baseAnchors)
-        assertEquals(
-            setOf(
-                "connectivitycheck.gstatic.com" to "false",
-                "cp.cloudflare.com" to "false",
-            ),
-            cleartextDomains,
-        )
+        assertEquals(emptySet(), cleartextDomains)
     }
 
     private fun Element.elements(name: String): List<Element> = (0 until childNodes.length)
