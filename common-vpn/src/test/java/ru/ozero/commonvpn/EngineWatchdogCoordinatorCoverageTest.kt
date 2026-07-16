@@ -306,6 +306,29 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
+    fun `restarting peer and stagnation watchdogs cancels previous jobs`() = runTest {
+        val plugin = FakeWatchdogPlugin(id = EngineId.BYEDPI)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            plugins = setOf(plugin),
+            controller = connectedController(plugin.id),
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+        )
+
+        watchdog.startPeerWatchdog(plugin.id)
+        val firstPeer = watchdog.currentJob("peerWatchJobRef")
+        watchdog.startPeerWatchdog(plugin.id)
+        watchdog.startStagnationWatchdog(plugin.id)
+        val firstStagnation = watchdog.currentJob("stagnationWatchJobRef")
+        watchdog.startStagnationWatchdog(plugin.id)
+
+        assertTrue(firstPeer.isCancelled)
+        assertTrue(firstStagnation.isCancelled)
+        watchdog.cancelWatchers()
+    }
+
+    @Test
     fun `peer watchdog converts recover exception into failed retry`() = runTest {
         val plugin = FakeWatchdogPlugin(
             stats = listOf(EngineStats(activeConnections = 1), EngineStats(activeConnections = 0)),
@@ -709,9 +732,10 @@ class EngineWatchdogCoordinatorCoverageTest {
     @Test
     fun `handleEngineFailure enters killswitch even when chain stop throws`() = runTest {
         val chain = mockk<ChainOrchestrator>()
+        val gateway = mockk<HevTunnelGateway>()
+        val gatewayAttempted = CountDownLatch(1)
         val controller = connectedController(EngineId.BYEDPI)
         val notification = mockk<OzeroNotificationFactory>(relaxed = true)
-        coEvery { chain.stop() } throws IllegalStateException("stop failed")
         val watchdog = watchdog(
             scope = backgroundScope,
             chain = chain,
@@ -719,13 +743,20 @@ class EngineWatchdogCoordinatorCoverageTest {
             tunFd = mockk(relaxed = true),
             killswitch = true,
             notificationFactory = notification,
+            tunnelGateway = gateway,
         )
+        coEvery { chain.stop() } throws IllegalStateException("stop failed")
+        every { gateway.stop() } answers {
+            gatewayAttempted.countDown()
+            throw IllegalStateException("gateway stop failed")
+        }
 
         val handled = watchdog.handleEngineFailure(EngineId.BYEDPI, "fatal")
         runCurrent()
 
         assertTrue(handled)
         assertTrue(controller.killswitchActive.value)
+        assertTrue(gatewayAttempted.await(2, TimeUnit.SECONDS))
         verify(exactly = 1) { notification.notifyStats(any()) }
     }
 
@@ -1039,6 +1070,12 @@ class EngineWatchdogCoordinatorCoverageTest {
             killswitchProvider = { killswitch },
             stopVpnRequest = { stopCount.updateAndGet { it + 1 } },
         )
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun EngineWatchdogCoordinator.currentJob(fieldName: String): Job {
+        val field = EngineWatchdogCoordinator::class.java.getDeclaredField(fieldName).apply { isAccessible = true }
+        return (field.get(this) as AtomicReference<Job?>).get()!!
     }
 
     private fun connectedController(engineId: EngineId): TunnelController = TunnelController().apply {

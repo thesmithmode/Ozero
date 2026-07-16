@@ -623,7 +623,11 @@ class ByeDpiEngineTest {
             firstLatch.countDown()
             0
         }
-        val eng = ByeDpiEngine(blockingProxy, socksProbe = { _, _, _ -> 1L })
+        val eng = ByeDpiEngine(
+            blockingProxy,
+            socksProbe = { _, _, _ -> 1L },
+            portFreeChecker = { true },
+        )
         try {
             eng.start(EngineConfig.ByeDpi(socksPort = 1080))
             val result = eng.start(EngineConfig.ByeDpi(socksPort = 1080))

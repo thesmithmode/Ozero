@@ -187,7 +187,7 @@ class WarpEngineSettingsViewModelTest {
     fun `onImportFile success добавляет слот и увеличивает importSuccessCount`() = runTest {
         importer.setConfig(SAMPLE)
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
-        advanceUntilIdle()
+        vm.uiState.first { it.importSuccessCount == 1 }
         assertEquals(1, store.slotCount())
         assertNull(vm.uiState.value.errorMessage)
         assertEquals(1, vm.uiState.value.importSuccessCount)
@@ -197,7 +197,7 @@ class WarpEngineSettingsViewModelTest {
     fun `onImportFile success uses exact display name`() = runTest {
         importer.setConfig(SAMPLE)
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)), "WARPv2_83.conf")
-        advanceUntilIdle()
+        vm.uiState.first { it.importSuccessCount == 1 }
         assertEquals("WARPv2_83.conf", vm.uiState.value.slots.first().name)
     }
 
@@ -205,10 +205,10 @@ class WarpEngineSettingsViewModelTest {
     fun `onImportFile blank display name falls back to generated slot names`() = runTest {
         importer.setConfig(SAMPLE)
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)), " ")
-        advanceUntilIdle()
+        vm.uiState.first { it.importSuccessCount == 1 }
         importer.setConfig(SAMPLE.copy(privateKey = "second-private-key"))
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)), null)
-        advanceUntilIdle()
+        vm.uiState.first { it.importSuccessCount == 2 }
         val names = vm.uiState.value.slots.map { it.name }.sorted()
         assertEquals(listOf("Ozero-1", "Ozero-2"), names)
     }
@@ -226,7 +226,7 @@ class WarpEngineSettingsViewModelTest {
     fun `onImportFile failure без message — fallback import failed`() = runTest {
         importer.result = Result.failure<ImportedWarpConfig>(RuntimeException())
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
-        advanceUntilIdle()
+        vm.uiState.first { it.errorMessage == "import failed" }
         assertEquals("import failed", vm.uiState.value.errorMessage)
     }
 
@@ -234,10 +234,10 @@ class WarpEngineSettingsViewModelTest {
     fun `onImportFile успешный дважды разными конфигами — importSuccessCount равен двум`() = runTest {
         importer.setConfig(SAMPLE)
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
-        advanceUntilIdle()
+        vm.uiState.first { it.importSuccessCount == 1 }
         importer.setConfig(SAMPLE.copy(privateKey = "second-private-key"))
         vm.onImportFile(ByteArrayInputStream(ByteArray(0)))
-        advanceUntilIdle()
+        vm.uiState.first { it.importSuccessCount == 2 }
         assertEquals(2, vm.uiState.value.importSuccessCount)
     }
 
