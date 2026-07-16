@@ -66,7 +66,7 @@ class EngineUrnetworkAwaitReadyTest {
     }
 
     @Test
-    fun `awaitReady times out after attach issued connect without usable runtime state`() = runTest {
+    fun `awaitReady accepts attached tunnel after connect was issued`() = runTest {
         val bridge = CountableBridge(fixedPeers = 0).also {
             it.runtimeSnapshotProvider = {
                 UrnetworkSdkBridge.RuntimeSnapshot(
@@ -83,9 +83,10 @@ class EngineUrnetworkAwaitReadyTest {
 
         val result = eng.awaitReady()
 
-        assertIs<EnginePlugin.ReadyResult.Timeout>(
+        assertEquals(
+            EnginePlugin.ReadyResult.Ready,
             result,
-            "connectIssued without provider state, peers, or CONNECTED status must not be Ready",
+            "attached tunnel with issued connect is sufficient for bounded startup readiness",
         )
     }
 

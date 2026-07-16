@@ -36,7 +36,7 @@ class SubscriptionBalanceContractTest {
     fun `RealBridge формула used = startBalance - balance - pending`() {
         val block = source
             .substringAfter("override suspend fun fetchSubscriptionBalance")
-            .substringBefore("private fun cleanupOnFailure")
+            .substringBefore("override suspend fun fetchAccountPoints")
         assertTrue(
             block.contains("startBalance - balance - pending"),
             "Формула used должна быть startBalance - balance - pending — иначе UI покажет неверный consumed bytes",
