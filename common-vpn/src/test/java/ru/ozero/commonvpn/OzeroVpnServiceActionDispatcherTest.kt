@@ -101,6 +101,29 @@ class OzeroVpnServiceActionDispatcherTest {
     }
 
     @Test
+    fun `hash collisions for known actions remain unknown`() {
+        val calls = Calls()
+        val dispatcher = calls.dispatcher()
+        val actions = listOf(
+            OzeroVpnService.ACTION_START,
+            OzeroVpnService.ACTION_STOP,
+            OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG,
+        )
+
+        actions.forEachIndexed { index, action ->
+            val chars = action.toCharArray()
+            chars[chars.lastIndex - 1] = chars[chars.lastIndex - 1] + 1
+            chars[chars.lastIndex] = chars[chars.lastIndex] - 31
+            val collision = chars.concatToString()
+            assertEquals(action.hashCode(), collision.hashCode())
+            assertEquals(OzeroVpnServiceStartResult.STICKY, dispatcher.dispatch(collision, 20 + index))
+        }
+
+        assertEquals(listOf(20, 21, 22), calls.latestStartIds)
+        assertEquals(0, calls.startCalls + calls.stopCalls + calls.restartCalls)
+    }
+
+    @Test
     fun `repeated actions update latest start id each time and keep callbacks isolated`() {
         val calls = Calls(idle = true)
         val dispatcher = calls.dispatcher()

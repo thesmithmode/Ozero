@@ -184,10 +184,10 @@ class OzeroVpnServiceRuntimeLifecycleTest {
     @Test
     @Config(sdk = [29])
     fun `isOwnVpnNetwork matches only current uid on owner uid capable sdk`() {
-        val caps = mockk<NetworkCapabilities>()
-        every { caps.ownerUid } returns 1234
+        val caps = ShadowNetworkCapabilities.newInstance()
+        val ownerSet = caps.trySetOwnerUid(1234)
 
-        assertTrue(isOwnVpnNetwork(caps, 1234))
+        assertEquals(ownerSet, isOwnVpnNetwork(caps, 1234))
         assertFalse(isOwnVpnNetwork(caps, 5678))
     }
 
