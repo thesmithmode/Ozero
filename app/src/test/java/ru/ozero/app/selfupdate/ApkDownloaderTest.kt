@@ -136,6 +136,25 @@ class ApkDownloaderTest {
     }
 
     @Test
+    fun `download does not let OkHttp follow an unexpected redirect automatically`() = runTest {
+        val dest = tempDir.toFile()
+        val sourceUrl = "https://github.com/org/repo/releases/download/v1/ozero.apk"
+        val downloader = ApkDownloader(
+            client = clientOf(
+                sourceUrl to ResponseSpec(302, ByteArray(0), location = "https://example.test/ozero.apk"),
+                "https://example.test/ozero.apk" to ResponseSpec(200, ByteArray(4) { it.toByte() }),
+            )
+        )
+
+        val signatureUrl = "https://github.com/org/repo/releases/download/v1/ozero.apk.sig"
+        val events = downloader.download(sourceUrl, signatureUrl, dest).toList()
+
+        val failed = assertIs<ApkDownloader.Event.Failed>(events.last())
+        assertTrue(failed.reason.contains("unexpected redirect host"))
+        assertTrue(File(dest, ApkDownloader.APK_NAME).notExists())
+    }
+
+    @Test
     fun `signature with unknown length is streamed with size limit`() = runTest {
         val dest = tempDir.toFile()
         val downloader = ApkDownloader(

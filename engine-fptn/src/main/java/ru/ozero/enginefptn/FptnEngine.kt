@@ -191,7 +191,6 @@ class FptnEngine(
         Log.d(TAG, "attachTun: fd=$tunFd server=${server.name}")
 
         val tun = tunIo.open(tunFd)
-        _pfd = tun.pfd
         val fos = tun.output
 
         wsClient.onOpen = {
@@ -223,18 +222,30 @@ class FptnEngine(
                 censorshipStrategy = _bypassMethod,
             )
         }.getOrElse { e ->
+            tun.close()
+            tun.abortAttach()
             _pfd = null
             PersistentLoggers.error(TAG, "nativeCreate failed: ${e.message}")
             return TunAttachResult.Failure("nativeCreate failed: ${e.message}")
         }
         Log.d(TAG, "attachTun: handle=$handle, starting WS thread")
         runCatching { wsClient.nativeRun(handle) }.getOrElse { e ->
+            tun.close()
+            tun.abortAttach()
             _pfd = null
             runCatching { wsClient.nativeDestroy(handle) }
             PersistentLoggers.error(TAG, "nativeRun failed: ${e.message}")
             return TunAttachResult.Failure("nativeRun failed: ${e.message}")
         }
+        runCatching { tun.completeAttach() }.getOrElse { e ->
+            tun.close()
+            tun.abortAttach()
+            runCatching { wsClient.nativeDestroy(handle) }
+            PersistentLoggers.error(TAG, "attachTun ownership transfer failed: ${e.message}")
+            return TunAttachResult.Failure("attachTun ownership transfer failed: ${e.message}")
+        }
         _nativeHandle = handle
+        _pfd = tun.pfd
 
         tunScope?.cancel()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -526,7 +537,13 @@ data class FptnTunStreams(
     val pfd: ParcelFileDescriptor?,
     val input: InputStream,
     val output: OutputStream,
+    private val onAttachComplete: () -> Unit = {},
+    private val onAttachAbort: () -> Unit = {},
 ) {
+    fun completeAttach() = onAttachComplete()
+
+    fun abortAttach() = onAttachAbort()
+
     fun close() {
         output.runCatching { close() }
         input.runCatching { close() }
@@ -536,12 +553,26 @@ data class FptnTunStreams(
 
 private object AndroidFptnTunIo : FptnTunIo {
     override fun open(tunFd: Int): FptnTunStreams {
-        val pfd = ParcelFileDescriptor.adoptFd(tunFd)
-        return FptnTunStreams(
-            pfd = pfd,
-            input = FileInputStream(pfd.fileDescriptor),
-            output = FileOutputStream(pfd.fileDescriptor),
-        )
+        val callerPfd = ParcelFileDescriptor.adoptFd(tunFd)
+        val enginePfd = try {
+            ParcelFileDescriptor.dup(callerPfd.fileDescriptor)
+        } catch (t: Throwable) {
+            callerPfd.detachFd()
+            throw t
+        }
+        return try {
+            FptnTunStreams(
+                pfd = enginePfd,
+                input = FileInputStream(enginePfd.fileDescriptor),
+                output = FileOutputStream(enginePfd.fileDescriptor),
+                onAttachComplete = { callerPfd.close() },
+                onAttachAbort = { callerPfd.detachFd() },
+            )
+        } catch (t: Throwable) {
+            enginePfd.close()
+            callerPfd.detachFd()
+            throw t
+        }
     }
 }
 

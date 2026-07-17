@@ -120,14 +120,14 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Test
-    fun `restart works from probing state when restart reaches connecting`() = runTest {
+    fun `restart works from probing state when restart reaches connected`() = runTest {
         val startServiceActions = mutableListOf<String?>()
         val tunnelController = TunnelController()
         tunnelController.setState(TunnelState.Probing(EngineId.FPTN))
         val context = recordingContext(startServiceActions) {
             tunnelController.setState(TunnelState.Disconnecting)
             launch {
-                tunnelController.setState(TunnelState.Connecting(EngineId.FPTN))
+                tunnelController.setState(TunnelState.Connected(EngineId.FPTN, 0))
             }
         }
         val coordinator = coordinator(context, tunnelController)

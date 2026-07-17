@@ -83,7 +83,7 @@ open class ApkDownloader(
         var currentUrl = url
         repeat(MAX_REDIRECTS + 1) { redirectCount ->
             val req = Request.Builder().url(currentUrl).build()
-            val resp = client.newCall(req).execute()
+            val resp = redirectClient.newCall(req).execute()
             if (!resp.isRedirect) return resp
             val nextUrl = resp.use { redirectTarget(req.url, it) }
             if (redirectCount == MAX_REDIRECTS) throw IOException("too many redirects for $url")
@@ -205,6 +205,11 @@ open class ApkDownloader(
     }
 
     private class SizeLimitException(msg: String) : IOException(msg)
+
+    private val redirectClient: OkHttpClient = client.newBuilder()
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .build()
 
     companion object {
         private const val TAG = "ApkDownloader"

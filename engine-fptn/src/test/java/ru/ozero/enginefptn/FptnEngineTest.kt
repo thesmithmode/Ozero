@@ -558,6 +558,7 @@ class FptnEngineTest {
     fun `attachTun maps native create exception to attach failure`() = runTest {
         val ws = FakeWebSocketClient(createFailure = IllegalStateException("create boom"))
         var outputClosed = false
+        var attachAborted = false
         val output = object : ByteArrayOutputStream() {
             override fun close() {
                 outputClosed = true
@@ -569,7 +570,7 @@ class FptnEngineTest {
             httpsClient = FakeHttpsClient(
                 postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
             ),
-            tunIo = fakeTunIo(output = output),
+            tunIo = fakeTunIo(output = output, onAttachAbort = { attachAborted = true }),
         )
         assertIs<StartResult.Success>(
             engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
@@ -580,13 +581,15 @@ class FptnEngineTest {
         val failure = assertIs<TunAttachResult.Failure>(attach)
         assertTrue(failure.reason.contains("nativeCreate failed"))
         assertEquals(emptyList(), ws.destroyedHandles)
-        assertFalse(outputClosed)
+        assertTrue(outputClosed)
+        assertTrue(attachAborted)
     }
 
     @Test
     fun `attachTun destroys handle when native run throws`() = runTest {
         val ws = FakeWebSocketClient(runFailure = IllegalStateException("run boom"))
         var outputClosed = false
+        var attachAborted = false
         val output = object : ByteArrayOutputStream() {
             override fun close() {
                 outputClosed = true
@@ -598,7 +601,7 @@ class FptnEngineTest {
             httpsClient = FakeHttpsClient(
                 postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
             ),
-            tunIo = fakeTunIo(output = output),
+            tunIo = fakeTunIo(output = output, onAttachAbort = { attachAborted = true }),
         )
         assertIs<StartResult.Success>(
             engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
@@ -609,7 +612,29 @@ class FptnEngineTest {
         val failure = assertIs<TunAttachResult.Failure>(attach)
         assertTrue(failure.reason.contains("nativeRun failed"))
         assertEquals(listOf(11L), ws.destroyedHandles)
-        assertFalse(outputClosed)
+        assertTrue(outputClosed)
+        assertTrue(attachAborted)
+    }
+
+    @Test
+    fun `attachTun completes fd transfer only after native startup succeeds`() = runTest {
+        var attachCompleted = false
+        engine = FptnEngine(
+            store,
+            wsClient = FakeWebSocketClient(),
+            httpsClient = FakeHttpsClient(
+                postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
+            ),
+            tunIo = fakeTunIo(onAttachComplete = { attachCompleted = true }),
+        )
+        assertIs<StartResult.Success>(
+            engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
+        )
+
+        assertIs<TunAttachResult.Success>(engine.attachTun(DETACHED_READ_WRITE_FD))
+
+        assertTrue(attachCompleted)
+        engine.stop()
     }
 
     @Test
@@ -1573,6 +1598,8 @@ class FptnEngineTest {
         inputBytes: ByteArray = ByteArray(0),
         input: InputStream = ByteArrayInputStream(inputBytes),
         output: OutputStream = ByteArrayOutputStream(),
+        onAttachComplete: () -> Unit = {},
+        onAttachAbort: () -> Unit = {},
     ): FptnTunIo =
         object : FptnTunIo {
             override fun open(tunFd: Int): FptnTunStreams =
@@ -1580,6 +1607,8 @@ class FptnEngineTest {
                     pfd = null,
                     input = input,
                     output = output,
+                    onAttachComplete = onAttachComplete,
+                    onAttachAbort = onAttachAbort,
                 )
         }
 
