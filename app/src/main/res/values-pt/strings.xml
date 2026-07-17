@@ -214,6 +214,7 @@
     <string name="evolution_fitness_label">Melhor resultado: %1$d%%</string>
     <string name="evolution_population_label">População</string>
     <string name="urnetwork_provide_mode_never">Nunca</string>
+    <string name="urnetwork_provide_mode_always">Sempre</string>
     <string name="urnetwork_auto_select">Seleção automática</string>
     <string name="urnetwork_provide_mode_desc">Escolha quando este dispositivo pode compartilhar tráfego com a rede URnetwork.</string>
     <string name="urnetwork_provide_network_mode_title">Rede para prover</string>
