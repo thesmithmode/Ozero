@@ -653,6 +653,24 @@ class AppBackupManagerTest {
     }
 
     @Test
+    fun `import split tunnel with empty rules clears existing package rules`() = runTest {
+        splitDao.rules.value = listOf(
+            AppSplitRule("com.old", true),
+            AppSplitRule("com.keep", false),
+        )
+        val backup = makeMinimalBackup()
+        val data = backup.copy(
+            settings = backup.settings.copy(splitMode = "ALLOWLIST"),
+            splitRules = emptyList(),
+        )
+
+        manager.import(data, setOf(BackupCategory.SPLIT_TUNNEL))
+
+        assertEquals("ALLOWLIST", ozeroDs.data.first()[SettingsKeys.SPLIT_MODE])
+        assertTrue(splitDao.rules.value.isEmpty())
+    }
+
+    @Test
     fun `export then import — полный roundtrip с категориями ALL`() = runTest {
         ozeroDs.edit { prefs ->
             prefs[SettingsKeys.SPLIT_MODE] = "per_app"

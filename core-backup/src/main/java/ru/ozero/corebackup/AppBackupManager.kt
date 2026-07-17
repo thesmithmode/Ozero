@@ -170,7 +170,7 @@ class AppBackupManager(
         data.settings.splitMode?.let { mode ->
             ozeroSettings.edit { prefs -> prefs[SettingsKeys.SPLIT_MODE] = mode }
         }
-        if (data.splitRules.isNotEmpty()) importSplit(data.splitRules)
+        importSplit(data.splitRules)
     }
 
     private suspend fun importFptnToken(s: BackupSettings) {

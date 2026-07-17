@@ -2,6 +2,7 @@ package ru.ozero.enginewarp
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class RemoteAwgRuntimeContractTest {
@@ -11,6 +12,21 @@ class RemoteAwgRuntimeContractTest {
         val f = File(moduleRoot, "src/main/java/ru/ozero/enginewarp/RemoteAwgRuntime.kt")
         assertTrue(f.exists(), "RemoteAwgRuntime.kt не найден: $f")
         f.readText()
+    }
+
+    @Test
+    fun `Binder TUN descriptors duplicate the saved fd before close`() {
+        val turnOnBlock = source
+            .substringAfter("override fun turnOn(")
+            .substringBefore("override fun turnOff")
+        val turnOnAndGetSocketsBlock = source
+            .substringAfter("override fun turnOnAndGetSockets(")
+            .substringBefore("override fun startProxy")
+
+        assertTrue(turnOnBlock.contains("ParcelFileDescriptor.fromFd(tunFd)"))
+        assertTrue(turnOnAndGetSocketsBlock.contains("ParcelFileDescriptor.fromFd(tunFd)"))
+        assertFalse(turnOnBlock.contains("ParcelFileDescriptor.adoptFd(tunFd)"))
+        assertFalse(turnOnAndGetSocketsBlock.contains("ParcelFileDescriptor.adoptFd(tunFd)"))
     }
 
     @Test
