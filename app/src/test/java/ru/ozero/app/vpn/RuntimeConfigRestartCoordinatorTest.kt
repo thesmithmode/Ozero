@@ -73,14 +73,14 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Test
-    fun `restart sends action and clears switching when tunnel starts again`() = runTest {
+    fun `restart sends action and clears switching when tunnel connects again`() = runTest {
         val startServiceActions = mutableListOf<String?>()
         val tunnelController = TunnelController()
         tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
         val context = recordingContext(startServiceActions) {
             tunnelController.setState(TunnelState.Disconnecting)
             launch {
-                tunnelController.setState(TunnelState.Probing(EngineId.WARP))
+                tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
             }
         }
         val coordinator = coordinator(context, tunnelController)
