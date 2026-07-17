@@ -559,15 +559,15 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `startVpn не откладывает startSequence при детекции внешнего VPN`() {
+    fun `startVpn waits for an external VPN to release its slot`() {
         assertTrue(
             source.contains("logActiveExternalVpn()"),
             "startVpn должен логировать внешний VPN для диагностики handoff.",
         )
         assertTrue(
-            !source.contains("EXTERNAL_VPN_RELEASE_DELAY_MS"),
-            "startVpn не должен иметь фиксированную задержку перед startSequence.run(): " +
-                "это откладывает lockdown TUN и создаёт окно утечки при handoff.",
+            source.contains("EXTERNAL_VPN_RELEASE_DELAY_MS") &&
+                startCoordinatorSource.contains("delay(deps.externalVpnReleaseDelayMs)"),
+            "при внешнем VPN нужна короткая задержка перед establish для освобождения VPN slot.",
         )
     }
 

@@ -59,13 +59,13 @@ class OzeroVpnServiceIpv6BlackholeTest {
     }
 
     @Test
-    fun `buildTunBuilder blackhole IPv6 when disabled`() {
+    fun `buildTunBuilder leaves IPv6 outside local proxy when disabled`() {
         val body = helperSource
             .substringAfter("fun buildTunBuilder(")
             .substringBefore("private fun applyLockdown")
         assertTrue(
-            body.contains("} else {\n            blackholeIpv6(builder, \"buildTunBuilder\")\n        }"),
-            "buildTunBuilder обязан blackhole IPv6 при ipv6Enabled=false, чтобы IPv6 не обходил VPN.",
+            !body.contains("blackholeIpv6(builder"),
+            "buildTunBuilder не должен маршрутизировать IPv6 в local SOCKS при ipv6Enabled=false.",
         )
     }
 

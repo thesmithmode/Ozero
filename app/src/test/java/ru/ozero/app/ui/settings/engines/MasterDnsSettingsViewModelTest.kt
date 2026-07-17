@@ -110,6 +110,7 @@ class MasterDnsSettingsViewModelTest {
         vm.onDeployClick(host = "10.0.0.1", port = 22, login = "root", password = "pass".toCharArray())
         val state = vm.state.first { it.deployState is MasterDnsDeployState.Done }
         assertEquals(toml, store.toml)
+        assertTrue(store.enabled)
         assertEquals("10.0.0.1", store.serverIp)
         assertEquals(22, store.serverPort)
         assertInstanceOf(MasterDnsDeployState.Done::class.java, state.deployState)
@@ -346,6 +347,7 @@ class MasterDnsSettingsViewModelTest {
         val state = vm.state.first { it.deployState is MasterDnsDeployState.Removed }
         assertEquals("", store.serverIp)
         assertEquals(22, store.serverPort)
+        assertFalse(store.enabled)
         assertInstanceOf(MasterDnsDeployState.Removed::class.java, state.deployState)
     }
 
@@ -475,11 +477,16 @@ class MasterDnsSettingsViewModelTest {
 
     private class FakeStore(initial: MasterDnsPersistedConfig) : MasterDnsConfigStore {
         private val flow = MutableStateFlow(initial)
+        var enabled: Boolean = initial.enabled
         var toml: String = initial.configToml
         var resolvers: List<String> = initial.resolvers
         var serverIp: String = initial.serverIp
         var serverPort: Int = initial.serverPort
         override fun config() = flow
+        override suspend fun setEnabled(enabled: Boolean) {
+            this.enabled = enabled
+            flow.value = flow.value.copy(enabled = enabled)
+        }
         override suspend fun setConfigToml(toml: String) {
             this.toml = toml
             flow.value = flow.value.copy(configToml = toml)
