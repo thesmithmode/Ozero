@@ -84,41 +84,4 @@ class BootDiagnosticsTombstoneTest {
         return f.readText()
     }
 
-    private class CountingInputStream(
-        private val bytes: ByteArray,
-    ) : InputStream() {
-        var readCalls: Int = 0
-            private set
-        private var offset: Int = 0
-
-        override fun read(): Int {
-            readCalls += 1
-            if (offset >= bytes.size) return -1
-            return bytes[offset++].toInt() and 0xFF
-        }
-
-        override fun read(buffer: ByteArray, off: Int, len: Int): Int {
-            readCalls += 1
-            if (offset >= bytes.size) return -1
-            val count = minOf(len, bytes.size - offset)
-            bytes.copyInto(buffer, off, offset, offset + count)
-            offset += count
-            return count
-        }
-    }
-
-    private class CountingBufferedReader(text: String) : BufferedReader(StringReader(text)) {
-        var readCalls: Int = 0
-            private set
-
-        override fun read(buffer: CharArray, off: Int, len: Int): Int {
-            readCalls += 1
-            return super.read(buffer, off, len)
-        }
-
-        override fun read(): Int {
-            readCalls += 1
-            return super.read()
-        }
-    }
 }

@@ -578,17 +578,26 @@ class EngineWarp(
         Log.i(TAG, "resolveEndpointHost host=$host provider=${provider.name}")
         for (attempt in 0..2) {
             val resolved = withContext(Dispatchers.IO) {
-                resolveViaDoH(host, bootstrapSafeDohUrl(provider))
+                if (provider.isSystem) {
+                    resolveViaSystemDns(host)
+                } else {
+                    resolveViaDoH(host, bootstrapSafeDohUrl(provider))
+                }
             }
             if (!resolved.isNullOrBlank()) {
                 Log.i(TAG, "endpoint resolved $host -> $resolved via ${provider.name} (attempt ${attempt + 1})")
-                return cfg.copy(peerEndpoint = "$resolved:$port")
+                val endpointHost = if (resolved.contains(':')) "[$resolved]" else resolved
+                return cfg.copy(peerEndpoint = "$endpointHost:$port")
             }
             if (attempt < 2) delay(200L shl attempt)
         }
         PersistentLoggers.warn(TAG, "endpoint resolve failed after 3 attempts for $host via ${provider.name}")
         return cfg
     }
+
+    private fun resolveViaSystemDns(host: String): String? = runCatching {
+        java.net.InetAddress.getByName(host).hostAddress
+    }.getOrNull()
 
     private fun bootstrapSafeDohUrl(provider: DoHProvider): String =
         provider.url.takeIf { provider.supportsJsonQueryApi() && isIpLiteralDohUrl(it) } ?: BOOTSTRAP_DOH_URL

@@ -255,7 +255,6 @@ private const val IMPORT_OVERLAY_HOLD_MS = 900L
 private const val IMPORT_OVERLAY_FADE_MS = 600
 private const val IMPORT_OVERLAY_SIZE_DP = 120
 private const val IMPORT_OVERLAY_ICON_DP = 96
-private const val MAX_WARP_IMPORT_BYTES = 512 * 1024
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

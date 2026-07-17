@@ -122,6 +122,7 @@ class EngineWarpSourceSentinelTest {
     fun `anchors — все функции-границы существуют в источнике`() {
         listOf(
             "private suspend fun resolveEndpointHost",
+            "private fun resolveViaSystemDns",
             "private fun bootstrapSafeDohUrl",
             "private fun DoHProvider.supportsJsonQueryApi",
             "private fun isIpLiteralDohUrl",
@@ -148,16 +149,22 @@ class EngineWarpSourceSentinelTest {
     }
 
     @Test
-    fun `resolveEndpointHost использует bootstrap DoH в Dispatchers IO`() {
+    fun `resolveEndpointHost выбирает system resolver или bootstrap DoH в Dispatchers IO`() {
         val body = source.substringAfter("private suspend fun resolveEndpointHost")
-            .substringBefore("private fun resolveViaDoH")
-        assertFalse(
-            body.contains("InetAddress.getByName"),
-            "Endpoint hostname must not use system DNS before tunnel establishment.",
+            .substringBefore("private fun resolveViaSystemDns")
+        assertTrue(
+            body.contains("provider.isSystem") && body.contains("resolveViaSystemDns(host)"),
+            "SYSTEM provider must preserve the platform resolver path.",
         )
         assertTrue(
             body.contains("withContext(Dispatchers.IO)"),
             "Bootstrap DoH lookup обязан выполняться в Dispatchers.IO.",
+        )
+        val systemResolverBody = source.substringAfter("private fun resolveViaSystemDns")
+            .substringBefore("private fun bootstrapSafeDohUrl")
+        assertTrue(
+            systemResolverBody.contains("InetAddress.getByName"),
+            "SYSTEM provider must resolve through the platform resolver.",
         )
     }
 
