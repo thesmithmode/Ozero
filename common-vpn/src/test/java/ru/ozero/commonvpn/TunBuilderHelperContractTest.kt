@@ -116,7 +116,7 @@ class TunBuilderHelperContractTest {
             body.contains("TunBuilderConfigurator(service.packageName)"),
             "configurator обязан брать packageName из переданного VpnService",
         )
-        assertTrue(body.contains("excludeSelf = false"), "buildTunBuilder не должен исключать UID приложения из VPN")
+        assertTrue(body.contains("excludeSelf = true"), "buildTunBuilder обязан исключать UID приложения из VPN")
     }
 
     @Test

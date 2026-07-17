@@ -129,10 +129,10 @@ class SplitTunnelVpnServiceSentinelTest {
     }
 
     @Test
-    fun `buildTunBuilder не исключает приложение из TUN policy`() {
+    fun `buildTunBuilder исключает приложение из local proxy TUN policy`() {
         assertTrue(
-            buildTunBlock.contains("excludeSelf = false"),
-            "buildTunBuilder не должен вызывать addDisallowedApplication(packageName) для app UID",
+            buildTunBlock.contains("excludeSelf = true"),
+            "buildTunBuilder обязан вызывать addDisallowedApplication(packageName) для local proxy app UID",
         )
     }
 }
