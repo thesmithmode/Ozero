@@ -6,13 +6,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
-import android.content.Intent
 import android.os.Build
 import ru.ozero.enginescore.PersistentLoggers
 
 class OzeroNotificationFactory(
     private val context: Context,
-    private val stopServiceClass: Class<out Service>,
 ) {
 
     fun build(contentText: String? = null): Notification {
@@ -22,14 +20,6 @@ class OzeroNotificationFactory(
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
         }
-        val stopIntent = Intent(context, stopServiceClass).setAction(OzeroVpnService.ACTION_STOP)
-        val stopPending = PendingIntent.getService(
-            context, 1, stopIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        val stopAction = Notification.Action.Builder(
-            android.R.drawable.ic_menu_close_clear_cancel, "Stop", stopPending,
-        ).build()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(
                 NotificationChannel(CHANNEL_ID, "Ozero VPN", NotificationManager.IMPORTANCE_LOW),
@@ -39,7 +29,6 @@ class OzeroNotificationFactory(
                 .setSmallIcon(android.R.drawable.ic_lock_lock)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
-                .addAction(stopAction)
                 .apply {
                     if (contentText != null) {
                         val firstLine = contentText.substringBefore('\n')
@@ -56,7 +45,6 @@ class OzeroNotificationFactory(
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .addAction(stopAction)
             .apply {
                 if (contentText != null) {
                     val firstLine = contentText.substringBefore('\n')

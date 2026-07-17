@@ -146,7 +146,7 @@ class SubscriptionGroupDaoTest {
         val g = dao.getById(id)!!
         assertEquals("", g.subscriptionUrl)
         assertEquals(false, g.isBuiltin)
-        assertEquals(true, g.autoUpdate)
+        assertEquals(false, g.autoUpdate)
         assertEquals(360, g.autoUpdateDelay)
         assertEquals(0L, g.lastUpdated)
         assertEquals(0, g.userOrder)

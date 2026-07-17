@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import ru.ozero.enginescore.ByeDpiArgs
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -72,7 +73,7 @@ class ByeDpiEngine(
         val args = when {
             settings?.byedpiUseUiMode == true ->
                 ByeDpiUiArgsBuilder.buildArgsOnly(settings.byedpiUiSettings).joinToString(" ")
-            !settings?.byedpiWinningArgs.isNullOrBlank() ->
+            !settings?.byedpiWinningArgs.isNullOrBlank() && ByeDpiArgs.validate(settings.byedpiWinningArgs!!) ->
                 settings.byedpiWinningArgs!!.trim() // CMD mode is verbatim; suffix injection changes strategy topology.
             else -> EngineConfig.ByeDpi().args
         }
@@ -97,7 +98,10 @@ class ByeDpiEngine(
         }
         val resolvedPort = if (config.socksPort > 0) config.socksPort else nextRotatedPort()
         val resolvedConfig = if (config.socksPort > 0) config else config.copy(socksPort = resolvedPort)
-        Log.i(TAG, "start socksPort=$resolvedPort args=${resolvedConfig.args}")
+        if (!ByeDpiArgs.validate(resolvedConfig.args)) {
+            return StartResult.Failure(reason = "ByeDPI args are too long")
+        }
+        Log.i(TAG, "start socksPort=$resolvedPort argsLength=${resolvedConfig.args.length}")
         val oldJob = proxyJobRef.getAndSet(null)
         val hadKnownWedge = nativeMayBeWedged.getAndSet(false)
         var rotateBeforeLaunch = hadKnownWedge
@@ -125,15 +129,18 @@ class ByeDpiEngine(
         } else if (oldJob != null) {
             drainOrRotateProxyLane()
         }
+        if (!portFreeChecker(resolvedPort)) {
+            PersistentLoggers.error(TAG, "byedpi socks port $resolvedPort already occupied")
+            return StartResult.Failure(reason = "byedpi socks port $resolvedPort already occupied")
+        }
         val args = buildArgs(resolvedConfig)
-        PersistentLoggers.debug(
-            TAG,
-            "jniStartProxy argv=[${args.joinToString(" ")}] (native префиксует argv[0]=\"byedpi\")",
-        )
+        PersistentLoggers.debug(TAG, "jniStartProxy argvCount=${args.size}")
         val generation = proxyGeneration.incrementAndGet()
+        val proxyExitCode = AtomicInteger(PROXY_EXIT_PENDING)
         val proxyJob = proxyScope.launch {
             PersistentLoggers.debug(TAG, "launch entered port=$resolvedPort")
-            val code = startProxyWithRecovery(args)
+            val code = startProxySafely(args)
+            proxyExitCode.set(code)
             PersistentLoggers.debug(TAG, "startProxy returned code=$code port=$resolvedPort")
             when {
                 code == 0 -> Unit
@@ -147,7 +154,7 @@ class ByeDpiEngine(
         }
         proxyJobRef.set(proxyJob)
 
-        val readyAt = waitSocksReady(resolvedPort, proxyJob)
+        val readyAt = waitSocksReady(resolvedPort, proxyExitCode)
         return if (readyAt >= 0) {
             activeSocksPort = resolvedPort
             Log.i(TAG, "started socksPort=$resolvedPort readyMs=$readyAt")
@@ -199,23 +206,10 @@ class ByeDpiEngine(
         PersistentLoggers.warn(TAG, "$reason — new ByeDPI proxy lane")
     }
 
-    private fun startProxyWithRecovery(args: Array<String>): Int {
-        val code = safeJniCall(fallback = -1, tag = "jniStartProxy threw") {
+    private fun startProxySafely(args: Array<String>): Int =
+        safeJniCall(fallback = -1, tag = "jniStartProxy threw") {
             proxy.startProxy(args)
         }
-        if (code != JNI_GUARD_BUSY) return code
-
-        val priorGuardState = safeJniCall(fallback = 0, tag = "emergencyReset threw") {
-            proxy.emergencyReset()
-        }
-        PersistentLoggers.error(
-            TAG,
-            "byedpi hang detected — emergencyReset выполнен (prior guard=$priorGuardState); retry start",
-        )
-        return safeJniCall(fallback = -1, tag = "jniStartProxy threw after reset") {
-            proxy.startProxy(args)
-        }
-    }
 
     private inline fun <T> safeJniCall(fallback: T, tag: String, block: () -> T): T = try {
         block()
@@ -226,11 +220,12 @@ class ByeDpiEngine(
         fallback
     }
 
-    private suspend fun waitSocksReady(port: Int, proxyJob: Job): Long {
+    private suspend fun waitSocksReady(port: Int, proxyExitCode: AtomicInteger): Long {
         val started = System.currentTimeMillis()
         var probeSuccess = false
         withTimeoutOrNull(readyTotalTimeoutMs) {
             while (true) {
+                if (proxyExitCode.get() != PROXY_EXIT_PENDING) return@withTimeoutOrNull
                 val ok = try {
                     socksProbe("127.0.0.1", port, readyProbeTimeoutMs)
                     true
@@ -240,10 +235,12 @@ class ByeDpiEngine(
                     false
                 }
                 if (ok) {
+                    delay(READY_STABILITY_MS)
+                    if (proxyExitCode.get() != PROXY_EXIT_PENDING) return@withTimeoutOrNull
                     probeSuccess = true
                     return@withTimeoutOrNull
                 }
-                if (!proxyJob.isActive) return@withTimeoutOrNull
+                if (proxyExitCode.get() != PROXY_EXIT_PENDING) return@withTimeoutOrNull
                 delay(READY_RETRY_MS)
             }
         }
@@ -315,11 +312,7 @@ class ByeDpiEngine(
 
     // Native inserts argv[0]="byedpi"; Kotlin prepending program-name makes getopt drop --ip.
     internal fun buildArgs(config: EngineConfig.ByeDpi): Array<String> {
-        val extra =
-            config.args.trim()
-                .takeIf { it.isNotEmpty() }
-                ?.split("\\s+".toRegex())
-                .orEmpty()
+        val extra = ByeDpiArgs.tokens(config.args)
         val hostsArgs = buildHostsArgs(config)
         return (listOf("--ip", "127.0.0.1", "-p", config.socksPort.toString()) + extra + hostsArgs)
             .toTypedArray()
@@ -343,7 +336,9 @@ class ByeDpiEngine(
         const val JNI_GUARD_BUSY = -2
         const val READY_PROBE_TIMEOUT_MS = 500
         const val READY_RETRY_MS = 100L
+        const val READY_STABILITY_MS = 100L
         const val STOP_GRACE_MS = 1_500L
+        private const val PROXY_EXIT_PENDING = Int.MIN_VALUE
 
         const val BYEDPI_STOP_TIMEOUT_MS = 2_500L
         const val AUTO_ROTATE_PORT = 0

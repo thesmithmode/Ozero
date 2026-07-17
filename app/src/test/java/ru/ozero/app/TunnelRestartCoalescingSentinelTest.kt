@@ -2,28 +2,19 @@ package ru.ozero.app
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TunnelRestartCoalescingSentinelTest {
 
     @Test
-    fun `restartVpnIfConnected coalesces concurrent restart requests`() {
+    fun `MainActivity has no lifecycle scoped restart queue`() {
         val source = mainActivitySource()
-        val block = source.substringAfter("private suspend fun restartVpnIfConnected")
-            .substringBefore("private fun observeLiveEngineSettingsChanges")
-        assertTrue(
-            source.contains("private val restartMutex = Mutex()") &&
-                source.contains("private val restartQueue = ArrayDeque<String>()") &&
-                source.contains("private var restartInProgress = false") &&
-                block.contains("restartMutex.withLock") &&
-                block.contains("restartQueue.addLast(reason)") &&
-                block.contains("restartQueue.removeFirstOrNull()") &&
-                block.contains("abortQueuedRestarts()") &&
-                block.contains("restartQueue.clear()") &&
-                block.contains("restartInProgress = false") &&
-                block.contains("restartQueue.isNotEmpty()"),
-            "restartVpnIfConnected must coalesce through a mutex-guarded queue so enqueue and exit checks stay consistent. Block:\n$block",
-        )
+        assertFalse(source.contains("restartMutex"))
+        assertFalse(source.contains("restartQueue"))
+        assertFalse(source.contains("restartInProgress"))
+        assertFalse(source.contains("ACTION_STOP"))
+        assertFalse(source.contains("ACTION_START"))
     }
 
     private fun mainActivitySource(): String {

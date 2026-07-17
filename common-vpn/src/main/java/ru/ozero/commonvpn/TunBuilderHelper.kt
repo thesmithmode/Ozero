@@ -90,6 +90,8 @@ class TunBuilderHelper(
         if (ipv6Enabled) {
             builder.addAddress(TUN_ADDRESS_V6, TUN_PREFIX_LENGTH_V6)
             builder.addRoute("::", 0)
+        } else {
+            blackholeIpv6(builder, "buildTunBuilder")
         }
         // Ровно один DNS — паритет с upstream ByeByeDPI.
         // Множественные DNS дублируют lookup через TUN и тормозят resolve.
@@ -101,7 +103,7 @@ class TunBuilderHelper(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching { builder.setMetered(false) }
         }
-        TunBuilderConfigurator(service.packageName).apply(builder, splitConfig, excludeSelf = true)
+        TunBuilderConfigurator(service.packageName).apply(builder, splitConfig, excludeSelf = false)
         return builder
     }
 

@@ -198,10 +198,13 @@ class OzeroVpnServiceLifecycleTest {
         val body = shutdownSource.substringAfter("suspend fun performShutdown(")
             .substringBefore("private fun recordSessionEnd(")
         assertTrue(
-            body.contains("stopSelfRequest(latestStartIdProvider())"),
+            body.contains("stopSelfRequest(stopRequestStartId ?: latestStartIdProvider())"),
             "performShutdown обязан вызывать stopSelfRequest(latestStartIdProvider()), а не безаргументный. " +
                 "stopSelf(startId) — no-op если пришёл новый intents, что исключает onDestroy при engine switch. " +
                 "Голый stopSelf() безусловно планирует onDestroy → ForegroundServiceDidNotStartInTimeException.",
+        )
+        assertTrue(
+            shutdownSource.contains("val stopRequestStartId = latestStartIdProvider()"),
         )
         assertFalse(
             body.contains(Regex("(?<!latestStartIdProvider\\(\\))\\bstopSelfRequest\\(\\)")),
@@ -556,26 +559,15 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
-    fun `startVpn использует EXTERNAL_VPN_RELEASE_DELAY_MS при детекции внешнего VPN`() {
-        assertTrue(
-            source.contains("EXTERNAL_VPN_RELEASE_DELAY_MS"),
-            "OzeroVpnService обязан иметь EXTERNAL_VPN_RELEASE_DELAY_MS константу: " +
-                "при запуске Ozero ПОСЛЕ другого VPN (URnetwork и т.п.) Android revoke'ает " +
-                "тот VPN, но его TUN ещё закрывается — establish() Ozero ловит race. " +
-                "Задержка перед establish() даёт ОС время полностью отпустить slot.",
-        )
+    fun `startVpn не откладывает startSequence при детекции внешнего VPN`() {
         assertTrue(
             source.contains("logActiveExternalVpn()"),
-            "startVpn должен вызывать logActiveExternalVpn() и использовать результат " +
-                "для условной задержки.",
+            "startVpn должен логировать внешний VPN для диагностики handoff.",
         )
-        val regex = Regex("EXTERNAL_VPN_RELEASE_DELAY_MS\\s*=\\s*(\\d[\\d_]*)L")
-        val m = regex.find(source) ?: error("EXTERNAL_VPN_RELEASE_DELAY_MS не найден")
-        val ms = m.groupValues[1].replace("_", "").toLong()
         assertTrue(
-            ms in 200L..1_500L,
-            "EXTERNAL_VPN_RELEASE_DELAY_MS должен быть [200..1500]ms — короче ловим race, " +
-                "длиннее юзер замечает paused старт. Fact=$ms",
+            !source.contains("EXTERNAL_VPN_RELEASE_DELAY_MS"),
+            "startVpn не должен иметь фиксированную задержку перед startSequence.run(): " +
+                "это откладывает lockdown TUN и создаёт окно утечки при handoff.",
         )
     }
 

@@ -16,17 +16,20 @@ API_LEVEL="${ANDROID_API:-24}"
 BUILD_DIR="$REPO_ROOT/build/fptn-$ABI"
 
 FPTN_REPO="https://github.com/fptn-project/FptnClient-Android.git"
+FPTN_SOURCE_COMMIT="d2ca1ff2cd3090d0b191ba320d1bca4a03452dea"
 FPTN_CLONE_DIR="$REPO_ROOT/build/fptn-android-src"
+CAMTLS_REPO="https://github.com/fptn-project/camouflage-tls.git"
+CAMTLS_COMMIT="52a8e81fa472813c4cc7f8d7ef69b73771758eba"
 
-# ---------------------------------------------------------------------------
-# 1. Clone FptnClient-Android (source of truth for fptn C++ lib + deps)
-# ---------------------------------------------------------------------------
 if [[ ! -d "$FPTN_CLONE_DIR/.git" ]]; then
-    git clone --depth 1 --recurse-submodules --shallow-submodules \
-        "$FPTN_REPO" "$FPTN_CLONE_DIR"
+    git init "$FPTN_CLONE_DIR"
+    git -C "$FPTN_CLONE_DIR" remote add origin "$FPTN_REPO"
 else
     echo "Using cached clone at $FPTN_CLONE_DIR"
 fi
+git -C "$FPTN_CLONE_DIR" fetch --depth 1 origin "$FPTN_SOURCE_COMMIT"
+git -C "$FPTN_CLONE_DIR" checkout --detach FETCH_HEAD
+git -C "$FPTN_CLONE_DIR" submodule update --init --recursive --depth 1
 
 FPTN_LIB_DIR="$FPTN_CLONE_DIR/app/src/main/cpp/libs/fptn"
 if [[ ! -d "$FPTN_LIB_DIR" ]] || [[ -z "$(ls -A "$FPTN_LIB_DIR" 2>/dev/null)" ]]; then
@@ -107,7 +110,19 @@ CONAN_GENERATORS="$CONAN_INSTALL_DIR/build/Release/generators"
 # camouflage-tls CMakeLists.txt unconditionally adds tests/ and example/ — no BUILD_TESTING guard.
 CAMTLS_DIR="$BUILD_DIR/camouflage-tls-src"
 if [[ ! -d "$CAMTLS_DIR/.git" ]]; then
-    git clone --depth 1 https://github.com/fptn-project/camouflage-tls.git "$CAMTLS_DIR"
+    git init "$CAMTLS_DIR"
+fi
+if git -C "$CAMTLS_DIR" remote get-url origin >/dev/null 2>&1; then
+    git -C "$CAMTLS_DIR" remote set-url origin "$CAMTLS_REPO"
+else
+    git -C "$CAMTLS_DIR" remote add origin "$CAMTLS_REPO"
+fi
+git -C "$CAMTLS_DIR" fetch --depth 1 origin "$CAMTLS_COMMIT"
+git -C "$CAMTLS_DIR" checkout --detach "$CAMTLS_COMMIT"
+CAMTLS_ACTUAL_COMMIT="$(git -C "$CAMTLS_DIR" rev-parse HEAD)"
+if [[ "$CAMTLS_ACTUAL_COMMIT" != "$CAMTLS_COMMIT" ]]; then
+    echo "ERROR: CamouflageTLS checkout mismatch: expected $CAMTLS_COMMIT, got $CAMTLS_ACTUAL_COMMIT" >&2
+    exit 1
 fi
 sed -i '/^add_subdirectory(example)/d; /^enable_testing/d; /^add_subdirectory(tests)/d; /^include_directories(tests/d' "$CAMTLS_DIR/CMakeLists.txt"
 
@@ -135,10 +150,16 @@ cp "$BUILD_DIR/cmake-build/libfptn_native_lib.so" "$OUT_DIR/libfptn_native_lib-$
 # 7. Manifest
 # ---------------------------------------------------------------------------
 FPTN_COMMIT="$(cd "$FPTN_CLONE_DIR" && git rev-parse HEAD)"
+if [[ "$FPTN_COMMIT" != "$FPTN_SOURCE_COMMIT" ]]; then
+    echo "ERROR: expected FPTN commit $FPTN_SOURCE_COMMIT, got $FPTN_COMMIT" >&2
+    exit 1
+fi
 {
     echo "# build_fptn manifest"
     echo "source_repo=$FPTN_REPO"
     echo "source_commit=$FPTN_COMMIT"
+    echo "camouflage_tls_repo=$CAMTLS_REPO"
+    echo "camouflage_tls_commit=$CAMTLS_ACTUAL_COMMIT"
     echo "ndk=$(basename "$NDK_HOME")"
     echo "api_level=$API_LEVEL"
     echo "abi=$ABI"

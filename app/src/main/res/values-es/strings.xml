@@ -214,8 +214,9 @@
     <string name="evolution_fitness_label">Mejor resultado: %1$d%%</string>
     <string name="evolution_population_label">Población</string>
     <string name="urnetwork_provide_mode_never">Nunca</string>
+    <string name="urnetwork_provide_mode_always">Siempre</string>
     <string name="urnetwork_auto_select">Selección automática</string>
-    <string name="urnetwork_provide_mode_desc">El uso compartido siempre está activado. Solo puedes elegir qué redes usa.</string>
+    <string name="urnetwork_provide_mode_desc">Elige cuándo este dispositivo puede compartir tráfico con la red URnetwork.</string>
     <string name="urnetwork_provide_network_mode_title">Red para proveer</string>
     <string name="urnetwork_provide_network_mode_wifi">Solo Wi-Fi</string>
     <string name="urnetwork_provide_network_mode_all">Wi-Fi y móvil</string>
@@ -435,6 +436,7 @@
     <string name="logs_empty">(vacío — el registro aún no se ha escrito)</string>
     <string name="logs_share_chooser_title">Compartir ozero.log</string>
     <string name="logs_copy_empty_toast">Vacío — nada que copiar</string>
+    <string name="logs_copy_done_private_toast_fmt">Copiado con secretos ocultos (%1$d caracteres). El portapapeles se borra en un minuto.</string>
     <string name="logs_copy_done_toast_fmt">Copiado (%1$d caracteres)</string>
     <string name="logs_export">Exportar .log</string>
     <string name="logs_export_level_title">Nivel mínimo</string>

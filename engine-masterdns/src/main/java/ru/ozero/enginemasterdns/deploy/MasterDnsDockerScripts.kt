@@ -124,6 +124,7 @@ internal object MasterDnsDockerScripts {
 
     const val installDocker: String =
         "set +e;" +
+            " install_log=\$(mktemp -t docker-install.XXXXXX 2>/dev/null) || { echo ERR_TEMP; exit 0; };" +
             " if command -v docker >/dev/null 2>&1 && sudo docker --version >/dev/null 2>&1;" +
             " then docker_already=1; else docker_already=0; fi;" +
             " if which apt-get >/dev/null 2>&1; then is_apt=1; else is_apt=0; fi;" +
@@ -132,15 +133,31 @@ internal object MasterDnsDockerScripts {
             " locked=0; for i in \$(seq 1 30);" +
             " do sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || { locked=0; break; };" +
             " locked=1; sleep 10; done;" +
-            " if [ \"\$locked\" = \"1\" ]; then echo ERR_DPKG_LOCKED; exit 0; fi; fi;" +
-            " if [ \"\$docker_already\" = \"0\" ];" +
-            " then if command -v curl >/dev/null 2>&1;" +
-            " then curl -fsSL https://get.docker.com -o /tmp/get-docker.sh 2>/dev/null" +
-            " && sudo sh /tmp/get-docker.sh >/tmp/docker-install.log 2>&1;" +
-            " elif command -v wget >/dev/null 2>&1;" +
-            " then wget -qO /tmp/get-docker.sh https://get.docker.com 2>/dev/null" +
-            " && sudo sh /tmp/get-docker.sh >/tmp/docker-install.log 2>&1;" +
-            " else echo INSTALLER_NO_FETCH >/tmp/docker-install.log; fi;" +
+            " if [ \"\$locked\" = \"1\" ]; then echo ERR_DPKG_LOCKED; exit 0; fi;" +
+            " sudo apt-get -yq update >>\$install_log 2>&1;" +
+            " sudo apt-get -yq install ca-certificates curl gnupg >>\$install_log 2>&1;" +
+            " . /etc/os-release 2>/dev/null || true;" +
+            " repo_os=; case \"\$ID \$ID_LIKE\" in *ubuntu*) repo_os=ubuntu;; *debian*) repo_os=debian;; esac;" +
+            " codename=\${UBUNTU_CODENAME:-\${VERSION_CODENAME:-}};" +
+            " if [ -n \"\$repo_os\" ] && [ -n \"\$codename\" ];" +
+            " then docker_key=\$(mktemp -t docker-gpg.XXXXXX 2>/dev/null);" +
+            " if [ -n \"\$docker_key\" ];" +
+            " then docker_gpg_url=https://download.docker.com/linux/\$repo_os/gpg;" +
+            " curl -fsSL \"\$docker_gpg_url\" -o \"\$docker_key\" >>\$install_log 2>&1" +
+            " && actual_fp=\$(gpg --batch --show-keys --with-colons \"\$docker_key\" 2>>\$install_log" +
+            " | awk -F: '/^fpr:/ {print toupper(\$10); exit}')" +
+            " && [ \"\$actual_fp\" = 9DC858229FC7DD38854AE2D88D81803C0EBFCD88 ]" +
+            " && keyring_tmp=\$(mktemp -t docker-keyring.XXXXXX 2>/dev/null)" +
+            " && gpg --dearmor -o \"\$keyring_tmp\" \"\$docker_key\" 2>>\$install_log" +
+            " && sudo install -m 0755 -d /etc/apt/keyrings >>\$install_log 2>&1" +
+            " && sudo install -m 0644 \"\$keyring_tmp\" /etc/apt/keyrings/docker.gpg >>\$install_log 2>&1" +
+            " && arch=\$(dpkg --print-architecture)" +
+            " && echo \"deb [arch=\$arch signed-by=/etc/apt/keyrings/docker.gpg]" +
+            " https://download.docker.com/linux/\$repo_os \$codename stable\"" +
+            " | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null" +
+            " && sudo apt-get -yq update >>\$install_log 2>&1" +
+            " && sudo apt-get -yq install docker-ce docker-ce-cli containerd.io >>\$install_log 2>&1;" +
+            " rm -f \"\$docker_key\" \"\$keyring_tmp\"; fi; fi; fi;" +
             " if ! command -v docker >/dev/null 2>&1;" +
             " then if which apt-get >/dev/null 2>&1;" +
             " then pm=apt-get; si='-yq install'; su='-yq update'; dp='docker.io';" +
@@ -153,15 +170,15 @@ internal object MasterDnsDockerScripts {
             " elif which pacman >/dev/null 2>&1;" +
             " then pm=pacman; si='-S --noconfirm --quiet'; su='-Sup'; dp='docker';" +
             " else echo ERR_NO_PM; exit 0; fi;" +
-            " sudo \$pm \$su >>/tmp/docker-install.log 2>&1;" +
-            " sudo \$pm \$si \$dp >>/tmp/docker-install.log 2>&1; fi; fi;" +
+            " sudo \$pm \$su >>\$install_log 2>&1;" +
+            " sudo \$pm \$si \$dp >>\$install_log 2>&1; fi; fi;" +
             " if command -v systemctl >/dev/null 2>&1;" +
             " then sudo systemctl enable --now docker >/dev/null 2>&1; sleep 3;" +
             " if [ \"\$(sudo systemctl is-active docker 2>/dev/null)\" != \"active\" ];" +
             " then sudo systemctl start docker >/dev/null 2>&1; sleep 3; fi; fi;" +
             " if sudo docker --version >/dev/null 2>&1; then echo DOCKER_OK;" +
-            " else echo \"--- /tmp/docker-install.log (tail -30) ---\";" +
-            " sudo tail -30 /tmp/docker-install.log 2>/dev/null || true;" +
+            " else echo \"--- docker install log (tail -30) ---\";" +
+            " sudo tail -30 \$install_log 2>/dev/null || true;" +
             " echo ERR_DOCKER; fi"
 
     val deployMasterDns: String =
@@ -442,10 +459,18 @@ AWK_DOMAIN_STRIP
             " echo AMNEZIA_DNS_REMOVED"
 
     const val removeAll =
-        "sudo docker stop masterdns-ozero 2>/dev/null || true;" +
-            " sudo docker rm -f masterdns-ozero 2>/dev/null || true;" +
-            " sudo docker rmi masterdns-ozero 2>/dev/null || true;" +
-            " sudo rm -rf /tmp/mdns_build 2>/dev/null || true;" +
+        "remove_failed=0; docker_ready=0;" +
+            " if sudo docker ps -a >/dev/null 2>&1; then docker_ready=1; else remove_failed=1; fi;" +
+            " if [ \"\$docker_ready\" = \"1\" ]; then" +
+            " if sudo docker inspect masterdns-ozero >/dev/null 2>&1;" +
+            " then sudo docker stop masterdns-ozero 2>/dev/null || true;" +
+            " sudo docker rm -f masterdns-ozero >/dev/null 2>&1 || remove_failed=1; fi;" +
+            " if sudo docker image inspect masterdns-ozero >/dev/null 2>&1;" +
+            " then sudo docker rmi masterdns-ozero >/dev/null 2>&1 || remove_failed=1; fi;" +
+            " if sudo docker volume inspect masterdns-key >/dev/null 2>&1;" +
+            " then sudo docker volume rm masterdns-key >/dev/null 2>&1 || remove_failed=1; fi; fi;" +
+            " if [ -e /tmp/mdns_build ];" +
+            " then sudo rm -rf /tmp/mdns_build >/dev/null 2>&1 || remove_failed=1; fi;" +
             " if [ -f /var/lib/masterdns-ozero/fw_opened ];" +
             " then fw=\$(sudo cat /var/lib/masterdns-ozero/fw_opened 2>/dev/null);" +
             " case \"\$fw\" in" +
@@ -456,10 +481,11 @@ AWK_DOMAIN_STRIP
             " if command -v iptables-save >/dev/null 2>&1 && [ -d /etc/iptables ];" +
             " then sudo iptables-save | sudo tee /etc/iptables/rules.v4 >/dev/null 2>&1 || true; fi;;" +
             " esac;" +
-            " sudo rm -f /var/lib/masterdns-ozero/fw_opened 2>/dev/null || true; fi;" +
-            " echo REMOVE_OK"
+            " sudo rm -f /var/lib/masterdns-ozero/fw_opened >/dev/null 2>&1 || remove_failed=1; fi;" +
+            " if [ \"\$remove_failed\" = \"0\" ]; then echo REMOVE_OK; else echo REMOVE_FAILED; fi"
 
     const val MARKER_REMOVE_OK = "REMOVE_OK"
+    const val MARKER_REMOVE_FAILED = "REMOVE_FAILED"
     const val MARKER_AMNEZIA_DNS_CONFLICT = "AMNEZIA_DNS_CONFLICT"
     const val MARKER_AMNEZIA_DNS_NOT_FOUND = "AMNEZIA_DNS_NOT_FOUND"
     const val MARKER_AMNEZIA_DNS_REMOVED = "AMNEZIA_DNS_REMOVED"

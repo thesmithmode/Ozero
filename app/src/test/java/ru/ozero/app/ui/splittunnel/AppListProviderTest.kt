@@ -152,9 +152,7 @@ class AppListProviderTest {
     fun `loadIcon кэширует результат`() {
         val source = readProviderSource()
         assertTrue(
-            source.contains("iconCache") &&
-                source.contains("iconCache.get(packageName)") &&
-                source.contains("iconCache.put(packageName, bitmap)"),
+            source.contains("iconCache.get(packageName)") && source.contains("iconCache.put(packageName, bitmap)"),
             "loadIcon обязан кэшировать ImageBitmap — иначе при scroll LazyColumn повторные " +
                 "decodes одной и той же иконки = jank.",
         )

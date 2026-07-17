@@ -9,7 +9,7 @@ data class SubscriptionGroup(
     val name: String,
     val subscriptionUrl: String = "",
     val isBuiltin: Boolean = false,
-    val autoUpdate: Boolean = true,
+    val autoUpdate: Boolean = false,
     val autoUpdateDelay: Int = 360,
     val lastUpdated: Long = 0,
     val bytesUsed: Long = 0,

@@ -22,6 +22,7 @@ class EngineWatchdogCoordinator(
     private val enginePlugins: Set<EnginePlugin>,
     private val tunnelController: TunnelController,
     private val chainOrchestrator: ChainOrchestrator,
+    private val tunnelGateway: HevTunnelGateway,
     private val notificationFactory: OzeroNotificationFactory,
     private val tunFdRef: AtomicReference<ParcelFileDescriptor?>,
     private val lockdownStartupFdRef: AtomicReference<ParcelFileDescriptor?>,
@@ -71,6 +72,7 @@ class EngineWatchdogCoordinator(
         val job = scope.launch {
             try {
                 var zeroPeersPolls = 0
+                var consecutiveRecoverFailures = 0
                 var hadPeers = false
                 while (isActive) {
                     delay(PEER_WATCHDOG_POLL_MS)
@@ -78,6 +80,7 @@ class EngineWatchdogCoordinator(
                     if (peers > 0) {
                         hadPeers = true
                         zeroPeersPolls = 0
+                        consecutiveRecoverFailures = 0
                         continue
                     }
                     val timeoutMs = peerWatchdogPolicy.timeoutMs
@@ -94,6 +97,7 @@ class EngineWatchdogCoordinator(
                     when (result) {
                         EnginePlugin.RecoverResult.Success -> {
                             zeroPeersPolls = 0
+                            consecutiveRecoverFailures = 0
                         }
                         EnginePlugin.RecoverResult.NotSupported -> {
                             PersistentLoggers.warn(
@@ -104,7 +108,16 @@ class EngineWatchdogCoordinator(
                             return@launch
                         }
                         is EnginePlugin.RecoverResult.Failed -> {
-                            PersistentLoggers.warn(TAG, "recover failed: ${result.reason} — продолжаем retry")
+                            consecutiveRecoverFailures += 1
+                            PersistentLoggers.warn(
+                                TAG,
+                                "recover failed: ${result.reason} " +
+                                    "($consecutiveRecoverFailures/$PEER_WATCHDOG_MAX_FAILED_RECOVERS)",
+                            )
+                            if (consecutiveRecoverFailures >= PEER_WATCHDOG_MAX_FAILED_RECOVERS) {
+                                handleEngineFailure(engineId, "peer watchdog recover failed: ${result.reason}")
+                                return@launch
+                            }
                             zeroPeersPolls = 0
                         }
                     }
@@ -208,6 +221,15 @@ class EngineWatchdogCoordinator(
                     PersistentLoggers.warn(TAG, "killswitch: chainOrchestrator.stop threw: ${t.message}")
                 }
         }
+        Thread({
+            runCatching { tunnelGateway.stop() }
+                .onFailure { t ->
+                    PersistentLoggers.warn(TAG, "killswitch: tunnelGateway.stop threw: ${t.message}")
+                }
+        }, "ozero-killswitch-native-stop").also {
+            it.isDaemon = true
+            it.start()
+        }
         runCatching { healthMonitor.stop() }
         notificationFactory.notifyStats("Killswitch активен — трафик заблокирован")
         starting.set(false)
@@ -218,6 +240,7 @@ class EngineWatchdogCoordinator(
         const val PEER_WATCHDOG_POLL_MS = 5_000L
         const val PEER_WATCHDOG_TIMEOUT_MS = 30_000L
         const val PEER_WATCHDOG_RECOVER_GRACE_MS = 30_000L
+        const val PEER_WATCHDOG_MAX_FAILED_RECOVERS = 3
         const val STAGNATION_POLL_MS = 10_000L
         const val STAGNATION_RECOVER_THRESHOLD_MS = 60_000L
         const val STAGNATION_RECOVER_GRACE_MS = 30_000L

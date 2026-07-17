@@ -106,6 +106,24 @@ class LogsViewModelTest {
     }
 
     @Test
+    fun `sanitizeClipboardLogText redacts sensitive clipboard payload`() {
+        val raw = listOf(
+            "token=abcdefghijklmnopqrstuvwxyzABCDEF0123456789",
+            "vless://secret@example.com/path",
+            "socks5://user:pass@proxy.example.com",
+        ).joinToString(" ")
+
+        val result = sanitizeClipboardLogText(raw)
+
+        assertTrue(result.contains("token=<redacted-token>"))
+        assertTrue(result.contains("<redacted-uri>"))
+        assertTrue(result.contains("socks5://<redacted>@proxy.example.com"))
+        assertTrue(!result.contains("abcdefghijklmnopqrstuvwxyzABCDEF0123456789"))
+        assertTrue(!result.contains("vless://secret@example.com/path"))
+        assertTrue(!result.contains("user:pass"))
+    }
+
+    @Test
     fun `LogsUiState builds sorted available tags with all first`() {
         val state = LogsUiState(
             entries = listOf(

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import ru.ozero.app.R
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginewarp.AwgParams
@@ -34,7 +36,6 @@ import ru.ozero.enginewarp.draftFromSlot
 import ru.ozero.enginewarp.hasRequiredFields
 import ru.ozero.enginewarp.toWarpConfig
 import java.io.InputStream
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 @HiltViewModel
@@ -47,27 +48,17 @@ class WarpEngineSettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(WarpSettingsUiState())
     val uiState: StateFlow<WarpSettingsUiState> = _uiState.asStateFlow()
     private var registerJob: Job? = null
-    private val autoTriggered = AtomicBoolean(false)
-
     init {
         viewModelScope.launch {
-            val migrationOk = runCatching { store.migrateIfNeeded() }
+            runCatching { store.migrateIfNeeded() }
                 .onFailure { t ->
                     _uiState.value = _uiState.value.copy(errorMessage = t.message ?: "migration failed")
                 }
-                .isSuccess
             store.slots().collect { slots ->
                 _uiState.value = _uiState.value.copy(
                     slots = slots,
                     activeSlotId = slots.firstOrNull { it.isActive }?.id,
                 )
-                val canAutoTrigger = migrationOk &&
-                    slots.isEmpty() &&
-                    !_uiState.value.isRegistering &&
-                    autoConfig.remainingCooldownMs() == 0L
-                if (canAutoTrigger && autoTriggered.compareAndSet(false, true)) {
-                    onGenerate()
-                }
             }
         }
     }
@@ -156,7 +147,7 @@ class WarpEngineSettingsViewModel @Inject constructor(
 
     fun onImportFile(stream: InputStream, displayName: String? = null) {
         viewModelScope.launch {
-            val result = fileImporter.import(stream)
+            val result = withContext(Dispatchers.IO) { fileImporter.import(stream) }
             result.fold(
                 onSuccess = { imported ->
                     val name = importedSlotName(displayName, store.slots().first())
@@ -198,6 +189,10 @@ class WarpEngineSettingsViewModel @Inject constructor(
 
     fun onClashYamlRejected() {
         _uiState.update { it.copy(errorMessage = "Формат Clash не поддерживается") }
+    }
+
+    fun onImportOpenFailed(t: Throwable) {
+        _uiState.update { it.copy(errorMessage = t.message ?: "import failed") }
     }
 
     fun onSetActive(id: String) {

@@ -5,6 +5,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.ResponseBody
+import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.security.cert.CertPathValidatorException
 import java.security.cert.CertificateException
 import javax.net.ssl.SSLHandshakeException
@@ -28,7 +31,6 @@ class RawUpdater(
     private val okHttpClient: OkHttpClient,
     private val groupDao: SubscriptionGroupDao,
     private val profileDao: ProxyProfileDao,
-    private val userCaOkHttpClient: OkHttpClient = okHttpClient,
 ) {
     suspend fun refresh(group: SubscriptionGroup): Result<Int> = withContext(Dispatchers.IO) {
         runCatching<Int> {
@@ -37,11 +39,11 @@ class RawUpdater(
                 .header("User-Agent", USER_AGENT)
                 .header("Accept", "text/plain, application/json, application/yaml, text/yaml, */*")
                 .build()
-            httpClientFor(group).newCall(request).execute().use { response ->
+            okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     error("Subscription HTTP ${response.code}")
                 }
-                val body = response.body?.string() ?: ""
+                val body = response.body?.readUtf8Limited(MAX_SUBSCRIPTION_BYTES) ?: ""
                 val subInfo = SubscriptionInfoParser.parse(response.header("Subscription-Userinfo"))
 
                 val beans = Base64BundleParser.parse(body)
@@ -112,9 +114,6 @@ class RawUpdater(
         }
     }
 
-    private fun httpClientFor(group: SubscriptionGroup): OkHttpClient =
-        if (group.isBuiltin) okHttpClient else userCaOkHttpClient
-
     companion object {
         private const val TAG = "RawUpdater"
         const val PROTOCOL_VLESS = 0
@@ -124,6 +123,7 @@ class RawUpdater(
 
         private const val USER_AGENT = "Ozero/1 sing-box-subscription"
         private const val MAX_PROFILES_PER_GROUP = 2_000
+        private const val MAX_SUBSCRIPTION_BYTES = 4L * 1024 * 1024
 
         private fun normalizeError(e: Throwable): Throwable = when {
             e.isSubscriptionCertificateFailure() ->
@@ -160,6 +160,29 @@ class RawUpdater(
             else -> PROTOCOL_VLESS
         }
     }
+}
+
+private fun ResponseBody.readUtf8Limited(maxBytes: Long): String {
+    val declaredLength = contentLength()
+    if (declaredLength > maxBytes) {
+        throw IOException("Subscription body too large")
+    }
+    val out = ByteArrayOutputStream(minOf(maxBytes, 8_192L).toInt())
+    byteStream().use { input ->
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var total = 0L
+        while (true) {
+            val read = input.read(buffer)
+            if (read == -1) break
+            total += read.toLong()
+            if (total > maxBytes) {
+                throw IOException("Subscription body too large")
+            }
+            out.write(buffer, 0, read)
+        }
+    }
+    val charset = contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
+    return out.toString(charset.name())
 }
 
 private fun ProxyProfile.stableBaseIdentityKey(): String =

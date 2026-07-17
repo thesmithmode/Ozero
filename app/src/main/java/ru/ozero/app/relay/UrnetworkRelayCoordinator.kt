@@ -20,6 +20,7 @@ import ru.ozero.engineurnetwork.UrnetworkJwtBootstrapper
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.byClientJwt
+import ru.ozero.engineurnetwork.provideEnabled
 import ru.ozero.engineurnetwork.provideNetworkMode
 import ru.ozero.engineurnetwork.walletAddress
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
@@ -50,22 +51,20 @@ class UrnetworkRelayCoordinator(
             tunnelController.state,
             configStore.byClientJwt(),
             configStore.walletAddress(),
-        ) { tunnelState, byClientJwt, walletAddress ->
-            Triple(tunnelState, byClientJwt, walletAddress)
+            configStore.provideEnabled(),
+        ) { tunnelState, byClientJwt, walletAddress, provideEnabled ->
+            RelayState(tunnelState, byClientJwt, walletAddress, provideEnabled)
         }
             .distinctUntilChanged()
-            .onEach { (tunnelState, byClientJwt, walletAddress) ->
-                handleState(tunnelState, byClientJwt, walletAddress)
+            .onEach { state ->
+                handleState(state)
             }
             .launchIn(scope)
         jobRef.getAndSet(newJob)?.cancel()
     }
 
-    private suspend fun handleState(
-        tunnelState: TunnelState,
-        byClientJwt: String?,
-        walletAddress: String,
-    ) {
+    private suspend fun handleState(state: RelayState) {
+        val tunnelState = state.tunnelState
         if (tunnelState !is TunnelState.Connected) {
             bootstrapAttemptedThisSession.set(false)
             if (relayOwned.compareAndSet(true, false)) {
@@ -82,29 +81,34 @@ class UrnetworkRelayCoordinator(
             relayOwned.set(false)
             return
         }
-        if (byClientJwt == null) {
+        if (!state.provideEnabled) {
+            bootstrapAttemptedThisSession.set(false)
+            if (relayOwned.compareAndSet(true, false)) {
+                stopWatchdog()
+                runCatching { networkMonitor?.stop() }
+                runCatching { relayLockManager?.release() }
+                runCatching { bridge.stop() }
+                closeDummyPipe()
+            }
+            return
+        }
+        if (state.byClientJwt == null) {
             if (bootstrapAttemptedThisSession.compareAndSet(false, true)) {
-                PersistentLoggers.debug(
-                    TAG,
-                    "mesh session: credential missing while ${tunnelState.engineId} active — acquiring",
-                )
-                val r = jwtBootstrapper.ensureClientJwt()
-                if (r is UrnetworkJwtBootstrapper.Result.Failed) {
-                    PersistentLoggers.warn(TAG, "mesh session: credential acquisition failed: ${r.reason}")
-                } else {
-                    PersistentLoggers.debug(TAG, "mesh session: credential acquired (${r.javaClass.simpleName})")
+                val result = jwtBootstrapper.ensureClientJwt()
+                if (result is UrnetworkJwtBootstrapper.Result.Failed) {
+                    PersistentLoggers.warn(TAG, "mesh session: credential acquisition failed: ${result.reason}")
                 }
             }
             return
         }
-        val result = startBridgeWithRetry(walletAddress, byClientJwt)
+        val result = startBridgeWithRetry(state.walletAddress, state.byClientJwt)
         if (result is UrnetworkSdkBridge.StartResult.Success) {
             relayOwned.set(true)
             attachDummyIoLoop()
             runCatching { bridge.setProvidePaused(false) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: worker pause toggle threw: ${it.message}") }
             val controlMode = runCatching { configStore.config().first().provideControlMode }
-                .getOrDefault(UrnetworkProvideControlMode.ALWAYS)
+                .getOrDefault(UrnetworkProvideControlMode.AUTO)
             runCatching { bridge.setProvideControlMode(controlMode) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: setProvideControlMode threw: ${it.message}") }
             val networkMode = runCatching { configStore.provideNetworkMode().first() }
@@ -181,7 +185,8 @@ class UrnetworkRelayCoordinator(
         walletAddress: String,
         byClientJwt: String,
     ): UrnetworkSdkBridge.StartResult? {
-        RETRY_BACKOFF_MS.forEachIndexed { attempt, delayMs ->
+        val maxAttempts = RETRY_BACKOFF_MS.size + 1
+        repeat(maxAttempts) { attempt ->
             val result = runCatching {
                 bridge.start(
                     walletAddress = walletAddress,
@@ -191,13 +196,14 @@ class UrnetworkRelayCoordinator(
                 )
             }.getOrNull()
             if (result is UrnetworkSdkBridge.StartResult.Success) return result
-            val isLast = attempt == RETRY_BACKOFF_MS.lastIndex
+            val isLast = attempt == maxAttempts - 1
+            val delayMs = RETRY_BACKOFF_MS.getOrNull(attempt)
             PersistentLoggers.warn(
                 TAG,
-                "mesh session: start attempt ${attempt + 1}/${RETRY_BACKOFF_MS.size} failed: $result" +
-                    if (isLast) " — giving up" else " — retry in ${delayMs / 1000}s",
+                "mesh session: start attempt ${attempt + 1}/$maxAttempts failed: $result" +
+                    if (isLast || delayMs == null) " — giving up" else " — retry in ${delayMs / 1000}s",
             )
-            if (!isLast) {
+            if (!isLast && delayMs != null) {
                 delay(delayMs)
                 if (!scope.isActive) return null
             }
@@ -214,6 +220,13 @@ class UrnetworkRelayCoordinator(
     }
 
     private companion object {
+        data class RelayState(
+            val tunnelState: TunnelState,
+            val byClientJwt: String?,
+            val walletAddress: String,
+            val provideEnabled: Boolean,
+        )
+
         const val TAG = "MeshSession"
         val RETRY_BACKOFF_MS = longArrayOf(5_000L, 30_000L, 90_000L)
         const val WATCHDOG_INTERVAL_MS = 60_000L

@@ -45,7 +45,7 @@ class SdkLocationToken(val sdk: ConnectLocation) : UrnetworkSdkBridge.LocationTo
 }
 
 internal enum class DeviceInitMode(val providePaused: Boolean) {
-    FULL_START(providePaused = false),
+    FULL_START(providePaused = true),
     LOCATION_BROWSE(providePaused = true),
 }
 
@@ -289,65 +289,69 @@ class RealUrnetworkSdkBridge(
     }
 
     private suspend fun stopUnderLock() {
-        runCatching { bridgeScope.coroutineContext.cancelChildren() }
-        contractStatusListener.detach()
-        detachConnectionStatusListener()
-        detachSelectedLocationListener()
-        tunnelStartedRef.set(false)
-        connectIssuedRef.set(false)
-        sharingTrafficLogged.set(false)
-        val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
-            withContext(Dispatchers.Main.immediate) {
-                walletVcRef.getAndSet(null)?.also { vc ->
-                    runCatching { vc.close() }
-                        .onFailure { PersistentLoggers.warn(TAG, "walletVc.close threw: ${it.message}") }
-                }
-                connectVcRef.getAndSet(null)?.also { vc ->
-                    runCatching { vc.disconnect() }
-                        .onFailure { PersistentLoggers.warn(TAG, "connectVc.disconnect threw: ${it.message}") }
-                    runCatching { vc.close() }
-                        .onFailure { PersistentLoggers.warn(TAG, "connectVc.close threw: ${it.message}") }
-                }
-                val hadLoop = ioLoopRef.getAndSet(null)?.also { loop ->
-                    runCatching { loop.close() }
-                        .onFailure { PersistentLoggers.warn(TAG, "ioLoop.close threw: ${it.message}") }
-                } != null
-                if (!hadLoop) {
-                    deviceRef.getAndSet(null)?.also { device -> closeDevice(device) }
-                } else {
-                    deviceRef.set(null)
+        try {
+            runCatching { bridgeScope.coroutineContext.cancelChildren() }
+            contractStatusListener.detach()
+            detachConnectionStatusListener()
+            detachSelectedLocationListener()
+            tunnelStartedRef.set(false)
+            connectIssuedRef.set(false)
+            sharingTrafficLogged.set(false)
+            val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
+                withContext(Dispatchers.Main.immediate) {
+                    walletVcRef.getAndSet(null)?.also { vc ->
+                        runCatching { vc.close() }
+                            .onFailure { PersistentLoggers.warn(TAG, "walletVc.close threw: ${it.message}") }
+                    }
+                    connectVcRef.getAndSet(null)?.also { vc ->
+                        runCatching { vc.disconnect() }
+                            .onFailure { PersistentLoggers.warn(TAG, "connectVc.disconnect threw: ${it.message}") }
+                        runCatching { vc.close() }
+                            .onFailure { PersistentLoggers.warn(TAG, "connectVc.close threw: ${it.message}") }
+                    }
+                    val hadLoop = ioLoopRef.getAndSet(null)?.also { loop ->
+                        runCatching { loop.close() }
+                            .onFailure { PersistentLoggers.warn(TAG, "ioLoop.close threw: ${it.message}") }
+                    } != null
+                    if (!hadLoop) {
+                        deviceRef.getAndSet(null)?.also { device -> closeDevice(device) }
+                    } else {
+                        deviceRef.set(null)
+                    }
                 }
             }
-        }
-        if (completed == null) {
-            PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms - refs cleared")
-        }
-        val releaseOutcome = runCatching {
-            withTimeoutOrNull(RUNTIME_RELEASE_TIMEOUT_MS) { UrnetworkRuntime.release() }
-        }
-        val released = when {
-            releaseOutcome.isFailure -> {
-                PersistentLoggers.warn(
-                    TAG,
-                    "runtime release threw: ${releaseOutcome.exceptionOrNull()?.message} - " +
-                        "Go runtime may hold UDP/file handles, URnetwork app may crash",
-                )
-                false
+            if (completed == null) {
+                PersistentLoggers.warn(TAG, "stop timed out after ${STOP_TIMEOUT_MS}ms - refs cleared")
             }
-            releaseOutcome.getOrNull() == null -> {
-                PersistentLoggers.warn(
-                    TAG,
-                    "runtime release timed out after ${RUNTIME_RELEASE_TIMEOUT_MS}ms - " +
-                        "Sdk.freeMemory hung, Go-runtime resources may leak",
-                )
-                false
+            val releaseOutcome = runCatching {
+                withTimeoutOrNull(RUNTIME_RELEASE_TIMEOUT_MS) { UrnetworkRuntime.release() }
             }
-            else -> true
-        }
-        if (released) {
-            Log.i(TAG, "stop complete - runtime released")
-        } else {
-            PersistentLoggers.warn(TAG, "stop complete - runtime release not confirmed")
+            val released = when {
+                releaseOutcome.isFailure -> {
+                    PersistentLoggers.warn(
+                        TAG,
+                        "runtime release threw: ${releaseOutcome.exceptionOrNull()?.message} - " +
+                            "Go runtime may hold UDP/file handles, URnetwork app may crash",
+                    )
+                    false
+                }
+                releaseOutcome.getOrNull() == null -> {
+                    PersistentLoggers.warn(
+                        TAG,
+                        "runtime release timed out after ${RUNTIME_RELEASE_TIMEOUT_MS}ms - " +
+                            "Sdk.freeMemory hung, Go-runtime resources may leak",
+                    )
+                    false
+                }
+                else -> true
+            }
+            if (released) {
+                Log.i(TAG, "stop complete - runtime released")
+            } else {
+                PersistentLoggers.warn(TAG, "stop complete - runtime release not confirmed")
+            }
+        } finally {
+            running.set(false)
         }
     }
 
@@ -666,11 +670,15 @@ class RealUrnetworkSdkBridge(
             PersistentLoggers.warn(TAG, "applyPerformanceProfile skipped - bridge not running")
             return
         }
+        val device = deviceRef.get() ?: return
         if (windowType == UrnetworkWindowType.AUTO && allowDirect) {
-            Log.i(TAG, "applyPerformanceProfile skip - AUTO+allowDirect uses SDK defaults")
+            runCatching { device.performanceProfile = null }
+                .onFailure {
+                    PersistentLoggers.warn(TAG, "applyPerformanceProfile reset threw: ${it.message}")
+                }
+            Log.i(TAG, "applyPerformanceProfile reset - AUTO+allowDirect uses SDK defaults")
             return
         }
-        val device = deviceRef.get() ?: return
         runCatching {
             val profile = PerformanceProfile()
             profile.windowType = when (windowType) {
@@ -798,19 +806,7 @@ class RealUrnetworkSdkBridge(
                     val plan = runCatching { sub?.plan }.getOrNull()
                     val store = runCatching { sub?.store }.getOrNull()
                     val used = startBalance - balance - pending
-                    val clientId = runCatching { device.clientId?.toString() }.getOrNull()
-                    val activeLocation = runCatching { device.connectLocation?.name }.getOrNull()
-                    val providePaused = runCatching { device.providePaused }.getOrNull()
-                    val balanceGb = balance / 1_000_000_000.0
                     val startGb = startBalance / 1_000_000_000.0
-                    val ratio = if (startBalance > 0) balance.toDouble() / startBalance else 0.0
-                    Log.i(
-                        TAG,
-                        "subscriptionBalance SDK raw: start=$startBalance(${"%.1f".format(startGb)}GB) " +
-                            "balance=$balance(${"%.1f".format(balanceGb)}GB) pending=$pending used=$used " +
-                            "plan=$plan store=$store clientId=$clientId loc=$activeLocation " +
-                            "providePaused=$providePaused balance/start=${"%.2f".format(ratio)}",
-                    )
                     if (startBalance > DOUBLE_QUOTA_THRESHOLD_BYTES) {
                         PersistentLoggers.warn(
                             TAG,

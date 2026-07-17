@@ -62,7 +62,7 @@ class OzeroVpnService : android.net.VpnService() {
     internal var processKiller: ProcessKiller = ProcessKiller { pid -> Process.killProcess(pid) }
 
     private val notificationFactory: OzeroNotificationFactory by lazy {
-        OzeroNotificationFactory(this, OzeroVpnService::class.java)
+        OzeroNotificationFactory(this)
     }
     private val tunBuilderHelper: TunBuilderHelper by lazy { TunBuilderHelper(this) }
     private val statsLogger: TunnelStatsLogger by lazy {
@@ -111,6 +111,7 @@ class OzeroVpnService : android.net.VpnService() {
             enginePlugins = enginePlugins,
             tunnelController = tunnelController,
             chainOrchestrator = chainOrchestrator,
+            tunnelGateway = tunnelGateway,
             notificationFactory = notificationFactory,
             tunFdRef = tunFdRef,
             lockdownStartupFdRef = lockdownStartupFdRef,
@@ -177,7 +178,6 @@ class OzeroVpnService : android.net.VpnService() {
                 runtimeConfigRestartCancelled = runtimeConfigRestartCancelled,
                 runtimeConfigRestartInProgress = runtimeConfigRestartInProgress,
                 shutdownJoinTimeoutMs = SHUTDOWN_JOIN_TIMEOUT_MS,
-                externalVpnReleaseDelayMs = EXTERNAL_VPN_RELEASE_DELAY_MS,
                 closeStaleTun = {
                     runCatching { tunFdRef.getAndSet(null)?.close() }
                         .onFailure { PersistentLoggers.warn(TAG, "startVpn: stale tunFd close threw: ${it.message}") }
@@ -210,7 +210,6 @@ class OzeroVpnService : android.net.VpnService() {
         private const val SHUTDOWN_JOIN_TIMEOUT_MS = 7_000L
         private const val ON_DESTROY_SHUTDOWN_TIMEOUT_MS = 5_000L
         internal const val REVOKE_KILL_DELAY_MS = 1_000L
-        internal const val EXTERNAL_VPN_RELEASE_DELAY_MS = 750L
     }
 
     override fun onCreate() {

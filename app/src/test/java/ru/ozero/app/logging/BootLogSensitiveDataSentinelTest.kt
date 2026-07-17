@@ -101,20 +101,24 @@ class BootLogSensitiveDataSentinelTest {
     }
 
     @Test
-    fun `FptnEngine логирует диагностику через PersistentLoggers debug на start и authenticate`() {
+    fun `FptnEngine не пишет connection metadata в PersistentLoggers`() {
         val src = readSource("engine-fptn/src/main/java/ru/ozero/enginefptn/FptnEngine.kt")
         assertTrue(
-            src.contains("PersistentLoggers.debug(") &&
-                src.contains("\"start: server=") &&
-                src.contains("sniDomain="),
-            "FptnEngine.start обязан логировать server+port+bypass+sniDomain в PersistentLoggers.debug — " +
-                "иначе HTTP 608 timeout диагностика невозможна по файл-логу (только logcat)",
+            src.contains("authenticate: POST \$API_LOGIN_PATH timeout="),
+            "FptnEngine.authenticate должен оставлять persistent checkpoint без server, port, sni и bypass",
         )
-        assertTrue(
-            src.contains("authenticate: POST /api/v1/login server=") &&
-                src.contains("sni=\$sniDomain bypass=\$bypassMethod"),
-            "FptnEngine.authenticate обязан логировать connection target в PersistentLoggers.debug " +
-                "до POST — иначе таймаут невозможно отличить от network unreachable по файл-логу",
+        assertNoForbidden(
+            src,
+            "FptnEngine.kt",
+            listOf(
+                "PersistentLoggers.debug(\n            TAG,\n            \"start: server=",
+                "PersistentLoggers.debug(\n                TAG,\n                \"authenticate: POST /api/v1/login server=",
+                "PersistentLoggers.debug(TAG, \"authenticate: success server=",
+                "server=\${server.name}:\${server.port} sni=",
+                "server=\${firstServer.name} port=",
+                "selected=\${fptn.selectedServerName",
+            ),
+            reason = "FPTN provider/server name, port, SNI and bypass strategy must not be persisted to shareable logs",
         )
     }
 

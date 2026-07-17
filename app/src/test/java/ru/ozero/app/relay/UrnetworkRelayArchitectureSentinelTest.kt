@@ -7,22 +7,23 @@ import kotlin.test.assertTrue
 class UrnetworkRelayArchitectureSentinelTest {
 
     @Test
-    fun `relay coordinator always starts monitor with enabled sharing`() {
+    fun `relay coordinator enforces explicit sharing opt in`() {
         val coordinator = source("src/main/java/ru/ozero/app/relay/UrnetworkRelayCoordinator.kt")
         val monitor = source("src/main/java/ru/ozero/app/relay/RelayNetworkMonitor.kt")
 
         assertTrue(
-            coordinator.contains("networkMonitor?.start(networkMode)"),
-            "RelayCoordinator обязан запускать RelayNetworkMonitor без legacy provideEnabled state.",
+            coordinator.contains("if (!state.provideEnabled)"),
+            "RelayCoordinator обязан прекращать relay до явного opt-in.",
         )
         assertTrue(
-            coordinator.contains("relayLockManager?.acquire()") && !coordinator.contains("if (provideEnabled)"),
-            "RelayCoordinator обязан брать relay lock без legacy provideEnabled branch.",
+            coordinator.indexOf("if (!state.provideEnabled)") <
+                coordinator.indexOf("networkMonitor?.start(networkMode)"),
+            "RelayCoordinator не должен запускать monitor до проверки opt-in.",
         )
         assertTrue(
             monitor.contains("fun start(networkMode: UrnetworkProvideNetworkMode)") &&
                 !monitor.contains("provideEnabled"),
-            "RelayNetworkMonitor не должен принимать legacy provideEnabled state.",
+            "RelayNetworkMonitor должен получать только уже разрешённый запуск.",
         )
     }
 

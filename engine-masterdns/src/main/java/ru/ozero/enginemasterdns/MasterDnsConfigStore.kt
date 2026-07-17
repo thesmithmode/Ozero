@@ -3,6 +3,7 @@ package ru.ozero.enginemasterdns
 import kotlinx.coroutines.flow.Flow
 
 data class MasterDnsPersistedConfig(
+    val enabled: Boolean = false,
     val configToml: String = "",
     val resolvers: List<String> = emptyList(),
     val serverIp: String = "",

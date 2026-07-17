@@ -177,7 +177,7 @@ class TunBuilderHelperCoverageTest {
         verify(exactly = 1) { builder.setSession("Ozero") }
         verify(exactly = 1) { builder.addDnsServer(TunBuilderHelper.TUN_DNS_SERVERS.first()) }
         verify(exactly = 1) { builder.addRoute("0.0.0.0", 0) }
-        verify(exactly = 1) { builder.addDisallowedApplication("ru.ozero.app") }
+        verify(exactly = 0) { builder.addDisallowedApplication("ru.ozero.app") }
     }
 
     @Test
@@ -221,25 +221,21 @@ class TunBuilderHelperCoverageTest {
     }
 
     @Test
-    fun `buildTunBuilder continues when dns or self exclusion throws`() {
+    fun `buildTunBuilder continues when dns fails and does not exclude self`() {
         val builder = builder()
         every { builder.addDnsServer("9.9.9.9") } throws IllegalArgumentException("bad dns")
-        every {
-            builder.addDisallowedApplication("ru.ozero.app")
-        } throws android.content.pm.PackageManager.NameNotFoundException()
-
         helper(builder, packageName = "ru.ozero.app").buildTunBuilder(
             splitConfig = SplitTunnelConfig(mode = SplitTunnelMode.BYPASS_LAN),
             customDnsServers = listOf("9.9.9.9"),
         )
 
         verify(exactly = 1) { builder.addDnsServer("9.9.9.9") }
-        verify(exactly = 1) { builder.addDisallowedApplication("ru.ozero.app") }
+        verify(exactly = 0) { builder.addDisallowedApplication("ru.ozero.app") }
         verify(exactly = 1) { builder.addRoute("8.0.0.0", 7) }
     }
 
     @Test
-    fun `buildTunBuilder defaults dns to first public v4 and skips ipv6 when disabled`() {
+    fun `buildTunBuilder defaults dns and blackholes ipv6 when disabled`() {
         val builder = builder()
 
         helper(builder).buildTunBuilder(
@@ -249,8 +245,10 @@ class TunBuilderHelperCoverageTest {
         )
 
         verify(exactly = 1) { builder.addDnsServer(TunBuilderHelper.TUN_DNS_SERVERS.first()) }
-        verify(exactly = 0) { builder.addAddress(TunBuilderHelper.TUN_ADDRESS_V6, any()) }
-        verify(exactly = 0) { builder.addRoute("::", 0) }
+        verify(exactly = 1) {
+            builder.addAddress(TunBuilderHelper.TUN_ADDRESS_V6, TunBuilderHelper.TUN_PREFIX_LENGTH_V6)
+        }
+        verify(exactly = 1) { builder.addRoute("::", 0) }
     }
 
     @Test

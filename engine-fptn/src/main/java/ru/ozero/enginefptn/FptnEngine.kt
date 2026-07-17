@@ -109,7 +109,7 @@ class FptnEngine(
         ipv6Address = "fd00::1",
         ipv6PrefixLength = 128,
         routeAllV4 = true,
-        routeAllV6 = false,
+        routeAllV6 = true,
     )
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
@@ -131,7 +131,7 @@ class FptnEngine(
             PersistentLoggers.error(
                 TAG,
                 "start: no server available - token contained ${tokenData.servers.size} server(s), " +
-                    "selected=${fptn.selectedServerName ?: "<auto>"}",
+                    "autoSelect=${fptn.autoSelect}",
             )
             return StartResult.Failure(FPTN_NO_SERVER_AVAILABLE)
         }
@@ -139,8 +139,7 @@ class FptnEngine(
         val firstServer = candidates.first()
         PersistentLoggers.debug(
             TAG,
-            "start: server=${firstServer.name} port=${firstServer.port} bypass=${fptn.bypassMethod} " +
-                "sniDomain=${fptn.sniDomain} tokenServers=${tokenData.servers.size} " +
+            "start: candidate selected tokenServers=${tokenData.servers.size} " +
                 "candidates=${candidates.size} autoSelect=${fptn.autoSelect}",
         )
         Log.d(
@@ -192,7 +191,6 @@ class FptnEngine(
         Log.d(TAG, "attachTun: fd=$tunFd server=${server.name}")
 
         val tun = tunIo.open(tunFd)
-        _pfd = tun.pfd
         val fos = tun.output
 
         wsClient.onOpen = {
@@ -225,17 +223,29 @@ class FptnEngine(
             )
         }.getOrElse { e ->
             tun.close()
+            tun.abortAttach()
+            _pfd = null
             PersistentLoggers.error(TAG, "nativeCreate failed: ${e.message}")
             return TunAttachResult.Failure("nativeCreate failed: ${e.message}")
         }
         Log.d(TAG, "attachTun: handle=$handle, starting WS thread")
         runCatching { wsClient.nativeRun(handle) }.getOrElse { e ->
             tun.close()
+            tun.abortAttach()
+            _pfd = null
             runCatching { wsClient.nativeDestroy(handle) }
             PersistentLoggers.error(TAG, "nativeRun failed: ${e.message}")
             return TunAttachResult.Failure("nativeRun failed: ${e.message}")
         }
+        runCatching { tun.completeAttach() }.getOrElse { e ->
+            tun.close()
+            tun.abortAttach()
+            runCatching { wsClient.nativeDestroy(handle) }
+            PersistentLoggers.error(TAG, "attachTun ownership transfer failed: ${e.message}")
+            return TunAttachResult.Failure("attachTun ownership transfer failed: ${e.message}")
+        }
         _nativeHandle = handle
+        _pfd = tun.pfd
 
         tunScope?.cancel()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -386,7 +396,7 @@ class FptnEngine(
                         return FptnAuthResult.Success(AuthenticatedServer(server, serverIp, auth.accessToken))
                     }
                     failures += FPTN_DNS_FAILED
-                    PersistentLoggers.warn(TAG, "authenticate: resolved IP missing server=${server.name}")
+                    PersistentLoggers.warn(TAG, "authenticate: resolved IP missing")
                 }
                 is ServerAuthResult.Failure -> {
                     failures += auth.reason
@@ -428,18 +438,13 @@ class FptnEngine(
             val reason = classifyFptnAuthFailure(error = e.message, exceptionName = e.javaClass.simpleName)
             PersistentLoggers.error(
                 TAG,
-                "authenticate: create exception ${e.javaClass.simpleName}: ${e.message} " +
-                    "server=${server.name}:${server.port} sni=$sniDomain bypass=$bypassMethod reason=$reason",
+                "authenticate: create exception ${e.javaClass.simpleName} reason=$reason",
             )
             return ServerAuthResult.Failure(reason)
         }
         return try {
             currentCoroutineContext().ensureActive()
-            PersistentLoggers.debug(
-                TAG,
-                "authenticate: POST /api/v1/login server=${server.name}:${server.port} " +
-                    "sni=$sniDomain bypass=$bypassMethod timeout=${timeoutS}s",
-            )
+            PersistentLoggers.debug(TAG, "authenticate: POST $API_LOGIN_PATH timeout=${timeoutS}s")
             val body = JSONObject().apply {
                 put("username", data.username)
                 put("password", data.password)
@@ -449,7 +454,7 @@ class FptnEngine(
             if (resp.code == 200) {
                 val token = JSONObject(resp.body).optString("access_token").takeIf { it.isNotBlank() }
                 if (token != null) {
-                    PersistentLoggers.debug(TAG, "authenticate: success server=${server.name}")
+                    PersistentLoggers.debug(TAG, "authenticate: success")
                 } else {
                     PersistentLoggers.error(TAG, "authenticate: 200 but no access_token in response")
                 }
@@ -458,8 +463,7 @@ class FptnEngine(
                 val reason = classifyFptnAuthFailure(resp)
                 PersistentLoggers.error(
                     TAG,
-                    "authenticate: HTTP ${resp.code} error=${resp.error} " +
-                        "server=${server.name}:${server.port} sni=$sniDomain bypass=$bypassMethod reason=$reason",
+                    "authenticate: HTTP ${resp.code} reason=$reason",
                 )
                 ServerAuthResult.Failure(reason, terminal = reason == FPTN_TOKEN_REJECTED)
             }
@@ -469,8 +473,7 @@ class FptnEngine(
             val reason = classifyFptnAuthFailure(error = e.message, exceptionName = e.javaClass.simpleName)
             PersistentLoggers.error(
                 TAG,
-                "authenticate: exception ${e.javaClass.simpleName}: ${e.message} " +
-                    "server=${server.name}:${server.port} sni=$sniDomain bypass=$bypassMethod reason=$reason",
+                "authenticate: exception ${e.javaClass.simpleName} reason=$reason",
             )
             ServerAuthResult.Failure(reason)
         } finally {
@@ -487,7 +490,7 @@ class FptnEngine(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            PersistentLoggers.warn(TAG, "resolve: failed server=${server.name} ${e.javaClass.simpleName}")
+            PersistentLoggers.warn(TAG, "resolve: failed ${e.javaClass.simpleName}")
             null
         }
     }
@@ -534,7 +537,13 @@ data class FptnTunStreams(
     val pfd: ParcelFileDescriptor?,
     val input: InputStream,
     val output: OutputStream,
+    private val onAttachComplete: () -> Unit = {},
+    private val onAttachAbort: () -> Unit = {},
 ) {
+    fun completeAttach() = onAttachComplete()
+
+    fun abortAttach() = onAttachAbort()
+
     fun close() {
         output.runCatching { close() }
         input.runCatching { close() }
@@ -544,12 +553,26 @@ data class FptnTunStreams(
 
 private object AndroidFptnTunIo : FptnTunIo {
     override fun open(tunFd: Int): FptnTunStreams {
-        val pfd = ParcelFileDescriptor.adoptFd(tunFd)
-        return FptnTunStreams(
-            pfd = pfd,
-            input = FileInputStream(pfd.fileDescriptor),
-            output = FileOutputStream(pfd.fileDescriptor),
-        )
+        val callerPfd = ParcelFileDescriptor.adoptFd(tunFd)
+        val enginePfd = try {
+            ParcelFileDescriptor.dup(callerPfd.fileDescriptor)
+        } catch (t: Throwable) {
+            callerPfd.detachFd()
+            throw t
+        }
+        return try {
+            FptnTunStreams(
+                pfd = enginePfd,
+                input = FileInputStream(enginePfd.fileDescriptor),
+                output = FileOutputStream(enginePfd.fileDescriptor),
+                onAttachComplete = { callerPfd.close() },
+                onAttachAbort = { callerPfd.detachFd() },
+            )
+        } catch (t: Throwable) {
+            enginePfd.close()
+            callerPfd.detachFd()
+            throw t
+        }
     }
 }
 

@@ -152,17 +152,3 @@ Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniForceClose(__attribute__((unused)) JNI
     BYEDPI_LOGW("jniForceClose exit close rc=%d server_fd=-1", rc);
     return rc;
 }
-
-JNIEXPORT jint JNICALL
-Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniEmergencyReset(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz) {
-    /* EMERGENCY ONLY: безопасный вызов только после серии stop+forceClose+join failures
-     * + jniStartProxy вернул JNI_GUARD_BUSY (т.е. подтверждённый wedge старой main()).
-     * Принудительно сбрасывает CAS guard атомарным exchange. Возвращает старое
-     * значение (1 = был wedge, 0 = guard уже свободен — emergencyReset noop).
-     *
-     * Race window vs полное зависание engine: если старая main() ВНЕЗАПНО оживёт
-     * после нашего exchange, две main() пересекутся на shared globals. Trade-off
-     * принят: краш памяти при wedge крайне маловероятен (main() реально мёртв);
-     * permanent dead engine иначе невосстановимо до process restart. */
-    return atomic_exchange(&g_proxy_running, 0);
-}

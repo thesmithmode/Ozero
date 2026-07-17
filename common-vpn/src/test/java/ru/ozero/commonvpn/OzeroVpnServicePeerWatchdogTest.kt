@@ -134,7 +134,7 @@ class OzeroVpnServicePeerWatchdogTest {
     }
 
     @Test
-    fun `peerWatchdog НЕ вызывает handleEngineFailure при Failed — бесконечный retry`() {
+    fun `peerWatchdog calls handleEngineFailure after repeated Failed recover`() {
         val body = watchdogSource
             .substringAfter("fun startPeerWatchdog")
             .substringBefore("fun cancelWatchers")
@@ -143,11 +143,11 @@ class OzeroVpnServicePeerWatchdogTest {
             "startPeerWatchdog must read timeout from engine peerWatchdogPolicy, not hardcode engine branches.",
         )
         assertTrue(
-            !body.contains("handleEngineFailure"),
-            "startPeerWatchdog body НЕ должен вызывать handleEngineFailure — юзер хочет бесконечный " +
-                "retry с жёлтой кнопкой. Регрессия 2026-05-20 (da4e2cda): handleEngineFailure → красная " +
-                "кнопка вместо жёлтой. handleEngineFailure живёт только в enterKillswitchMode/health-watcher. " +
-                "Body:\n$body",
+            body.contains("consecutiveRecoverFailures") &&
+                body.contains("PEER_WATCHDOG_MAX_FAILED_RECOVERS") &&
+                body.contains("handleEngineFailure"),
+            "Persistent Failed recover must eventually reach handleEngineFailure so a dead custom-TUN " +
+                "engine cannot stay active forever. Body:\n$body",
         )
     }
 
@@ -180,15 +180,14 @@ class OzeroVpnServicePeerWatchdogTest {
     }
 
     @Test
-    fun `peerWatchdog не имеет жёсткого лимита recover-попыток — бесконечный retry до NotSupported`() {
+    fun `peerWatchdog has bounded Failed recover attempts`() {
         val body = watchdogSource
             .substringAfter("fun startPeerWatchdog")
             .substringBefore("fun cancelWatchers")
         assertTrue(
-            !body.contains("PEER_WATCHDOG_MAX_RECOVERS"),
-            "startPeerWatchdog не должен иметь MAX_RECOVERS лимит — watchdog обязан бесконечно " +
-                "переподключаться пока RecoverResult != NotSupported. Пауза между попытками " +
-                "обеспечена zeroPeersPolls=0 + PEER_WATCHDOG_TIMEOUT_MS. Body:\n$body",
+            body.contains("PEER_WATCHDOG_MAX_FAILED_RECOVERS") && body.contains("consecutiveRecoverFailures"),
+            "startPeerWatchdog must bound consecutive Failed recover attempts before terminal " +
+                "failure handling. Body:\n$body",
         )
     }
 

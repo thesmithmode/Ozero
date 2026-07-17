@@ -9,6 +9,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -565,6 +566,21 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
+    fun `consume restore error clears restore error`() = runTest {
+        val harness = Harness()
+        every { harness.appContext.assets.open("singbox/preset_groups.json") } throws IllegalStateException("missing")
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+
+        harness.viewModel.onRestoreDefaults()
+        advanceUntilIdle()
+        harness.viewModel.consumeRestoreError()
+        advanceUntilIdle()
+
+        assertNull(harness.viewModel.state.value.restoreError)
+    }
+
+    @Test
     fun `import from file with invalid text opens manual dialog with filename default`() = runTest {
         val harness = Harness()
         harness.startStateCollection(backgroundScope)
@@ -663,6 +679,62 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
         assertNull(harness.viewModel.state.value.expandedGroupId)
         coVerify(exactly = 0) { harness.rawUpdater.refresh(any()) }
+    }
+
+    @Test
+    fun `onGroupExpand keeps latest expanded group while earlier load is pending`() = runTest {
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0), group(id = 2L, userOrder = 1)),
+            initialProfiles = listOf(
+                profile(id = 71L, groupId = 1L, name = "First", userOrder = 0),
+                profile(id = 72L, groupId = 2L, name = "Second", userOrder = 0),
+            ),
+        )
+        val firstLoad = CompletableDeferred<Unit>()
+        harness.profileDao.beforeGetByGroupIdLimited = { groupId ->
+            if (groupId == 1L) firstLoad.await()
+        }
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+
+        harness.viewModel.onGroupExpand(1L)
+        runCurrent()
+        harness.viewModel.onGroupExpand(2L)
+        advanceUntilIdle()
+
+        assertEquals(2L, harness.viewModel.state.value.expandedGroupId)
+
+        firstLoad.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(2L, harness.viewModel.state.value.expandedGroupId)
+        assertEquals(listOf(71L), harness.viewModel.state.value.groupProfiles.getValue(1L).map { it.id })
+        assertEquals(listOf(72L), harness.viewModel.state.value.groupProfiles.getValue(2L).map { it.id })
+    }
+
+    @Test
+    fun `onGroupExpand collapses group while profile load is pending`() = runTest {
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0)),
+            initialProfiles = listOf(profile(id = 71L, groupId = 1L, name = "Existing", userOrder = 0)),
+        )
+        val firstLoad = CompletableDeferred<Unit>()
+        harness.profileDao.beforeGetByGroupIdLimited = { firstLoad.await() }
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+
+        harness.viewModel.onGroupExpand(1L)
+        runCurrent()
+        harness.viewModel.onGroupExpand(1L)
+        runCurrent()
+
+        assertNull(harness.viewModel.state.value.expandedGroupId)
+
+        firstLoad.complete(Unit)
+        advanceUntilIdle()
+
+        assertNull(harness.viewModel.state.value.expandedGroupId)
+        assertEquals(listOf(71L), harness.viewModel.state.value.groupProfiles.getValue(1L).map { it.id })
     }
 
     @Test
@@ -1076,6 +1148,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         private val flow: MutableStateFlow<List<ProxyProfile>>,
     ) : ProxyProfileDao {
         val insertedProfiles = mutableListOf<ProxyProfile>()
+        var beforeGetByGroupIdLimited: suspend (Long) -> Unit = {}
 
         override fun getAllFlow(): Flow<List<ProxyProfile>> = flow
 
@@ -1091,8 +1164,10 @@ class SingboxEngineSettingsViewModelCoverageTest {
         override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> =
             flow.value.filter { it.groupId == groupId }
 
-        override suspend fun getByGroupIdLimited(groupId: Long, limit: Int): List<ProxyProfile> =
-            flow.value.filter { it.groupId == groupId }.take(limit)
+        override suspend fun getByGroupIdLimited(groupId: Long, limit: Int): List<ProxyProfile> {
+            beforeGetByGroupIdLimited(groupId)
+            return flow.value.filter { it.groupId == groupId }.take(limit)
+        }
 
         override suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile> =
             flow.value.filter { it.groupId == groupId }.sortedByAutoPriority().take(limit)

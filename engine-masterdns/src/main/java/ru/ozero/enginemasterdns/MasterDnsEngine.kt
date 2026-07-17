@@ -21,6 +21,7 @@ class MasterDnsEngine(
     private val portAllocator: MasterDnsPortAllocator = MasterDnsPortAllocator(),
     private val resolversProvider: () -> List<String> = { emptyList() },
     private val configTomlProvider: () -> String = { "" },
+    private val enabledProvider: () -> Boolean = { false },
     private val startTimeoutMs: Long = START_TIMEOUT_MS,
 ) : EnginePlugin {
 
@@ -42,6 +43,7 @@ class MasterDnsEngine(
     private var activeSocksPort: Int = 0
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
+        if (!enabledProvider()) return null
         val toml = configTomlProvider().trim()
         if (toml.isEmpty()) return null
         return EngineConfig.MasterDns(

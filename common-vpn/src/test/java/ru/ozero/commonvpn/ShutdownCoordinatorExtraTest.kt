@@ -6,10 +6,17 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.ChainOrchestrator
 import java.util.concurrent.atomic.AtomicBoolean
@@ -176,6 +183,20 @@ class ShutdownCoordinatorExtraTest {
     }
 
     @Test
+    fun `performShutdown closes startup lockdown fd on direct lifecycle shutdown`() = runTest {
+        val lockdownFd = mockk<ParcelFileDescriptor>(relaxed = true)
+        val fixture = shutdownFixture(this, sessionId = -1L, lockdownFd = lockdownFd)
+        fixture.state.stopping.set(true)
+
+        fixture.coordinator.performShutdown(callStopSelf = false)
+
+        verify(exactly = 1) { lockdownFd.close() }
+        assertEquals(null, fixture.state.lockdownStartupFdRef.get())
+        verify(exactly = 0) { fixture.stopSelfRequest.invoke(any()) }
+        assertFalse(fixture.state.stopping.get())
+    }
+
+    @Test
     fun `performShutdown with callStopSelf true uses latest start id`() = runTest {
         val fixture = shutdownFixture(this, sessionId = -1L)
 
@@ -185,6 +206,27 @@ class ShutdownCoordinatorExtraTest {
         verify(exactly = 1) { fixture.stopSelfRequest.invoke(42) }
         assertFalse(fixture.state.stopping.get())
         assertFalse(fixture.state.stopSignal.get())
+    }
+
+    @Test
+    fun `performShutdown times out waiting for cancellation resistant startup`() = runTest {
+        val release = CompletableDeferred<Unit>()
+        val startJob = launch {
+            withContext(NonCancellable) { release.await() }
+        }
+        runCurrent()
+        val fixture = shutdownFixture(this, startJob = startJob)
+
+        val shutdown = async { fixture.coordinator.performShutdown(callStopSelf = false) }
+        advanceTimeBy(ShutdownCoordinator.PARALLEL_STOP_TIMEOUT_MS)
+        runCurrent()
+        release.complete(Unit)
+        shutdown.await()
+        startJob.join()
+
+        assertTrue(startJob.isCompleted)
+        verify(exactly = 1) { fixture.stopForegroundRequest.invoke() }
+        verify(exactly = 0) { fixture.stopSelfRequest.invoke(any()) }
     }
 
     private fun shutdownFixture(

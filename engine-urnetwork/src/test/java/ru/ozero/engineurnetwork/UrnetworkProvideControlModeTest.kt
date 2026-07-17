@@ -16,23 +16,23 @@ class UrnetworkProvideControlModeTest {
     }
 
     @Test
-    fun `fromRaw возвращает ALWAYS как дефолт для null`() {
-        assertEquals(UrnetworkProvideControlMode.ALWAYS, UrnetworkProvideControlMode.fromRaw(null))
+    fun `fromRaw возвращает AUTO как дефолт для null`() {
+        assertEquals(UrnetworkProvideControlMode.AUTO, UrnetworkProvideControlMode.fromRaw(null))
     }
 
     @Test
-    fun `fromRaw возвращает ALWAYS как дефолт для пустой строки`() {
-        assertEquals(UrnetworkProvideControlMode.ALWAYS, UrnetworkProvideControlMode.fromRaw(""))
+    fun `fromRaw возвращает AUTO как дефолт для пустой строки`() {
+        assertEquals(UrnetworkProvideControlMode.AUTO, UrnetworkProvideControlMode.fromRaw(""))
     }
 
     @Test
-    fun `fromRaw возвращает ALWAYS как дефолт для неизвестного значения`() {
-        assertEquals(UrnetworkProvideControlMode.ALWAYS, UrnetworkProvideControlMode.fromRaw("xyz"))
+    fun `fromRaw возвращает AUTO как дефолт для неизвестного значения`() {
+        assertEquals(UrnetworkProvideControlMode.AUTO, UrnetworkProvideControlMode.fromRaw("xyz"))
     }
 
     @Test
     fun `fromRaw чувствителен к регистру и возвращает дефолт для AUTO в верхнем регистре`() {
-        assertEquals(UrnetworkProvideControlMode.ALWAYS, UrnetworkProvideControlMode.fromRaw("AUTO"))
+        assertEquals(UrnetworkProvideControlMode.AUTO, UrnetworkProvideControlMode.fromRaw("AUTO"))
     }
 
     @Test

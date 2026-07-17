@@ -86,7 +86,7 @@ class FptnEngineTest {
         assertEquals("10.10.0.1", spec.ipv4Address)
         assertEquals("fd00::1", spec.ipv6Address)
         assertEquals(true, spec.routeAllV4)
-        assertEquals(false, spec.routeAllV6)
+        assertEquals(true, spec.routeAllV6)
     }
 
     @Test
@@ -139,6 +139,15 @@ class FptnEngineTest {
     fun `start with wrong config type returns failure`() = runTest {
         val result = engine.start(EngineConfig.ByeDpi(), Upstream.None)
         assertIs<StartResult.Failure>(result)
+    }
+
+    @Test
+    fun `tunSpec routes IPv6 when IPv6 family is enabled`() = runTest {
+        val spec = engine.tunSpec()
+
+        assertEquals(true, spec.allowFamilyV6)
+        assertNotNull(spec.ipv6Address)
+        assertEquals(true, spec.routeAllV6)
     }
 
     @Test
@@ -548,13 +557,20 @@ class FptnEngineTest {
     @Test
     fun `attachTun maps native create exception to attach failure`() = runTest {
         val ws = FakeWebSocketClient(createFailure = IllegalStateException("create boom"))
+        var outputClosed = false
+        var attachAborted = false
+        val output = object : ByteArrayOutputStream() {
+            override fun close() {
+                outputClosed = true
+            }
+        }
         engine = FptnEngine(
             store,
             wsClient = ws,
             httpsClient = FakeHttpsClient(
                 postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
             ),
-            tunIo = fakeTunIo(),
+            tunIo = fakeTunIo(output = output, onAttachAbort = { attachAborted = true }),
         )
         assertIs<StartResult.Success>(
             engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
@@ -565,18 +581,27 @@ class FptnEngineTest {
         val failure = assertIs<TunAttachResult.Failure>(attach)
         assertTrue(failure.reason.contains("nativeCreate failed"))
         assertEquals(emptyList(), ws.destroyedHandles)
+        assertTrue(outputClosed)
+        assertTrue(attachAborted)
     }
 
     @Test
     fun `attachTun destroys handle when native run throws`() = runTest {
         val ws = FakeWebSocketClient(runFailure = IllegalStateException("run boom"))
+        var outputClosed = false
+        var attachAborted = false
+        val output = object : ByteArrayOutputStream() {
+            override fun close() {
+                outputClosed = true
+            }
+        }
         engine = FptnEngine(
             store,
             wsClient = ws,
             httpsClient = FakeHttpsClient(
                 postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
             ),
-            tunIo = fakeTunIo(),
+            tunIo = fakeTunIo(output = output, onAttachAbort = { attachAborted = true }),
         )
         assertIs<StartResult.Success>(
             engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
@@ -587,6 +612,29 @@ class FptnEngineTest {
         val failure = assertIs<TunAttachResult.Failure>(attach)
         assertTrue(failure.reason.contains("nativeRun failed"))
         assertEquals(listOf(11L), ws.destroyedHandles)
+        assertTrue(outputClosed)
+        assertTrue(attachAborted)
+    }
+
+    @Test
+    fun `attachTun completes fd transfer only after native startup succeeds`() = runTest {
+        var attachCompleted = false
+        engine = FptnEngine(
+            store,
+            wsClient = FakeWebSocketClient(),
+            httpsClient = FakeHttpsClient(
+                postResponses = ArrayDeque(listOf(FptnNativeResponse(200, """{"access_token":"access"}""", ""))),
+            ),
+            tunIo = fakeTunIo(onAttachComplete = { attachCompleted = true }),
+        )
+        assertIs<StartResult.Success>(
+            engine.start(EngineConfig.Fptn(token = "fptn:${validTokenB64(host = "127.0.0.1")}"), Upstream.None),
+        )
+
+        assertIs<TunAttachResult.Success>(engine.attachTun(DETACHED_READ_WRITE_FD))
+
+        assertTrue(attachCompleted)
+        engine.stop()
     }
 
     @Test
@@ -1550,6 +1598,8 @@ class FptnEngineTest {
         inputBytes: ByteArray = ByteArray(0),
         input: InputStream = ByteArrayInputStream(inputBytes),
         output: OutputStream = ByteArrayOutputStream(),
+        onAttachComplete: () -> Unit = {},
+        onAttachAbort: () -> Unit = {},
     ): FptnTunIo =
         object : FptnTunIo {
             override fun open(tunFd: Int): FptnTunStreams =
@@ -1557,6 +1607,8 @@ class FptnEngineTest {
                     pfd = null,
                     input = input,
                     output = output,
+                    onAttachComplete = onAttachComplete,
+                    onAttachAbort = onAttachAbort,
                 )
         }
 

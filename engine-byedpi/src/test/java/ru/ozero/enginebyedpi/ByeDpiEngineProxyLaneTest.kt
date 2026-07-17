@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.parallel.ResourceLock
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.StartResult
+import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -25,7 +26,6 @@ class ByeDpiEngineProxyLaneTest {
         val firstNativeEntered = CountDownLatch(1)
         val firstNativeExit = CountDownLatch(1)
         val recoveryStartEntered = CountDownLatch(1)
-        val retryStartEntered = CountDownLatch(1)
         val calls = AtomicInteger(0)
         val blockingProxy: ByeDpiProxy = mockk(relaxed = true)
         mockkObject(ByeDpiProxy.Companion)
@@ -42,39 +42,34 @@ class ByeDpiEngineProxyLaneTest {
                     recoveryStartEntered.countDown()
                     ByeDpiEngine.JNI_GUARD_BUSY
                 }
-                else -> {
-                    retryStartEntered.countDown()
-                    0
-                }
+                else -> error("unexpected startProxy call")
             }
         }
         every { blockingProxy.stopProxy() } returns 0
         every { blockingProxy.forceClose() } returns 0
-        every { blockingProxy.emergencyReset() } returns 1
         val eng = ByeDpiEngine(
             blockingProxy,
             socksProbe = { _, port, _ ->
                 if (port == 1080) {
                     assertTrue(firstNativeEntered.await(5, TimeUnit.SECONDS))
-                } else if (port == 1081) {
-                    assertTrue(retryStartEntered.await(5, TimeUnit.SECONDS))
+                    1L
+                } else {
+                    throw IOException("refused")
                 }
-                1L
             },
+            readyTotalTimeoutMs = 300,
         )
         runBlocking {
             try {
                 assertIs<StartResult.Success>(eng.start(EngineConfig.ByeDpi(socksPort = 1080)))
-                assertIs<StartResult.Success>(eng.start(EngineConfig.ByeDpi(socksPort = 1081)))
+                assertIs<StartResult.Failure>(eng.start(EngineConfig.ByeDpi(socksPort = 1081)))
             } finally {
                 firstNativeExit.countDown()
                 unmockkObject(ByeDpiProxy.Companion)
             }
         }
         assertTrue(recoveryStartEntered.await(5, TimeUnit.SECONDS))
-        assertTrue(retryStartEntered.await(5, TimeUnit.SECONDS))
-        verify(exactly = 1) { blockingProxy.emergencyReset() }
-        verify(exactly = 3) { blockingProxy.startProxy(any()) }
+        verify(exactly = 2) { blockingProxy.startProxy(any()) }
     }
 
     @Test
@@ -82,7 +77,6 @@ class ByeDpiEngineProxyLaneTest {
         val firstNativeEntered = CountDownLatch(1)
         val firstNativeExit = CountDownLatch(1)
         val recoveryStartEntered = CountDownLatch(1)
-        val retryStartEntered = CountDownLatch(1)
         val calls = AtomicInteger(0)
         val blockingProxy: ByeDpiProxy = mockk(relaxed = true)
         mockkObject(ByeDpiProxy.Companion)
@@ -99,39 +93,34 @@ class ByeDpiEngineProxyLaneTest {
                     recoveryStartEntered.countDown()
                     ByeDpiEngine.JNI_GUARD_BUSY
                 }
-                else -> {
-                    retryStartEntered.countDown()
-                    0
-                }
+                else -> error("unexpected startProxy call")
             }
         }
         every { blockingProxy.stopProxy() } returns 0
         every { blockingProxy.forceClose() } returns 0
-        every { blockingProxy.emergencyReset() } returns 1
         val eng = ByeDpiEngine(
             blockingProxy,
             socksProbe = { _, port, _ ->
                 if (port == 1080) {
                     assertTrue(firstNativeEntered.await(5, TimeUnit.SECONDS))
-                } else if (port == 1081) {
-                    assertTrue(retryStartEntered.await(5, TimeUnit.SECONDS))
+                    1L
+                } else {
+                    throw IOException("refused")
                 }
-                1L
             },
+            readyTotalTimeoutMs = 300,
         )
         runBlocking {
             try {
                 assertIs<StartResult.Success>(eng.start(EngineConfig.ByeDpi(socksPort = 1080)))
                 eng.stop()
-                assertIs<StartResult.Success>(eng.start(EngineConfig.ByeDpi(socksPort = 1081)))
+                assertIs<StartResult.Failure>(eng.start(EngineConfig.ByeDpi(socksPort = 1081)))
             } finally {
                 firstNativeExit.countDown()
                 unmockkObject(ByeDpiProxy.Companion)
             }
         }
         assertTrue(recoveryStartEntered.await(5, TimeUnit.SECONDS))
-        assertTrue(retryStartEntered.await(5, TimeUnit.SECONDS))
-        verify(exactly = 1) { blockingProxy.emergencyReset() }
-        verify(exactly = 3) { blockingProxy.startProxy(any()) }
+        verify(exactly = 2) { blockingProxy.startProxy(any()) }
     }
 }
