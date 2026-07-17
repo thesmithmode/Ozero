@@ -83,5 +83,4 @@ class BootDiagnosticsTombstoneTest {
         check(f.exists()) { "BootDiagnostics.kt не найден: $f" }
         return f.readText()
     }
-
 }
