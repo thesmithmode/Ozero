@@ -45,7 +45,7 @@ bouncycastle = "1.80"
 
 # WorkManager + Hilt-Work (E16.1 PublicProxyHarvester periodic job)
 work = "2.11.2"
-hiltWork = "1.2.0"
+hiltWork = "1.4.0"
 
 # Testing
 junitJupiter = "5.11.0"
