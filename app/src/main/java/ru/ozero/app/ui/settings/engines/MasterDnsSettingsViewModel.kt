@@ -95,6 +95,7 @@ class MasterDnsSettingsViewModel @Inject constructor(
                     logFor(step, host = host)?.let(::appendLog)
                     if (step is MasterDnsDeployState.Removed) {
                         runCatching {
+                            store.setEnabled(false)
                             store.setServerIp("")
                             store.setServerPort(22)
                         }.onFailure { PersistentLoggers.error(TAG, "undeploy persist failed: ${it.message}", it) }
@@ -169,6 +170,7 @@ class MasterDnsSettingsViewModel @Inject constructor(
             store.setServerIp(host)
             store.setServerPort(port)
             store.setResolvers(listOf("$host:$MASTERDNS_DNS_PORT"))
+            store.setEnabled(true)
         }.onFailure { PersistentLoggers.error(TAG, "deploy persist failed: ${it.message}", it) }
         appendLog("✓ Резолверы и client_config записаны автоматически")
     }

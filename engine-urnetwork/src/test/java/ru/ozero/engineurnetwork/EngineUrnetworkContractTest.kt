@@ -25,7 +25,7 @@ class EngineUrnetworkContractTest {
         override: String? = null,
         byJwt: String? = null,
         byClientJwt: String? = null,
-        provideEnabled: Boolean = true,
+        provideEnabled: Boolean = false,
         bridge: FakeUrnetworkSdkBridge = FakeUrnetworkSdkBridge(),
         authService: FakeAuthService = FakeAuthService(),
     ): Triple<EngineUrnetwork, FakeUrnetworkSdkBridge, InMemoryUrnetworkConfigStore> {
@@ -373,11 +373,11 @@ class EngineUrnetworkContractTest {
     }
 
     @Test
-    fun `start с provideEnabled=false всё равно вызывает setProvidePaused(false) на bridge`() = runTest {
+    fun `start с provideEnabled=false сохраняет provider paused`() = runTest {
         val bridge = FakeUrnetworkSdkBridge()
         val (e, _, _) = engine(byJwt = "j", byClientJwt = "cj", provideEnabled = false, bridge = bridge)
         e.start(baseConfig, Upstream.None)
-        assertEquals(false, bridge.lastProvidePaused)
+        assertEquals(true, bridge.lastProvidePaused)
     }
 
     private class FakeAuthService(

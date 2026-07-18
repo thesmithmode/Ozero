@@ -96,8 +96,8 @@ class EngineUrnetworkCoverageTest {
         assertEquals(UrnetworkWindowType.SPEED, bridge.windowType)
         assertEquals(true, bridge.fixedIpSize)
         assertEquals(false, bridge.allowDirect)
-        assertEquals(false, bridge.providePaused)
-        assertEquals(UrnetworkProvideControlMode.ALWAYS, bridge.controlMode)
+        assertEquals(true, bridge.providePaused)
+        assertEquals(UrnetworkProvideControlMode.AUTO, bridge.controlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, bridge.networkMode)
         fixture.close()
     }

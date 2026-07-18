@@ -306,7 +306,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
         if (vc != null) {
             viewModelScope.launch(Dispatchers.Main.immediate) {
                 runCatching { vc.filterLocations(query) }
-                    .onFailure { PersistentLoggers.warn(TAG, "filterLocations($query) threw: ${it.message}") }
+                    .onFailure { PersistentLoggers.warn(TAG, "filterLocations threw: ${it.message}") }
             }
         }
     }
@@ -349,7 +349,7 @@ class UrnetworkLocationsViewModel @Inject constructor(
         Log.i(
             TAG,
             "updateLocations: countries=${allCountries.size} regions=${allRegions.size} " +
-                "cities=${allCities.size} bestMatches=${allBestMatches.size} query='${searchQuery.value}'",
+                "cities=${allCities.size} bestMatches=${allBestMatches.size}",
         )
         applyFilter(searchQuery.value)
     }

@@ -27,6 +27,7 @@ class ConfigBuilderDnsTest {
         assertContains(json, "\"type\":\"https\"")
         assertContains(json, "\"domain_resolver\":\"dns-domain-resolver\"")
         assertContains(json, "\"tag\":\"dns-domain-resolver\"")
+        assertFalse(json.contains("\"detour\":\"proxy\""))
         assertFalse(json.contains("https://dns.example/dns-query"))
     }
 

@@ -65,6 +65,17 @@ class Base64BundleParserTest {
     }
 
     @Test
+    fun `should prefer url-safe decoder when encoded bundle contains url-safe alphabet`() {
+        val link = "$vless1~"
+        val encoded = Base64.getUrlEncoder()
+            .withoutPadding()
+            .encodeToString(link.toByteArray(Charsets.UTF_8))
+        val result = Base64BundleParser.parse(encoded)
+        assertEquals(1, result.size)
+        assertEquals("S1~", result.single().name)
+    }
+
+    @Test
     fun `should handle base64 text that requires padding restoration`() {
         val encoded = encodeBase64(vless1).dropLast(1)
         val result = Base64BundleParser.parse(encoded)

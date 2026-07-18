@@ -530,16 +530,20 @@ private fun ProfileItem(
     }
 }
 
-private data class SingboxProfileDisplay(
+private const val MAX_SINGBOX_PROFILE_DISPLAY_NAME_CHARS = 512
+private const val MAX_SINGBOX_PROFILE_DISPLAY_PARTS = 8
+
+internal data class SingboxProfileDisplay(
     val title: String,
     val subtitle: String,
 )
 
-private fun String.toSingboxProfileDisplay(): SingboxProfileDisplay {
-    val parts = split("|")
+internal fun String.toSingboxProfileDisplay(): SingboxProfileDisplay {
+    val boundedName = take(MAX_SINGBOX_PROFILE_DISPLAY_NAME_CHARS)
+    val parts = boundedName.split("|", limit = MAX_SINGBOX_PROFILE_DISPLAY_PARTS)
         .map { it.trim() }
         .filter { it.isNotEmpty() }
-    if (parts.size < 2) return SingboxProfileDisplay(trim(), "")
+    if (parts.size < 2) return SingboxProfileDisplay(boundedName.trim(), "")
     val sniPart = parts.firstOrNull { it.contains("SNI:", ignoreCase = true) }
     val host = sniPart
         ?.substringAfter("SNI:", "")
@@ -619,6 +623,29 @@ private fun SingboxTopBarActions(
     filePickerLauncher: ManagedActivityResultLauncher<Array<String>, Uri?>,
     onOpenAdvanced: () -> Unit,
 ) {
+    var showAllGroupsProbeDialog by remember { mutableStateOf(false) }
+    if (showAllGroupsProbeDialog) {
+        AlertDialog(
+            onDismissRequest = { showAllGroupsProbeDialog = false },
+            title = { Text(stringResource(R.string.singbox_probe_all_privacy_title)) },
+            text = { Text(stringResource(R.string.singbox_probe_all_privacy_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showAllGroupsProbeDialog = false
+                        viewModel.onPing()
+                    },
+                ) {
+                    Text(stringResource(R.string.singbox_probe_all_privacy_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAllGroupsProbeDialog = false }) {
+                    Text(stringResource(R.string.singbox_cancel))
+                }
+            },
+        )
+    }
     Box {
         IconButton(
             onClick = { viewModel.onShowAddMenu(true) },
@@ -659,7 +686,7 @@ private fun SingboxTopBarActions(
         }
     } else {
         TextButton(
-            onClick = { viewModel.onPing() },
+            onClick = { showAllGroupsProbeDialog = true },
             enabled = state.groups.isNotEmpty(),
             modifier = Modifier.testTag("singbox_ping_all_button"),
         ) {

@@ -172,6 +172,21 @@ class UnifiedLogFileParserTest {
     }
 
     @Test
+    fun `filterByLevel — spoofed level token in continuation does not change filter`() {
+        val text = """
+            2026-05-25 10:00:00.000 DEBUG [T] A: debug start
+            continuation 2026-05-25 10:00:01.000 ERROR fake token
+            debug continuation secret
+            2026-05-25 10:00:02.000 ERROR [T] B: real error
+        """.trimIndent()
+        val filtered = UnifiedLogFileParser.filterByLevel(text, LogLevel.ERROR)
+        assertTrue(!filtered.contains("debug start"))
+        assertTrue(!filtered.contains("fake token"))
+        assertTrue(!filtered.contains("debug continuation secret"))
+        assertTrue(filtered.contains("real error"))
+    }
+
+    @Test
     fun `LogLevel severity order is correct`() {
         assertTrue(LogLevel.TRACE.severity < LogLevel.DEBUG.severity)
         assertTrue(LogLevel.DEBUG.severity < LogLevel.INFO.severity)

@@ -4,6 +4,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.ChainOrchestrator
@@ -61,14 +62,24 @@ class ShutdownCoordinator(
             SessionStatsRecorder.Status.DISCONNECTED
         }
         recordSessionEnd(endStatus)
-        val job = scope.launch { performShutdown(callStopSelf = callStopSelf) }
+        val stopRequestStartId = latestStartIdProvider()
+        val job = scope.launch {
+            performShutdown(
+                callStopSelf = callStopSelf,
+                stopRequestStartId = stopRequestStartId,
+            )
+        }
         state.shutdownJobRef.set(job)
     }
 
-    suspend fun performShutdown(callStopSelf: Boolean = true) {
+    suspend fun performShutdown(
+        callStopSelf: Boolean = true,
+        stopRequestStartId: Int? = null,
+    ) {
         PersistentLoggers.info(TAG, "performShutdown begin")
         try {
             deps.statsLogger.cancel()
+            cancelStartBeforeStopPass()
 
             val chainStopJob = scope.launch {
                 runCatching { deps.chainOrchestrator.stop() }
@@ -97,6 +108,8 @@ class ShutdownCoordinator(
                 Log.i(TAG, "native tunnel stop completed")
             }
 
+            runCatching { state.lockdownStartupFdRef.getAndSet(null)?.close() }
+                .onFailure { PersistentLoggers.warn(TAG, "lockdownStartupFd.close threw: ${it.message}") }
             runCatching { state.tunFdRef.getAndSet(null)?.close() }
                 .onFailure { PersistentLoggers.warn(TAG, "tunFd.close threw: ${it.message}") }
         } finally {
@@ -106,8 +119,16 @@ class ShutdownCoordinator(
             state.stopSignal.set(false)
             state.tunIfaceNameRef.set(null)
             stopForegroundRequest()
-            if (callStopSelf) stopSelfRequest(latestStartIdProvider())
+            if (callStopSelf) stopSelfRequest(stopRequestStartId ?: latestStartIdProvider())
             PersistentLoggers.info(TAG, "performShutdown end")
+        }
+    }
+
+    private suspend fun cancelStartBeforeStopPass() {
+        val startJob = state.startJobRef.getAndSet(null) ?: return
+        val joined = withTimeoutOrNull(PARALLEL_STOP_TIMEOUT_MS) { startJob.cancelAndJoin() }
+        if (joined == null) {
+            PersistentLoggers.warn(TAG, "start sequence cancel hung > ${PARALLEL_STOP_TIMEOUT_MS}ms")
         }
     }
 

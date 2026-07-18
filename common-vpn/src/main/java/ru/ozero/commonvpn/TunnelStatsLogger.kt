@@ -10,7 +10,7 @@ import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-private data class TunnelStatsReadResult(val rxBytes: Long, val txBytes: Long, val source: String) {
+internal data class TunnelStatsReadResult(val rxBytes: Long, val txBytes: Long, val source: String) {
     fun shouldRebaseFrom(
         baseline: TunnelStatsReadResult?,
         previousBySource: TunnelStatsReadResult?,

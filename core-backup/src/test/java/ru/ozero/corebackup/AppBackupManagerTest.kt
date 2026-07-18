@@ -152,8 +152,8 @@ class AppBackupManagerTest {
         assertEquals("quality", data.urnetwork.windowType)
         assertEquals(true, data.urnetwork.fixedIpSize)
         assertEquals(false, data.urnetwork.allowDirect)
-        assertEquals(true, data.urnetwork.provideEnabled)
-        assertEquals("always", data.urnetwork.provideControlMode)
+        assertEquals(false, data.urnetwork.provideEnabled)
+        assertEquals("auto", data.urnetwork.provideControlMode)
         assertEquals("all", data.urnetwork.provideNetworkMode)
         assertEquals("DE", data.urnetwork.selectedLocation?.countryCode)
         assertEquals("Bavaria", data.urnetwork.selectedLocation?.region)
@@ -213,7 +213,7 @@ class AppBackupManagerTest {
             ),
         )
 
-        assertEquals("per_app", data.settings.splitMode)
+        assertNull(data.settings.splitMode)
         assertEquals(false, data.settings.ipv6Enabled)
         assertEquals(true, data.settings.autoStart)
         assertEquals("warp", data.settings.manualEngine)
@@ -307,8 +307,8 @@ class AppBackupManagerTest {
         assertEquals(UrnetworkWindowType.SPEED, cfg.windowType)
         assertEquals(true, cfg.fixedIpSize)
         assertEquals(false, cfg.allowDirect)
-        assertEquals(true, cfg.provideEnabled)
-        assertEquals(UrnetworkProvideControlMode.ALWAYS, cfg.provideControlMode)
+        assertEquals(false, cfg.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.AUTO, cfg.provideControlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, cfg.provideNetworkMode)
         assertEquals("ES", cfg.selectedLocation.countryCode)
         assertEquals("Madrid", cfg.selectedLocation.city)
@@ -396,11 +396,38 @@ class AppBackupManagerTest {
         manager.import(data, setOf(BackupCategory.GENERAL_SETTINGS))
 
         val prefs = ozeroDs.data.first()
-        assertEquals("global", prefs[SettingsKeys.SPLIT_MODE])
+        assertNull(prefs[SettingsKeys.SPLIT_MODE])
         assertEquals("fptn", prefs[SettingsKeys.MANUAL_ENGINE])
         assertEquals("persisted-token", fptnStore.currentConfig().token)
         assertEquals("ignored", prefs[SettingsKeys.CUSTOM_DNS_SERVERS])
         assertNull(prefs[SettingsKeys.URNETWORK_ENABLED])
+    }
+
+    @Test
+    fun `import split mode only when split tunnel category is selected`() = runTest {
+        ozeroDs.edit { it[SettingsKeys.SPLIT_MODE] = "existing" }
+        val data = makeMinimalBackup().copy(
+            settings = BackupSettings(
+                splitMode = "ALLOWLIST",
+                ipv6Enabled = true,
+                autoStart = null,
+                manualEngine = null,
+                bydpiWinningArgs = null,
+                urnetworkEnabled = null,
+                urnetworkJwt = null,
+                customDnsServers = null,
+                hostsMode = null,
+                hostsList = null,
+                uiLocaleTag = null,
+                appMode = null,
+            ),
+        )
+
+        manager.import(data, setOf(BackupCategory.GENERAL_SETTINGS))
+        assertEquals("existing", ozeroDs.data.first()[SettingsKeys.SPLIT_MODE])
+
+        manager.import(data, setOf(BackupCategory.SPLIT_TUNNEL))
+        assertEquals("ALLOWLIST", ozeroDs.data.first()[SettingsKeys.SPLIT_MODE])
     }
 
     @Test
@@ -460,7 +487,7 @@ class AppBackupManagerTest {
         assertEquals(UrnetworkWindowType.QUALITY, cfg.windowType)
         assertEquals(true, cfg.fixedIpSize)
         assertEquals(false, cfg.allowDirect)
-        assertEquals(true, cfg.provideEnabled)
+        assertEquals(false, cfg.provideEnabled)
         assertEquals(UrnetworkProvideControlMode.ALWAYS, cfg.provideControlMode)
         assertEquals(UrnetworkProvideNetworkMode.WIFI, cfg.provideNetworkMode)
         assertEquals(null, cfg.selectedLocation.countryCode)
@@ -623,6 +650,24 @@ class AppBackupManagerTest {
         assertFalse("com.old" in packages)
         assertTrue("com.keep" in packages)
         assertTrue("com.new" in packages)
+    }
+
+    @Test
+    fun `import split tunnel with empty rules clears existing package rules`() = runTest {
+        splitDao.rules.value = listOf(
+            AppSplitRule("com.old", true),
+            AppSplitRule("com.keep", false),
+        )
+        val backup = makeMinimalBackup()
+        val data = backup.copy(
+            settings = backup.settings.copy(splitMode = "ALLOWLIST"),
+            splitRules = emptyList(),
+        )
+
+        manager.import(data, setOf(BackupCategory.SPLIT_TUNNEL))
+
+        assertEquals("ALLOWLIST", ozeroDs.data.first()[SettingsKeys.SPLIT_MODE])
+        assertTrue(splitDao.rules.value.isEmpty())
     }
 
     @Test

@@ -30,12 +30,15 @@ abstract class DownloadBinaryTask : DefaultTask() {
     @get:Input
     abstract val retryDelaysMs: ListProperty<Long>
 
+    @get:Internal
+    internal var lockFileParser: (Path) -> LockFile = { path -> LockFileParser.parse(path) }
+
     @TaskAction
     fun run() {
         val lockPath = lockFile.get().asFile.toPath()
         val lock =
             try {
-                LockFileParser.parse(lockPath)
+                lockFileParser(lockPath)
             } catch (e: LockFileException) {
                 throw GradleException(e.gradleMessage(), e)
             }

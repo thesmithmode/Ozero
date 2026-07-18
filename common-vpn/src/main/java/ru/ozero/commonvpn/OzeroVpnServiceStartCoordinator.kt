@@ -37,11 +37,7 @@ internal class OzeroVpnServiceStartCoordinator(
                     return@launch
                 }
                 if (externalVpnActive) {
-                    PersistentLoggers.warn(
-                        TAG,
-                        "external VPN was active, delaying ${deps.externalVpnReleaseDelayMs}ms before establish",
-                    )
-                    runCatching { delay(deps.externalVpnReleaseDelayMs) }
+                    delay(deps.externalVpnReleaseDelayMs)
                 }
                 deps.startSequence()
             } finally {

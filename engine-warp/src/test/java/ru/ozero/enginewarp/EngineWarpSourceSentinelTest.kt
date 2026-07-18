@@ -56,9 +56,9 @@ class EngineWarpSourceSentinelTest {
             body.contains("PersistentLoggers.trace") && body.contains("warp stats"),
             "stats poll обязан вызывать PersistentLoggers.trace с \"warp stats\" prefix — boot.log readable, не info/warn",
         )
-        assertTrue(
-            body.contains("deltaTx") && body.contains("deltaRx"),
-            "stats log must contain traffic deltas (deltaTx/deltaRx), not only absolute counters.",
+        assertFalse(
+            body.contains("deltaTx") || body.contains("deltaRx") || body.contains("tx=\${") || body.contains("rx=\${"),
+            "stats log must not persist traffic counters or deltas.",
         )
     }
 
@@ -89,6 +89,24 @@ class EngineWarpSourceSentinelTest {
     }
 
     @Test
+    fun `attachTun failure persistent log does not include raw INI`() {
+        val body = source.substringAfter("override suspend fun attachTun(tunFd: Int)")
+            .substringBefore("private fun registerNetworkCallback")
+        assertTrue(
+            body.contains("attachTun failed: ${'$'}{r.reason}; iniBytes="),
+            "attachTun failure log must keep failure reason and non-secret size diagnostics.",
+        )
+        assertFalse(
+            body.contains("\nini:\n"),
+            "Persistent attachTun failure logs must not include raw or partially redacted INI.",
+        )
+        assertFalse(
+            body.contains("maskedIni"),
+            "Partial INI masking is unsafe for raw imported configs with extra secret fields.",
+        )
+    }
+
+    @Test
     fun `sentinel awaitReady при Ready ставит activeConnections=1 — amber flash fix`() {
         val awaitBody = source.substringAfter("override suspend fun awaitReady()")
             .substringBefore("override suspend fun recover()")
@@ -104,6 +122,7 @@ class EngineWarpSourceSentinelTest {
     fun `anchors — все функции-границы существуют в источнике`() {
         listOf(
             "private suspend fun resolveEndpointHost",
+            "private fun resolveViaSystemDns",
             "private fun bootstrapSafeDohUrl",
             "private fun DoHProvider.supportsJsonQueryApi",
             "private fun isIpLiteralDohUrl",
@@ -130,13 +149,22 @@ class EngineWarpSourceSentinelTest {
     }
 
     @Test
-    fun `resolveEndpointHost оборачивает InetAddress getByName в withContext IO`() {
+    fun `resolveEndpointHost выбирает system resolver или bootstrap DoH в Dispatchers IO`() {
         val body = source.substringAfter("private suspend fun resolveEndpointHost")
-            .substringBefore("private fun resolveViaDoH")
+            .substringBefore("private fun resolveViaSystemDns")
+        assertTrue(
+            body.contains("provider.isSystem") && body.contains("resolveViaSystemDns(host)"),
+            "SYSTEM provider must preserve the platform resolver path.",
+        )
         assertTrue(
             body.contains("withContext(Dispatchers.IO)"),
-            "InetAddress.getByName — blocking call, обязан быть в withContext(Dispatchers.IO). " +
-                "Без этого блокирует Dispatchers.Default при system DNS lookup.",
+            "Bootstrap DoH lookup обязан выполняться в Dispatchers.IO.",
+        )
+        val systemResolverBody = source.substringAfter("private fun resolveViaSystemDns")
+            .substringBefore("private fun bootstrapSafeDohUrl")
+        assertTrue(
+            systemResolverBody.contains("InetAddress.getByName"),
+            "SYSTEM provider must resolve through the platform resolver.",
         )
     }
 

@@ -1,7 +1,9 @@
 package ru.ozero.singboxroom
 
 import androidx.room.Room
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.runBlocking
+import java.lang.reflect.Proxy
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -146,9 +148,29 @@ class SubscriptionGroupDaoTest {
         val g = dao.getById(id)!!
         assertEquals("", g.subscriptionUrl)
         assertEquals(false, g.isBuiltin)
-        assertEquals(true, g.autoUpdate)
+        assertEquals(false, g.autoUpdate)
         assertEquals(360, g.autoUpdateDelay)
         assertEquals(0L, g.lastUpdated)
         assertEquals(0, g.userOrder)
+    }
+
+    @Test
+    fun `migration disables auto update only for builtin groups`() {
+        val statements = mutableListOf<String>()
+        val database = Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java),
+        ) { _, method, args ->
+            if (method.name == "execSQL") statements += args?.first() as String
+            null
+        } as SupportSQLiteDatabase
+
+        SingboxDatabase.MIGRATION_2_3.migrate(database)
+
+        assertTrue(
+            statements.contains(
+                "UPDATE `subscription_groups` SET `autoUpdate` = 0 WHERE `isBuiltin` = 1",
+            ),
+        )
     }
 }

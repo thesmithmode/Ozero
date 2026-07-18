@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*.*.*'
-    branches:
-      - main
 
 permissions: {}
 
@@ -21,7 +19,7 @@ jobs:
       tag: ${{ steps.ver.outputs.tag }}
       version: ${{ steps.ver.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Resolve version tag
@@ -50,7 +48,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -69,32 +67,34 @@ jobs:
         with:
           cache-read-only: true
 
-      - name: Cache libhev-ozero-socks5-tunnel.so jniLibs
-        id: libhev-cache
-        uses: actions/cache@v5
-        with:
-          path: common-vpn/src/main/jniLibs/arm64-v8a/libhev-ozero-socks5-tunnel.so
-          key: libhev-ozero-2.7.0-ndk-r27c-platform-android-24-pkgname-hev-16kb-arm64-v1
-
       - name: Setup Android NDK
         id: ndk
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r27c
           add-to-path: false
 
-      - name: Clone hev-socks5-tunnel (pinned)
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
+      - name: Clone hev-socks5-tunnel at verified commit
         env:
+          HEV_REPO: https://github.com/heiher/hev-socks5-tunnel.git
           HEV_VERSION: '2.7.0'
+          HEV_COMMIT_SHA: 54eab54ab4e6e9a708229a89a05578e52074fc6f
         run: |
-          git clone --depth 1 --recursive --branch "$HEV_VERSION" \
-            https://github.com/heiher/hev-socks5-tunnel.git \
-            "$RUNNER_TEMP/hev-socks5-tunnel"
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/hev-socks5-tunnel"
+          git init "$SRC"
+          git -C "$SRC" remote add origin "$HEV_REPO"
+          git -C "$SRC" fetch --no-tags --depth 1 origin "$HEV_COMMIT_SHA"
+          git -C "$SRC" checkout --detach FETCH_HEAD
+          ACTUAL_SHA=$(git -C "$SRC" rev-parse HEAD)
+          if [ "$ACTUAL_SHA" != "$HEV_COMMIT_SHA" ]; then
+            echo "::error::hev-socks5-tunnel $HEV_VERSION resolved to $ACTUAL_SHA, expected $HEV_COMMIT_SHA"
+            exit 1
+          fi
+          git -C "$SRC" submodule update --init --recursive --depth 1
+          echo "hev-socks5-tunnel $HEV_VERSION verified at $ACTUAL_SHA"
 
       - name: Build libhev-ozero-socks5-tunnel.so (arm64-v8a via ndk-build)
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
         run: |
@@ -128,7 +128,6 @@ jobs:
           ls -la "$OUT/arm64-v8a/libhev-ozero-socks5-tunnel.so"
 
       - name: Assert JNI symbols в libhev-ozero-socks5-tunnel.so
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
         run: |
@@ -143,7 +142,6 @@ jobs:
           echo "JNI symbols OK (arm64-v8a)"
 
       - name: Assert PKGNAME=hev зашит в libhev-ozero-socks5-tunnel.so
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           SO="common-vpn/src/main/jniLibs/arm64-v8a/libhev-ozero-socks5-tunnel.so"
@@ -155,7 +153,6 @@ jobs:
           echo "PKGNAME=hev зашит корректно"
 
       - name: Assert 16KB page-size alignment в arm64-v8a libhev
-        if: steps.libhev-cache.outputs.cache-hit != 'true'
         env:
           NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
         run: |
@@ -210,7 +207,8 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber -R "${{ github.repository }}"
+          .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs singbox-core/libs-stubs /tmp/go-stubs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -232,22 +230,69 @@ jobs:
         run: |
           set -euo pipefail
           DST="engine-fptn/src/main/jniLibs/arm64-v8a/libfptn_native_lib.so"
-          if [ -f "$DST" ] && [ "$(stat -c%s "$DST")" -gt 1000 ]; then
-            echo "libfptn_native_lib.so already in repo — skipping download"
-            exit 0
+          eval "$(python3 - <<'PY'
+          import shlex
+          from pathlib import Path
+
+          current = None
+          result = None
+          for raw in Path('build-tools/binaries.lock.yaml').read_text().splitlines():
+              if raw.startswith('  - '):
+                  if current and current.get('engine') == 'fptn' and current.get('name') == 'libfptn_native_lib-arm64-v8a.so':
+                      result = current
+                  current = {}
+                  raw = '    ' + raw[4:]
+              if current is not None and raw.startswith('    ') and ': ' in raw:
+                  key, value = raw.strip().split(': ', 1)
+                  current[key] = value
+          if current and current.get('engine') == 'fptn' and current.get('name') == 'libfptn_native_lib-arm64-v8a.so':
+              result = current
+          if result is None:
+              raise SystemExit('missing fptn lock entry')
+          for key in ('download_url', 'sha256', 'size_bytes', 'source_repo', 'source_commit'):
+              print(f'LOCK_{key.upper()}={shlex.quote(result[key])}')
+          PY
+          )"
+          ASSET="${LOCK_DOWNLOAD_URL##*/}"
+          TAG=$(printf '%s\n' "$LOCK_DOWNLOAD_URL" | sed -E 's#^https://github.com/[^/]+/[^/]+/releases/download/([^/]+)/.*#\1#')
+          if ! printf '%s\n' "$TAG" | grep -Eq '^fptn-[a-f0-9]{8}$'; then
+            echo "::error::invalid fptn lock tag: $TAG"
+            exit 1
           fi
-          TAG=$(gh release list --limit 100 --json tagName \
-            | grep -oE '"fptn-[a-f0-9]{8}"' \
-            | head -n1 | tr -d '"')
-          if [ -z "$TAG" ]; then
-            echo "::error::no fptn release found — run binaries.yml with artifact=fptn first"
+          if [ -f "$DST" ]; then
+            EXISTING_SHA=$(sha256sum "$DST" | awk '{print $1}')
+            if [ "$EXISTING_SHA" = "$LOCK_SHA256" ]; then
+              echo "libfptn_native_lib.so matches lock"
+              exit 0
+            fi
+          fi
+          TMPDIR=$(mktemp -d)
+          gh release download "$TAG" -p "$ASSET" -p "manifest.txt" -D "$TMPDIR" --clobber
+          if ! grep -qx "source_repo=$LOCK_SOURCE_REPO" "$TMPDIR/manifest.txt"; then
+            echo "::error::FPTN manifest source_repo mismatch"
+            exit 1
+          fi
+          if ! grep -qx "source_commit=$LOCK_SOURCE_COMMIT" "$TMPDIR/manifest.txt"; then
+            echo "::error::FPTN manifest source_commit mismatch"
+            exit 1
+          fi
+          if ! grep -qx "$LOCK_SHA256  $ASSET" "$TMPDIR/manifest.txt"; then
+            echo "::error::FPTN manifest sha256 mismatch"
+            exit 1
+          fi
+          ACTUAL_SHA=$(sha256sum "$TMPDIR/$ASSET" | awk '{print $1}')
+          ACTUAL_SIZE=$(stat -c%s "$TMPDIR/$ASSET")
+          if [ "$ACTUAL_SHA" != "$LOCK_SHA256" ]; then
+            echo "::error::FPTN binary sha256 mismatch"
+            exit 1
+          fi
+          if [ "$ACTUAL_SIZE" != "$LOCK_SIZE_BYTES" ]; then
+            echo "::error::FPTN binary size mismatch"
             exit 1
           fi
           mkdir -p "$(dirname "$DST")"
-          gh release download "$TAG" -p "libfptn_native_lib-arm64-v8a.so" \
-            -D /tmp/fptn-dl --clobber
-          cp /tmp/fptn-dl/libfptn_native_lib-arm64-v8a.so "$DST"
-          echo "Downloaded $DST from $TAG"
+          cp "$TMPDIR/$ASSET" "$DST"
+          echo "Downloaded verified $DST from $TAG"
 
       - name: Build signed release APK
         env:
@@ -276,8 +321,8 @@ jobs:
             echo "::error::APK versionCode=$VC ≠ VERSION_CODE=$VC_EXPECTED в gradle.properties"
             exit 1
           fi
-          if [ "$VC" -lt 2211 ]; then
-            echo "::error::APK versionCode=$VC < floor 2211 (v0.2.1 baseline)"
+          if [ "$VC" -lt 2713 ]; then
+            echo "::error::APK versionCode=$VC < floor 2713 (legacy monotonic baseline)"
             exit 1
           fi
           echo "APK versionCode=$VC OK"
@@ -499,7 +544,7 @@ jobs:
 
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: release-all
           merge-multiple: true

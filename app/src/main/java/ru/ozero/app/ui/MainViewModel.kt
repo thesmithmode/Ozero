@@ -312,7 +312,7 @@ class MainViewModel @Inject constructor(
                         val result = resolveIpInfoWithRetry(s.engineId, s.socksPort)
                         when (result) {
                             is IpInfoState.Loaded ->
-                                Log.i(IP_TAG, "resolve ok ip='${result.info.ip}' country=${result.info.country}")
+                                Log.i(IP_TAG, "resolve ok country=${result.info.country}")
                             is IpInfoState.Error ->
                                 PersistentLoggers.warn(IP_TAG, "resolve error: ${result.message}")
                             else -> Unit
@@ -330,12 +330,12 @@ class MainViewModel @Inject constructor(
     fun refreshIpInfo() {
         viewModelScope.launch {
             val s = tunnelController.state.value
-            _ipInfo.value = IpInfoState.Loading
-            _ipInfo.value = if (s is TunnelState.Connected) {
-                resolveIpInfoWithRetry(s.engineId, s.socksPort)
-            } else {
-                resolveOnce(engineId = null, socksPort = 0)
+            if (s !is TunnelState.Connected) {
+                _ipInfo.value = IpInfoState.Idle
+                return@launch
             }
+            _ipInfo.value = IpInfoState.Loading
+            _ipInfo.value = resolveIpInfoWithRetry(s.engineId, s.socksPort)
         }
     }
 

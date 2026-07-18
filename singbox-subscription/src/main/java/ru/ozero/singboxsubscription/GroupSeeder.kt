@@ -25,15 +25,19 @@ class GroupSeeder(
             if (!seenUrls.add(preset.url)) {
                 return@forEachIndexed
             }
-            if (dao.getByUrl(preset.url) == null) {
+            val existing = dao.getByUrl(preset.url)
+            if (existing == null) {
                 dao.insert(
                     SubscriptionGroup(
                         name = preset.name,
                         subscriptionUrl = preset.url,
                         isBuiltin = true,
+                        autoUpdate = false,
                         userOrder = index,
                     ),
                 )
+            } else if (existing.isBuiltin && existing.autoUpdate) {
+                dao.update(existing.copy(autoUpdate = false))
             }
         }
     }

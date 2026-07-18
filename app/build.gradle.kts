@@ -1,9 +1,13 @@
-val gitVersionName: String = providers.environmentVariable("OZERO_VERSION_NAME")
-    .orNull?.removePrefix("v")?.ifEmpty { null }
-    ?: providers.exec {
+fun gitVersionNameFromGit(): String = runCatching {
+    providers.exec {
         commandLine("git", "describe", "--tags", "--match", "v*.*.*", "--abbrev=0")
         isIgnoreExitValue = true
     }.standardOutput.asText.get().trim().removePrefix("v").ifEmpty { "0.0.0" }
+}.getOrDefault("0.0.0")
+
+val gitVersionName: String = providers.environmentVariable("OZERO_VERSION_NAME")
+    .orNull?.removePrefix("v")?.ifEmpty { null }
+    ?: gitVersionNameFromGit()
 
 val gitVersionCode: Int = (findProperty("VERSION_CODE") as? String)?.toInt()
     ?: error("VERSION_CODE not set in gradle.properties")

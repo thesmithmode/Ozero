@@ -93,15 +93,13 @@ class BootDiagnosticsDumpExitReasonsTest {
         val log = BootFileLogger.read()
         assertTrue(log.contains("exitReasons count=3"))
         assertTrue(log.contains("exit pid=111 reason=CRASH_NATIVE"))
-        assertTrue(log.contains("tombstone saved pid=111"))
+        assertTrue(log.contains("tombstone pid=111 bytes=6"))
         assertTrue(log.contains("exit pid=222 reason=CRASH_JVM"))
         assertTrue(log.contains("trace pid=222"))
         assertTrue(log.contains("exit pid=333 reason=SIGNALED"))
         assertTrue(log.contains("signaled pid=333 signal=SIGKILL(9)"))
 
-        val saved = File(File(filesDir, "debug"), "tombstone-111-2222.pb")
-        assertTrue(saved.exists())
-        assertTrue(saved.readBytes().contentEquals(nativeBytes))
+        assertFalse(log.contains("tombstone saved"))
     }
 
     private fun mockContext(filesDir: File): Context {

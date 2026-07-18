@@ -2090,6 +2090,64 @@ class StartSequenceCoordinatorExtraTest {
         verify(exactly = 1) { fixture.engineWatchdog.handleEngineFailure(EngineId.WARP, "custom start failed") }
     }
 
+    @Test
+    fun `custom tun stopping during attach closes owned tun and stops chain`() = runTest {
+        lateinit var fixture: StartFixture
+        val engine = FakeTunEnginePlugin(
+            id = EngineId.WARP,
+            attachResult = TunAttachResult.Success,
+            onAttach = { fixture.state.stopping.set(true) },
+        )
+        fixture = startFixture(
+            engine,
+            settings = SettingsModel(
+                trafficMode = TrafficMode.TUN,
+                manualEngine = EngineId.WARP,
+            ),
+        )
+        val tunFd = mockTunFd(rawFd = 75, dupFd = 175)
+        every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), false) } returns mockTunBuilder(tunFd)
+
+        fixture.coordinator.run()
+
+        verify(exactly = 1) { tunFd.close() }
+        assertEquals(1, engine.stopCalls)
+        assertFalse(fixture.stopRequested.get())
+    }
+
+    @Test
+    fun `private traffic predicates cover retry and capability boundaries`() {
+        val proxyEngine = FakeEnginePlugin(
+            id = EngineId.BYEDPI,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            proxyEngine,
+            settings = SettingsModel(trafficMode = TrafficMode.PROXY),
+        )
+        val preserve = StartSequenceCoordinator::class.java.getDeclaredMethod(
+            "shouldPreserveTunOnAutoRetry",
+            EngineId::class.java,
+            Boolean::class.javaPrimitiveType!!,
+            TrafficMode::class.java,
+            Boolean::class.javaPrimitiveType!!,
+        ).apply { isAccessible = true }
+        val allowed = StartSequenceCoordinator::class.java.getDeclaredMethod(
+            "engineAllowedForTrafficMode",
+            EngineId::class.java,
+            TrafficMode::class.java,
+        ).apply { isAccessible = true }
+
+        assertTrue(preserve.invoke(fixture.coordinator, null, false, TrafficMode.TUN, true) as Boolean)
+        assertFalse(preserve.invoke(fixture.coordinator, EngineId.BYEDPI, false, TrafficMode.TUN, true) as Boolean)
+        assertFalse(preserve.invoke(fixture.coordinator, null, true, TrafficMode.TUN, true) as Boolean)
+        assertFalse(preserve.invoke(fixture.coordinator, null, false, TrafficMode.PROXY, true) as Boolean)
+        assertFalse(preserve.invoke(fixture.coordinator, null, false, TrafficMode.TUN, false) as Boolean)
+        assertTrue(allowed.invoke(fixture.coordinator, EngineId.WARP, TrafficMode.TUN) as Boolean)
+        assertTrue(allowed.invoke(fixture.coordinator, EngineId.BYEDPI, TrafficMode.PROXY) as Boolean)
+        assertFalse(allowed.invoke(fixture.coordinator, EngineId.WARP, TrafficMode.PROXY) as Boolean)
+    }
+
     private fun startFixture(
         vararg engines: EnginePlugin,
         settings: SettingsModel,
@@ -2308,6 +2366,7 @@ class StartSequenceCoordinatorExtraTest {
             dnsServers = listOf("1.1.1.1"),
         ),
         private val attachThrows: Boolean = false,
+        private val onAttach: () -> Unit = {},
     ) : EnginePlugin, TunFdAcceptor {
         override val capabilities = EngineCapabilities(
             supportsTcp = true,
@@ -2343,6 +2402,7 @@ class StartSequenceCoordinatorExtraTest {
 
         override suspend fun attachTun(tunFd: Int): TunAttachResult {
             attachedFds += tunFd
+            onAttach()
             if (attachThrows) error("attach down")
             return attachResult
         }

@@ -105,8 +105,8 @@ class StartSequenceCoordinatorContractTest {
     fun `run ветка killswitch строит instant lockdown TUN ДО pickAuto`() {
         val body = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
         val killswitchIdx = body.indexOf("if (trafficMode == TrafficMode.TUN && killswitch) {")
-        val pickIdx = body.indexOf("autoCandidatesWithPreflight(")
-        assertTrue(killswitchIdx in 0 until pickIdx, "Killswitch lockdown TUN строится ДО pickAuto.")
+        val pickIdx = body.indexOf("val autoPicks =")
+        assertTrue(killswitchIdx in 0 until pickIdx, "Killswitch lockdown TUN строится ДО auto pick.")
         assertTrue(
             body.contains("state.lockdownStartupFdRef.set(fd)"),
             "Killswitch ветка обязана сохранять lockdownStartupFdRef.",
@@ -152,13 +152,14 @@ class StartSequenceCoordinatorContractTest {
     }
 
     @Test
-    fun `autoCandidatesWithPreflight использует no-op SocketProtector`() {
-        val body = source.substringAfter("private suspend fun autoCandidatesWithPreflight(")
-            .substringBefore("private suspend fun establishTunForEngine(")
-        assertTrue(
-            body.contains("SocketProtector { _ -> true }"),
-            "preflight обязан использовать no-op protector — TUN ещё не создан на момент preflight.",
-        )
+    fun `autoCandidatesWithPreflight используется только в PROXY auto-mode`() {
+        val runBody = source.substringAfter("suspend fun run(").substringBefore("suspend fun engineNeedsCustomTun(")
+        val tunGateIdx = runBody.indexOf("if (trafficMode == TrafficMode.TUN)")
+        val plainAutoIdx = runBody.indexOf("autoCandidates(effectiveSettings, trafficMode)")
+        val preflightIdx = runBody.indexOf("autoCandidatesWithPreflight(effectiveSettings, trafficMode)")
+        assertTrue(tunGateIdx >= 0, "TUN/PROXY gate не найден в run.")
+        assertTrue(plainAutoIdx in tunGateIdx until preflightIdx, "TUN auto-mode должен идти без preflight.")
+        assertTrue(preflightIdx > plainAutoIdx, "Preflight должен остаться только в PROXY ветке.")
     }
 
     @Test
@@ -244,6 +245,45 @@ class StartSequenceCoordinatorContractTest {
         assertTrue(
             body.contains("resetAfterAutoCandidateFailure"),
             "после runtime fail auto-mode обязан сбросить transient state перед следующим candidate.",
+        )
+    }
+
+    @Test
+    fun `auto-mode TUN killswitch retry preserves active TUN until next candidate`() {
+        val runBody = source.substringAfter("suspend fun run(").substringBefore("private suspend fun runSingleProxy(")
+        assertTrue(
+            runBody.contains("shouldPreserveTunOnAutoRetry(manualEngine, isLast, trafficMode, killswitch)"),
+            "non-final auto retry должен вычислять preserveTunOnFailure только для effective TUN killswitch.",
+        )
+        val preserveBody = source.substringAfter("private fun shouldPreserveTunOnAutoRetry(")
+            .substringBefore("private fun autoCandidates(")
+        assertTrue(
+            preserveBody.contains("manualEngine == null") &&
+                preserveBody.contains("!isLast") &&
+                preserveBody.contains("trafficMode == TrafficMode.TUN") &&
+                preserveBody.contains("killswitch"),
+            "preserveTunOnFailure должен включаться только для non-final auto TUN killswitch retry.",
+        )
+        assertTrue(
+            runBody.contains("preserveTunOnFailure = preserveTunOnFailure"),
+            "runtime failure path обязан получать preserveTunOnFailure до attach/awaitReady ошибок.",
+        )
+        assertTrue(
+            runBody.contains("resetAfterAutoCandidateFailure(pick.first, preserveTunOnFailure)"),
+            "reset между auto candidates не должен безусловно закрывать активный TUN при killswitch.",
+        )
+        val resetBody = source.substringAfter("private suspend fun resetAfterAutoCandidateFailure(")
+            .substringBefore("companion object")
+        val guardedClose = "if (!preserveTunOnFailure) runCatching { state.tunFdRef.getAndSet(null)?.close() }"
+        assertTrue(
+            resetBody.contains(guardedClose),
+            "killswitch retry обязан сохранять текущий TUN до establish следующего candidate.",
+        )
+        val routeBody = source.substringAfter("private suspend fun routeTrafficForEngine(")
+            .substringBefore("private suspend fun startNativeTunnel(")
+        assertTrue(
+            routeBody.contains(guardedClose),
+            "attachTun failure не должен открывать bypass gap при non-final auto killswitch retry.",
         )
     }
 

@@ -27,13 +27,21 @@ object Sha256Verifier {
         return md.digest().joinToString("") { "%02x".format(it) }
     }
 
-    fun verifyAndMove(temp: Path, finalDst: Path, expectedSha256: String) {
-        val actual = Files.newInputStream(temp).use { streamingHash(it) }
+    fun verify(path: Path, expectedSha256: String) {
+        val actual = Files.newInputStream(path).use { streamingHash(it) }
         if (actual != expectedSha256) {
-            Files.deleteIfExists(temp)
             throw IntegrityException(
-                "SHA256 mismatch for ${finalDst.fileName}: expected=$expectedSha256, actual=$actual",
+                "SHA256 mismatch for ${path.fileName}: expected=$expectedSha256, actual=$actual",
             )
+        }
+    }
+
+    fun verifyAndMove(temp: Path, finalDst: Path, expectedSha256: String) {
+        try {
+            verify(temp, expectedSha256)
+        } catch (e: IntegrityException) {
+            Files.deleteIfExists(temp)
+            throw e
         }
         Files.createDirectories(finalDst.parent)
         Files.move(temp, finalDst, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)

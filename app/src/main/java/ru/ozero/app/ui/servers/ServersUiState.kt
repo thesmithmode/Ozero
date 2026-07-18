@@ -15,6 +15,11 @@ sealed interface ServersUiState {
         val entry: ServerEntity? get() = servers.firstOrNull { it.id == entryId }
         val exit: ServerEntity? get() = servers.firstOrNull { it.id == exitId }
         val canSave: Boolean
-            get() = entry != null && exit != null && entryId != exitId
+            get() = entry?.supportsDoubleHop == true &&
+                exit?.supportsDoubleHop == true &&
+                entryId != exitId
     }
 }
+
+private val ServerEntity.supportsDoubleHop: Boolean
+    get() = protocol == "vless"

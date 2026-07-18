@@ -24,22 +24,23 @@ class SharedPrefsStrategyTestSettingsStore(context: Context) : StrategyTestSetti
         evolutionMutationRate = prefs.getFloat(KEY_EVOLUTION_MUTATION_RATE, 0.2f),
         evolutionEliteCount = prefs.getInt(KEY_EVOLUTION_ELITE_COUNT, 5),
         evolutionTargetFitness = prefs.getFloat(KEY_EVOLUTION_TARGET_FITNESS, 0.85f),
-    )
+    ).normalized()
 
     override fun save(settings: StrategyTestSettings) {
+        val normalized = settings.normalized()
         prefs.edit()
-            .putInt(KEY_REQUESTS_PER_DOMAIN, settings.requestsPerDomain)
-            .putInt(KEY_CONCURRENT_LIMIT, settings.concurrentLimit)
-            .putInt(KEY_TIMEOUT_SECONDS, settings.timeoutSeconds)
-            .putLong(KEY_DELAY_BETWEEN_MS, settings.delayBetweenMs)
-            .putBoolean(KEY_USE_CUSTOM, settings.useCustomStrategies)
-            .putString(KEY_CUSTOM_STRATEGIES, settings.customStrategies.take(MAX_CUSTOM_STRATEGIES_LEN))
-            .putBoolean(KEY_EVOLUTION_MODE, settings.evolutionMode)
-            .putInt(KEY_EVOLUTION_POPULATION_SIZE, settings.evolutionPopulationSize)
-            .putInt(KEY_EVOLUTION_MAX_GENERATIONS, settings.evolutionMaxGenerations)
-            .putFloat(KEY_EVOLUTION_MUTATION_RATE, settings.evolutionMutationRate)
-            .putInt(KEY_EVOLUTION_ELITE_COUNT, settings.evolutionEliteCount)
-            .putFloat(KEY_EVOLUTION_TARGET_FITNESS, settings.evolutionTargetFitness)
+            .putInt(KEY_REQUESTS_PER_DOMAIN, normalized.requestsPerDomain)
+            .putInt(KEY_CONCURRENT_LIMIT, normalized.concurrentLimit)
+            .putInt(KEY_TIMEOUT_SECONDS, normalized.timeoutSeconds)
+            .putLong(KEY_DELAY_BETWEEN_MS, normalized.delayBetweenMs)
+            .putBoolean(KEY_USE_CUSTOM, normalized.useCustomStrategies)
+            .putString(KEY_CUSTOM_STRATEGIES, normalized.customStrategies.take(MAX_CUSTOM_STRATEGIES_LEN))
+            .putBoolean(KEY_EVOLUTION_MODE, normalized.evolutionMode)
+            .putInt(KEY_EVOLUTION_POPULATION_SIZE, normalized.evolutionPopulationSize)
+            .putInt(KEY_EVOLUTION_MAX_GENERATIONS, normalized.evolutionMaxGenerations)
+            .putFloat(KEY_EVOLUTION_MUTATION_RATE, normalized.evolutionMutationRate)
+            .putInt(KEY_EVOLUTION_ELITE_COUNT, normalized.evolutionEliteCount)
+            .putFloat(KEY_EVOLUTION_TARGET_FITNESS, normalized.evolutionTargetFitness)
             .apply()
     }
 

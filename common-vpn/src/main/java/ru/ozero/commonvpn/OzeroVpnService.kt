@@ -62,7 +62,7 @@ class OzeroVpnService : android.net.VpnService() {
     internal var processKiller: ProcessKiller = ProcessKiller { pid -> Process.killProcess(pid) }
 
     private val notificationFactory: OzeroNotificationFactory by lazy {
-        OzeroNotificationFactory(this, OzeroVpnService::class.java)
+        OzeroNotificationFactory(this)
     }
     private val tunBuilderHelper: TunBuilderHelper by lazy { TunBuilderHelper(this) }
     private val statsLogger: TunnelStatsLogger by lazy {
@@ -111,6 +111,7 @@ class OzeroVpnService : android.net.VpnService() {
             enginePlugins = enginePlugins,
             tunnelController = tunnelController,
             chainOrchestrator = chainOrchestrator,
+            tunnelGateway = tunnelGateway,
             notificationFactory = notificationFactory,
             tunFdRef = tunFdRef,
             lockdownStartupFdRef = lockdownStartupFdRef,

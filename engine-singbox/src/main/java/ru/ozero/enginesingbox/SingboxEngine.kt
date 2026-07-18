@@ -634,7 +634,7 @@ class SingboxEngine @Inject constructor(
     private fun chainWrapperBlobs(selectedProfileId: Long?): List<ByteArray> {
         val selected = selectedProfileId ?: return emptyList()
         if (selected == SELECTED_AUTO) return emptyList()
-        return cachedChainProfileIds
+        return chainProfileIdsBlocking()
             .filter { it != selected }
             .mapNotNull { id -> cachedProfilesById[id]?.beanBlob ?: resolveProfileByIdBlocking(id)?.beanBlob }
     }
@@ -648,18 +648,24 @@ class SingboxEngine @Inject constructor(
         }
 
     private fun supportedBeans(blobs: List<ByteArray>): List<AbstractBean> =
-        blobs.mapNotNull { blob ->
-            runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
-                .onFailure { e -> PersistentLoggers.warn(TAG, "bean deserialize: ${e.message}") }
-                .getOrNull()
-                ?.takeIf { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
-        }
+        blobs.asSequence()
+            .filter { it.size <= MAX_AUTO_SELECT_BLOB_BYTES }
+            .take(MAX_AUTO_SELECT_OUTBOUNDS)
+            .mapNotNull { blob ->
+                runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
+                    .onFailure { e -> PersistentLoggers.warn(TAG, "bean deserialize: ${e.message}") }
+                    .getOrNull()
+                    ?.takeIf { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
+            }
+            .toList()
 
-    private fun isSupportedRoutableBlob(blob: ByteArray): Boolean =
-        runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
+    private fun isSupportedRoutableBlob(blob: ByteArray): Boolean {
+        if (blob.size > MAX_AUTO_SELECT_BLOB_BYTES) return false
+        return runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
             .getOrNull()
             ?.let { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
             ?: false
+    }
 
     private fun autoSelectBlobWindow(profiles: List<ProxyProfile>): List<ByteArray> =
         profiles
@@ -669,6 +675,13 @@ class SingboxEngine @Inject constructor(
 
     private fun resolveProfileByIdBlocking(id: Long): ProxyProfile? =
         runBlocking(Dispatchers.IO) { profileDao.getById(id) }
+
+    private fun chainProfileIdsBlocking(): List<Long> =
+        cachedChainProfileIds.ifEmpty {
+            runBlocking(Dispatchers.IO) {
+                proxyChainDao.getAll().map { it.profileId }
+            }
+        }
 
     private fun AbstractBean.hasRoutableServerAddress(): Boolean {
         val host = serverAddress.trim().trim('[', ']').lowercase()
@@ -808,6 +821,7 @@ class SingboxEngine @Inject constructor(
         private const val READY_PROBE_ATTEMPTS = 5
         private const val READY_PROBE_RETRY_MS = 500L
         private const val MAX_AUTO_SELECT_OUTBOUNDS = 50
+        private const val MAX_AUTO_SELECT_BLOB_BYTES = 64 * 1024
         private const val MAX_AUTO_PROFILE_SCAN = 2_000
         private const val CHAIN_PORT_BASE = 49408
         private const val CHAIN_PORT_RANGE = 256

@@ -391,7 +391,7 @@ class EngineWarp(
                 TunAttachResult.Success
             }
             is WarpSdkBridge.AttachResult.Failed -> {
-                PersistentLoggers.error(TAG, "attachTun failed: ${r.reason}")
+                PersistentLoggers.error(TAG, "attachTun failed: ${r.reason}; iniBytes=${ini.toByteArray().size}")
                 TunAttachResult.Failure(r.reason)
             }
         }
@@ -412,8 +412,6 @@ class EngineWarp(
     private fun startStatsPoll(uapiPath: String) {
         statsJobRef.getAndSet(null)?.cancel()
         val job = ownedScope.launch {
-            var prevRx = 0L
-            var prevTx = 0L
             var tick = 0
             var consecutiveNullReads = 0
             try {
@@ -436,15 +434,10 @@ class EngineWarp(
                         )
                         tick += 1
                         if (tick % STATS_LOG_EVERY == 0) {
-                            val dRx = state.rxBytes - prevRx
-                            val dTx = state.txBytes - prevTx
                             PersistentLoggers.trace(
                                 TAG,
-                                "warp stats tx=${state.txBytes}B rx=${state.rxBytes}B " +
-                                    "deltaTx=${dTx}B deltaRx=${dRx}B hsAge=${ageS ?: "never"}s",
+                                "warp stats handshakeRecent=$handshakeRecent activeConnections=${_stats.value.activeConnections}",
                             )
-                            prevRx = state.rxBytes
-                            prevTx = state.txBytes
                         }
                     } else {
                         consecutiveNullReads += 1
@@ -584,22 +577,27 @@ class EngineWarp(
         val provider = cfg.doHProvider
         Log.i(TAG, "resolveEndpointHost host=$host provider=${provider.name}")
         for (attempt in 0..2) {
-            val resolved = if (provider.isSystem) {
-                withContext(Dispatchers.IO) {
-                    runCatching { java.net.InetAddress.getByName(host).hostAddress }.getOrNull()
+            val resolved = withContext(Dispatchers.IO) {
+                if (provider.isSystem) {
+                    resolveViaSystemDns(host)
+                } else {
+                    resolveViaDoH(host, bootstrapSafeDohUrl(provider))
                 }
-            } else {
-                withContext(Dispatchers.IO) { resolveViaDoH(host, bootstrapSafeDohUrl(provider)) }
             }
             if (!resolved.isNullOrBlank()) {
                 Log.i(TAG, "endpoint resolved $host -> $resolved via ${provider.name} (attempt ${attempt + 1})")
-                return cfg.copy(peerEndpoint = "$resolved:$port")
+                val endpointHost = if (resolved.contains(':')) "[$resolved]" else resolved
+                return cfg.copy(peerEndpoint = "$endpointHost:$port")
             }
             if (attempt < 2) delay(200L shl attempt)
         }
         PersistentLoggers.warn(TAG, "endpoint resolve failed after 3 attempts for $host via ${provider.name}")
         return cfg
     }
+
+    private fun resolveViaSystemDns(host: String): String? = runCatching {
+        java.net.InetAddress.getByName(host).hostAddress
+    }.getOrNull()
 
     private fun bootstrapSafeDohUrl(provider: DoHProvider): String =
         provider.url.takeIf { provider.supportsJsonQueryApi() && isIpLiteralDohUrl(it) } ?: BOOTSTRAP_DOH_URL
@@ -621,12 +619,26 @@ class EngineWarp(
             conn.connectTimeout = DOH_CONNECT_TIMEOUT_MS
             conn.readTimeout = DOH_READ_TIMEOUT_MS
             if (conn.responseCode != 200) return@runCatching null
-            val body = conn.inputStream.bufferedReader().readText()
+            val contentLength = conn.contentLengthLong
+            if (contentLength > DOH_MAX_RESPONSE_BYTES) return@runCatching null
+            val body = conn.inputStream.bufferedReader().use { it.readBounded(DOH_MAX_RESPONSE_BYTES) }
+                ?: return@runCatching null
             Regex("\"data\"\\s*:\\s*\"([0-9]{1,3}(?:\\.[0-9]{1,3}){3})\"").find(body)?.groupValues?.get(1)
         } finally {
             conn.disconnect()
         }
     }.getOrNull()
+
+    private fun java.io.Reader.readBounded(maxChars: Int): String? {
+        val out = StringBuilder()
+        val buffer = CharArray(1024)
+        while (true) {
+            val read = read(buffer)
+            if (read < 0) return out.toString()
+            if (out.length + read > maxChars) return null
+            out.append(buffer, 0, read)
+        }
+    }
 
     private fun applyEndpointToRawIni(rawIni: String, resolvedEndpoint: String): String =
         rawIni.lineSequence().joinToString("\n") { line ->
@@ -672,6 +684,7 @@ class EngineWarp(
         const val TUNNEL_NAME = "ozero-warp"
         const val DOH_CONNECT_TIMEOUT_MS = 3_000
         const val DOH_READ_TIMEOUT_MS = 3_000
+        const val DOH_MAX_RESPONSE_BYTES = 65_536
         const val BOOTSTRAP_DOH_URL = "https://1.1.1.1/dns-query"
         const val WARP_IPV6_BLACKHOLE_ADDRESS = "fd00::1"
         const val WARP_IPV6_BLACKHOLE_PREFIX = 128

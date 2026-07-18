@@ -42,7 +42,9 @@ class UrnetworkRelayCoordinatorTest {
     @BeforeEach
     fun setUp() {
         tunnelStateFlow = MutableStateFlow(TunnelState.Idle)
-        configStore = InMemoryUrnetworkConfigStore(UrnetworkConfig(walletOverride = "test-wallet"))
+        configStore = InMemoryUrnetworkConfigStore(
+            UrnetworkConfig(walletOverride = "test-wallet", provideEnabled = true),
+        )
         bridge = FakeBridge()
         bootstrapper = FakeJwtBootstrapper()
 
@@ -124,73 +126,77 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay передаёт setProvidePaused false даже когда configStore был выключен`() = relayTest {
+    fun `relay не запускается без явного opt in`() = relayTest {
         setByClientJwt("test-jwt")
         configStore.update { it.copy(provideEnabled = false) }
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        assertEquals(1, bridge.startCalls)
-        assertEquals(false, bridge.lastProvidePaused)
+        assertEquals(0, bridge.startCalls)
+        assertEquals(0, bridge.setProvidePausedCalls)
     }
 
     @Test
-    fun `relay не запускает bridge если JWT null но триггерит bootstrap`() = relayTest {
+    fun `relay запускает bootstrap но не bridge без JWT`() = relayTest {
         setByClientJwt(null)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        assertEquals(0, bridge.startCalls, "без JWT bridge.start не зовётся пока bootstrap не закончит")
+        assertEquals(0, bridge.startCalls)
         assertEquals(0, bridge.setProvidePausedCalls)
-        assertEquals(1, bootstrapper.calls, "missing JWT при не-URnetwork engine → bootstrapper вызван")
+        assertEquals(0, bridge.connectBestAvailableCalls)
+        assertEquals(1, bootstrapper.calls)
     }
 
     @Test
-    fun `bootstrap acquires JWT и затем relay стартует когда JWT появился через configStore`() = relayTest {
+    fun `bootstrap не запускается до opt in`() = relayTest {
+        configStore.update { it.copy(provideEnabled = false) }
+        setByClientJwt(null)
+        tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+
+        assertEquals(0, bootstrapper.calls)
+    }
+
+    @Test
+    fun `bootstrap сохраняет JWT и запускает relay`() = relayTest {
         bootstrapper.onCallSetJwt("bootstrapped-jwt", configStore)
         setByClientJwt(null)
-
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        assertEquals(1, bootstrapper.calls, "bootstrap вызван")
-        assertEquals(1, bridge.startCalls, "после acquire через configStore distinct emit → bridge.start")
+        assertEquals(1, bootstrapper.calls)
+        assertEquals(1, bridge.startCalls)
     }
 
     @Test
-    fun `bootstrap не зовётся повторно в одной tunnel session`() = relayTest {
+    fun `bootstrap выполняется один раз за tunnel session`() = relayTest {
         setByClientJwt(null)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
-        tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
-        tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+        tunnelStateFlow.value = TunnelState.Connected(EngineId.WARP, socksPort = 0)
 
-        assertEquals(1, bootstrapper.calls, "не thrash: один acquire на session")
+        assertEquals(1, bootstrapper.calls)
     }
 
     @Test
-    fun `bootstrap session flag сбрасывается на disconnect — позволяет retry на следующем reconnect`() =
-        relayTest {
-            setByClientJwt(null)
-            tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
-            assertEquals(1, bootstrapper.calls)
+    fun `bootstrap снова разрешен после disconnect`() = relayTest {
+        setByClientJwt(null)
+        tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+        tunnelStateFlow.value = TunnelState.Idle
+        tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-            tunnelStateFlow.value = TunnelState.Idle
-            tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
-
-            assertEquals(2, bootstrapper.calls, "новая session после disconnect → retry разрешён")
-        }
+        assertEquals(2, bootstrapper.calls)
+    }
 
     @Test
-    fun `bootstrap не зовётся когда URnetwork engine активен — он сам acquires`() = relayTest {
+    fun `bootstrap не дублирует запуск активного URnetwork`() = relayTest {
         setByClientJwt(null)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.URNETWORK, socksPort = 0)
 
-        assertEquals(0, bootstrapper.calls, "URnetwork engine.start сам делает acquire — coordinator не дублирует")
+        assertEquals(0, bootstrapper.calls)
     }
 
     @Test
-    fun `bootstrap не зовётся когда JWT уже есть`() = relayTest {
+    fun `relay стартует когда JWT уже есть`() = relayTest {
         setByClientJwt("existing-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        assertEquals(0, bootstrapper.calls, "JWT уже есть → coordinator стартует bridge без bootstrap")
         assertEquals(1, bridge.startCalls)
     }
 
@@ -239,11 +245,11 @@ class UrnetworkRelayCoordinatorTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        advanceTimeBy(35_000L)
+        advanceTimeBy(125_000L)
         runCurrent()
 
         assertEquals(0, bridge.connectBestAvailableCalls)
-        assertEquals(3, bridge.startCalls, "retry 3 attempts")
+        assertEquals(4, bridge.startCalls, "retry after each configured backoff")
     }
 
     @Test
@@ -293,7 +299,7 @@ class UrnetworkRelayCoordinatorTest {
         setByClientJwt("test-jwt")
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        advanceTimeBy(35_000L)
+        advanceTimeBy(125_000L)
         runCurrent()
 
         assertEquals(0, bridge.attachRelayTunCalls)
@@ -306,7 +312,7 @@ class UrnetworkRelayCoordinatorTest {
         configStore.setProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        assertEquals(UrnetworkProvideControlMode.ALWAYS, bridge.lastControlMode)
+        assertEquals(UrnetworkProvideControlMode.AUTO, bridge.lastControlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, bridge.lastNetworkMode)
     }
 
@@ -326,7 +332,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay starts monitor and acquires lock when config tried to disable provide`() {
+    fun `relay does not start monitor or acquire lock when provide is disabled`() {
         val monitor = mockk<RelayNetworkMonitor>(relaxed = true)
         val locks = mockk<RelayLockManager>(relaxed = true)
         relayTest(networkMonitor = monitor, relayLockManager = locks) {
@@ -334,8 +340,26 @@ class UrnetworkRelayCoordinatorTest {
             configStore.update { it.copy(provideEnabled = false) }
             tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-            verify { monitor.start(UrnetworkProvideNetworkMode.WIFI) }
-            verify { locks.acquire() }
+            verify(exactly = 0) { monitor.start(any()) }
+            verify(exactly = 0) { locks.acquire() }
+            assertEquals(0, bridge.startCalls)
+        }
+    }
+
+    @Test
+    fun `disabling provide stops owned relay and releases resources`() {
+        val monitor = mockk<RelayNetworkMonitor>(relaxed = true)
+        val locks = mockk<RelayLockManager>(relaxed = true)
+        relayTest(networkMonitor = monitor, relayLockManager = locks) {
+            setByClientJwt("test-jwt")
+            tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
+            assertEquals(1, bridge.startCalls)
+
+            configStore.update { it.copy(provideEnabled = false) }
+
+            assertEquals(1, bridge.stopCalls)
+            verify { monitor.stop() }
+            verify { locks.release() }
         }
     }
 
@@ -371,11 +395,11 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     private class FakeJwtBootstrapper : UrnetworkJwtBootstrapper {
-        var calls: Int = 0
-        private var onCallAction: (suspend () -> UrnetworkJwtBootstrapper.Result)? = null
+        var calls = 0
+        private var action: (suspend () -> UrnetworkJwtBootstrapper.Result)? = null
 
         fun onCallSetJwt(jwt: String, store: InMemoryUrnetworkConfigStore) {
-            onCallAction = {
+            action = {
                 store.setByClientJwt(jwt)
                 UrnetworkJwtBootstrapper.Result.Acquired
             }
@@ -383,8 +407,7 @@ class UrnetworkRelayCoordinatorTest {
 
         override suspend fun ensureClientJwt(): UrnetworkJwtBootstrapper.Result {
             calls++
-            return onCallAction?.invoke()
-                ?: UrnetworkJwtBootstrapper.Result.Failed("FakeJwtBootstrapper default failure")
+            return action?.invoke() ?: UrnetworkJwtBootstrapper.Result.Failed("test failure")
         }
     }
 

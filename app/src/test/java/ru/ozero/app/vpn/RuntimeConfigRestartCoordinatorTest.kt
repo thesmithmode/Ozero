@@ -73,14 +73,14 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Test
-    fun `restart sends action and clears switching when tunnel starts again`() = runTest {
+    fun `restart sends action and clears switching when tunnel connects again`() = runTest {
         val startServiceActions = mutableListOf<String?>()
         val tunnelController = TunnelController()
         tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
         val context = recordingContext(startServiceActions) {
             tunnelController.setState(TunnelState.Disconnecting)
             launch {
-                tunnelController.setState(TunnelState.Probing(EngineId.WARP))
+                tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
             }
         }
         val coordinator = coordinator(context, tunnelController)
@@ -120,19 +120,40 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Test
-    fun `restart works from probing state when restart reaches connecting`() = runTest {
+    fun `restart works from probing state when restart reaches connected`() = runTest {
         val startServiceActions = mutableListOf<String?>()
         val tunnelController = TunnelController()
         tunnelController.setState(TunnelState.Probing(EngineId.FPTN))
         val context = recordingContext(startServiceActions) {
             tunnelController.setState(TunnelState.Disconnecting)
             launch {
-                tunnelController.setState(TunnelState.Connecting(EngineId.FPTN))
+                tunnelController.setState(TunnelState.Connected(EngineId.FPTN, 0))
             }
         }
         val coordinator = coordinator(context, tunnelController)
 
         val restarted = coordinator.restartVpnIfRunning("token changed")
+        runCurrent()
+
+        assertTrue(restarted)
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
+        assertTrue(tunnelController.switching.value == null)
+    }
+
+    @Test
+    fun `restart accepts probing handoff without waiting for connected`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val context = recordingContext(startServiceActions) {
+            tunnelController.setState(TunnelState.Disconnecting)
+            launch {
+                tunnelController.setState(TunnelState.Probing(EngineId.WARP))
+            }
+        }
+        val coordinator = coordinator(context, tunnelController)
+
+        val restarted = coordinator.restartVpnIfRunning("settings changed")
         runCurrent()
 
         assertTrue(restarted)

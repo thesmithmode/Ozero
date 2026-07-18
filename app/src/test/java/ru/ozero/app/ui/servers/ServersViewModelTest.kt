@@ -34,6 +34,11 @@ class ServersViewModelTest {
         server("c", "NL", "single"),
     )
 
+    private val imported = listOf(
+        server("a", "RU", "single"),
+        server("b", "DE", "single"),
+    )
+
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(dispatcher)
@@ -112,6 +117,23 @@ class ServersViewModelTest {
     }
 
     @Test
+    fun `canSave false when selected protocol cannot chain`() = runTest {
+        dao.emit(
+            listOf(
+                server("a", "RU", "single"),
+                server("b", "DE", "single", protocol = "trojan"),
+            ),
+        )
+        advanceUntilIdle()
+
+        viewModel.onEntrySelect("a")
+        viewModel.onExitSelect("b")
+        advanceUntilIdle()
+
+        assertFalse((viewModel.uiState.value as ServersUiState.Content).canSave)
+    }
+
+    @Test
     fun `content resolves selected entry exit and can save distinct pair`() = runTest {
         dao.emit(sample)
         advanceUntilIdle()
@@ -127,8 +149,8 @@ class ServersViewModelTest {
     }
 
     @Test
-    fun `onSavePair upserts both entries with cross pairId`() = runTest {
-        dao.emit(sample)
+    fun `onSavePair upserts both entries with runtime roles and cross pairId`() = runTest {
+        dao.emit(imported)
         advanceUntilIdle()
 
         viewModel.onEntrySelect("a")
@@ -138,7 +160,9 @@ class ServersViewModelTest {
         advanceUntilIdle()
 
         val byId = dao.upserts.associateBy { it.id }
+        assertEquals("entry", byId["a"]?.role)
         assertEquals("b", byId["a"]?.pairId)
+        assertEquals("exit", byId["b"]?.role)
         assertEquals("a", byId["b"]?.pairId)
     }
 
@@ -197,15 +221,19 @@ class ServersViewModelTest {
         assertEquals(emptyList<ServerEntity>(), dao.upserts)
     }
 
-    private fun server(id: String, country: String, role: String) =
-        ServerEntity(
-            id = id,
-            country = country,
-            role = role,
-            protocol = "vless",
-            uri = "vless://$id",
-            port = 443,
-        )
+    private fun server(
+        id: String,
+        country: String,
+        role: String,
+        protocol: String = "vless",
+    ) = ServerEntity(
+        id = id,
+        country = country,
+        role = role,
+        protocol = protocol,
+        uri = "$protocol://$id",
+        port = 443,
+    )
 
     private class FakeServerDao : ServerDao {
         private val flow = MutableStateFlow<List<ServerEntity>>(emptyList())

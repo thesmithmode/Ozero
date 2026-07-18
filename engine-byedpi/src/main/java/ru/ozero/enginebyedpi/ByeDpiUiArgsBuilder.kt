@@ -45,7 +45,8 @@ internal object ByeDpiUiArgsBuilder {
 
         if (settings.desyncMethod == DesyncMethod.FAKE) {
             if (settings.fakeTtl > 0) args.add("-t${settings.fakeTtl}")
-            if (settings.fakeSni.isNotBlank()) args.add("-n${settings.fakeSni}")
+            val fakeSni = settings.fakeSni.trim()
+            if (fakeSni.isNotEmpty() && isValidFakeSni(fakeSni)) args.add("-n$fakeSni")
             if (settings.fakeOffset != 0) args.add("-O${settings.fakeOffset}")
         }
 
@@ -86,4 +87,22 @@ internal object ByeDpiUiArgsBuilder {
 
         return args
     }
+
+    private fun isValidFakeSni(value: String): Boolean {
+        if (value.length > MAX_FAKE_SNI_LENGTH) return false
+        if (value.any(Char::isWhitespace)) return false
+        if (value.startsWith(".") || value.endsWith(".")) return false
+        val labels = value.split('.')
+        return labels.size >= MIN_FAKE_SNI_LABELS && labels.all(::isValidFakeSniLabel)
+    }
+
+    private fun isValidFakeSniLabel(label: String): Boolean {
+        if (label.isEmpty() || label.length > MAX_FAKE_SNI_LABEL_LENGTH) return false
+        if (label.startsWith("-") || label.endsWith("-")) return false
+        return label.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '-' }
+    }
+
+    private const val MIN_FAKE_SNI_LABELS = 2
+    private const val MAX_FAKE_SNI_LENGTH = 253
+    private const val MAX_FAKE_SNI_LABEL_LENGTH = 63
 }

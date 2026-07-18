@@ -66,10 +66,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import java.io.ByteArrayInputStream
 import ru.ozero.app.R
 import ru.ozero.app.ui.theme.OzeroPalette
-import ru.ozero.app.util.readBytesBounded
 import ru.ozero.enginewarp.AwgPreset
 import ru.ozero.enginewarp.AwgPresets
 import ru.ozero.enginewarp.DnsPresets
@@ -89,8 +87,10 @@ fun WarpEngineSettingsScreen(
 
     if (state.editDraft != null) {
         BackHandler { viewModel.onEditCancel() }
+        val resolvedError = state.errorMessageRes?.let { stringResource(it) } ?: state.errorMessage
         WarpEditScreen(
             draft = state.editDraft!!,
+            errorMessage = resolvedError,
             onDraftChange = viewModel::onEditDraftChange,
             onSave = viewModel::onSaveEdit,
             onCancel = viewModel::onEditCancel,
@@ -120,14 +120,15 @@ fun WarpEngineSettingsScreen(
         val displayName = context.contentResolver.query(
             uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null,
         )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null } ?: "import"
-        val bytes = context.contentResolver.openInputStream(uri)?.use {
-            it.readBytesBounded(MAX_WARP_IMPORT_BYTES)
-        }
-            ?: return@rememberLauncherForActivityResult
         if (displayName.endsWith(".yaml", ignoreCase = true) || displayName.endsWith(".yml", ignoreCase = true)) {
             viewModel.onClashYamlRejected()
         } else {
-            viewModel.onImportFile(ByteArrayInputStream(bytes), displayName)
+            runCatching { context.contentResolver.openInputStream(uri) }
+                .onSuccess { stream ->
+                    stream ?: return@onSuccess
+                    viewModel.onImportFile(stream, displayName)
+                }
+                .onFailure(viewModel::onImportOpenFailed)
         }
     }
     Scaffold(
@@ -254,12 +255,12 @@ private const val IMPORT_OVERLAY_HOLD_MS = 900L
 private const val IMPORT_OVERLAY_FADE_MS = 600
 private const val IMPORT_OVERLAY_SIZE_DP = 120
 private const val IMPORT_OVERLAY_ICON_DP = 96
-private const val MAX_WARP_IMPORT_BYTES = 512 * 1024
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WarpEditScreen(
     draft: WarpEditDraft,
+    errorMessage: String?,
     onDraftChange: (WarpEditDraft) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
@@ -288,6 +289,14 @@ private fun WarpEditScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
             WarpTextField(
                 label = stringResource(R.string.warp_field_name),
                 value = draft.name,
@@ -679,16 +688,17 @@ private fun SlotListContent(
     onStartEdit: (String) -> Unit,
     onDeleteSlot: (String) -> Unit,
 ) {
+    val resolvedError = state.errorMessageRes?.let { stringResource(it) } ?: state.errorMessage
     LazyColumn(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
             start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (errorMessage != null) {
+        if (resolvedError != null) {
             item {
                 Text(
-                    text = errorMessage,
+                    text = resolvedError,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 4.dp),

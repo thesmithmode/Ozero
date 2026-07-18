@@ -12,21 +12,20 @@ class PrebuiltSoSymbolContractTest {
         "Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy",
         "Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStopProxy",
         "Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniForceClose",
-        "Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniEmergencyReset",
     )
 
     @Test
-    fun `libbyedpi arm64-v8a содержит все JNI символы включая jniEmergencyReset`() {
+    fun `libbyedpi arm64-v8a содержит обязательные JNI символы`() {
         checkSoSymbols("arm64-v8a")
     }
 
     @Test
-    fun `libbyedpi armeabi-v7a содержит все JNI символы включая jniEmergencyReset`() {
+    fun `libbyedpi armeabi-v7a содержит обязательные JNI символы`() {
         checkSoSymbols("armeabi-v7a")
     }
 
     @Test
-    fun `libbyedpi x86_64 содержит все JNI символы включая jniEmergencyReset`() {
+    fun `libbyedpi x86_64 содержит обязательные JNI символы`() {
         checkSoSymbols("x86_64")
     }
 

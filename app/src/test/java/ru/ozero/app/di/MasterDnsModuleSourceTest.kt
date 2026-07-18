@@ -32,4 +32,12 @@ class MasterDnsModuleSourceTest {
         assertTrue(text.contains("MasterDnsPrefs")) { "qualifier MasterDnsPrefs missing" }
         assertTrue(text.contains("masterdns_prefs")) { "preferences file name missing" }
     }
+
+    @Test
+    fun `server deployer stores ssh known hosts in app files`() {
+        val text = source.readText()
+        assertTrue(text.contains("SshjMasterDnsDeployer(knownHostsFile)"))
+        assertTrue(text.contains("context.filesDir"))
+        assertTrue(text.contains("ssh_known_hosts"))
+    }
 }

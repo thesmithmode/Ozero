@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Ozero
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download libbox AAR
         env:
@@ -25,9 +25,9 @@ jobs:
           set -euo pipefail
           VERSION="${{ inputs.libbox_version }}"
           mkdir -p singbox-core/libs
-          gh release download "singbox-$VERSION" -p "libbox.aar" -D singbox-core/libs --clobber
+          gh release download "singbox-$VERSION" -p "libbox.aar" -D singbox-core/libs --clobber -R "${{ github.repository }}"
+          .github/scripts/verify-libbox-aar.sh singbox-core/libs/libbox.aar "$VERSION"
           ls -la singbox-core/libs/
-          sha256sum singbox-core/libs/libbox.aar
 
       - name: Verify AAR contents
         run: |
