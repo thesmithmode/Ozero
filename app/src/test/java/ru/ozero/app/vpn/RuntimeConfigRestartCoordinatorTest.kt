@@ -141,6 +141,27 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Test
+    fun `restart accepts probing handoff without waiting for connected`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val context = recordingContext(startServiceActions) {
+            tunnelController.setState(TunnelState.Disconnecting)
+            launch {
+                tunnelController.setState(TunnelState.Probing(EngineId.WARP))
+            }
+        }
+        val coordinator = coordinator(context, tunnelController)
+
+        val restarted = coordinator.restartVpnIfRunning("settings changed")
+        runCurrent()
+
+        assertTrue(restarted)
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
+        assertTrue(tunnelController.switching.value == null)
+    }
+
+    @Test
     fun `restart returns false and clears switching when restarted tunnel fails`() = runTest {
         val startServiceActions = mutableListOf<String?>()
         val tunnelController = TunnelController()

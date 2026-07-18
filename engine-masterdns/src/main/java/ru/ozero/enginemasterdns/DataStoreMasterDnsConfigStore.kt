@@ -14,9 +14,10 @@ class DataStoreMasterDnsConfigStore(
 ) : MasterDnsConfigStore {
 
     override fun config(): Flow<MasterDnsPersistedConfig> = dataStore.data.map { prefs ->
+        val configToml = prefs[KEY_TOML].orEmpty()
         MasterDnsPersistedConfig(
-            enabled = prefs[KEY_ENABLED] ?: false,
-            configToml = prefs[KEY_TOML].orEmpty(),
+            enabled = prefs[KEY_ENABLED] ?: configToml.isNotBlank(),
+            configToml = configToml,
             resolvers = prefs[KEY_RESOLVERS].orEmpty()
                 .split('\n')
                 .map { it.trim() }

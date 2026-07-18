@@ -22,6 +22,15 @@ class DataStoreMasterDnsConfigStoreTest {
     }
 
     @Test
+    fun `legacy saved config is enabled when enabled key is absent`(@TempDir tmp: Path) = runTest {
+        val store = makeStore(tmp)
+
+        store.setConfigToml("SERVER = \"203.0.113.10\"")
+
+        assertEquals(true, store.config().first().enabled)
+    }
+
+    @Test
     fun `setEnabled persists start eligibility`(@TempDir tmp: Path) = runTest {
         val store = makeStore(tmp)
 
