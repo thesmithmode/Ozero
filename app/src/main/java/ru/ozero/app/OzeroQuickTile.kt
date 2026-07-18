@@ -47,8 +47,11 @@ class OzeroQuickTile : TileService() {
 
     override fun onClick() {
         super.onClick()
-        when (qsTile?.state) {
-            Tile.STATE_ACTIVE -> stopVpn()
+        when (tunnelController.state.value) {
+            is TunnelState.Connected,
+            is TunnelState.Connecting,
+            is TunnelState.Probing,
+            -> stopVpn()
             else -> startVpn()
         }
     }

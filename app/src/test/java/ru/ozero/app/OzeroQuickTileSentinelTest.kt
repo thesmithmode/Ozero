@@ -50,6 +50,22 @@ class OzeroQuickTileSentinelTest {
     }
 
     @Test
+    fun `onClick отменяет незавершенный запуск по фактическому tunnel state`() {
+        val source = locateTile().readText()
+        val onClickBody = source
+            .substringAfter("override fun onClick()")
+            .substringBefore("private fun syncTileState")
+        assertTrue(
+            onClickBody.contains("tunnelController.state.value") &&
+                onClickBody.contains("TunnelState.Connecting") &&
+                onClickBody.contains("TunnelState.Probing") &&
+                onClickBody.contains("-> stopVpn()") &&
+                !onClickBody.contains("qsTile?.state"),
+            "onClick обязан отменять Connecting/Probing по фактическому TunnelState, а не по визуальному состоянию тайла",
+        )
+    }
+
+    @Test
     fun `OzeroQuickTile отменяет job в onStopListening`() {
         val source = locateTile().readText()
         assertTrue(
