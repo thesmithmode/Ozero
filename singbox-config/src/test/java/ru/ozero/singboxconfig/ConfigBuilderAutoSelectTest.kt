@@ -1,6 +1,7 @@
 package ru.ozero.singboxconfig
 
 import org.junit.jupiter.api.Test
+import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
@@ -142,6 +143,34 @@ class ConfigBuilderAutoSelectTest {
 
         assertTrue(result.isFailure)
         assertContains(result.exceptionOrNull()?.message.orEmpty(), "Unsupported transport")
+    }
+
+    @Test
+    fun `auto config skips beans with missing credentials before rendering`() {
+        val invalidVless = makeVless("vless-invalid.example.com").apply { uuid = "" }
+        val invalidVmess = makeVmess("vmess-invalid.example.com").apply { uuid = "" }
+        val invalidTrojan = makeTrojan("trojan-invalid.example.com").apply { password = "" }
+        val invalidShadowsocks = ShadowsocksBean().apply {
+            serverAddress = "ss-invalid.example.com"
+            serverPort = 8388
+            method = "aes-128-gcm"
+            password = ""
+        }
+        val valid = makeVless("ok.example.com")
+
+        val json = ConfigBuilder.buildSingboxAutoConfig(
+            listOf(invalidVless, invalidVmess, invalidTrojan, invalidShadowsocks, valid),
+        )
+
+        assertFalse(ConfigBuilder.isSupportedBean(invalidVless))
+        assertFalse(ConfigBuilder.isSupportedBean(invalidVmess))
+        assertFalse(ConfigBuilder.isSupportedBean(invalidTrojan))
+        assertFalse(ConfigBuilder.isSupportedBean(invalidShadowsocks))
+        assertContains(json, "\"server\":\"ok.example.com\"")
+        assertFalse(json.contains("vless-invalid.example.com"))
+        assertFalse(json.contains("vmess-invalid.example.com"))
+        assertFalse(json.contains("trojan-invalid.example.com"))
+        assertFalse(json.contains("ss-invalid.example.com"))
     }
 
     @Test

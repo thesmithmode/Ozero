@@ -34,6 +34,8 @@ class MainActivitySwitchingSentinelTest {
             source.contains("EngineRuntimeConfigRestartObserver").not() &&
                 app.contains("runtimeConfigRestartCoordinator.start(appScope)") &&
                 coordinator.contains("observer.start") &&
+                coordinator.contains("EngineSettingsRestartObserver") &&
+                coordinator.contains("settingsRepository.settings") &&
                 coordinator.contains("tunnelController.state"),
             "Runtime config restarts must be process-wide, not gated by MainActivity STARTED lifecycle.",
         )

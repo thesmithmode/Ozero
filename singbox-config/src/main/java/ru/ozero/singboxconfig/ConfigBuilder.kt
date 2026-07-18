@@ -64,9 +64,17 @@ object ConfigBuilder {
 
     fun isSupportedBean(bean: AbstractBean): Boolean {
         if (bean.serverPort !in MIN_PORT..MAX_PORT) return false
-        if (bean !is StandardV2RayBean) return true
-        return bean.type in SUPPORTED_TRANSPORTS && bean.hasSupportedSecurity()
+        return when (bean) {
+            is VLESSBean -> bean.uuid.isNotBlank() && isSupportedStandardBean(bean)
+            is VMessBean -> bean.uuid.isNotBlank() && isSupportedStandardBean(bean)
+            is TrojanBean -> bean.password.isNotBlank() && isSupportedStandardBean(bean)
+            is ShadowsocksBean -> bean.method.isNotBlank() && bean.password.isNotBlank()
+            else -> false
+        }
     }
+
+    private fun isSupportedStandardBean(bean: StandardV2RayBean): Boolean =
+        bean.type in SUPPORTED_TRANSPORTS && bean.hasSupportedSecurity()
 
     fun buildChainConfig(
         bean: AbstractBean,
