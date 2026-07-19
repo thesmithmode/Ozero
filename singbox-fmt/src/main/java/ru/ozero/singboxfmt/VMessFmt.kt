@@ -2,9 +2,12 @@ package ru.ozero.singboxfmt
 
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import java.util.Locale
 import org.json.JSONObject
 
 object VMessFmt {
+
+    private val TRUTHY_JSON_VALUES = setOf("1", "true", "yes")
 
     fun parse(uri: String): VMessBean {
         require(uri.startsWith("vmess://")) { "Not a vmess:// URI" }
@@ -34,9 +37,29 @@ object VMessFmt {
         bean.sni = j.optString("sni", "")
         bean.alpn = j.optString("alpn", "")
         bean.utlsFingerprint = j.optString("fp", "")
+        bean.allowInsecure = jsonBoolean(
+            j,
+            "allowInsecure",
+            "allow-insecure",
+            "allow_insecure",
+            "insecure",
+            "skip-cert-verify",
+            "skipCertVerify",
+            "skip_cert_verify",
+        )
         bean.initializeDefaultValues()
         return bean
     }
+
+    private fun jsonBoolean(j: JSONObject, vararg keys: String): Boolean =
+        keys.any { key ->
+            when (val value = j.opt(key)) {
+                is Boolean -> value
+                is Number -> value.toInt() != 0
+                is String -> value.lowercase(Locale.ROOT) in TRUTHY_JSON_VALUES
+                else -> false
+            }
+        }
 
     private fun parseStd(parsed: UriCompat): VMessBean {
         val bean = VMessBean()
