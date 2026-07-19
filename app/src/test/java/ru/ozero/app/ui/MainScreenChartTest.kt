@@ -138,11 +138,25 @@ class MainScreenChartTest {
     }
 
     @Test
-    fun `chartNiceMax содержит 1-2-5 гранулярные уровни`() {
+    fun `chartNiceMax содержит 1-2-2_5-5 гранулярные уровни`() {
         val body = chartUtilsSource.substringAfter("fun chartNiceMax")
-        assertTrue(body.contains("2_048") || body.contains("2048"), "2KB/s уровень отсутствует")
-        assertTrue(body.contains("20_480") || body.contains("20480"), "20KB/s уровень отсутствует")
-        assertTrue(body.contains("51_200") || body.contains("51200"), "50KB/s уровень отсутствует")
+        assertTrue(body.contains("2f"), "2x уровень отсутствует")
+        assertTrue(body.contains("2.5f"), "2.5x уровень отсутствует")
+        assertTrue(body.contains("5f"), "5x уровень отсутствует")
+        assertTrue(body.contains("20f"), "20x уровень отсутствует")
+        assertTrue(body.contains("500f"), "500x уровень отсутствует")
+    }
+
+    @Test
+    fun `chartNiceMax сохраняет sub-megabyte уровни`() {
+        val max = ru.ozero.app.ui.components.chartNiceMax(900f * 1_024f)
+        assertTrue(max < 1_048_576f, "900KiB/s не должен прыгать на 1MiB ceiling")
+    }
+
+    @Test
+    fun `chartAxisLabels строит частую круглую шкалу сверху вниз`() {
+        val labels = ru.ozero.app.ui.components.chartAxisLabels(25f, 5)
+        assertEquals(listOf(25L, 20L, 15L, 10L, 5L, 0L), labels)
     }
 
     @Test

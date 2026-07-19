@@ -29,6 +29,7 @@ class FmtAdditionalBranchCoverageTest {
               "sni":"sni.example.com",
               "alpn":"h2",
               "fp":"chrome",
+              "skip-cert-verify":"true",
               "ps":"Tls Json"
             }
         """.trimIndent()
@@ -42,6 +43,7 @@ class FmtAdditionalBranchCoverageTest {
         assertEquals("http", bean.type)
         assertEquals("tls", bean.security)
         assertEquals("sni.example.com", bean.sni)
+        assertEquals(true, bean.allowInsecure)
         assertEquals("Tls Json", bean.name)
     }
 

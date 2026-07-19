@@ -250,24 +250,28 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             }
             groups.map { gid ->
                 async {
+                    _uiState.update { it.copy(isPinging = it.isPinging + gid) }
                     val probeProfiles = prioritizeSingboxAutoProfiles(
                         profileDao.getAutoCandidatesByGroupId(gid, MAX_PROFILE_SCAN),
                         MAX_PROBE_PROFILES,
                     )
-                    if (probeProfiles.isEmpty()) return@async
-                    _uiState.update { it.copy(isPinging = it.isPinging + gid) }
-                    probeService.probeAndAutoSelect(
-                        profiles = probeProfiles,
-                        onProfileTestingChanged = ::onProfileTestingChanged,
-                    )
-                    val updated = profileDao.getByGroupIdLimited(gid, MAX_VISIBLE_PROFILES)
-                    _uiState.update {
-                        it.copy(
-                            isPinging = it.isPinging - gid,
-                            testingProfileIds = it.testingProfileIds -
-                                probeProfiles.map { profile -> profile.id }.toSet(),
-                            groupProfiles = it.groupProfiles + (gid to updated),
-                        )
+                    try {
+                        if (probeProfiles.isNotEmpty()) {
+                            probeService.probeAndAutoSelect(
+                                profiles = probeProfiles,
+                                onProfileTestingChanged = ::onProfileTestingChanged,
+                            )
+                        }
+                    } finally {
+                        val updated = profileDao.getByGroupIdLimited(gid, MAX_VISIBLE_PROFILES)
+                        _uiState.update {
+                            it.copy(
+                                isPinging = it.isPinging - gid,
+                                testingProfileIds = it.testingProfileIds -
+                                    probeProfiles.map { profile -> profile.id }.toSet(),
+                                groupProfiles = it.groupProfiles + (gid to updated),
+                            )
+                        }
                     }
                 }
             }.awaitAll()

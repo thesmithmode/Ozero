@@ -34,9 +34,29 @@ object VMessFmt {
         bean.sni = j.optString("sni", "")
         bean.alpn = j.optString("alpn", "")
         bean.utlsFingerprint = j.optString("fp", "")
+        bean.allowInsecure = jsonBoolean(
+            j,
+            "allowInsecure",
+            "allow-insecure",
+            "allow_insecure",
+            "insecure",
+            "skip-cert-verify",
+            "skipCertVerify",
+            "skip_cert_verify",
+        )
         bean.initializeDefaultValues()
         return bean
     }
+
+    private fun jsonBoolean(j: JSONObject, vararg keys: String): Boolean =
+        keys.any { key ->
+            when (val value = j.opt(key)) {
+                is Boolean -> value
+                is Number -> value.toInt() != 0
+                is String -> value.lowercase() in setOf("1", "true", "yes")
+                else -> false
+            }
+        }
 
     private fun parseStd(parsed: UriCompat): VMessBean {
         val bean = VMessBean()

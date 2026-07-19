@@ -4,15 +4,29 @@ import androidx.compose.ui.graphics.Path
 
 fun chartNiceMax(bps: Float): Float {
     if (bps <= 0f) return 10_240f
-    val levels = floatArrayOf(
-        1_024f, 2_048f, 5_120f,
-        10_240f, 20_480f, 51_200f,
-        102_400f, 204_800f, 512_000f,
-        1_048_576f, 2_097_152f, 5_242_880f,
-        10_485_760f, 20_971_520f, 52_428_800f,
-        104_857_600f, 209_715_200f,
+    val units = floatArrayOf(
+        1_024f,
+        1_048_576f,
+        1_073_741_824f,
+        1_099_511_627_776f,
     )
-    return levels.firstOrNull { it > bps * 1.1f } ?: (bps * 2f)
+    val factors = floatArrayOf(
+        1f, 2f, 2.5f, 5f, 10f, 20f,
+        25f, 50f, 100f, 200f, 250f, 500f, 1_000f,
+    )
+    val target = bps * 1.03f
+    for (unit in units) {
+        for (factor in factors) {
+            val level = unit * factor
+            if (level >= target) return level
+        }
+    }
+    return target
+}
+
+fun chartAxisLabels(max: Float, steps: Int): List<Long> {
+    if (max <= 0f || steps <= 0) return emptyList()
+    return (steps downTo 0).map { index -> ((max / steps) * index).toLong() }
 }
 
 fun Path.addSmooth(values: List<Float>, step: Float, height: Float, safeMax: Float) {
