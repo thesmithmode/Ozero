@@ -139,12 +139,11 @@ class MainScreenChartTest {
 
     @Test
     fun `chartNiceMax содержит 1-2-2_5-5 гранулярные уровни`() {
-        val body = chartUtilsSource.substringAfter("fun chartNiceMax")
-        assertTrue(body.contains("2f"), "2x уровень отсутствует")
-        assertTrue(body.contains("2.5f"), "2.5x уровень отсутствует")
-        assertTrue(body.contains("5f"), "5x уровень отсутствует")
-        assertTrue(body.contains("20f"), "20x уровень отсутствует")
-        assertTrue(body.contains("500f"), "500x уровень отсутствует")
+        assertTrue(chartUtilsSource.contains("2f"), "2x уровень отсутствует")
+        assertTrue(chartUtilsSource.contains("2.5f"), "2.5x уровень отсутствует")
+        assertTrue(chartUtilsSource.contains("5f"), "5x уровень отсутствует")
+        assertTrue(chartUtilsSource.contains("20f"), "20x уровень отсутствует")
+        assertTrue(chartUtilsSource.contains("500f"), "500x уровень отсутствует")
     }
 
     @Test
@@ -157,6 +156,10 @@ class MainScreenChartTest {
     fun `chartAxisLabels строит частую круглую шкалу сверху вниз`() {
         val labels = ru.ozero.app.ui.components.chartAxisLabels(25f, 5)
         assertEquals(listOf(25L, 20L, 15L, 10L, 5L, 0L), labels)
+        assertEquals(
+            listOf(26L, 20L, 15L, 10L, 5L, 0L),
+            ru.ozero.app.ui.components.chartAxisLabels(25.5f, 5),
+        )
     }
 
     @Test

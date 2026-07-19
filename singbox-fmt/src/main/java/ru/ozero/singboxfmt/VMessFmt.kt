@@ -2,9 +2,12 @@ package ru.ozero.singboxfmt
 
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import java.util.Locale
 import org.json.JSONObject
 
 object VMessFmt {
+
+    private val TRUTHY_JSON_VALUES = setOf("1", "true", "yes")
 
     fun parse(uri: String): VMessBean {
         require(uri.startsWith("vmess://")) { "Not a vmess:// URI" }
@@ -53,7 +56,7 @@ object VMessFmt {
             when (val value = j.opt(key)) {
                 is Boolean -> value
                 is Number -> value.toInt() != 0
-                is String -> value.lowercase() in setOf("1", "true", "yes")
+                is String -> value.lowercase(Locale.ROOT) in TRUTHY_JSON_VALUES
                 else -> false
             }
         }
