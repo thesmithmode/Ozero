@@ -186,10 +186,10 @@ class ConfigBuilderAutoSelectTest {
     }
 
     @Test
-    fun `isSupportedBean preserves unknown non-standard beans`() {
+    fun `isSupportedBean rejects unknown non-standard beans`() {
         val bean = object : AbstractBean() {}
 
-        assertTrue(ConfigBuilder.isSupportedBean(bean))
+        assertFalse(ConfigBuilder.isSupportedBean(bean))
     }
 
     @Test

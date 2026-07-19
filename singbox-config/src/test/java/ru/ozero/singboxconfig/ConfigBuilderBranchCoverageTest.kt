@@ -243,7 +243,7 @@ class ConfigBuilderBranchCoverageTest {
         assertFailsWith<IllegalArgumentException> {
             ConfigBuilder.buildChainConfig(unknown, socksPort = 2085)
         }
-        assertFailsWith<IllegalStateException> {
+        assertFailsWith<IllegalArgumentException> {
             ConfigBuilder.buildChainConfig(unsupported, socksPort = 2086)
         }
     }

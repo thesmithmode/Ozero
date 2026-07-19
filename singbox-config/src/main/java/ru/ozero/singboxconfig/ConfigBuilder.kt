@@ -71,8 +71,7 @@ object ConfigBuilder {
             is VMessBean -> isSupportedStandardBean(bean)
             is TrojanBean -> isSupportedStandardBean(bean)
             is ShadowsocksBean -> true
-            is StandardV2RayBean -> false
-            else -> true
+            else -> false
         }
     }
 
