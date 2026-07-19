@@ -1034,6 +1034,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
             name = name,
             beanBlob = KryoSerializer.serialize(
                 VLESSBean().apply {
+                    uuid = "12345678-1234-1234-1234-123456789abc"
                     serverAddress = "$name.example.com"
                     serverPort = 443
                     type = "tcp"

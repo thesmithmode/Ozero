@@ -20,6 +20,32 @@ class ClashYamlParserBranchCoverageTest {
     }
 
     @Test
+    fun `parse skips proxies with missing credentials`() {
+        val yaml = """
+            proxies:
+              - name: ss-no-password
+                type: ss
+                server: ss.example.com
+                port: 8388
+                cipher: aes-128-gcm
+              - name: trojan-no-password
+                type: trojan
+                server: trojan.example.com
+                port: 443
+              - name: valid
+                type: vless
+                server: valid.example.com
+                port: 443
+                uuid: 12345678-1234-1234-1234-123456789abc
+        """.trimIndent()
+
+        val parsed = ClashYamlParser.parse(yaml)
+
+        assertEquals(1, parsed.size)
+        assertEquals("valid", parsed.single().name)
+    }
+
+    @Test
     fun `parse covers nested transport fallbacks and h2 normalization`() {
         val yaml = """
             proxies:

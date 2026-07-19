@@ -233,7 +233,6 @@ class ConfigBuilderBranchCoverageTest {
 
         val httpJson = ConfigBuilder.buildSingboxConfig(http)
         val h2Json = ConfigBuilder.buildSingboxConfig(h2)
-        val unknownJson = ConfigBuilder.buildChainConfig(unknown, socksPort = 2085)
 
         assertContains(httpJson, "\"type\":\"http\"")
         assertContains(httpJson, "\"host\":[\"front.example.com\"]")
@@ -241,10 +240,9 @@ class ConfigBuilderBranchCoverageTest {
         assertContains(h2Json, "\"type\":\"http\"")
         assertFalse(h2Json.contains("\"host\""))
         assertContains(h2Json, "\"path\":\"/h2\"")
-        assertFalse(unknownJson.contains("\"transport\""))
-        assertFalse(unknownJson.contains("\"tls\""))
-        assertContains(unknownJson, "\"listen_port\":2085")
-        assertContains(unknownJson, "\"final\":\"proxy\"")
+        assertFailsWith<IllegalArgumentException> {
+            ConfigBuilder.buildChainConfig(unknown, socksPort = 2085)
+        }
         assertFailsWith<IllegalStateException> {
             ConfigBuilder.buildChainConfig(unsupported, socksPort = 2086)
         }

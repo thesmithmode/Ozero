@@ -10,6 +10,7 @@ import ru.ozero.singboxfmt.StandardV2RayBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxfmt.hasRequiredOutboundCredentials
 
 private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
 private const val REALITY_PUBLIC_KEY_BYTES = 32
@@ -83,6 +84,7 @@ object ConfigBuilder {
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
+        require(isSupportedBean(bean)) { "Unsupported transport: ${(bean as? StandardV2RayBean)?.type}" }
         val outbound = beanOutbound(bean, "proxy", detour = upstream?.let { "upstream" })
         return buildChainFullConfig(socksPort, listOf(outbound), upstream, dnsServers, ipv6Enabled)
     }
