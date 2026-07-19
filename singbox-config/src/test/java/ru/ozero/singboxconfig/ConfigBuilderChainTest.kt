@@ -2,10 +2,8 @@ package ru.ozero.singboxconfig
 
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.WireGuardOutboundConfig
-import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.VLESSBean
 import kotlin.test.assertContains
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
