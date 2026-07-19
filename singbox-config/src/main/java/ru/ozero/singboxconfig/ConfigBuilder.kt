@@ -5,7 +5,11 @@ import java.util.Base64
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.WireGuardOutboundConfig
 import ru.ozero.singboxfmt.AbstractBean
+import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.StandardV2RayBean
+import ru.ozero.singboxfmt.TrojanBean
+import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxfmt.hasRequiredOutboundCredentials
 
 private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
@@ -63,7 +67,11 @@ object ConfigBuilder {
         if (bean.serverPort !in MIN_PORT..MAX_PORT) return false
         if (!bean.hasRequiredOutboundCredentials()) return false
         return when (bean) {
-            is StandardV2RayBean -> isSupportedStandardBean(bean)
+            is VLESSBean -> isSupportedStandardBean(bean)
+            is VMessBean -> isSupportedStandardBean(bean)
+            is TrojanBean -> isSupportedStandardBean(bean)
+            is ShadowsocksBean -> true
+            is StandardV2RayBean -> false
             else -> true
         }
     }

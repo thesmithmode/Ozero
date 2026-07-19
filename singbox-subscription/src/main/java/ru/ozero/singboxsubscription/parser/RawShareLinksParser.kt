@@ -145,9 +145,8 @@ object RawShareLinksParser {
     private fun applyTls(bean: StandardV2RayBean, outbound: JSONObject) {
         val tls = outbound.optJSONObject("tls") ?: return
         if (!tls.optBoolean("enabled", false)) return
-        val reality = tls.optJSONObject("reality")
-        val realityEnabled = reality?.optBoolean("enabled", false) == true
-        bean.security = if (realityEnabled && reality != null) "reality" else "tls"
+        val reality = tls.optJSONObject("reality")?.takeIf { it.optBoolean("enabled", false) }
+        bean.security = if (reality != null) "reality" else "tls"
         bean.sni = tls.optString("server_name", bean.sni)
         bean.alpn = tls.optJSONArray("alpn")?.let { alpn ->
             buildList {
@@ -159,7 +158,7 @@ object RawShareLinksParser {
         bean.allowInsecure = tls.optBoolean("insecure", bean.allowInsecure)
         val fingerprint = tls.optJSONObject("utls")?.optString("fingerprint").orEmpty()
         bean.utlsFingerprint = fingerprint
-        if (realityEnabled && reality != null) {
+        if (reality != null) {
             bean.realityPublicKey = reality.optString("public_key")
             bean.realityShortId = reality.optString("short_id")
             bean.realityFingerprint = fingerprint.ifEmpty { bean.realityFingerprint }
