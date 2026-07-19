@@ -65,6 +65,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 import ru.ozero.app.ui.components.addSmooth
+import ru.ozero.app.ui.components.chartAxisLabels
 import ru.ozero.app.ui.components.chartNiceMax
 import ru.ozero.app.ui.theme.OzeroPalette
 import ru.ozero.commonvpn.BytesFormatter
@@ -303,8 +304,9 @@ private fun TrafficLineChart(
         val raw = if (allValues.isEmpty()) 0f else allValues.maxOf { it }.toFloat()
         chartNiceMax(raw)
     }
-    val maxLabel = BytesFormatter.humanReadable(niceMax.toLong())
-    val midLabel = BytesFormatter.humanReadable((niceMax / 2).toLong())
+    val axisLabels = remember(niceMax) {
+        chartAxisLabels(niceMax, CHART_AXIS_STEPS).map(BytesFormatter::humanReadable)
+    }
 
     val bucketLabels = remember(data.buckets, timeframe) {
         buildBucketLabels(data.buckets, timeframe)
@@ -322,17 +324,17 @@ private fun TrafficLineChart(
                     verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.End,
                 ) {
-                    Text(maxLabel, style = axisStyle)
-                    Text(midLabel, style = axisStyle)
-                    Text("0", style = axisStyle)
+                    axisLabels.forEach { label ->
+                        Text(label, style = axisStyle)
+                    }
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Canvas(modifier = Modifier.weight(1f).fillMaxHeight()) {
                     val w = size.width
                     val h = size.height
                     val linePx = with(density) { 1.dp.toPx() }
-                    for (i in 1..3) {
-                        val y = h * i / 4f
+                    for (i in 1 until CHART_AXIS_STEPS) {
+                        val y = h * i / CHART_AXIS_STEPS.toFloat()
                         drawLine(gridColor, Offset(0f, y), Offset(w, y), linePx)
                     }
                     drawRect(borderColor, style = Stroke(width = linePx))
@@ -632,3 +634,5 @@ private fun buildBucketLabels(
     }
     return indices.map { i -> fmt.format(Date(buckets[i])) }
 }
+
+private const val CHART_AXIS_STEPS = 5
