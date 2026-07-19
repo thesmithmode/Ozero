@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginescore.settings.TrafficMode
@@ -100,6 +101,32 @@ class EngineSettingsRestartObserverTriggersTest : EngineSettingsRestartObserverT
 
         assertEquals(1, collected.size)
         assertEquals(TrafficMode.PROXY, collected.single().snapshot.trafficMode)
+        job.cancel()
+    }
+
+    @Test
+    fun `byedpi UI settings change triggers restart for UI mode`() = runTest(dispatcher) {
+        val flow = MutableSharedFlow<SettingsModel>(replay = 0, extraBufferCapacity = 8)
+        val observer = newObserver(flow, alwaysConnected())
+        val collected = mutableListOf<EngineSettingsRestartObserver.Trigger>()
+        val job = collectTriggers(observer, collected)
+        advanceUntilIdle()
+
+        val baseline = SettingsModel.DEFAULT.copy(
+            manualEngine = EngineId.BYEDPI,
+            byedpiUseUiMode = true,
+            byedpiUiSettings = ByeDpiUiSettings.DEFAULT,
+        )
+        val changedUiSettings = ByeDpiUiSettings.DEFAULT.copy(fakeSni = "front.example.com")
+        flow.emit(baseline)
+        advanceRestartDebounce()
+        advanceUntilIdle()
+        flow.emit(baseline.copy(byedpiUiSettings = changedUiSettings))
+        advanceRestartDebounce()
+        advanceUntilIdle()
+
+        assertEquals(1, collected.size)
+        assertEquals(changedUiSettings, collected.single().snapshot.byedpiUiSettings)
         job.cancel()
     }
 

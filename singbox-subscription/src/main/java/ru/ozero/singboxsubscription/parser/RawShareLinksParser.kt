@@ -8,6 +8,7 @@ import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.V2RayFmt
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxfmt.hasRequiredOutboundCredentials
 
 object RawShareLinksParser {
     private const val MIN_PORT = 1
@@ -112,7 +113,8 @@ object RawShareLinksParser {
             outbound.has("server") &&
                 outbound.has("server_port") &&
                 it.serverAddress.isNotBlank() &&
-                it.hasValidPort()
+                it.hasValidPort() &&
+                it.hasRequiredOutboundCredentials()
         }
 
     private fun AbstractBean.hasValidPort(): Boolean = serverPort in MIN_PORT..MAX_PORT
@@ -157,9 +159,10 @@ object RawShareLinksParser {
         bean.allowInsecure = tls.optBoolean("insecure", bean.allowInsecure)
         val fingerprint = tls.optJSONObject("utls")?.optString("fingerprint").orEmpty()
         bean.utlsFingerprint = fingerprint
-        if (realityEnabled && reality != null) {
-            bean.realityPublicKey = reality.optString("public_key")
-            bean.realityShortId = reality.optString("short_id")
+        if (realityEnabled) {
+            val realityOptions = requireNotNull(reality)
+            bean.realityPublicKey = realityOptions.optString("public_key")
+            bean.realityShortId = realityOptions.optString("short_id")
             bean.realityFingerprint = fingerprint.ifEmpty { bean.realityFingerprint }
         }
     }

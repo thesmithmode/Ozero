@@ -2,8 +2,10 @@ package ru.ozero.singboxconfig
 
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.WireGuardOutboundConfig
+import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.VLESSBean
 import kotlin.test.assertContains
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -107,6 +109,31 @@ class ConfigBuilderChainTest {
         assertContains(json, "\"tag\":\"proxy-0\"")
         assertFalse(json.contains("splithttp"), "auto chain must not pass unsupported transports to libbox")
         assertFalse(json.contains("\"tag\":\"proxy-1\""), "unsupported beans must not leave gaps in urltest tags")
+    }
+
+    @Test
+    fun `auto chain config applies outbound cap after filtering unsupported beans`() {
+        val supported = (1..50).map { makeBean(uuid = "aaaa-$it", host = "s$it.com") }
+        val unsupported = makeBean(uuid = "", host = "invalid.com")
+
+        val json = ConfigBuilder.buildAutoChainConfig(supported + unsupported, socksPort = 49410)
+
+        assertContains(json, "\"server\":\"s50.com\"")
+        assertFalse(json.contains("invalid.com"))
+    }
+
+    @Test
+    fun `single chain config rejects credentialless shadowsocks before rendering`() {
+        val bean = ShadowsocksBean().apply {
+            serverAddress = "ss.example.com"
+            serverPort = 8388
+            method = "aes-128-gcm"
+            password = ""
+        }
+
+        assertFailsWith<IllegalArgumentException> {
+            ConfigBuilder.buildChainConfig(bean, socksPort = 49410)
+        }
     }
 
     @Test

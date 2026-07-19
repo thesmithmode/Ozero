@@ -10,6 +10,7 @@ import ru.ozero.singboxfmt.StandardV2RayBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxfmt.hasRequiredOutboundCredentials
 
 object ClashYamlParser {
     private const val MAX_YAML_CODE_POINTS = 16 * 1024 * 1024
@@ -70,7 +71,11 @@ object ClashYamlParser {
             pluginOpts = fields.string("plugin-opts", "plugin_opts", entrySeparator = ";")
         }
         else -> null
-    }?.takeIf { it.serverAddress.isNotBlank() && it.serverPort in MIN_PORT..MAX_PORT }
+    }?.takeIf {
+        it.serverAddress.isNotBlank() &&
+            it.serverPort in MIN_PORT..MAX_PORT &&
+            it.hasRequiredOutboundCredentials()
+    }
 
     private fun AbstractBean.applyCommon(fields: Map<String, Any?>) {
         name = fields.string("name")

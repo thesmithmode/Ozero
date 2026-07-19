@@ -5,6 +5,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -21,6 +22,13 @@ import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EngineRuntimeConfigProvider
+import ru.ozero.enginescore.settings.AppMode
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
+import ru.ozero.enginescore.settings.HostsMode
+import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginescore.settings.SplitTunnelMode
+import ru.ozero.enginescore.settings.TrafficMode
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -44,6 +52,7 @@ class RuntimeConfigRestartCoordinatorTest {
             },
             observer = EngineRuntimeConfigRestartObserver(setOf(runtimeProvider(EngineId.WARP, changes))),
             tunnelController = tunnelController,
+            settingsRepository = fakeSettingsRepository(),
         )
 
         coordinator.start(backgroundScope)
@@ -54,6 +63,32 @@ class RuntimeConfigRestartCoordinatorTest {
 
         assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
         assertFalse(coordinator.restartInProgress())
+    }
+
+    @Test
+    fun `manual engine settings change restarts connected tunnel`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val settings = MutableStateFlow(SettingsModel(manualEngine = EngineId.WARP))
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val coordinator = RuntimeConfigRestartCoordinator(
+            context = recordingContext(startServiceActions) {
+                tunnelController.setState(TunnelState.Disconnecting)
+                launch { tunnelController.setState(TunnelState.Connected(EngineId.FPTN, 0)) }
+            },
+            observer = EngineRuntimeConfigRestartObserver(emptySet()),
+            tunnelController = tunnelController,
+            settingsRepository = fakeSettingsRepository(settings),
+        )
+
+        coordinator.start(backgroundScope)
+        runCurrent()
+        settings.value = SettingsModel(manualEngine = EngineId.FPTN)
+        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        runCurrent()
+
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
+        assertEquals(TunnelState.Connected(EngineId.FPTN, 0), tunnelController.state.value)
     }
 
     @Test
@@ -244,6 +279,7 @@ class RuntimeConfigRestartCoordinatorTest {
             context = context,
             observer = EngineRuntimeConfigRestartObserver(emptySet()),
             tunnelController = tunnelController,
+            settingsRepository = fakeSettingsRepository(),
         )
 
         val firstRestart = runCatching { coordinator.restartVpnIfRunning("current-request") }
@@ -465,6 +501,7 @@ class RuntimeConfigRestartCoordinatorTest {
             },
             observer = EngineRuntimeConfigRestartObserver(setOf(runtimeProvider(EngineId.WARP, changes))),
             tunnelController = tunnelController,
+            settingsRepository = fakeSettingsRepository(),
         )
 
         repeat(5) { coordinator.start(backgroundScope) }
@@ -542,6 +579,7 @@ class RuntimeConfigRestartCoordinatorTest {
             },
             observer = EngineRuntimeConfigRestartObserver(emptySet()),
             tunnelController = tunnelController,
+            settingsRepository = fakeSettingsRepository(),
         )
 
         val first = runCatching { coordinator.restartVpnIfRunning("first") }
@@ -567,6 +605,7 @@ class RuntimeConfigRestartCoordinatorTest {
             },
             observer = EngineRuntimeConfigRestartObserver(setOf(runtimeProvider(EngineId.SINGBOX, changes))),
             tunnelController = tunnelController,
+            settingsRepository = fakeSettingsRepository(),
         )
 
         coordinator.start(backgroundScope)
@@ -603,6 +642,7 @@ class RuntimeConfigRestartCoordinatorTest {
         context = context,
         observer = EngineRuntimeConfigRestartObserver(emptySet()),
         tunnelController = tunnelController,
+        settingsRepository = fakeSettingsRepository(),
     )
 
     private fun recordingContext(
@@ -627,6 +667,32 @@ class RuntimeConfigRestartCoordinatorTest {
         val field = javaClass.getDeclaredField("restartInProgress")
         field.isAccessible = true
         return field.getBoolean(this)
+    }
+
+    private fun fakeSettingsRepository(
+        flow: Flow<SettingsModel> = MutableStateFlow(SettingsModel()),
+    ): SettingsRepository = object : SettingsRepository {
+        override val settings: Flow<SettingsModel> = flow
+        override suspend fun setSplitMode(mode: SplitTunnelMode) = Unit
+        override suspend fun setIpv6Enabled(enabled: Boolean) = Unit
+        override suspend fun setAutoStart(enabled: Boolean) = Unit
+        override suspend fun setTrafficMode(mode: TrafficMode) = Unit
+        override suspend fun setManualEngine(engine: EngineId?) = Unit
+        override suspend fun setEngineAutoPriority(priority: List<EngineId>) = Unit
+        override suspend fun setUrnetworkEnabled(enabled: Boolean) = Unit
+        override suspend fun setUrnetworkJwt(jwt: String?) = Unit
+        override suspend fun setUrnetworkCountryCode(code: String?) = Unit
+        override suspend fun setByedpiWinningArgs(args: String?) = Unit
+        override suspend fun setByedpiDefaultAccepted(accepted: Boolean) = Unit
+        override suspend fun setByedpiUseUiMode(enabled: Boolean) = Unit
+        override suspend fun setByedpiUiSettings(settings: ByeDpiUiSettings) = Unit
+        override suspend fun setCustomDnsServers(servers: List<String>) = Unit
+        override suspend fun setHostsMode(mode: HostsMode) = Unit
+        override suspend fun setHosts(hosts: List<String>) = Unit
+        override suspend fun setUiLocaleTag(tag: String?) = Unit
+        override suspend fun setAppMode(mode: AppMode) = Unit
+        override suspend fun setKillswitchEnabled(enabled: Boolean) = Unit
+        override suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean) = Unit
     }
 
     private fun TunnelController.setState(state: TunnelState) {

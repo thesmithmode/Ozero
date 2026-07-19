@@ -756,6 +756,41 @@ class RawShareLinksParserTest {
     }
 
     @Test
+    fun `should skip sing-box json outbounds with missing credentials`() {
+        val json = """
+            {
+              "outbounds": [
+                {
+                  "type": "shadowsocks",
+                  "tag": "No password",
+                  "server": "ss.example.com",
+                  "server_port": 8388,
+                  "method": "aes-128-gcm"
+                },
+                {
+                  "type": "trojan",
+                  "tag": "No password",
+                  "server": "trojan.example.com",
+                  "server_port": 443
+                },
+                {
+                  "type": "vless",
+                  "tag": "Valid",
+                  "server": "valid.example.com",
+                  "server_port": 443,
+                  "uuid": "12345678-1234-1234-1234-123456789abc"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = RawShareLinksParser.parse(json)
+
+        assertEquals(1, result.size)
+        assertEquals("Valid", result.single().name)
+    }
+
+    @Test
     fun `should return empty for sing-box outbounds with blank server values`() {
         val json = """
             {
