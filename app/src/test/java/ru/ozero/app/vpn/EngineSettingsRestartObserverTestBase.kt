@@ -18,6 +18,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.TrafficMode
 
@@ -58,6 +59,7 @@ abstract class EngineSettingsRestartObserverTestBase {
         manualEngine: EngineId?,
         byedpiWinningArgs: String? = null,
         byedpiUseUiMode: Boolean = false,
+        byedpiUiSettings: ByeDpiUiSettings = ByeDpiUiSettings.DEFAULT,
         ipv6Enabled: Boolean = false,
         trafficMode: TrafficMode = TrafficMode.TUN,
         customDnsServers: List<String> = emptyList(),
@@ -70,6 +72,7 @@ abstract class EngineSettingsRestartObserverTestBase {
         trafficMode = trafficMode,
         customDnsServers = customDnsServers,
         engineAutoPriority = engineAutoPriority,
+        byedpiUiSettings = byedpiUiSettings,
     )
 
     protected fun trigger(

@@ -43,8 +43,8 @@ object ConfigBuilder {
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
-        require(beans.size <= MAX_AUTO_OUTBOUNDS) { "auto-select supports at most $MAX_AUTO_OUTBOUNDS outbounds" }
         val supported = beans.filter { isSupportedBean(it) }
+        require(supported.size <= MAX_AUTO_OUTBOUNDS) { "auto-select supports at most $MAX_AUTO_OUTBOUNDS outbounds" }
         require(supported.isNotEmpty()) { "no beans with supported transport types" }
         val proxyOutbounds = supported.mapIndexed { index, bean -> beanOutbound(bean, "proxy-$index") }
         val tagList = proxyOutbounds.indices.joinToString(",") { jsonString("proxy-$it") }
@@ -64,9 +64,17 @@ object ConfigBuilder {
 
     fun isSupportedBean(bean: AbstractBean): Boolean {
         if (bean.serverPort !in MIN_PORT..MAX_PORT) return false
-        if (bean !is StandardV2RayBean) return true
-        return bean.type in SUPPORTED_TRANSPORTS && bean.hasSupportedSecurity()
+        return when (bean) {
+            is VLESSBean -> bean.uuid.isNotBlank() && isSupportedStandardBean(bean)
+            is VMessBean -> bean.uuid.isNotBlank() && isSupportedStandardBean(bean)
+            is TrojanBean -> bean.password.isNotBlank() && isSupportedStandardBean(bean)
+            is ShadowsocksBean -> bean.method.isNotBlank() && bean.password.isNotBlank()
+            else -> bean !is StandardV2RayBean
+        }
     }
+
+    private fun isSupportedStandardBean(bean: StandardV2RayBean): Boolean =
+        bean.type in SUPPORTED_TRANSPORTS && bean.hasSupportedSecurity()
 
     fun buildChainConfig(
         bean: AbstractBean,
@@ -75,6 +83,7 @@ object ConfigBuilder {
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
+        require(isSupportedBean(bean)) { "Unsupported transport: ${(bean as? StandardV2RayBean)?.type}" }
         val outbound = beanOutbound(bean, "proxy", detour = upstream?.let { "upstream" })
         return buildChainFullConfig(socksPort, listOf(outbound), upstream, dnsServers, ipv6Enabled)
     }
@@ -87,8 +96,8 @@ object ConfigBuilder {
         ipv6Enabled: Boolean = true,
     ): String {
         require(beans.isNotEmpty()) { "beans must not be empty for auto-select chain config" }
-        require(beans.size <= MAX_AUTO_OUTBOUNDS) { "auto-select supports at most $MAX_AUTO_OUTBOUNDS outbounds" }
         val supported = beans.filter { isSupportedBean(it) }
+        require(supported.size <= MAX_AUTO_OUTBOUNDS) { "auto-select supports at most $MAX_AUTO_OUTBOUNDS outbounds" }
         require(supported.isNotEmpty()) { "no beans with supported transport types" }
         val detourTag = upstream?.let { "upstream" }
         val proxyOutbounds = supported.mapIndexed { index, bean ->

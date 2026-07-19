@@ -10,3 +10,11 @@ abstract class AbstractBean {
     fun displayAddress(): String = "$serverAddress:$serverPort"
     fun displayName(): String = if (name.isNotEmpty()) name else displayAddress()
 }
+
+fun AbstractBean.hasRequiredOutboundCredentials(): Boolean = when (this) {
+    is VLESSBean -> uuid.isNotBlank()
+    is VMessBean -> uuid.isNotBlank()
+    is TrojanBean -> password.isNotBlank()
+    is ShadowsocksBean -> method.isNotBlank() && password.isNotBlank()
+    else -> true
+}
