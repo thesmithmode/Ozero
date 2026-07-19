@@ -109,12 +109,9 @@ class SingboxProbeService internal constructor(
                             val latency = withTimeoutOrNull(probeSettings.timeoutMs.toLong()) {
                                 probeLatencyMs(bean, probeSettings)
                             } ?: LATENCY_TIMED_OUT
+                            if (latency == LATENCY_SKIPPED_ACTIVE_RUNTIME) continue
                             val storedLatency = if (latency >= 0) latency else LATENCY_FAILED
-                            val probeError = when {
-                                storedLatency >= 0 -> null
-                                latency == LATENCY_SKIPPED_ACTIVE_RUNTIME -> PROBE_ERROR_BUSY
-                                else -> PROBE_ERROR_FAILED
-                            }
+                            val probeError = if (storedLatency >= 0) null else PROBE_ERROR_FAILED
                             profileDao.updateProbeResult(profile.id, storedLatency, probeError)
                             results.add(ProbeResult(index, profile, storedLatency))
                         } finally {
@@ -161,7 +158,6 @@ class SingboxProbeService internal constructor(
         const val MAX_CONCURRENT_PROFILE_PROBES = 1
         const val PROBE_ERROR_UNSUPPORTED = "unsupported"
         const val PROBE_ERROR_FAILED = "probe failed"
-        const val PROBE_ERROR_BUSY = "runtime busy"
         const val DEFAULT_PROBE_TIMEOUT_MS = 3_000
         const val MIN_PROBE_TIMEOUT_MS = 1_000
         const val MAX_PROBE_TIMEOUT_MS = 10_000

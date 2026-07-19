@@ -10,7 +10,10 @@ fun chartNiceMax(bps: Float): Float {
         1_073_741_824f,
         1_099_511_627_776f,
     )
-    val factors = floatArrayOf(1f, 2f, 2.5f, 5f, 10f)
+    val factors = floatArrayOf(
+        1f, 2f, 2.5f, 5f, 10f, 20f,
+        25f, 50f, 100f, 200f, 250f, 500f, 1_000f,
+    )
     val target = bps * 1.03f
     for (unit in units) {
         for (factor in factors) {
