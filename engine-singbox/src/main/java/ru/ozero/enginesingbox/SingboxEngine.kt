@@ -280,7 +280,8 @@ class SingboxEngine @Inject constructor(
         pendingSocksPort = 0
         pendingConfig = null
         val port = allocateChainPort()
-        val json = if (config.autoSelectBeanBlobs.isNotEmpty()) {
+        val proxyAutoSelect = config.autoSelectBeanBlobs.isNotEmpty()
+        val json = if (proxyAutoSelect) {
             val beans = supportedBeans(config.autoSelectBeanBlobs.take(MAX_AUTO_SELECT_OUTBOUNDS))
             if (beans.isEmpty()) return StartResult.Failure("chain auto-select: no valid beans")
             runCatching {
@@ -372,6 +373,7 @@ class SingboxEngine @Inject constructor(
                 return StartResult.Failure("sing-box proxy runtime failed to start")
             }
             activeSocksPort = port
+            activeAutoSelect = proxyAutoSelect
             PersistentLoggers.info(TAG, "startProxyMode sent over AIDL port=$port")
             StartResult.Success(socksPort = port)
         }.getOrElse {
@@ -515,11 +517,11 @@ class SingboxEngine @Inject constructor(
     }
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
-        val autoSelectRuntime = activeAutoSelect || activeTunAutoSelect
-        return awaitRoutedReady(allowWarmAutoSelect = autoSelectRuntime)
+        val canAcceptWarmAutoSelectRuntime = activeAutoSelect || activeTunAutoSelect
+        return awaitRoutedReady(canAcceptWarmAutoSelectRuntime = canAcceptWarmAutoSelectRuntime)
     }
 
-    private suspend fun awaitRoutedReady(allowWarmAutoSelect: Boolean): EnginePlugin.ReadyResult {
+    private suspend fun awaitRoutedReady(canAcceptWarmAutoSelectRuntime: Boolean): EnginePlugin.ReadyResult {
         var lastFailure: ProbeResult.Failure? = null
         repeat(READY_PROBE_ATTEMPTS) { attempt ->
             when (val result = probeInternal(clearOnRoutedFailure = false)) {
@@ -534,15 +536,22 @@ class SingboxEngine @Inject constructor(
                 }
             }
         }
-        if (allowWarmAutoSelect && isRuntimeStillRunning()) {
-            PersistentLoggers.warn(TAG, "awaitReady allows warm auto-select runtime after routed probe timeout")
+        val failureReason = lastFailure?.reason ?: "sing-box routed probe failed"
+        if (canAcceptWarmAutoSelectRuntime && hasWarmAutoSelectState() && isRuntimeStillRunning()) {
+            PersistentLoggers.warn(
+                TAG,
+                "awaitReady allows warm auto-select runtime after $READY_PROBE_ATTEMPTS routed probe attempts " +
+                    "lastFailure=$failureReason",
+            )
             return EnginePlugin.ReadyResult.Ready
         }
         activeSocksPort = 0
         activeTunAutoSelect = false
-        if (allowWarmAutoSelect) activeAutoSelect = false
-        return EnginePlugin.ReadyResult.Timeout(lastFailure?.reason ?: "sing-box routed probe failed")
+        if (canAcceptWarmAutoSelectRuntime) activeAutoSelect = false
+        return EnginePlugin.ReadyResult.Timeout(failureReason)
     }
+
+    private fun hasWarmAutoSelectState(): Boolean = activeSocksPort > 0 && (activeAutoSelect || activeTunAutoSelect)
 
     private fun isRuntimeStillRunning(): Boolean = runCatching {
         proxy?.runtimeRunning() == true

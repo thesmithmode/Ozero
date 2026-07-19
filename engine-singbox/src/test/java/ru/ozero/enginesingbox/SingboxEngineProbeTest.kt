@@ -606,6 +606,54 @@ class SingboxEngineProbeTest {
     }
 
     @Test
+    fun `awaitReady fast fails warm auto select when runtime health clears active port`() = runTest {
+        val engine = buildEngine()
+        engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.runtimeRunning() } returnsMany listOf(false, true)
+        engine.setPrivateField("proxy", process)
+        engine.setPrivateField("activeSocksPort", 49408)
+        engine.setPrivateField("activeAutoSelect", true)
+
+        val result = engine.awaitReady()
+
+        val failure = assertIs<EnginePlugin.ReadyResult.Timeout>(result)
+        assertTrue(failure.reason.contains("not running"))
+        assertEquals(0, engine.privateIntField("activeSocksPort"))
+        assertEquals(false, engine.privateBooleanField("activeAutoSelect"))
+    }
+
+    @Test
+    fun `proxy mode auto select is eligible for warm awaitReady`() = runTest {
+        val engine = buildEngine()
+        engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.startProxyMode(any(), any()) } returns Unit
+        every { process.runtimeRunning() } returns true
+        engine.setPrivateField("proxy", process)
+
+        val start = engine.start(
+            EngineConfig.Singbox(
+                beanBlob = ByteArray(0),
+                protocolType = SingboxEngine.PROTOCOL_AUTO_SELECT,
+                autoSelectBeanBlobs = listOf(
+                    makeVlessBlob("one.example.com"),
+                    makeVlessBlob("two.example.com"),
+                ),
+                proxyMode = true,
+            ),
+            Upstream.None,
+        )
+        val success = assertIs<StartResult.Success>(start)
+        val ready = engine.awaitReady()
+
+        assertIs<EnginePlugin.ReadyResult.Ready>(ready)
+        assertEquals(success.socksPort, engine.privateIntField("activeSocksPort"))
+        assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
+        verify(exactly = 0) { process.stopAndWait(any()) }
+    }
+
+    @Test
     fun `awaitReady retries transient routed probe failures without clearing active port`() = runTest {
         val engine = buildEngine()
         var calls = 0
