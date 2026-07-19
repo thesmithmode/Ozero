@@ -1,6 +1,7 @@
 package ru.ozero.singboxconfig
 
 import org.junit.jupiter.api.Test
+import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
@@ -171,6 +172,24 @@ class ConfigBuilderAutoSelectTest {
         assertFalse(json.contains("vmess-invalid.example.com"))
         assertFalse(json.contains("trojan-invalid.example.com"))
         assertFalse(json.contains("ss-invalid.example.com"))
+    }
+
+    @Test
+    fun `auto config applies outbound cap after filtering unsupported beans`() {
+        val supported = (1..50).map { makeVless("server$it.example.com", 443) }
+        val invalid = makeVless("invalid.example.com", 443).apply { uuid = "" }
+
+        val json = ConfigBuilder.buildSingboxAutoConfig(supported + invalid)
+
+        assertContains(json, "\"server\":\"server50.example.com\"")
+        assertFalse(json.contains("invalid.example.com"))
+    }
+
+    @Test
+    fun `isSupportedBean preserves unknown non-standard beans`() {
+        val bean = object : AbstractBean() {}
+
+        assertTrue(ConfigBuilder.isSupportedBean(bean))
     }
 
     @Test

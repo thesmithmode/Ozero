@@ -110,6 +110,17 @@ class ConfigBuilderChainTest {
     }
 
     @Test
+    fun `auto chain config applies outbound cap after filtering unsupported beans`() {
+        val supported = (1..50).map { makeBean(uuid = "aaaa-$it", host = "s$it.com") }
+        val unsupported = makeBean(uuid = "", host = "invalid.com")
+
+        val json = ConfigBuilder.buildAutoChainConfig(supported + unsupported, socksPort = 49410)
+
+        assertContains(json, "\"server\":\"s50.com\"")
+        assertFalse(json.contains("invalid.com"))
+    }
+
+    @Test
     fun `auto chain config fails fast when all transports unsupported`() {
         val unsupportedOnly = listOf(
             makeBean(uuid = "aaaa-2", host = "s2.com").apply { type = "splithttp" },
