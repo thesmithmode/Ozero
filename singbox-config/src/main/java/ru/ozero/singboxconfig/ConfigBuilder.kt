@@ -66,10 +66,10 @@ object ConfigBuilder {
     fun isSupportedBean(bean: AbstractBean): Boolean {
         if (bean.serverPort !in MIN_PORT..MAX_PORT) return false
         return when (bean) {
-            is VLESSBean -> bean.hasRequiredOutboundCredentials() && isSupportedStandardBean(bean)
-            is VMessBean -> bean.hasRequiredOutboundCredentials() && isSupportedStandardBean(bean)
-            is TrojanBean -> bean.hasRequiredOutboundCredentials() && isSupportedStandardBean(bean)
-            is ShadowsocksBean -> bean.hasRequiredOutboundCredentials()
+            is VLESSBean -> bean.uuid.isNotBlank() && isSupportedStandardBean(bean)
+            is VMessBean -> bean.uuid.isNotBlank() && isSupportedStandardBean(bean)
+            is TrojanBean -> bean.password.isNotBlank() && isSupportedStandardBean(bean)
+            is ShadowsocksBean -> bean.method.isNotBlank() && bean.password.isNotBlank()
             else -> bean !is StandardV2RayBean
         }
     }

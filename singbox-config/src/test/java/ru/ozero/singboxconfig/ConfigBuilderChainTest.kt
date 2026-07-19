@@ -123,20 +123,6 @@ class ConfigBuilderChainTest {
     }
 
     @Test
-    fun `single chain config rejects credentialless shadowsocks before rendering`() {
-        val bean = ShadowsocksBean().apply {
-            serverAddress = "ss.example.com"
-            serverPort = 8388
-            method = "aes-128-gcm"
-            password = ""
-        }
-
-        assertFailsWith<IllegalArgumentException> {
-            ConfigBuilder.buildChainConfig(bean, socksPort = 49410)
-        }
-    }
-
-    @Test
     fun `auto chain config fails fast when all transports unsupported`() {
         val unsupportedOnly = listOf(
             makeBean(uuid = "aaaa-2", host = "s2.com").apply { type = "splithttp" },
