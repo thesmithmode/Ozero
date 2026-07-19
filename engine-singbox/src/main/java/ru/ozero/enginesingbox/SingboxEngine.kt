@@ -516,10 +516,10 @@ class SingboxEngine @Inject constructor(
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
         val autoSelectRuntime = activeAutoSelect || activeTunAutoSelect
-        return awaitRoutedReady(clearAutoSelect = autoSelectRuntime)
+        return awaitRoutedReady(allowWarmAutoSelect = autoSelectRuntime)
     }
 
-    private suspend fun awaitRoutedReady(clearAutoSelect: Boolean): EnginePlugin.ReadyResult {
+    private suspend fun awaitRoutedReady(allowWarmAutoSelect: Boolean): EnginePlugin.ReadyResult {
         var lastFailure: ProbeResult.Failure? = null
         repeat(READY_PROBE_ATTEMPTS) { attempt ->
             when (val result = probeInternal(clearOnRoutedFailure = false)) {
@@ -534,11 +534,19 @@ class SingboxEngine @Inject constructor(
                 }
             }
         }
+        if (allowWarmAutoSelect && isRuntimeStillRunning()) {
+            PersistentLoggers.warn(TAG, "awaitReady allows warm auto-select runtime after routed probe timeout")
+            return EnginePlugin.ReadyResult.Ready
+        }
         activeSocksPort = 0
         activeTunAutoSelect = false
-        if (clearAutoSelect) activeAutoSelect = false
+        if (allowWarmAutoSelect) activeAutoSelect = false
         return EnginePlugin.ReadyResult.Timeout(lastFailure?.reason ?: "sing-box routed probe failed")
     }
+
+    private fun isRuntimeStillRunning(): Boolean = runCatching {
+        proxy?.runtimeRunning() == true
+    }.getOrDefault(false)
 
     override fun stats(): Flow<EngineStats> = flow {
         while (true) {
