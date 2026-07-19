@@ -264,6 +264,8 @@ class FptnEngine(
                 } catch (e: Exception) {
                     if (isActive) {
                         PersistentLoggers.error(TAG, "TUN read loop terminated: ${e.javaClass.simpleName}")
+                    } else {
+                        Log.d(TAG, "TUN read loop stopped: ${e.javaClass.simpleName}")
                     }
                 }
             }
@@ -304,10 +306,10 @@ class FptnEngine(
             Log.d(TAG, "stop: nativeStop handle=$h")
             wsClient.nativeStop(h)
         }
+        scope?.cancel()
         _pfd?.close()
         _pfd = null
 
-        scope?.cancel()
         scope?.coroutineContext?.get(Job)?.join()
         Log.d(TAG, "stop: TUN loop joined")
 

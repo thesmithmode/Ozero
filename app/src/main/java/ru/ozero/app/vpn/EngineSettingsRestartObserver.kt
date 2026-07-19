@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.PersistentLoggers
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.TrafficMode
 
@@ -30,6 +31,7 @@ class EngineSettingsRestartObserver(
         val trafficMode: TrafficMode,
         val customDnsServers: List<String>,
         val engineAutoPriority: List<EngineId>?,
+        val byedpiUiSettings: ByeDpiUiSettings = ByeDpiUiSettings.DEFAULT,
     )
 
     data class Trigger(val previous: Snapshot, val snapshot: Snapshot)
@@ -43,6 +45,11 @@ class EngineSettingsRestartObserver(
                     manualEngine = it.manualEngine,
                     byedpiWinningArgs = it.byedpiWinningArgs?.trim(),
                     byedpiUseUiMode = it.byedpiUseUiMode,
+                    byedpiUiSettings = if (it.byedpiUseUiMode) {
+                        it.byedpiUiSettings
+                    } else {
+                        ByeDpiUiSettings.DEFAULT
+                    },
                     ipv6Enabled = it.ipv6Enabled,
                     trafficMode = it.trafficMode,
                     customDnsServers = it.customDnsServers,
@@ -129,6 +136,7 @@ class EngineSettingsRestartObserver(
             EngineId.BYEDPI ->
                 byedpiWinningArgs == other.byedpiWinningArgs &&
                     byedpiUseUiMode == other.byedpiUseUiMode &&
+                    byedpiUiSettings == other.byedpiUiSettings &&
                     commonRuntimeMatches
             else -> commonRuntimeMatches
         }

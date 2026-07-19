@@ -6,7 +6,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
@@ -14,7 +16,10 @@ import ru.ozero.app.logging.AppLogger
 import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
+import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.SettingsRepository
 import javax.inject.Inject
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Singleton
 
 @Singleton
@@ -22,23 +27,32 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
     @ApplicationContext private val context: Context,
     private val observer: EngineRuntimeConfigRestartObserver,
     private val tunnelController: TunnelController,
+    private val settingsRepository: SettingsRepository,
 ) {
     private val restartMutex = Mutex()
     private val restartQueue = ArrayDeque<String>()
     private var restartInProgress = false
-    private var started = false
+    private val started = AtomicBoolean(false)
 
     fun start(scope: CoroutineScope) {
-        if (started) return
-        started = true
+        if (!started.compareAndSet(false, true)) return
+        val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
+            AppLogger.e(TAG, "VPN restart observer failed", throwable)
+        }
         observer.start(
             scope = scope,
-            exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-                AppLogger.e(TAG, "runtime config restart observer failed", throwable)
-            },
+            exceptionHandler = exceptionHandler,
             state = tunnelController.state,
             restart = ::restartVpnIfRunning,
         )
+        val settingsObserver = EngineSettingsRestartObserver(
+            settingsFlow = settingsRepository.settings,
+            vpnStateProvider = { tunnelController.state.value },
+            onRestartConnected = { snapshot -> restartVpnIfRunning(snapshot.restartReason()) },
+        )
+        scope.launch(exceptionHandler) {
+            settingsObserver.triggers.collect { trigger -> settingsObserver.handle(trigger) }
+        }
     }
 
     internal suspend fun restartVpnIfRunning(reason: String): Boolean {
@@ -147,6 +161,12 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
             throw e
         }
     }
+
+    private fun EngineSettingsRestartObserver.Snapshot.restartReason(): String =
+        "settings changed: target=${targetEngineForRestart()?.name ?: "AUTO"}"
+
+    private fun EngineSettingsRestartObserver.Snapshot.targetEngineForRestart(): EngineId? =
+        manualEngine ?: engineAutoPriority?.firstOrNull()
 
     private fun sendVpnAction(action: String) {
         context.startService(

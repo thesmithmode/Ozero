@@ -10,6 +10,7 @@ import ru.ozero.singboxfmt.StandardV2RayBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxfmt.hasRequiredOutboundCredentials
 
 private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
 private const val REALITY_PUBLIC_KEY_BYTES = 32
@@ -43,8 +44,8 @@ object ConfigBuilder {
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
-        require(beans.size <= MAX_AUTO_OUTBOUNDS) { "auto-select supports at most $MAX_AUTO_OUTBOUNDS outbounds" }
         val supported = beans.filter { isSupportedBean(it) }
+        require(supported.size <= MAX_AUTO_OUTBOUNDS) { "auto-select supports at most $MAX_AUTO_OUTBOUNDS outbounds" }
         require(supported.isNotEmpty()) { "no beans with supported transport types" }
         val proxyOutbounds = supported.mapIndexed { index, bean -> beanOutbound(bean, "proxy-$index") }
         val tagList = proxyOutbounds.indices.joinToString(",") { jsonString("proxy-$it") }
@@ -64,9 +65,17 @@ object ConfigBuilder {
 
     fun isSupportedBean(bean: AbstractBean): Boolean {
         if (bean.serverPort !in MIN_PORT..MAX_PORT) return false
-        if (bean !is StandardV2RayBean) return true
-        return bean.type in SUPPORTED_TRANSPORTS && bean.hasSupportedSecurity()
+        return when (bean) {
+            is VLESSBean -> bean.hasRequiredOutboundCredentials() && isSupportedStandardBean(bean)
+            is VMessBean -> bean.hasRequiredOutboundCredentials() && isSupportedStandardBean(bean)
+            is TrojanBean -> bean.hasRequiredOutboundCredentials() && isSupportedStandardBean(bean)
+            is ShadowsocksBean -> bean.hasRequiredOutboundCredentials()
+            else -> bean !is StandardV2RayBean
+        }
     }
+
+    private fun isSupportedStandardBean(bean: StandardV2RayBean): Boolean =
+        bean.type in SUPPORTED_TRANSPORTS && bean.hasSupportedSecurity()
 
     fun buildChainConfig(
         bean: AbstractBean,
@@ -75,6 +84,7 @@ object ConfigBuilder {
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
+        require(isSupportedBean(bean)) { "Unsupported transport: ${(bean as? StandardV2RayBean)?.type}" }
         val outbound = beanOutbound(bean, "proxy", detour = upstream?.let { "upstream" })
         return buildChainFullConfig(socksPort, listOf(outbound), upstream, dnsServers, ipv6Enabled)
     }
@@ -87,8 +97,8 @@ object ConfigBuilder {
         ipv6Enabled: Boolean = true,
     ): String {
         require(beans.isNotEmpty()) { "beans must not be empty for auto-select chain config" }
-        require(beans.size <= MAX_AUTO_OUTBOUNDS) { "auto-select supports at most $MAX_AUTO_OUTBOUNDS outbounds" }
         val supported = beans.filter { isSupportedBean(it) }
+        require(supported.size <= MAX_AUTO_OUTBOUNDS) { "auto-select supports at most $MAX_AUTO_OUTBOUNDS outbounds" }
         require(supported.isNotEmpty()) { "no beans with supported transport types" }
         val detourTag = upstream?.let { "upstream" }
         val proxyOutbounds = supported.mapIndexed { index, bean ->

@@ -406,6 +406,7 @@ class SingboxProbeServiceTest {
             name = host,
             beanBlob = KryoSerializer.serialize(
                 VLESSBean().apply {
+                    uuid = "12345678-1234-1234-1234-123456789abc"
                     serverAddress = host
                     serverPort = port
                     this.type = type

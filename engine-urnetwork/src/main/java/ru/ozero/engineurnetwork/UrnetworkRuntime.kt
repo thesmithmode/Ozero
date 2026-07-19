@@ -101,7 +101,7 @@ object UrnetworkRuntime {
             manager = null
             runCatching { Sdk.freeMemory() }
                 .onFailure { PersistentLoggers.warn(TAG, "Sdk.freeMemory threw: ${it.message}") }
-            PersistentLoggers.warn(TAG, "runtime released pid=${android.os.Process.myPid()}")
+            Log.i(TAG, "runtime released pid=${android.os.Process.myPid()}")
         }
     }
 }
