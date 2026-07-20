@@ -49,7 +49,7 @@ class SingboxEngineWarmReadinessTest {
     }
 
     @Test
-    fun `proxy mode auto select is eligible for warm awaitReady`() = runTest {
+    fun `proxy mode auto select stays unready until routed probe succeeds`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
         val process = mockk<ISingboxEngineProcess>()
@@ -57,24 +57,25 @@ class SingboxEngineWarmReadinessTest {
         every { process.runtimeRunning() } returns true
         engine.setPrivateField("proxy", process)
 
-        val start = engine.start(
-            EngineConfig.Singbox(
-                beanBlob = ByteArray(0),
-                protocolType = SingboxEngine.PROTOCOL_AUTO_SELECT,
-                autoSelectBeanBlobs = listOf(
-                    makeVlessBlob("one.example.com"),
-                    makeVlessBlob("two.example.com"),
+        assertIs<StartResult.Success>(
+            engine.start(
+                EngineConfig.Singbox(
+                    beanBlob = ByteArray(0),
+                    protocolType = SingboxEngine.PROTOCOL_AUTO_SELECT,
+                    autoSelectBeanBlobs = listOf(
+                        makeVlessBlob("one.example.com"),
+                        makeVlessBlob("two.example.com"),
+                    ),
+                    proxyMode = true,
                 ),
-                proxyMode = true,
+                Upstream.None,
             ),
-            Upstream.None,
         )
-        val success = assertIs<StartResult.Success>(start)
         val ready = engine.awaitReady()
 
-        assertIs<EnginePlugin.ReadyResult.Ready>(ready)
-        assertEquals(success.socksPort, engine.privateIntField("activeSocksPort"))
-        assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
+        assertIs<EnginePlugin.ReadyResult.Timeout>(ready)
+        assertEquals(0, engine.privateIntField("activeSocksPort"))
+        assertEquals(false, engine.privateBooleanField("activeAutoSelect"))
         verify(exactly = 0) { process.stopAndWait(any()) }
     }
 
