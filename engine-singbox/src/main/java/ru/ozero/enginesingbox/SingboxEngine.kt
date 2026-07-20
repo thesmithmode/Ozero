@@ -515,7 +515,10 @@ class SingboxEngine @Inject constructor(
                 activeSocksPort = 0
                 activeTunAutoSelect = false
             }
-            ProbeResult.Failure("sing-box routed probe failed")
+            ProbeResult.Failure(
+                "sing-box routed probe failed",
+                code = ProbeResult.Failure.Code.ROUTED_PROBE_FAILED,
+            )
         }
     }
 
@@ -551,7 +554,8 @@ class SingboxEngine @Inject constructor(
         return EnginePlugin.ReadyResult.Timeout(failureReason)
     }
 
-    private fun ProbeResult.Failure.isRoutedProbeFailure(): Boolean = reason == "sing-box routed probe failed"
+    private fun ProbeResult.Failure.isRoutedProbeFailure(): Boolean =
+        code == ProbeResult.Failure.Code.ROUTED_PROBE_FAILED
 
     override fun stats(): Flow<EngineStats> = flow {
         while (true) {

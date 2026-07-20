@@ -8,6 +8,7 @@ import org.json.JSONObject
 object VMessFmt {
 
     private val TRUTHY_JSON_VALUES = setOf("1", "true", "yes")
+    private val FALSEY_JSON_VALUES = setOf("0", "false", "no")
 
     fun parse(uri: String): VMessBean {
         require(uri.startsWith("vmess://")) { "Not a vmess:// URI" }
@@ -52,14 +53,20 @@ object VMessFmt {
     }
 
     private fun jsonBoolean(j: JSONObject, vararg keys: String): Boolean =
-        keys.any { key ->
-            when (val value = j.opt(key)) {
-                is Boolean -> value
-                is Number -> value.toInt() != 0
-                is String -> value.lowercase(Locale.ROOT) in TRUTHY_JSON_VALUES
-                else -> false
-            }
+        keys.fold<Boolean?>(null) { resolved, key ->
+            if (j.has(key)) jsonBooleanValue(j.opt(key)) ?: resolved else resolved
+        } ?: false
+
+    private fun jsonBooleanValue(value: Any?): Boolean? = when (value) {
+        is Boolean -> value
+        is Number -> value.toInt() != 0
+        is String -> when (value.lowercase(Locale.ROOT)) {
+            in TRUTHY_JSON_VALUES -> true
+            in FALSEY_JSON_VALUES -> false
+            else -> null
         }
+        else -> null
+    }
 
     private fun parseStd(parsed: UriCompat): VMessBean {
         val bean = VMessBean()

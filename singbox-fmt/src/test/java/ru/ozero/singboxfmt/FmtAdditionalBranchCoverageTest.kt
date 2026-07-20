@@ -48,6 +48,23 @@ class FmtAdditionalBranchCoverageTest {
     }
 
     @Test
+    fun `vmess json insecure conflict uses deterministic key order`() {
+        val json = """
+            {
+              "add":"vm.example.com",
+              "id":"id",
+              "tls":"tls",
+              "allowInsecure":true,
+              "skip-cert-verify":"false"
+            }
+        """.trimIndent()
+        val encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(json.toByteArray())
+        val bean = V2RayFmt.parseVMess("vmess://$encoded")
+
+        assertEquals(false, bean.allowInsecure)
+    }
+
+    @Test
     fun `vless and shadowsocks cover filled optional branch values`() {
         val vlessUri = "vless://id@vl.example.com:8443" +
             "?type=xhttp&host=front&path=/split&mode=stream-up" +
