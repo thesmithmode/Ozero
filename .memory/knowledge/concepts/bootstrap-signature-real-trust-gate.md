@@ -3,7 +3,7 @@ title: Bootstrap signature real trust gate
 sources:
   - daily/2026-06-01.md
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-07-20
 ---
 # Bootstrap signature real trust gate
 

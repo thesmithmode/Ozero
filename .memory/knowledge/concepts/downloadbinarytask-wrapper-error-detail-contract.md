@@ -3,7 +3,7 @@ title: DownloadBinaryTask wrapper must preserve actionable error details
 sources:
   - daily/2026-06-04.md
 created: 2026-06-04
-updated: 2026-06-04
+updated: 2026-07-20
 ---
 # DownloadBinaryTask wrapper must preserve actionable error details
 
@@ -18,6 +18,8 @@ updated: 2026-06-04
 The 2026-06-04 CI investigation found `buildSrc` failing in `DownloadBinaryTaskTest`. The production wrapper had shifted toward generic top-level messages, while tests expected details from the cause such as malformed YAML, HTTP `404`, or SHA256 mismatch. The root cause was loss of actionable diagnostic detail, not a network or coverage problem.
 
 For supply-chain tasks, wrapper messages are part of the operational contract. They allow CI logs to distinguish lock-file parse failures, download failures, and integrity failures without guessing. This relates to [[concepts/ci-artifact-report-driven-debugging]] and [[concepts/ci-coverage-gate-artifact-trust-contract]] because reliable CI diagnosis depends on precise artifacts and messages.
+
+Preserving detail does not require retaining unreachable nullable-message fallbacks. The wrapper should combine a stable failure category with the actual cause message when present, while dead `message ?: fallback` branches can be removed when the exception contract guarantees a message. This improves both diagnostics and honest branch coverage.
 
 ## Related Concepts
 - [[concepts/ci-artifact-report-driven-debugging]]

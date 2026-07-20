@@ -3,7 +3,7 @@ title: Startup snapshot acceptance must match runtime-affecting settings
 sources:
   - daily/2026-06-03.md
 created: 2026-06-04
-updated: 2026-06-13
+updated: 2026-07-20
 ---
 # Startup snapshot acceptance must match runtime-affecting settings
 ## Key Points

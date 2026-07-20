@@ -3,7 +3,7 @@ title: CI push is not a hypothesis proof
 sources:
   - daily/2026-06-02.md
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-07-20
 ---
 
 # CI push is not a hypothesis proof

@@ -67,3 +67,19 @@ test
 - Source: daily/2026-06-03.md
 - Articles created: [[concepts/current-ci-run-grounding-before-fix]], [[concepts/startsequence-startup-tun-killswitch-regression]], [[concepts/powershell-replace-literal-newline-trap]], [[concepts/bug-by-bug-red-ci-stabilization]], [[connections/runtime-restart-ci-stabilization-feedback-loop]]
 - Articles updated: [[concepts/engine-settings-restart-startup-runtime-match]], [[concepts/warp-raw-ini-preserve-unmodeled-peer-fields]], [[concepts/singbox-selected-profile-row-fingerprint]], [[concepts/dev-ci-kotlin-style-cascade]], [[concepts/singbox-subscription-branch-coverage-edges]]
+## [2026-07-20T19:26:37+03:00] compile | 2026-06-01.md
+- Source: daily/2026-06-01.md
+- Articles created: none (existing articles reused to avoid duplicates)
+- Articles updated: [[concepts/runTest-backgroundscope-hot-flow-collectors]], [[concepts/warp-pretunnel-endpoint-doh-parity]], [[concepts/jacoco-honest-coverage-gate-boundary]], [[concepts/bootstrap-signature-real-trust-gate]], [[concepts/engine-runtime-config-restart-observer-stateflow-tests]], [[concepts/unified-logger-rotation-test-helper-append-contract]], [[connections/coverage-gate-vs-test-harness-validity-loop]]
+## [2026-07-20T19:31:43+03:00] compile | 2026-06-02.md
+- Source: daily/2026-06-02.md
+- Articles created: none (existing articles reused to avoid duplicates)
+- Articles updated: [[concepts/ci-push-not-hypothesis-proof]], [[concepts/jacoco-testable-logic-exclude-boundary]], [[concepts/runtime-restart-application-scope-observer]], [[concepts/runtime-restart-service-owned-action]], [[concepts/watchdog-active-engine-failure-filter]], [[concepts/auto-preflight-all-fail-stop-contract]], [[connections/runtime-restart-watchdog-preflight-state-ownership]]
+## [2026-07-20T19:35:28+03:00] compile | 2026-06-03.md
+- Source: daily/2026-06-03.md
+- Articles created: none (existing articles reused to avoid duplicates)
+- Articles updated: [[concepts/bug-by-bug-red-ci-stabilization]], [[concepts/powershell-replace-literal-newline-trap]], [[concepts/startsequence-startup-tun-killswitch-regression]], [[concepts/current-ci-run-grounding-before-fix]], [[concepts/engine-settings-restart-startup-runtime-match]], [[concepts/warp-raw-ini-preserve-unmodeled-peer-fields]], [[concepts/singbox-selected-profile-row-fingerprint]], [[connections/runtime-restart-ci-stabilization-feedback-loop]]
+## [2026-07-20T19:43:14+03:00] compile | 2026-06-04.md
+- Source: daily/2026-06-04.md
+- Articles created: none (existing articles reused to avoid duplicates)
+- Articles updated: [[concepts/ci-current-run-batch-failure-triage]], [[concepts/coverage-gap-targeted-branch-remediation]], [[concepts/kotlin-atomicreference-null-generic-trap]], [[concepts/tcp-probe-test-local-closed-port-contract]], [[concepts/downloadbinarytask-wrapper-error-detail-contract]], [[connections/current-ci-green-proof-vs-coverage-debt-loop]]

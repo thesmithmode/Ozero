@@ -155,7 +155,7 @@ object WarpModule {
         override val engineId: EngineId = EngineId.WARP
         override val changes = store.activeSlot().map { it?.runtimeFingerprint() }
         override val includeStarting: Boolean = false
-        override val replayAfterStarting: Boolean = true
+        override val replayAfterStarting: Boolean = false
         override val restartReason: String = "WARP active slot changed while active -> restart"
     }
 

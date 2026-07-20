@@ -3,7 +3,7 @@ title: Targeted branch-coverage remediation before gate weakening
 sources:
   - daily/2026-06-04.md
 created: 2026-06-05
-updated: 2026-06-09
+updated: 2026-07-20
 ---
 
 ## Summary
@@ -23,6 +23,8 @@ The sessions document a cycle: global JaCoCo percentages were red despite green 
 Late 2026-06-04 sessions sharpened the method: coverage work should start from JaCoCo XML/sourcefile hotspots, not from module-level percentage guesses. This prevented WARP-related misses from being assigned to the wrong module and separated real parser/helper branches from synthetic coroutine or dead fallback branches. The related pattern is captured in [[concepts/jacoco-sourcefile-hotspot-driven-coverage]].
 
 The same approach also reduced collateral risk: where branches were provably unreachable, dead code was simplified and removed, and helper visibility stayed internal. This avoided broad excludes and preserved verifier trust boundaries while still reducing recurring “historical debt” risk in runtime-heavy modules.
+
+Concrete examples included split-tunnel `ALLOWLIST` and `BLOCKLIST` paths, shutdown-without-session behavior, empty streams, malformed parser input, raw WARP INI preservation, and transport edge cases. These scenarios demonstrate that a useful coverage test names an observable branch contract; it does not merely execute additional lines.
 
 ## Related Concepts
 - [[concepts/buildsrc-lockfileparser-date-branch-coverage]]

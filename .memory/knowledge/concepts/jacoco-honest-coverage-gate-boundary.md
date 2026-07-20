@@ -3,7 +3,7 @@ title: JaCoCo honest coverage gate boundary
 sources:
   - daily/2026-06-01.md
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-07-20
 ---
 # JaCoCo honest coverage gate boundary
 

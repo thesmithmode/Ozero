@@ -3,7 +3,7 @@ title: TCP Probe Test Local Closed Port Contract
 sources:
   - [[daily/2026-06-04]]
 created: 2026-06-04
-updated: 2026-06-04
+updated: 2026-07-20
 ---
 # TCP Probe Test Local Closed Port Contract
 
@@ -18,6 +18,8 @@ updated: 2026-06-04
 During the 2026-06-04 CI recovery, `TcpProbeTest` was found fragile because `10.255.255.1`, previously treated as a non-answering private address, returned `Ok` in the local network. That made the test dependent on ambient routing rather than the TCP probe failure contract.
 
 The stable pattern is to allocate or identify a localhost port with no listener and use that as the failure target. This makes the negative path independent of external network topology and keeps the test focused on controlled connection refusal or timeout handling.
+
+The port must remain under test control: obtain an unused local port and ensure no listener is active when the probe runs. This keeps the assertion about probe behavior rather than about routing policy, VPN state, or an organization's private-address topology.
 
 ## Related Concepts
 - [[concepts/regression-test-bounded-waits]]

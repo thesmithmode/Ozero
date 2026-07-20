@@ -3,7 +3,7 @@ title: Singbox restart fingerprints must include the selected profile row payloa
 sources:
   - daily/2026-06-03.md
 created: 2026-06-04
-updated: 2026-06-13
+updated: 2026-07-20
 ---
 # Singbox restart fingerprints must include the selected profile row payload
 ## Key Points

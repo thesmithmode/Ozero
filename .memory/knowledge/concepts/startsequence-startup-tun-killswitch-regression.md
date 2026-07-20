@@ -3,7 +3,7 @@ title: StartSequenceCoordinator must preserve startup TUN and killswitch orderin
 sources:
   - daily/2026-06-03.md
 created: 2026-06-13
-updated: 2026-06-13
+updated: 2026-07-20
 ---
 # StartSequenceCoordinator must preserve startup TUN and killswitch ordering
 ## Key Points

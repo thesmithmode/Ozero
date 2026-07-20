@@ -276,4 +276,11 @@ class MainScreenChartTest {
         assertEquals(1f, result[0].first)
         assertEquals(2f, result[29].first)
     }
+
+    @Test
+    fun `chartNiceMax uses 30 GiB ceiling for a 28_5 GiB peak`() {
+        val gib = 1_073_741_824f
+
+        assertEquals(30f * gib, ru.ozero.app.ui.components.chartNiceMax(28.5f * gib))
+    }
 }

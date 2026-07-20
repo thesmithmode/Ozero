@@ -3,7 +3,7 @@ title: PowerShell replace can insert literal newline escape text
 sources:
   - daily/2026-06-03.md
 created: 2026-06-13
-updated: 2026-06-13
+updated: 2026-07-20
 ---
 # PowerShell replace can insert literal newline escape text
 ## Key Points

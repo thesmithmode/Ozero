@@ -3,7 +3,7 @@ title: "JaCoCo excludes must keep testable production logic in the gate"
 sources:
   - daily/2026-06-02.md
 created: 2026-06-04
-updated: 2026-06-04
+updated: 2026-07-20
 ---
 # JaCoCo excludes must keep testable production logic in the gate
 ## Key Points

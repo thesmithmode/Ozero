@@ -3,10 +3,13 @@ title: Engine runtime config restart observer StateFlow tests
 sources:
   - daily/2026-06-01.md
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-07-20
 ---
 
 # Engine runtime config restart observer StateFlow tests
+
+## Summary
+`EngineRuntimeConfigRestartObserver` tests should model provider state with replaying flows and isolate Android lifecycle behavior so restart-state coverage remains deterministic on the JVM.
 
 ## Key Points
 - Tests for `EngineRuntimeConfigRestartObserver` should model real providers as state/baseline flows, not replayless hot flows.

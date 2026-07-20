@@ -3,7 +3,7 @@ title: Current CI Green Proof vs Coverage Debt Loop
 sources:
   - [[daily/2026-06-04]]
 created: 2026-06-04
-updated: 2026-06-04
+updated: 2026-07-20
 ---
 # Current CI Green Proof vs Coverage Debt Loop
 
@@ -18,6 +18,8 @@ updated: 2026-06-04
 The 2026-06-04 sessions connected two recurring problems: `dev` was only green when a fresh GitHub Actions run ended in `success`, while multiple modules had coverage deficits that could not be resolved by treating every red job as a product regression. Some failures were ordinary compile/style regressions, but others were historical coverage debt exposed by a broader or stricter gate.
 
 This creates a loop: gather all failing jobs from the current run, fix compile/style/assertion blockers first, then use JaCoCo reports to decide whether to add targeted tests, simplify dead branches, or apply explicit per-module baselines for historical runtime surfaces. The loop ends only with terminal CI success, not with a commit or partial local pass.
+
+Explicitly authorized local lint, unit tests, and coverage verification can cheaply reject a known-bad push, but they remain secondary evidence. The authoritative final signal is a fresh GitHub Actions run bound to the pushed SHA, because workflow wiring, test discovery, and hosted-runner behavior are part of the acceptance contract.
 
 ## Related Concepts
 - [[concepts/ci-current-run-batch-failure-triage]]

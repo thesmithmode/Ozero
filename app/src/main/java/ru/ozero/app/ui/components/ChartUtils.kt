@@ -18,6 +18,7 @@ private val CHART_NICE_FACTORS = floatArrayOf(
     10f,
     20f,
     25f,
+    30f,
     50f,
     100f,
     200f,

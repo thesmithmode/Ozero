@@ -3,7 +3,7 @@ title: Kotlin AtomicReference null generic trap
 sources:
   - daily/2026-06-04.md
 created: 2026-06-04
-updated: 2026-06-04
+updated: 2026-07-20
 ---
 # Kotlin AtomicReference null generic trap
 
@@ -18,6 +18,8 @@ updated: 2026-06-04
 The 2026-06-04 CI repair loop found that new `common-vpn` tests used `AtomicReference(null)` without explicit generic types. Kotlin inferred an unusable nullable bottom type, which broke compilation where concrete fields or callbacks were expected. This blocked `common-vpn` before test reports and coverage artifacts could be generated.
 
 The practical rule is to write the domain type at construction time, for example `AtomicReference<MyType?>(null)`, when the reference is used across fakes, callbacks, or observable state. This belongs with other Kotlin test infrastructure traps such as [[concepts/kotlin-action-lambda-unused-param]] and [[concepts/cascade-unresolved-import-masking]] because it can look like a broader module failure while the root cause is a small type inference issue.
+
+When a grouped Android job has no test or coverage artifact, compilation output must be checked before the job is classified as a JaCoCo failure. In this incident, explicit generic types restored compilation and allowed later gates to reveal their own independent results.
 
 ## Related Concepts
 - [[concepts/cascade-unresolved-import-masking]]

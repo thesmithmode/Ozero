@@ -203,6 +203,7 @@ class DataStoreWarpConfigSlotStore(
             payloadHexI4 = awgObj.optString("i4Hex", "").takeIf { it.isNotEmpty() },
             payloadHexI5 = awgObj.optString("i5Hex", "").takeIf { it.isNotEmpty() },
         )
+        val rawIni = obj.optString("rawIni", "").takeIf { it.isNotEmpty() }
         val config = WarpConfig(
             privateKey = configObj.getString("priv"),
             publicKey = configObj.optString("pub", ""),
@@ -218,14 +219,13 @@ class DataStoreWarpConfigSlotStore(
             awgParams = awg,
             doHProvider = parseDoHProvider(configObj),
         )
-        val rawIni = obj.optString("rawIni", "").takeIf { it.isNotEmpty() }
         val endpointList = obj.optJSONArray("endpointList")?.let { arr ->
             (0 until arr.length()).map { arr.getString(it) }
         } ?: emptyList()
         return WarpConfigSlot(
             id = obj.getString("id"),
             name = obj.getString("name"),
-            config = config.copy(awgParams = migrateAwgParams(awg)),
+            config = config.copy(awgParams = migrateAwgParams(awg, rawIni)),
             isActive = obj.optBoolean("isActive", false),
             rawIniOverride = rawIni,
             endpointList = endpointList,
@@ -240,7 +240,16 @@ class DataStoreWarpConfigSlotStore(
         return DoHProvider.entries.firstOrNull { it.name == name } ?: WarpConfig.DEFAULT_DOH_PROVIDER
     }
 
-    private fun migrateAwgParams(awg: AwgParams): AwgParams {
+    private fun String.hasExplicitAwgJunkParams(): Boolean =
+        lineSequence().any { line ->
+            when (line.substringBefore('=').trim().lowercase()) {
+                "jc", "jmin", "jmax" -> true
+                else -> false
+            }
+        }
+
+    private fun migrateAwgParams(awg: AwgParams, rawIni: String?): AwgParams {
+        if (awg == AwgParams.VANILLA && rawIni?.hasExplicitAwgJunkParams() != true) return AwgParams()
         val isOldInjected = awg.underloadPacketJunkSize == 19 &&
             awg.payloadPacketJunkSize == 20 &&
             awg.payloadPacketSizeCount1 == 28 &&

@@ -884,7 +884,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
-    fun `onAutoSelectBest caps probe candidates`() = runTest {
+    fun `onAutoSelectBest probes every available candidate`() = runTest {
         val profiles = (1L..70L).map { id ->
             profile(id = id, groupId = 1L, name = "P$id", userOrder = id.toInt())
         }
@@ -898,7 +898,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         harness.viewModel.onAutoSelectBest()
         advanceUntilIdle()
 
-        assertEquals(50, harness.probeCalls.size)
+        assertEquals(70, harness.probeCalls.size)
     }
 
     @Test

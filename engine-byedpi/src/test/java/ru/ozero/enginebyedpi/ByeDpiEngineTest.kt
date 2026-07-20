@@ -28,6 +28,7 @@ import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -466,10 +467,14 @@ class ByeDpiEngineTest {
             recProxy,
             socksProbe = { _, _, _ ->
                 if (firstProxyExited.count > 0) {
-                    firstProxyExited.await()
+                    if (!firstProxyExited.await(100, TimeUnit.MILLISECONDS)) {
+                        throw IOException("first proxy did not exit")
+                    }
                     throw IOException("refused")
                 }
-                secondProxyStarted.await()
+                if (!secondProxyStarted.await(100, TimeUnit.MILLISECONDS)) {
+                    throw IOException("second proxy did not start")
+                }
                 1L
             },
             readyTotalTimeoutMs = 300,

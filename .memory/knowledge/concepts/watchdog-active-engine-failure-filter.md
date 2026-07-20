@@ -3,7 +3,7 @@ title: "Engine watchdog must ignore stale failures for inactive engines"
 sources:
   - daily/2026-06-02.md
 created: 2026-06-04
-updated: 2026-06-04
+updated: 2026-07-20
 ---
 # Engine watchdog must ignore stale failures for inactive engines
 ## Key Points

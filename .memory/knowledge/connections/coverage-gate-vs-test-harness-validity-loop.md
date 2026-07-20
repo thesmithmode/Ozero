@@ -3,10 +3,13 @@ title: Coverage gate vs test harness validity loop
 sources:
   - daily/2026-06-01.md
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-07-20
 ---
 
 # Coverage gate vs test harness validity loop
+
+## Summary
+A strict coverage gate is trustworthy only when it measures meaningful production logic and runs deterministic tests whose fixtures reflect real contracts.
 
 ## Key Points
 - A strict coverage gate is useful only when its measured surface is honest and its sentinel tests are deterministic.

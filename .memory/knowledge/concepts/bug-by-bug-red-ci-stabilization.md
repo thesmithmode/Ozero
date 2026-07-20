@@ -3,7 +3,7 @@ title: Red CI stabilization should proceed one confirmed bug at a time
 sources:
   - daily/2026-06-03.md
 created: 2026-06-13
-updated: 2026-06-13
+updated: 2026-07-20
 ---
 # Red CI stabilization should proceed one confirmed bug at a time
 ## Key Points

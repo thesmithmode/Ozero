@@ -3,7 +3,7 @@ title: runTest backgroundScope for hot flow collectors
 sources:
   - daily/2026-06-01.md
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-07-20
 ---
 # runTest backgroundScope for hot flow collectors
 

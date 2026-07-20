@@ -3,7 +3,7 @@ title: Current CI run must be grounded before fixing red jobs
 sources:
   - daily/2026-06-03.md
 created: 2026-06-13
-updated: 2026-06-13
+updated: 2026-07-20
 ---
 # Current CI run must be grounded before fixing red jobs
 ## Key Points

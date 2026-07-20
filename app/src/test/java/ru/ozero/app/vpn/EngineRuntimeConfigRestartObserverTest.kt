@@ -975,7 +975,7 @@ class EngineRuntimeConfigRestartObserverTest {
         val warpModule = readSource("src/main/java/ru/ozero/app/di/WarpModule.kt")
 
         assertTrue(warpModule.contains("override val includeStarting: Boolean = false"))
-        assertTrue(warpModule.contains("override val replayAfterStarting: Boolean = true"))
+        assertTrue(warpModule.contains("override val replayAfterStarting: Boolean = false"))
     }
 
     @Test

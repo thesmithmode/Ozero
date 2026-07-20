@@ -3,7 +3,7 @@ title: WARP pre-tunnel endpoint DoH parity
 sources:
   - daily/2026-06-01.md
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-07-20
 ---
 # WARP pre-tunnel endpoint DoH parity
 

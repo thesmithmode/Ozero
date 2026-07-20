@@ -3,10 +3,13 @@ title: Unified logger rotation test helper append contract
 sources:
   - daily/2026-06-01.md
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-07-20
 ---
 
 # Unified logger rotation test helper append contract
+
+## Summary
+Log-rotation fixtures must preserve the pre-rotation content that their assertions expect to find in the rotated file.
 
 ## Key Points
 - A log rotation test helper must preserve pre-rotation markers when the assertion expects them in the rotated file.

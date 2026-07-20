@@ -492,6 +492,31 @@ class DataStoreWarpConfigSlotStoreTest {
         assertEquals(5, saved.config.awgParams.payloadPacketJunkSize)
     }
 
+    @Test
+    fun `legacy vanilla slot without raw INI migrates to obfuscated defaults`() = runTest {
+        val ds = FakePreferencesDataStore()
+        ds.edit { it[stringPreferencesKey("warp_slots_json")] = "[${buildValidSlotJson("legacy", "Legacy")}]" }
+        val store = DataStoreWarpConfigSlotStore(ds, DataStoreWarpConfigStore(FakePreferencesDataStore()))
+
+        val saved = store.slots().first().single()
+
+        assertEquals(AwgParams.DEFAULT_JC, saved.config.awgParams.junkPacketCount)
+        assertEquals(AwgParams.DEFAULT_JMIN, saved.config.awgParams.junkPacketMinSize)
+        assertEquals(AwgParams.DEFAULT_JMAX, saved.config.awgParams.junkPacketMaxSize)
+    }
+
+    @Test
+    fun `explicit vanilla raw INI remains vanilla`() = runTest {
+        val ds = FakePreferencesDataStore()
+        val slot = JSONObject(buildValidSlotJson("vanilla", "Vanilla"))
+            .put("rawIni", "[Interface]\nJc = 0\nJmin = 0\nJmax = 0\n[Peer]\nEndpoint = example.com:1")
+            .toString()
+        ds.edit { it[stringPreferencesKey("warp_slots_json")] = "[$slot]" }
+        val store = DataStoreWarpConfigSlotStore(ds, DataStoreWarpConfigStore(FakePreferencesDataStore()))
+
+        assertEquals(AwgParams.VANILLA, store.slots().first().single().config.awgParams)
+    }
+
     private fun buildValidSlotJson(
         id: String,
         name: String,

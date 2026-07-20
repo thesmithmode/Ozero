@@ -3,7 +3,7 @@ title: "Auto preflight must stop VPN when all candidates fail"
 sources:
   - daily/2026-06-02.md
 created: 2026-06-04
-updated: 2026-06-04
+updated: 2026-07-20
 ---
 # Auto preflight must stop VPN when all candidates fail
 ## Key Points
