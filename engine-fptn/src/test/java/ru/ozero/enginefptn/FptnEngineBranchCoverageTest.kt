@@ -359,6 +359,9 @@ class FptnEngineBranchCoverageTest {
             body: String,
             timeoutSeconds: Int,
         ): FptnNativeResponse {
+            if (postDelayMs > timeoutSeconds * 1_000L) {
+                return FptnNativeResponse(608, "", "timeout")
+            }
             runBlocking {
                 delay(postDelayMs)
             }
