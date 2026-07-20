@@ -243,46 +243,38 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         pingJob?.cancel()
         _uiState.update { it.copy(isPinging = emptySet()) }
         pingJob = viewModelScope.launch {
-            val groups = if (groupId != null) {
+            val groupIds = if (groupId != null) {
                 listOf(groupId)
             } else {
                 groupDao.getAll().map { it.id }
             }
-            groups.map { gid ->
-                async {
-                    var probeProfiles = emptyList<ProxyProfile>()
-                    try {
-                        _uiState.update { it.copy(isPinging = it.isPinging + gid) }
-                        probeProfiles = prioritizeSingboxAutoProfiles(
-                            profileDao.getAutoCandidatesByGroupId(gid, MAX_PROFILE_SCAN),
-                            MAX_PROBE_PROFILES,
-                        )
-                        if (probeProfiles.isNotEmpty()) {
-                            probeService.probeAndAutoSelect(
-                                profiles = probeProfiles,
-                                onProfileTestingChanged = ::onProfileTestingChanged,
-                            )
-                        }
-                    } finally {
-                        val updated = runCatching {
-                            profileDao.getByGroupIdLimited(gid, MAX_VISIBLE_PROFILES)
-                        }.getOrNull()
-                        _uiState.update {
-                            val nextGroupProfiles = if (updated != null) {
-                                it.groupProfiles + (gid to updated)
-                            } else {
-                                it.groupProfiles
-                            }
-                            it.copy(
-                                isPinging = it.isPinging - gid,
-                                testingProfileIds = it.testingProfileIds -
-                                    probeProfiles.map { profile -> profile.id }.toSet(),
-                                groupProfiles = nextGroupProfiles,
-                            )
-                        }
-                    }
+            var probeProfiles = emptyList<ProxyProfile>()
+            try {
+                _uiState.update { it.copy(isPinging = it.isPinging + groupIds) }
+                probeProfiles = prioritizeSingboxAutoProfiles(
+                    groupIds.flatMap { id -> profileDao.getAutoCandidatesByGroupId(id, MAX_PROFILE_SCAN) },
+                    MAX_PROBE_PROFILES,
+                )
+                if (probeProfiles.isNotEmpty()) {
+                    probeService.probeAndAutoSelect(
+                        profiles = probeProfiles,
+                        onProfileTestingChanged = ::onProfileTestingChanged,
+                        updateManualSelection = false,
+                    )
                 }
-            }.awaitAll()
+            } finally {
+                val refreshed = groupIds.associateWith { id ->
+                    profileDao.getByGroupIdLimited(id, MAX_VISIBLE_PROFILES)
+                }
+                _uiState.update {
+                    it.copy(
+                        isPinging = it.isPinging - groupIds.toSet(),
+                        testingProfileIds = it.testingProfileIds -
+                            probeProfiles.map { profile -> profile.id }.toSet(),
+                        groupProfiles = it.groupProfiles + refreshed,
+                    )
+                }
+            }
         }
     }
 
@@ -319,7 +311,9 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         var errorMsg: String? = null
         try {
             val result = rawUpdater.refresh(group)
-            errorMsg = result.exceptionOrNull()?.message
+            errorMsg = result.exceptionOrNull()?.let { failure ->
+                groupDao.getById(groupId)?.lastRefreshErrorCode ?: failure.message
+            }
         } catch (ce: CancellationException) {
             throw ce
         } catch (t: Throwable) {
@@ -524,7 +518,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         private const val MAX_IMPORT_PROFILES = 2_000
         private const val MAX_PROFILE_SCAN = 2_000
         private const val MAX_VISIBLE_PROFILES = 500
-        private const val MAX_PROBE_PROFILES = 50
+        private const val MAX_PROBE_PROFILES = MAX_PROFILE_SCAN
     }
 
     private fun onProfileTestingChanged(profileId: Long, isTesting: Boolean) {

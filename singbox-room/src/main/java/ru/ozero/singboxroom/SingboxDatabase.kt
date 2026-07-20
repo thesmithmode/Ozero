@@ -13,7 +13,7 @@ import ru.ozero.singboxroom.entity.SubscriptionGroup
 
 @Database(
     entities = [SubscriptionGroup::class, ProxyProfile::class, ProxyChainStep::class],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class SingboxDatabase : RoomDatabase() {
@@ -50,6 +50,24 @@ abstract class SingboxDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `proxy_profiles` ADD COLUMN `probeError` TEXT")
                 db.execSQL("ALTER TABLE `proxy_profiles` ADD COLUMN `lastProbeAt` INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("UPDATE `subscription_groups` SET `autoUpdate` = 0 WHERE `isBuiltin` = 1")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `subscription_groups` ADD COLUMN `lastAttemptAt` " +
+                        "INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL("ALTER TABLE `subscription_groups` ADD COLUMN `lastRefreshErrorCode` TEXT")
+                db.execSQL(
+                    "ALTER TABLE `subscription_groups` ADD COLUMN `lastServerCount` " +
+                        "INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL(
+                    "UPDATE `subscription_groups` SET `autoUpdate` = 1 " +
+                        "WHERE `subscriptionUrl` != ''",
+                )
             }
         }
     }

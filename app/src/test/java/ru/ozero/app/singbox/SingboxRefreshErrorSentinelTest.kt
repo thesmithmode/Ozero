@@ -58,7 +58,7 @@ class SingboxRefreshErrorSentinelTest {
     }
 
     @Test
-    fun `onPing существует и использует async и awaitAll`() {
+    fun `onPing отправляет общий список в пакетную проверку без смены ручного выбора`() {
         val src = locateFile(vmPath)
         val text = src.readText()
         assertTrue(
@@ -68,8 +68,10 @@ class SingboxRefreshErrorSentinelTest {
         )
         val block = text.substringAfter("fun onPing(").substringBefore("\n    fun ")
         assertTrue(
-            block.contains("async") && block.contains("awaitAll"),
-            "onPing обязан использовать async+awaitAll — параллельный пинг всех групп",
+            block.contains("groupIds.flatMap") &&
+                block.contains("probeService.probeAndAutoSelect") &&
+                block.contains("updateManualSelection = false"),
+            "onPing обязан передавать общий список пакетной проверке и сохранять ручной выбор",
         )
     }
 

@@ -148,10 +148,33 @@ class SubscriptionGroupDaoTest {
         val g = dao.getById(id)!!
         assertEquals("", g.subscriptionUrl)
         assertEquals(false, g.isBuiltin)
-        assertEquals(false, g.autoUpdate)
+        assertEquals(true, g.autoUpdate)
         assertEquals(360, g.autoUpdateDelay)
         assertEquals(0L, g.lastUpdated)
+        assertEquals(0L, g.lastAttemptAt)
+        assertNull(g.lastRefreshErrorCode)
+        assertEquals(0, g.lastServerCount)
         assertEquals(0, g.userOrder)
+    }
+
+    @Test
+    fun `should persist subscription refresh status`() = runBlocking {
+        val dao = db.subscriptionGroupDao()
+        val id = dao.insert(
+            SubscriptionGroup(
+                name = "Status",
+                lastUpdated = 100L,
+                lastAttemptAt = 200L,
+                lastRefreshErrorCode = "timeout",
+                lastServerCount = 7,
+            ),
+        )
+
+        val group = dao.getById(id)!!
+        assertEquals(100L, group.lastUpdated)
+        assertEquals(200L, group.lastAttemptAt)
+        assertEquals("timeout", group.lastRefreshErrorCode)
+        assertEquals(7, group.lastServerCount)
     }
 
     @Test
@@ -171,6 +194,29 @@ class SubscriptionGroupDaoTest {
             statements.contains(
                 "UPDATE `subscription_groups` SET `autoUpdate` = 0 WHERE `isBuiltin` = 1",
             ),
+        )
+    }
+
+    @Test
+    fun `migration adds refresh status and enables remote auto update`() {
+        val statements = mutableListOf<String>()
+        val database = Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java),
+        ) { _, method, args ->
+            if (method.name == "execSQL") statements += args?.first() as String
+            null
+        } as SupportSQLiteDatabase
+
+        SingboxDatabase.MIGRATION_3_4.migrate(database)
+
+        assertTrue(statements.any { it.contains("ADD COLUMN `lastAttemptAt`") })
+        assertTrue(statements.any { it.contains("ADD COLUMN `lastRefreshErrorCode`") })
+        assertTrue(statements.any { it.contains("ADD COLUMN `lastServerCount`") })
+        assertTrue(
+            statements.any {
+                it.contains("SET `autoUpdate` = 1") && it.contains("WHERE `subscriptionUrl` != ''")
+            },
         )
     }
 }

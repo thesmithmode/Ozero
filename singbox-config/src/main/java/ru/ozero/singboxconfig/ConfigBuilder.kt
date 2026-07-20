@@ -25,6 +25,7 @@ object ConfigBuilder {
     private const val MIN_PORT = 1
     private const val MAX_PORT = 65_535
     private const val MAX_AUTO_OUTBOUNDS = 50
+    private const val MAX_PROBE_OUTBOUNDS = 10
     private const val MAX_AUTO_CONFIG_BYTES = 512 * 1024
 
     fun buildSingboxConfig(
@@ -115,6 +116,35 @@ object ConfigBuilder {
         return buildChainFullConfig(socksPort, listOf(urltest) + proxyOutbounds, upstream, dnsServers, ipv6Enabled)
     }
 
+    fun buildProbeConfig(
+        targets: List<ProbeTarget>,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
+    ): String {
+        require(targets.isNotEmpty()) { "probe targets must not be empty" }
+        require(targets.size <= MAX_PROBE_OUTBOUNDS) {
+            "probe config supports at most $MAX_PROBE_OUTBOUNDS outbounds"
+        }
+        require(targets.map { it.socksPort }.distinct().size == targets.size) {
+            "probe socks ports must be unique"
+        }
+        targets.forEach { target ->
+            require(target.socksPort in MIN_PORT..MAX_PORT) { "invalid probe socks port" }
+            require(isSupportedBean(target.bean)) { "unsupported probe target" }
+        }
+
+        val inbounds = targets.mapIndexed { index, target ->
+            socksInbound(target.socksPort, "probe-in-$index")
+        }
+        val outbounds = targets.mapIndexed { index, target ->
+            beanOutbound(target.bean, "probe-out-$index")
+        }
+        val routeRules = targets.indices.map { index ->
+            """{"inbound":["probe-in-$index"],"outbound":"probe-out-$index"}"""
+        }
+        return buildProbeFullConfig(inbounds, outbounds, routeRules, dnsServers, ipv6Enabled)
+    }
+
     fun buildWireGuardChainConfig(
         wg: WireGuardOutboundConfig,
         socksPort: Int,
@@ -155,6 +185,8 @@ object ConfigBuilder {
     }
 
     data class Upstream(val host: String, val port: Int)
+
+    data class ProbeTarget(val bean: AbstractBean, val socksPort: Int)
 
     private fun profileChainOutbounds(
         selected: AbstractBean,
@@ -245,6 +277,35 @@ object ConfigBuilder {
         sb.append(""""rules":[{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}]""")
         sb.append('}')
         sb.append('}')
+        return sb.toString()
+    }
+
+    private fun buildProbeFullConfig(
+        inbounds: List<String>,
+        proxyOutbounds: List<String>,
+        routeRules: List<String>,
+        dnsServers: List<String>,
+        ipv6Enabled: Boolean,
+    ): String {
+        val sb = StringBuilder()
+        sb.append('{')
+        sb.append(""""log":{"level":"warn","timestamp":true},""")
+        sb.append(""""inbounds":[""")
+        sb.append(inbounds.joinToString(","))
+        sb.append("""],""")
+        sb.append(""""outbounds":[""")
+        sb.append(proxyOutbounds.joinToString(","))
+        sb.append(""",{"type":"direct","tag":"direct"}""")
+        sb.append(""",{"type":"block","tag":"block"}""")
+        sb.append("""],""")
+        sb.append(dnsConfig(dnsServers, detour = null, ipv6Enabled = ipv6Enabled))
+        sb.append(""""route":{"final":"block","auto_detect_interface":true,"rules":[""")
+        sb.append("""{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}""")
+        routeRules.forEach { rule ->
+            sb.append(',')
+            sb.append(rule)
+        }
+        sb.append("]}}")
         return sb.toString()
     }
 
@@ -341,8 +402,8 @@ object ConfigBuilder {
         return sb.toString()
     }
 
-    private fun socksInbound(port: Int): String = buildString {
-        append("""{"type":"socks","tag":"socks-in",""")
+    private fun socksInbound(port: Int, tag: String = "socks-in"): String = buildString {
+        append("""{"type":"socks","tag":${jsonString(tag)},""")
         append(""""listen":"127.0.0.1","listen_port":$port}""")
     }
 

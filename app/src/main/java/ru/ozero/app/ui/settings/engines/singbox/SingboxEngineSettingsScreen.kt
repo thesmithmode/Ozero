@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,6 +62,9 @@ import ru.ozero.app.R
 import ru.ozero.app.util.readTextBounded
 import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
+import ru.ozero.singboxsubscription.SubscriptionRefreshErrorCode
+import java.text.DateFormat
+import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -405,11 +409,25 @@ private fun SubscriptionGroupItem(
                 modifier = Modifier.size(20.dp),
             )
             Spacer(Modifier.width(8.dp))
-            Text(
-                text = group.name,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = group.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = subscriptionGroupStatusText(group),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (group.lastRefreshErrorCode == null) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             if (state.isRefreshing) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 IconButton(onClick = actions.onCancelRefresh, modifier = Modifier.size(36.dp)) {
@@ -444,15 +462,16 @@ private fun SubscriptionGroupItem(
         }
 
         if (state.isExpanded) {
-            if (state.refreshError != null) {
+            val refreshError = state.refreshError ?: group.lastRefreshErrorCode
+            if (refreshError != null) {
                 Text(
-                    text = stringResource(R.string.singbox_refresh_error, state.refreshError),
+                    text = stringResource(R.string.singbox_refresh_error, singboxRefreshErrorText(refreshError)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
                 )
             }
-            if (state.profiles.isEmpty() && !state.isRefreshing && state.refreshError == null) {
+            if (state.profiles.isEmpty() && !state.isRefreshing && refreshError == null) {
                 Text(
                     text = stringResource(R.string.singbox_no_profiles_hint),
                     style = MaterialTheme.typography.bodySmall,
@@ -484,6 +503,7 @@ private fun ProfileItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onSelect)
+            .heightIn(min = 56.dp)
             .padding(start = 28.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -496,38 +516,77 @@ private fun ProfileItem(
             Text(
                 text = display.title,
                 style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            if (display.subtitle.isNotEmpty()) {
-                Text(
-                    text = display.subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Text(
+                text = display.subtitle.ifEmpty { "\u00A0" },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
-        when {
-            isTesting -> {
-                Spacer(Modifier.width(4.dp))
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-            }
-            profile.latencyMs >= 0 -> {
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    text = "${profile.latencyMs}ms",
+        Spacer(Modifier.width(8.dp))
+        Box(modifier = Modifier.width(76.dp), contentAlignment = Alignment.CenterEnd) {
+            when {
+                isTesting -> CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                profile.latencyMs >= 0 -> Text(
+                    text = "${profile.latencyMs} ms",
                     style = MaterialTheme.typography.labelSmall,
                     color = singboxLatencyColor(profile.latencyMs),
+                    maxLines = 1,
                 )
-            }
-            profile.latencyMs == SingboxProbeService.LATENCY_FAILED -> {
-                Spacer(Modifier.width(4.dp))
-                Text(
+                profile.latencyMs == SingboxProbeService.LATENCY_FAILED -> Text(
                     text = singboxProbeErrorText(profile.probeError),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                else -> Text(
+                    text = stringResource(R.string.singbox_latency_untested),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
             }
         }
     }
+}
+
+@Composable
+private fun subscriptionGroupStatusText(group: SubscriptionGroup): String {
+    val updated = group.lastUpdated.takeIf { it > 0L }?.let { timestamp ->
+        DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(timestamp))
+    }
+    return when {
+        group.lastRefreshErrorCode != null && updated != null -> stringResource(
+            R.string.singbox_group_status_error_after_update,
+            updated,
+            group.lastServerCount,
+            singboxRefreshErrorText(group.lastRefreshErrorCode),
+        )
+        group.lastRefreshErrorCode != null -> stringResource(
+            R.string.singbox_group_status_error,
+            singboxRefreshErrorText(group.lastRefreshErrorCode),
+        )
+        updated != null -> stringResource(R.string.singbox_group_status_updated, updated, group.lastServerCount)
+        else -> stringResource(R.string.singbox_group_status_never)
+    }
+}
+
+@Composable
+private fun singboxRefreshErrorText(errorCode: String): String = when (errorCode) {
+    SubscriptionRefreshErrorCode.TLS_CERTIFICATE -> stringResource(R.string.singbox_refresh_error_tls_certificate)
+    SubscriptionRefreshErrorCode.DNS -> stringResource(R.string.singbox_refresh_error_dns)
+    SubscriptionRefreshErrorCode.TIMEOUT -> stringResource(R.string.singbox_refresh_error_timeout)
+    SubscriptionRefreshErrorCode.HTTP -> stringResource(R.string.singbox_refresh_error_http)
+    SubscriptionRefreshErrorCode.NO_PROFILES -> stringResource(R.string.singbox_refresh_error_no_profiles)
+    SubscriptionRefreshErrorCode.BODY_TOO_LARGE -> stringResource(R.string.singbox_refresh_error_body_too_large)
+    SubscriptionRefreshErrorCode.INVALID_URL -> stringResource(R.string.singbox_refresh_error_invalid_url)
+    SubscriptionRefreshErrorCode.NETWORK -> stringResource(R.string.singbox_refresh_error_network)
+    else -> stringResource(R.string.singbox_refresh_error_unknown)
 }
 
 private const val MAX_SINGBOX_PROFILE_DISPLAY_NAME_CHARS = 512
@@ -786,7 +845,10 @@ private fun AddManualLinksDialog(
 @Composable
 internal fun singboxProbeErrorText(probeError: String?): String =
     when (probeError) {
-        SingboxProbeService.PROBE_ERROR_UNSUPPORTED -> stringResource(R.string.singbox_latency_failed)
+        SingboxProbeService.PROBE_ERROR_UNSUPPORTED -> stringResource(R.string.singbox_latency_unsupported)
+        "timeout" -> stringResource(R.string.singbox_latency_timeout)
+        "runtime_busy" -> stringResource(R.string.singbox_latency_runtime_busy)
+        "tls" -> stringResource(R.string.singbox_latency_tls)
         SingboxProbeService.PROBE_ERROR_FAILED -> stringResource(R.string.singbox_latency_failed)
         else -> stringResource(R.string.singbox_latency_failed)
     }

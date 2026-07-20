@@ -23,6 +23,7 @@ import ru.ozero.singboxroom.entity.SubscriptionGroup
 import ru.ozero.singboxsubscription.parser.RawShareLinksParser
 import java.security.cert.CertPathValidatorException
 import java.util.Base64
+import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.SSLHandshakeException
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -261,15 +262,19 @@ class RawUpdaterTest {
     }
 
     @Test
-    fun `should update lastUpdated timestamp after successful refresh`() = runBlocking {
+    fun `should persist successful refresh status`() = runBlocking {
         val before = System.currentTimeMillis()
         server.enqueue(MockResponse().setBody(vless1))
-        val g = group()
+        val g = group().copy(lastRefreshErrorCode = SubscriptionRefreshErrorCode.NETWORK)
+        groupDao.update(g)
 
         rawUpdater.refresh(g)
 
         val updated = groupDao.groups.first { it.id == g.id }
         assertTrue(updated.lastUpdated >= before)
+        assertTrue(updated.lastAttemptAt >= before)
+        assertEquals(null, updated.lastRefreshErrorCode)
+        assertEquals(1, updated.lastServerCount)
     }
 
     @Test
@@ -282,20 +287,60 @@ class RawUpdaterTest {
         val result = rawUpdater.refresh(g)
 
         assertTrue(result.isFailure)
+        val updated = groupDao.groups.first { it.id == g.id }
+        assertTrue(updated.lastAttemptAt > 0L)
+        assertEquals(SubscriptionRefreshErrorCode.NETWORK, updated.lastRefreshErrorCode)
     }
 
     @Test
-    fun `should use default trust client for custom subscriptions`() = runBlocking {
-        var calls = 0
+    fun `should keep builtin subscriptions on system trust client`() = runBlocking {
+        val systemCalls = AtomicInteger(0)
+        val userCaCalls = AtomicInteger(0)
         rawUpdater = RawUpdater(
             okHttpClient = OkHttpClient.Builder()
                 .addInterceptor { chain ->
-                    calls += 1
+                    systemCalls.incrementAndGet()
                     chain.proceed(chain.request())
                 }
                 .build(),
             groupDao = groupDao,
             profileDao = profileDao,
+            userCaOkHttpClient = OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    userCaCalls.incrementAndGet()
+                    chain.proceed(chain.request())
+                }
+                .build(),
+        )
+        server.enqueue(MockResponse().setBody(vless1))
+        val g = group().copy(isBuiltin = true)
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isSuccess, "Expected success but got ${result.exceptionOrNull()}")
+        assertEquals(1, systemCalls.get())
+        assertEquals(0, userCaCalls.get())
+    }
+
+    @Test
+    fun `should use system and user trust client for custom subscriptions`() = runBlocking {
+        val systemCalls = AtomicInteger(0)
+        val userCaCalls = AtomicInteger(0)
+        rawUpdater = RawUpdater(
+            okHttpClient = OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    systemCalls.incrementAndGet()
+                    chain.proceed(chain.request())
+                }
+                .build(),
+            groupDao = groupDao,
+            profileDao = profileDao,
+            userCaOkHttpClient = OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    userCaCalls.incrementAndGet()
+                    chain.proceed(chain.request())
+                }
+                .build(),
         )
         server.enqueue(MockResponse().setBody(vless1))
         val g = group().copy(isBuiltin = false)
@@ -303,7 +348,8 @@ class RawUpdaterTest {
         val result = rawUpdater.refresh(g)
 
         assertTrue(result.isSuccess, "Expected success but got ${result.exceptionOrNull()}")
-        assertEquals(1, calls)
+        assertEquals(0, systemCalls.get())
+        assertEquals(1, userCaCalls.get())
     }
 
     @Test
@@ -316,6 +362,10 @@ class RawUpdaterTest {
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()!!.message!!.contains("Subscription HTTP 503"))
         assertEquals(0, profileDao.profiles.size)
+        assertEquals(
+            SubscriptionRefreshErrorCode.HTTP,
+            groupDao.groups.first { it.id == g.id }.lastRefreshErrorCode,
+        )
     }
 
     @Test
@@ -343,6 +393,10 @@ class RawUpdaterTest {
                 "Subscription TLS certificate validation failed",
                 result.exceptionOrNull()?.message,
             )
+            assertEquals(
+                SubscriptionRefreshErrorCode.TLS_CERTIFICATE,
+                groupDao.groups.first { it.id == g.id }.lastRefreshErrorCode,
+            )
         }
     }
 
@@ -364,19 +418,30 @@ class RawUpdaterTest {
     }
 
     @Test
-    fun `should return zero count for empty body`() = runBlocking {
+    fun `should reject empty body without replacing cached profiles`() = runBlocking {
         server.enqueue(MockResponse().setBody(""))
         val g = group()
+        val existing = ru.ozero.singboxroom.entity.ProxyProfile(
+            id = 8L,
+            groupId = g.id,
+            name = "Cached",
+            beanBlob = byteArrayOf(1),
+            protocolType = RawUpdater.PROTOCOL_VLESS,
+        )
+        profileDao.profiles.add(existing)
 
         val result = rawUpdater.refresh(g)
 
-        assertEquals(true, result.isSuccess, "Expected success but got ${result.exceptionOrNull()}")
-        assertEquals(0, result.getOrNull())
-        assertEquals(0, profileDao.profiles.size)
+        assertTrue(result.isFailure)
+        assertEquals(listOf(existing), profileDao.profiles)
+        assertEquals(
+            SubscriptionRefreshErrorCode.NO_PROFILES,
+            groupDao.groups.first { it.id == g.id }.lastRefreshErrorCode,
+        )
     }
 
     @Test
-    fun `should treat bodyless successful response as empty subscription`() = runBlocking {
+    fun `should reject bodyless successful response`() = runBlocking {
         rawUpdater = RawUpdater(
             okHttpClient = OkHttpClient.Builder()
                 .addInterceptor { chain ->
@@ -396,13 +461,12 @@ class RawUpdaterTest {
 
         val result = rawUpdater.refresh(g)
 
-        assertTrue(result.isSuccess, "Expected success but got ${result.exceptionOrNull()}")
-        assertEquals(0, result.getOrNull())
+        assertTrue(result.isFailure)
         assertEquals(0, profileDao.profiles.size)
     }
 
     @Test
-    fun `should treat null body successful response as empty subscription`() = runBlocking {
+    fun `should reject null body successful response`() = runBlocking {
         val mockedResponse = mockk<Response>(relaxed = true).apply {
             every { body } returns null
             every { isSuccessful } returns true
@@ -423,8 +487,7 @@ class RawUpdaterTest {
         val g = group()
         val result = rawUpdater.refresh(g)
 
-        assertTrue(result.isSuccess)
-        assertEquals(0, result.getOrNull())
+        assertTrue(result.isFailure)
         assertEquals(0, profileDao.profiles.size)
     }
 
@@ -936,7 +999,7 @@ class RawUpdaterTest {
     }
 
     @Test
-    fun `should delete stale rows when successful response has null body`() = runBlocking {
+    fun `should preserve cached rows when successful response has null body`() = runBlocking {
         val mockedResponse = mockk<Response>(relaxed = true).apply {
             every { body } returns null
             every { isSuccessful } returns true
@@ -961,9 +1024,9 @@ class RawUpdaterTest {
 
         val result = rawUpdater.refresh(g)
 
-        assertTrue(result.isSuccess)
-        assertEquals(0, result.getOrNull())
-        assertTrue(profileDao.profiles.isEmpty())
+        assertTrue(result.isFailure)
+        assertEquals(1, profileDao.profiles.size)
+        assertEquals(701L, profileDao.profiles.single().id)
     }
 
     @Test

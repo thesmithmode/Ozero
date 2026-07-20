@@ -153,6 +153,9 @@ class SingboxEngine @Inject constructor(
     @Volatile
     private var activeAutoSelect: Boolean = false
 
+    @Volatile
+    private var attachReadinessVerified: Boolean = false
+
     private val bindLock = Any()
 
     private val localProtector = object : ISingboxProtector.Stub() {
@@ -162,6 +165,7 @@ class SingboxEngine @Inject constructor(
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
 
+        attachReadinessVerified = false
         chainMode = upstream !is Upstream.None || config.proxyMode
         PersistentLoggers.debug(
             TAG,
@@ -277,6 +281,7 @@ class SingboxEngine @Inject constructor(
         activeSocksPort = 0
         activeAutoSelect = false
         activeTunAutoSelect = false
+        attachReadinessVerified = false
         pendingSocksPort = 0
         pendingConfig = null
         val port = allocateChainPort()
@@ -419,13 +424,14 @@ class SingboxEngine @Inject constructor(
             }
             val autoSelect = pendingTunAutoSelect
             val routedReady = warmTrafficProbe(pendingSocksPort, autoSelect)
-            if (!routedReady && !autoSelect) {
+            if (!routedReady) {
                 stopRuntimeAfterFailedReadiness(p)
                 clearPendingStart()
                 return TunAttachResult.Failure("sing-box routed probe failed")
             }
             activeSocksPort = pendingSocksPort
             activeTunAutoSelect = autoSelect
+            attachReadinessVerified = true
             pendingTunAutoSelect = false
             pendingSocksPort = 0
             pendingConfig = null
@@ -472,6 +478,7 @@ class SingboxEngine @Inject constructor(
         chainMode = false
         activeAutoSelect = false
         activeTunAutoSelect = false
+        attachReadinessVerified = false
         activeSocksPort = 0
         val p = proxy
         if (p != null) {
@@ -514,6 +521,7 @@ class SingboxEngine @Inject constructor(
             if (clearOnRoutedFailure) {
                 activeSocksPort = 0
                 activeTunAutoSelect = false
+                attachReadinessVerified = false
             }
             ProbeResult.Failure(
                 "sing-box routed probe failed",
@@ -525,6 +533,17 @@ class SingboxEngine @Inject constructor(
     override suspend fun awaitReady(): EnginePlugin.ReadyResult = awaitRoutedReady()
 
     private suspend fun awaitRoutedReady(): EnginePlugin.ReadyResult {
+        if (attachReadinessVerified) {
+            attachReadinessVerified = false
+            val p = proxy ?: run {
+                clearRuntimeState()
+                return EnginePlugin.ReadyResult.Timeout("sing-box process is not connected")
+            }
+            val runtimeRunning = runCatching { p.runtimeRunning() }.getOrDefault(false)
+            if (runtimeRunning) return EnginePlugin.ReadyResult.Ready
+            clearRuntimeState()
+            return EnginePlugin.ReadyResult.Timeout("sing-box runtime is not running")
+        }
         var lastFailure: ProbeResult.Failure? = null
         for (attempt in 0 until READY_PROBE_ATTEMPTS) {
             when (val result = probeInternal(clearOnRoutedFailure = false)) {
@@ -551,6 +570,7 @@ class SingboxEngine @Inject constructor(
         activeSocksPort = 0
         activeAutoSelect = false
         activeTunAutoSelect = false
+        attachReadinessVerified = false
         return EnginePlugin.ReadyResult.Timeout(failureReason)
     }
 
@@ -802,6 +822,7 @@ class SingboxEngine @Inject constructor(
         pendingSocksPort = 0
         activeAutoSelect = false
         activeTunAutoSelect = false
+        attachReadinessVerified = false
         activeSocksPort = 0
     }
 

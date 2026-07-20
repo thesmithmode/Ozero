@@ -9,8 +9,10 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.URL
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SingboxHttp204RoutedProbeTest {
@@ -41,10 +43,65 @@ class SingboxHttp204RoutedProbeTest {
             )
             .distinct()
 
-        assertTrue(urls.all { it.startsWith("https://") })
+        assertTrue(urls.first().startsWith("https://"))
+        assertTrue(urls.drop(1).all { it.startsWith("http://") })
         assertTrue(urls.any { it.contains("gstatic") })
+        assertTrue(urls.any { it.contains("msftconnecttest") })
         assertTrue(urls.any { it.contains("cloudflare") })
         assertEquals(3, urls.size)
+    }
+
+    @Test
+    fun `HTTPS handshake failure falls back to HTTP 204 through SOCKS`() = runTest {
+        SocksHttpServer(statusCode = 204, reason = "No Content", failuresBeforeResponse = 1).use { socks ->
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("https://first.example/generate_204"),
+                fallbackProbeUrls = listOf(URL("http://second.example/generate_204")),
+                timeoutMs = 1_000,
+            )
+
+            val latency = probe.probeLatencyMs(socks.port)
+
+            assertTrue(latency >= 1L)
+            assertTrue(socks.requestText.startsWith("GET /generate_204 "))
+        }
+    }
+
+    @Test
+    fun `routed probe fails when HTTPS and HTTP endpoints all fail`() = runTest {
+        SocksHttpServer(statusCode = 204, reason = "No Content", failuresBeforeResponse = 3).use { socks ->
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("https://first.example/generate_204"),
+                fallbackProbeUrls = listOf(
+                    URL("http://second.example/generate_204"),
+                    URL("http://third.example/generate_204"),
+                ),
+                timeoutMs = 1_000,
+            )
+
+            val latency = probe.probeLatencyMs(socks.port)
+
+            assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
+            assertEquals("", socks.requestText)
+        }
+    }
+
+    @Test
+    fun `routed probe never falls back to direct HTTP`() = runTest {
+        DirectHttpServer().use { direct ->
+            SocksHttpServer(statusCode = 204, reason = "No Content", failuresBeforeResponse = 1).use { socks ->
+                val probe = SingboxHttp204RoutedProbe(
+                    probeUrl = URL("http://127.0.0.1:${direct.port}/generate_204"),
+                    fallbackProbeUrls = emptyList(),
+                    timeoutMs = 1_000,
+                )
+
+                val latency = probe.probeLatencyMs(socks.port)
+
+                assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
+                assertFalse(direct.accepted)
+            }
+        }
     }
 
     @Test
@@ -160,10 +217,10 @@ class SingboxHttp204RoutedProbeTest {
     }
 
     @Test
-    fun `routed probe accepts HTTP 200 content response through SOCKS`() = runTest {
-        SocksHttpServer(statusCode = 200, reason = "OK").use { socks ->
+    fun `routed probe accepts exact Microsoft connectivity response through SOCKS`() = runTest {
+        SocksHttpServer(statusCode = 200, reason = "OK", body = "Microsoft Connect Test").use { socks ->
             val probe = SingboxHttp204RoutedProbe(
-                probeUrl = URL("http://www.cloudflare.com/cdn-cgi/trace"),
+                probeUrl = URL("http://www.msftconnecttest.com/connecttest.txt"),
                 fallbackProbeUrls = emptyList(),
                 timeoutMs = 1_000,
             )
@@ -171,7 +228,23 @@ class SingboxHttp204RoutedProbeTest {
             val latency = probe.probeLatencyMs(socks.port)
 
             assertTrue(latency >= 1L)
-            assertTrue(socks.requestText.startsWith("GET /cdn-cgi/trace "))
+            assertTrue(socks.requestText.startsWith("GET /connecttest.txt "))
+        }
+    }
+
+    @Test
+    fun `routed probe rejects unexpected Microsoft connectivity body`() = runTest {
+        SocksHttpServer(statusCode = 200, reason = "OK", body = "unexpected").use { socks ->
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("http://www.msftconnecttest.com/connecttest.txt"),
+                fallbackProbeUrls = emptyList(),
+                timeoutMs = 1_000,
+            )
+
+            val latency = probe.probeLatencyMs(socks.port)
+
+            assertEquals(SingboxHttp204RoutedProbe.LATENCY_FAILED, latency)
+            assertTrue(socks.requestText.startsWith("GET /connecttest.txt "))
         }
     }
 
@@ -256,6 +329,7 @@ class SingboxHttp204RoutedProbeTest {
         private val statusCode: Int,
         private val reason: String,
         failuresBeforeResponse: Int = 0,
+        private val body: String = "",
     ) : AutoCloseable {
         private val server = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
         private val attemptsBeforeSuccess = failuresBeforeResponse + 1
@@ -298,12 +372,39 @@ class SingboxHttp204RoutedProbeTest {
             if (!shouldRespond) return
 
             requestText = input.readHttpHeaders()
+            val responseBody = body.toByteArray(StandardCharsets.US_ASCII)
             output.write(
-                "HTTP/1.1 $statusCode $reason\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                "HTTP/1.1 $statusCode $reason\r\nContent-Length: ${responseBody.size}\r\nConnection: close\r\n\r\n"
                     .toByteArray(StandardCharsets.US_ASCII),
             )
+            output.write(responseBody)
             output.flush()
         }
+
+        override fun close() {
+            runCatching { server.close() }
+            runCatching { worker.join(1_000) }
+        }
+    }
+
+    private class DirectHttpServer : AutoCloseable {
+        private val server = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
+        private val acceptedRef = AtomicBoolean(false)
+        private val worker = thread(start = true, isDaemon = true) {
+            runCatching {
+                server.accept().use { socket ->
+                    acceptedRef.set(true)
+                    socket.getOutputStream().write(
+                        "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                            .toByteArray(StandardCharsets.US_ASCII),
+                    )
+                }
+            }
+        }
+
+        val port: Int = server.localPort
+        val accepted: Boolean
+            get() = acceptedRef.get()
 
         override fun close() {
             runCatching { server.close() }

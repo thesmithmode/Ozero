@@ -99,13 +99,13 @@ class OzeroApp : Application(), Configuration.Provider {
             .onFailure { BootFileLogger.warn(TAG, "urnetworkRelayCoordinator.start failed", it) }
         runCatching { urnetworkContractStatusObserver.start() }
             .onFailure { BootFileLogger.warn(TAG, "urnetworkContractStatusObserver.start failed", it) }
-        runCatching { SubscriptionUpdateWorker.schedule(WorkManager.getInstance(this)) }
-            .onFailure { BootFileLogger.warn(TAG, "SubscriptionUpdateWorker.schedule failed", it) }
         runCatching { runtimeConfigRestartCoordinator.start(appScope) }
             .onFailure { BootFileLogger.warn(TAG, "runtimeConfigRestartCoordinator.start failed", it) }
         appScope.launch {
             runCatching { groupSeeder.seedPresets(loadPresetGroups()) }
                 .onFailure { BootFileLogger.warn(TAG, "groupSeeder.seedPresets failed", it) }
+            runCatching { SubscriptionUpdateWorker.schedule(WorkManager.getInstance(this@OzeroApp)) }
+                .onFailure { BootFileLogger.warn(TAG, "SubscriptionUpdateWorker.schedule failed", it) }
         }
     }
 

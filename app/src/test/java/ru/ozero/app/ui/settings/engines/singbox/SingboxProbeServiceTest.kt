@@ -143,6 +143,26 @@ class SingboxProbeServiceTest {
     }
 
     @Test
+    fun `probeAndAutoSelect skips entire batch without stopping active runtime`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val profiles = listOf(
+            makeProfile(id = 1L, host = "active-first.example", port = 443),
+            makeProfile(id = 2L, host = "active-second.example", port = 443),
+        )
+        val probe = ActiveRuntimeBatchProfileProbe()
+
+        SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(profiles)
+
+        assertEquals(1, probe.batchCalls.get())
+        assertEquals(0, probe.startCount.get())
+        assertEquals(0, probe.stopCount.get())
+        assertTrue(dao.latencies.isEmpty())
+        assertNull(prefsFlow.value[selectedProfileKey])
+    }
+
+    @Test
     fun `probeAndAutoSelect marks invalid port as failed and never calls probe`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
@@ -179,11 +199,53 @@ class SingboxProbeServiceTest {
             })
 
         assertEquals(profiles.map { it.id }.toSet(), testedIds)
-        assertEquals(
-            SingboxProbeService.MAX_CONCURRENT_PROFILE_PROBES,
-            maxTestingNow.get(),
-            "profile testing UI state must match the single service-backed probe slot",
+        assertTrue(
+            maxTestingNow.get() in 2..SingboxProbeService.MAX_CONCURRENT_PROFILE_PROBES,
+            "profile testing UI state must stay inside the bounded probe batch",
         )
+    }
+
+    @Test
+    fun `probeAndAutoSelect starts and stops one runtime per bounded batch`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val profiles = (1L..25L).map { id -> makeProfile(id, "batch-$id.example", 443) }
+        val probe = TrackingBatchProfileProbe()
+
+        SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(profiles)
+
+        assertEquals(listOf(10, 10, 5), probe.batchSizes)
+        assertEquals(3, probe.startCount.get())
+        assertEquals(3, probe.stopCount.get())
+        assertEquals(10, probe.maxConcurrentTargets.get())
+        assertEquals(0, probe.legacyCalls.get())
+        assertEquals(profiles.map { it.id }.toSet(), dao.latencies.keys)
+    }
+
+    @Test
+    fun `probeAndAutoSelect records terminal failures when batch probe throws`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dao = FakeProxyProfileDao()
+        val profiles = listOf(
+            makeProfile(id = 1L, host = "failure-first.example", port = 443),
+            makeProfile(id = 2L, host = "failure-second.example", port = 443),
+        )
+        val probe = object : SingboxProfileProbe, SingboxBatchProfileProbe {
+            override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int =
+                SingboxProbeService.LATENCY_FAILED
+
+            override suspend fun probeBatch(
+                targets: List<SingboxProfileProbeTarget>,
+                settings: SingboxProfileProbeSettings,
+            ): Map<Long, SingboxProbeOutcome> = error("batch failed")
+        }
+
+        SingboxProbeService(dao, flowDataStore(prefsFlow), probe).probeAndAutoSelect(profiles)
+
+        assertEquals(profiles.associate { it.id to SingboxProbeService.LATENCY_FAILED }, dao.latencies)
+        assertEquals(profiles.associate { it.id to SingboxProbeService.PROBE_ERROR_FAILED }, dao.errors)
+        assertNull(prefsFlow.value[selectedProfileKey])
     }
 
     @Test
@@ -215,7 +277,7 @@ class SingboxProbeServiceTest {
             .probeAndAutoSelect(listOf(profile))
 
         assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[12L])
-        assertEquals(SingboxProbeService.PROBE_ERROR_FAILED, dao.errors[12L])
+        assertEquals(SingboxProbeService.PROBE_ERROR_TIMEOUT, dao.errors[12L])
         assertNull(prefsFlow.value[selectedProfileKey])
     }
 
@@ -389,8 +451,8 @@ class SingboxProbeServiceTest {
         job.cancel()
         job.join()
 
-        assertEquals(1, probe.calls.get())
-        assertNull(dao.latencies[2L])
+        assertTrue(probe.calls.get() in 1..2)
+        assertTrue(dao.latencies.isEmpty())
         assertNull(prefsFlow.value[selectedProfileKey])
     }
 
@@ -488,6 +550,55 @@ class SingboxProbeServiceTest {
         override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
             delay(10)
             return 1
+        }
+    }
+
+    private class TrackingBatchProfileProbe : SingboxProfileProbe, SingboxBatchProfileProbe {
+        val startCount = AtomicInteger(0)
+        val stopCount = AtomicInteger(0)
+        val legacyCalls = AtomicInteger(0)
+        val maxConcurrentTargets = AtomicInteger(0)
+        val batchSizes = mutableListOf<Int>()
+
+        override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
+            legacyCalls.incrementAndGet()
+            return SingboxProbeService.LATENCY_FAILED
+        }
+
+        override suspend fun probeBatch(
+            targets: List<SingboxProfileProbeTarget>,
+            settings: SingboxProfileProbeSettings,
+        ): Map<Long, SingboxProbeOutcome> {
+            startCount.incrementAndGet()
+            batchSizes += targets.size
+            maxConcurrentTargets.updateAndGet { previous -> maxOf(previous, targets.size) }
+            return try {
+                delay(10)
+                targets.associate { target ->
+                    target.profileId to SingboxProbeOutcome.Success(target.profileId.toInt())
+                }
+            } finally {
+                stopCount.incrementAndGet()
+            }
+        }
+    }
+
+    private class ActiveRuntimeBatchProfileProbe : SingboxProfileProbe, SingboxBatchProfileProbe {
+        val batchCalls = AtomicInteger(0)
+        val startCount = AtomicInteger(0)
+        val stopCount = AtomicInteger(0)
+
+        override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int =
+            LATENCY_SKIPPED_ACTIVE_RUNTIME
+
+        override suspend fun probeBatch(
+            targets: List<SingboxProfileProbeTarget>,
+            settings: SingboxProfileProbeSettings,
+        ): Map<Long, SingboxProbeOutcome> {
+            batchCalls.incrementAndGet()
+            return targets.associate { target ->
+                target.profileId to SingboxProbeOutcome.SkippedActiveRuntime
+            }
         }
     }
 

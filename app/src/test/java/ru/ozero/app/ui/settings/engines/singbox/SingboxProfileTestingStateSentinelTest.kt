@@ -29,5 +29,16 @@ class SingboxProfileTestingStateSentinelTest {
                 screenSource.contains("CircularProgressIndicator"),
             "Each profile row must show that the specific server is being tested",
         )
+        assertTrue(
+            screenSource.contains("heightIn(min = 56.dp)") &&
+                screenSource.contains("display.subtitle.ifEmpty") &&
+                screenSource.contains("singbox_latency_untested"),
+            "Profile rows must keep a stable layout and always show an explicit probe state",
+        )
+        assertTrue(
+            screenSource.contains("subscriptionGroupStatusText(group)") &&
+                screenSource.contains("lastRefreshErrorCode"),
+            "Subscription rows must show persistent refresh state after the screen is reopened",
+        )
     }
 }

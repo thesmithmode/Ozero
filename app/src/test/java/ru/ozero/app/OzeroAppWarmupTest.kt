@@ -54,6 +54,16 @@ class OzeroAppWarmupTest {
         )
     }
 
+    @Test
+    fun `обновление подписок планируется после восстановления встроенных групп`() {
+        val onCreateBody = funBody(source, "onCreate")
+        val seedIndex = onCreateBody.indexOf("groupSeeder.seedPresets")
+        val scheduleIndex = onCreateBody.indexOf("SubscriptionUpdateWorker.schedule")
+
+        assertTrue(seedIndex >= 0)
+        assertTrue(scheduleIndex > seedIndex)
+    }
+
     private fun funBody(src: String, name: String): String {
         val idx = src.indexOf("override fun $name").takeIf { it >= 0 } ?: src.indexOf("fun $name")
         check(idx >= 0) { "fun $name not found" }

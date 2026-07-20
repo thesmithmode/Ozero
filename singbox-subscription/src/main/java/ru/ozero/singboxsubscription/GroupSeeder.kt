@@ -32,12 +32,12 @@ class GroupSeeder(
                         name = preset.name,
                         subscriptionUrl = preset.url,
                         isBuiltin = true,
-                        autoUpdate = false,
+                        autoUpdate = true,
                         userOrder = index,
                     ),
                 )
-            } else if (existing.isBuiltin && existing.autoUpdate) {
-                dao.update(existing.copy(autoUpdate = false))
+            } else if (existing.isBuiltin && !existing.autoUpdate) {
+                dao.update(existing.copy(autoUpdate = true))
             }
         }
     }

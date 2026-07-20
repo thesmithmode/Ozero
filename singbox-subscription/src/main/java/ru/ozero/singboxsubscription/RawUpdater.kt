@@ -8,6 +8,8 @@ import okhttp3.Request
 import okhttp3.ResponseBody
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.security.cert.CertPathValidatorException
 import java.security.cert.CertificateException
 import javax.net.ssl.SSLHandshakeException
@@ -31,23 +33,28 @@ class RawUpdater(
     private val okHttpClient: OkHttpClient,
     private val groupDao: SubscriptionGroupDao,
     private val profileDao: ProxyProfileDao,
+    private val userCaOkHttpClient: OkHttpClient = okHttpClient,
 ) {
     suspend fun refresh(group: SubscriptionGroup): Result<Int> = withContext(Dispatchers.IO) {
-        runCatching<Int> {
+        val lastAttemptAt = System.currentTimeMillis()
+        val attemptedGroup = group.copy(lastAttemptAt = lastAttemptAt)
+        val result = runCatching<Int> {
+            groupDao.update(attemptedGroup)
             val request = Request.Builder()
                 .url(group.subscriptionUrl)
                 .header("User-Agent", USER_AGENT)
                 .header("Accept", "text/plain, application/json, application/yaml, text/yaml, */*")
                 .build()
-            okHttpClient.newCall(request).execute().use { response ->
+            httpClientFor(group).newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    error("Subscription HTTP ${response.code}")
+                    throw SubscriptionHttpException(response.code)
                 }
                 val body = response.body?.readUtf8Limited(MAX_SUBSCRIPTION_BYTES) ?: ""
                 val subInfo = SubscriptionInfoParser.parse(response.header("Subscription-Userinfo"))
 
                 val beans = Base64BundleParser.parse(body)
                     .ifEmpty { RawShareLinksParser.parse(body) }
+                if (beans.isEmpty()) throw SubscriptionNoProfilesException()
 
                 val profiles = beans.take(MAX_PROFILES_PER_GROUP).mapIndexed { idx, bean ->
                     ProxyProfile(
@@ -91,16 +98,20 @@ class RawUpdater(
 
                 profileDao.replaceForGroup(group.id, profilesWithStableIds)
 
-                val usedBytes = subInfo?.let { it.uploadBytes + it.downloadBytes } ?: group.bytesUsed
+                val currentGroup = groupDao.getById(group.id) ?: attemptedGroup
+                val usedBytes = subInfo?.let { it.uploadBytes + it.downloadBytes } ?: currentGroup.bytesUsed
                 val remainingBytes = subInfo?.let {
                     maxOf(0L, it.totalBytes - it.uploadBytes - it.downloadBytes)
-                } ?: group.bytesRemaining
+                } ?: currentGroup.bytesRemaining
                 groupDao.update(
-                    group.copy(
+                    currentGroup.copy(
                         lastUpdated = System.currentTimeMillis(),
+                        lastAttemptAt = lastAttemptAt,
+                        lastRefreshErrorCode = null,
+                        lastServerCount = profilesWithStableIds.size,
                         bytesUsed = usedBytes,
                         bytesRemaining = remainingBytes,
-                        expiryDate = subInfo?.expiryTimestamp ?: group.expiryDate,
+                        expiryDate = subInfo?.expiryTimestamp ?: currentGroup.expiryDate,
                     ),
                 )
 
@@ -109,10 +120,27 @@ class RawUpdater(
             }
         }.recoverCatching { e ->
             throw normalizeError(e)
-        }.onFailure { e ->
-            Log.w(TAG, "refresh failed groupId=${group.id}: ${e.message}")
         }
+        result.exceptionOrNull()?.let { failure ->
+            val errorCode = refreshErrorCode(failure)
+            runCatching {
+                val currentGroup = groupDao.getById(group.id) ?: attemptedGroup
+                groupDao.update(
+                    currentGroup.copy(
+                        lastAttemptAt = lastAttemptAt,
+                        lastRefreshErrorCode = errorCode,
+                    ),
+                )
+            }.onFailure { statusFailure ->
+                if (statusFailure !== failure) failure.addSuppressed(statusFailure)
+            }
+            Log.w(TAG, "refresh failed groupId=${group.id} code=$errorCode")
+        }
+        result
     }
+
+    private fun httpClientFor(group: SubscriptionGroup): OkHttpClient =
+        if (group.isBuiltin) okHttpClient else userCaOkHttpClient
 
     companion object {
         private const val TAG = "RawUpdater"
@@ -131,8 +159,23 @@ class RawUpdater(
             else -> e
         }
 
+        private fun refreshErrorCode(error: Throwable): String = when {
+            error.isSubscriptionCertificateFailure() -> SubscriptionRefreshErrorCode.TLS_CERTIFICATE
+            error.causeChain().any { it is SocketTimeoutException } -> SubscriptionRefreshErrorCode.TIMEOUT
+            error.causeChain().any { it is UnknownHostException } -> SubscriptionRefreshErrorCode.DNS
+            error.causeChain().any { it is SubscriptionHttpException } -> SubscriptionRefreshErrorCode.HTTP
+            error.causeChain().any { it is SubscriptionNoProfilesException } ->
+                SubscriptionRefreshErrorCode.NO_PROFILES
+            error.causeChain().any { it is SubscriptionBodyTooLargeException } ->
+                SubscriptionRefreshErrorCode.BODY_TOO_LARGE
+            error.causeChain().any { it is IllegalArgumentException } -> SubscriptionRefreshErrorCode.INVALID_URL
+            error.causeChain().any { it is IOException } -> SubscriptionRefreshErrorCode.NETWORK
+            else -> SubscriptionRefreshErrorCode.UNKNOWN
+        }
+
         private fun Throwable.isSubscriptionCertificateFailure(): Boolean {
-            if (this !is SSLHandshakeException && this !is SSLPeerUnverifiedException) return false
+            if (this is SSLPeerUnverifiedException) return true
+            if (this !is SSLHandshakeException) return false
             return causeChain().any { cause ->
                 cause is CertificateException ||
                     cause is CertPathValidatorException ||
@@ -165,7 +208,7 @@ class RawUpdater(
 private fun ResponseBody.readUtf8Limited(maxBytes: Long): String {
     val declaredLength = contentLength()
     if (declaredLength > maxBytes) {
-        throw IOException("Subscription body too large")
+        throw SubscriptionBodyTooLargeException()
     }
     val out = ByteArrayOutputStream(minOf(maxBytes, 8_192L).toInt())
     byteStream().use { input ->
@@ -176,7 +219,7 @@ private fun ResponseBody.readUtf8Limited(maxBytes: Long): String {
             if (read == -1) break
             total += read.toLong()
             if (total > maxBytes) {
-                throw IOException("Subscription body too large")
+                throw SubscriptionBodyTooLargeException()
             }
             out.write(buffer, 0, read)
         }
@@ -184,6 +227,24 @@ private fun ResponseBody.readUtf8Limited(maxBytes: Long): String {
     val charset = contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
     return out.toString(charset.name())
 }
+
+object SubscriptionRefreshErrorCode {
+    const val TLS_CERTIFICATE = "tls_certificate"
+    const val TIMEOUT = "timeout"
+    const val DNS = "dns"
+    const val HTTP = "http"
+    const val NO_PROFILES = "no_profiles"
+    const val BODY_TOO_LARGE = "body_too_large"
+    const val INVALID_URL = "invalid_url"
+    const val NETWORK = "network"
+    const val UNKNOWN = "unknown"
+}
+
+private class SubscriptionHttpException(statusCode: Int) : IOException("Subscription HTTP $statusCode")
+
+private class SubscriptionNoProfilesException : IOException("Subscription contains no supported servers")
+
+private class SubscriptionBodyTooLargeException : IOException("Subscription body too large")
 
 private fun ProxyProfile.stableBaseIdentityKey(): String =
     listOf(

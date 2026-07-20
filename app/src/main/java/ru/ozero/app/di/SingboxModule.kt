@@ -54,7 +54,11 @@ object SingboxModule {
         @ApplicationContext context: Context,
     ): SingboxDatabase =
         Room.databaseBuilder(context, SingboxDatabase::class.java, "singbox.db")
-            .addMigrations(SingboxDatabase.MIGRATION_1_2, SingboxDatabase.MIGRATION_2_3)
+            .addMigrations(
+                SingboxDatabase.MIGRATION_1_2,
+                SingboxDatabase.MIGRATION_2_3,
+                SingboxDatabase.MIGRATION_3_4,
+            )
             .fallbackToDestructiveMigration()
             .build()
 
@@ -98,6 +102,7 @@ object SingboxModule {
             okHttpClient = SubscriptionTrustClientFactory.createSystem(),
             groupDao = groupDao,
             profileDao = profileDao,
+            userCaOkHttpClient = SubscriptionTrustClientFactory.create(),
         )
 
     @Provides
