@@ -52,10 +52,13 @@ object VMessFmt {
         return bean
     }
 
-    private fun jsonBoolean(j: JSONObject, vararg keys: String): Boolean =
-        keys.fold<Boolean?>(null) { resolved, key ->
-            if (j.has(key)) jsonBooleanValue(j.opt(key)) ?: resolved else resolved
-        } ?: false
+    private fun jsonBoolean(j: JSONObject, vararg keys: String): Boolean {
+        var resolved: Boolean? = null
+        for (key in keys) {
+            if (j.has(key)) resolved = jsonBooleanValue(j.opt(key)) ?: resolved
+        }
+        return resolved ?: false
+    }
 
     private fun jsonBooleanValue(value: Any?): Boolean? = when (value) {
         is Boolean -> value
