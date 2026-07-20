@@ -2,9 +2,13 @@ package ru.ozero.singboxfmt
 
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import java.util.Locale
 import org.json.JSONObject
 
 object VMessFmt {
+
+    private val TRUTHY_JSON_VALUES = setOf("1", "true", "yes")
+    private val FALSEY_JSON_VALUES = setOf("0", "false", "no")
 
     fun parse(uri: String): VMessBean {
         require(uri.startsWith("vmess://")) { "Not a vmess:// URI" }
@@ -34,8 +38,34 @@ object VMessFmt {
         bean.sni = j.optString("sni", "")
         bean.alpn = j.optString("alpn", "")
         bean.utlsFingerprint = j.optString("fp", "")
+        bean.allowInsecure = jsonBoolean(
+            j,
+            "allowInsecure",
+            "allow-insecure",
+            "allow_insecure",
+            "insecure",
+            "skip-cert-verify",
+            "skipCertVerify",
+            "skip_cert_verify",
+        )
         bean.initializeDefaultValues()
         return bean
+    }
+
+    private fun jsonBoolean(j: JSONObject, vararg keys: String): Boolean =
+        keys.fold<Boolean?>(null) { resolved, key ->
+            if (j.has(key)) jsonBooleanValue(j.opt(key)) ?: resolved else resolved
+        } ?: false
+
+    private fun jsonBooleanValue(value: Any?): Boolean? = when (value) {
+        is Boolean -> value
+        is Number -> value.toInt() != 0
+        is String -> when (value.lowercase(Locale.ROOT)) {
+            in TRUTHY_JSON_VALUES -> true
+            in FALSEY_JSON_VALUES -> false
+            else -> null
+        }
+        else -> null
     }
 
     private fun parseStd(parsed: UriCompat): VMessBean {
