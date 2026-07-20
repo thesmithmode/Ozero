@@ -29,6 +29,7 @@ class FmtAdditionalBranchCoverageTest {
               "sni":"sni.example.com",
               "alpn":"h2",
               "fp":"chrome",
+              "skip-cert-verify":"true",
               "ps":"Tls Json"
             }
         """.trimIndent()
@@ -42,7 +43,25 @@ class FmtAdditionalBranchCoverageTest {
         assertEquals("http", bean.type)
         assertEquals("tls", bean.security)
         assertEquals("sni.example.com", bean.sni)
+        assertEquals(true, bean.allowInsecure)
         assertEquals("Tls Json", bean.name)
+    }
+
+    @Test
+    fun `vmess json insecure conflict uses deterministic key order`() {
+        val json = """
+            {
+              "add":"vm.example.com",
+              "id":"id",
+              "tls":"tls",
+              "allowInsecure":true,
+              "skip-cert-verify":"false"
+            }
+        """.trimIndent()
+        val encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(json.toByteArray())
+        val bean = V2RayFmt.parseVMess("vmess://$encoded")
+
+        assertEquals(false, bean.allowInsecure)
     }
 
     @Test
