@@ -57,7 +57,7 @@ class ConfigBuilderAutoSelectTest {
         val json = ConfigBuilder.buildSingboxAutoConfig(listOf(makeVless()))
 
         assertContains(json, "\"type\":\"urltest\"")
-        assertContains(json, "https://www.gstatic.com/generate_204")
+        assertContains(json, "http://www.gstatic.com/generate_204")
         assertContains(json, "\"interval\":\"3m\"")
         assertContains(json, "\"tolerance\":50")
         assertContains(json, "\"interrupt_exist_connections\":true")

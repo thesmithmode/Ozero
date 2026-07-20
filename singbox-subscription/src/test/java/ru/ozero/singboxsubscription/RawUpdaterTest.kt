@@ -85,6 +85,7 @@ class RawUpdaterTest {
         assertEquals(2, result.getOrNull())
         assertEquals(2, profileDao.profiles.size)
         assertTrue(profileDao.profiles.all { it.groupId == g.id })
+        assertEquals("mihomo/1.19.23", server.takeRequest().getHeader("User-Agent"))
     }
 
     @Test
@@ -113,7 +114,11 @@ class RawUpdaterTest {
             protocolType = RawUpdater.PROTOCOL_VLESS,
         )
         profileDao.profiles.add(existing)
-        server.enqueue(MockResponse().setBody("x".repeat(4 * 1024 * 1024 + 1)))
+        server.enqueue(
+            MockResponse()
+                .setBody("x")
+                .setHeader("Content-Length", 16L * 1024 * 1024 + 1),
+        )
         val g = group()
 
         val result = rawUpdater.refresh(g)
@@ -350,6 +355,36 @@ class RawUpdaterTest {
         assertTrue(result.isSuccess, "Expected success but got ${result.exceptionOrNull()}")
         assertEquals(0, systemCalls.get())
         assertEquals(1, userCaCalls.get())
+    }
+
+    @Test
+    fun `should retry custom subscription with system trust after certificate failure`() = runBlocking {
+        val systemCalls = AtomicInteger(0)
+        val userCaCalls = AtomicInteger(0)
+        rawUpdater = RawUpdater(
+            okHttpClient = OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    systemCalls.incrementAndGet()
+                    chain.proceed(chain.request())
+                }
+                .build(),
+            groupDao = groupDao,
+            profileDao = profileDao,
+            userCaOkHttpClient = OkHttpClient.Builder()
+                .addInterceptor {
+                    userCaCalls.incrementAndGet()
+                    throw SSLHandshakeException("Trust anchor for certification path not found")
+                }
+                .build(),
+        )
+        server.enqueue(MockResponse().setBody(vless1))
+        val g = group().copy(isBuiltin = false)
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isSuccess, "Expected success but got ${result.exceptionOrNull()}")
+        assertEquals(1, userCaCalls.get())
+        assertEquals(1, systemCalls.get())
     }
 
     @Test

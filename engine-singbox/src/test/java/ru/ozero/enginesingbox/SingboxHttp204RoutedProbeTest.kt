@@ -43,8 +43,7 @@ class SingboxHttp204RoutedProbeTest {
             )
             .distinct()
 
-        assertTrue(urls.first().startsWith("https://"))
-        assertTrue(urls.drop(1).all { it.startsWith("http://") })
+        assertTrue(urls.all { it.startsWith("http://") })
         assertTrue(urls.any { it.contains("gstatic") })
         assertTrue(urls.any { it.contains("msftconnecttest") })
         assertTrue(urls.any { it.contains("cloudflare") })

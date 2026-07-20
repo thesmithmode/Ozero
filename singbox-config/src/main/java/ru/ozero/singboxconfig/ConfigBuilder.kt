@@ -16,7 +16,7 @@ private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
 private const val REALITY_PUBLIC_KEY_BYTES = 32
 private const val DNS_DOMAIN_RESOLVER_TAG = "dns-domain-resolver"
 private val DNS_DOMAIN_RESOLVER_TYPES = setOf("https", "tls")
-private const val AUTO_SELECT_PROBE_URL = "https://www.gstatic.com/generate_204"
+private const val AUTO_SELECT_PROBE_URL = "http://www.gstatic.com/generate_204"
 
 @Suppress("TooManyFunctions")
 object ConfigBuilder {
