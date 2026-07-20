@@ -279,6 +279,34 @@ class DataStoreWarpConfigSlotStoreTest {
     }
 
     @Test
+    fun `legacy vanilla AWG json without raw ini migrates to obfuscated defaults`() = runTest {
+        val ds = FakePreferencesDataStore()
+        val slot = buildValidSlotJson("id-legacy-vanilla", "LegacyVanilla")
+        ds.edit { it[stringPreferencesKey("warp_slots_json")] = "[$slot]" }
+        val store = DataStoreWarpConfigSlotStore(ds, DataStoreWarpConfigStore(FakePreferencesDataStore()))
+
+        val saved = store.slots().first().single()
+
+        assertEquals(AwgParams.DEFAULT_JC, saved.config.awgParams.junkPacketCount)
+        assertEquals(AwgParams.DEFAULT_JMIN, saved.config.awgParams.junkPacketMinSize)
+        assertEquals(AwgParams.DEFAULT_JMAX, saved.config.awgParams.junkPacketMaxSize)
+    }
+
+    @Test
+    fun `explicit raw ini vanilla AWG stays vanilla`() = runTest {
+        val ds = FakePreferencesDataStore()
+        val slot = JSONObject(buildValidSlotJson("id-explicit-vanilla", "ExplicitVanilla"))
+            .put("rawIni", "[Interface]\nJc = 0\nJmin = 0\nJmax = 0\n[Peer]\nEndpoint = h:1\n")
+            .toString()
+        ds.edit { it[stringPreferencesKey("warp_slots_json")] = "[$slot]" }
+        val store = DataStoreWarpConfigSlotStore(ds, DataStoreWarpConfigStore(FakePreferencesDataStore()))
+
+        val saved = store.slots().first().single()
+
+        assertEquals(AwgParams.VANILLA, saved.config.awgParams)
+    }
+
+    @Test
     fun `один сломанный слот в массиве — валидные слоты не теряются`() = runTest {
         val ds = FakePreferencesDataStore()
         val goodSlot = buildValidSlotJson("id-good", "Good")
