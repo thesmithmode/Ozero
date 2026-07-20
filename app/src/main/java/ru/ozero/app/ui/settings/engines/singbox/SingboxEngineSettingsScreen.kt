@@ -560,16 +560,17 @@ private fun subscriptionGroupStatusText(group: SubscriptionGroup): String {
     val updated = group.lastUpdated.takeIf { it > 0L }?.let { timestamp ->
         DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(timestamp))
     }
+    val refreshErrorCode = group.lastRefreshErrorCode
     return when {
-        group.lastRefreshErrorCode != null && updated != null -> stringResource(
+        refreshErrorCode != null && updated != null -> stringResource(
             R.string.singbox_group_status_error_after_update,
             updated,
             group.lastServerCount,
-            singboxRefreshErrorText(group.lastRefreshErrorCode),
+            singboxRefreshErrorText(refreshErrorCode),
         )
-        group.lastRefreshErrorCode != null -> stringResource(
+        refreshErrorCode != null -> stringResource(
             R.string.singbox_group_status_error,
-            singboxRefreshErrorText(group.lastRefreshErrorCode),
+            singboxRefreshErrorText(refreshErrorCode),
         )
         updated != null -> stringResource(R.string.singbox_group_status_updated, updated, group.lastServerCount)
         else -> stringResource(R.string.singbox_group_status_never)
