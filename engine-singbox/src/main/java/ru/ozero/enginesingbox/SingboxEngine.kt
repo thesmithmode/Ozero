@@ -424,14 +424,14 @@ class SingboxEngine @Inject constructor(
             }
             val autoSelect = pendingTunAutoSelect
             val routedReady = warmTrafficProbe(pendingSocksPort, autoSelect)
-            if (!routedReady) {
+            if (!routedReady && !autoSelect) {
                 stopRuntimeAfterFailedReadiness(p)
                 clearPendingStart()
                 return TunAttachResult.Failure("sing-box routed probe failed")
             }
             activeSocksPort = pendingSocksPort
             activeTunAutoSelect = autoSelect
-            attachReadinessVerified = true
+            attachReadinessVerified = routedReady
             pendingTunAutoSelect = false
             pendingSocksPort = 0
             pendingConfig = null
@@ -561,11 +561,25 @@ class SingboxEngine @Inject constructor(
         }
         val failureReason = lastFailure?.reason ?: "sing-box routed probe failed"
         val routedProbeFailure = lastFailure?.isRoutedProbeFailure() == true
+        val runtimeRunningAfterAttempts = if (routedProbeFailure && activeTunAutoSelect) {
+            isRuntimeStillRunning()
+        } else {
+            false
+        }
+        if (routedProbeFailure && activeTunAutoSelect && runtimeRunningAfterAttempts) {
+            PersistentLoggers.warn(
+                TAG,
+                "awaitReady allows warm TUN auto-select runtime after $READY_PROBE_ATTEMPTS routed probe attempts " +
+                    "lastFailure=$failureReason",
+            )
+            return EnginePlugin.ReadyResult.Ready
+        }
         PersistentLoggers.warn(
             TAG,
             "awaitReady timeout reason=$failureReason attempts=$READY_PROBE_ATTEMPTS " +
                 "activePort=$activeSocksPort activeAuto=$activeAutoSelect " +
-                "activeTunAuto=$activeTunAutoSelect routedProbeFailure=$routedProbeFailure",
+                "activeTunAuto=$activeTunAutoSelect runtimeRunning=$runtimeRunningAfterAttempts " +
+                "routedProbeFailure=$routedProbeFailure",
         )
         activeSocksPort = 0
         activeAutoSelect = false
@@ -576,6 +590,10 @@ class SingboxEngine @Inject constructor(
 
     private fun ProbeResult.Failure.isRoutedProbeFailure(): Boolean =
         code == ProbeResult.Failure.Code.ROUTED_PROBE_FAILED
+
+    private fun isRuntimeStillRunning(): Boolean = runCatching {
+        proxy?.runtimeRunning() == true
+    }.getOrDefault(false)
 
     override fun stats(): Flow<EngineStats> = flow {
         while (true) {
