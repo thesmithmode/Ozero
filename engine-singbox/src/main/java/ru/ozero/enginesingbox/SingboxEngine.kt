@@ -561,23 +561,11 @@ class SingboxEngine @Inject constructor(
         }
         val failureReason = lastFailure?.reason ?: "sing-box routed probe failed"
         val routedProbeFailure = lastFailure?.isRoutedProbeFailure() == true
-        val runtimeRunningAfterAttempts = if (routedProbeFailure && activeTunAutoSelect) {
-            runCatching { proxy?.runtimeRunning() == true }.getOrDefault(false)
-        } else {
-            false
-        }
-        if (routedProbeFailure && activeTunAutoSelect && runtimeRunningAfterAttempts) {
-            PersistentLoggers.warn(
-                TAG,
-                "awaitReady accepts live TUN auto-select runtime after $READY_PROBE_ATTEMPTS routed probe attempts",
-            )
-            return EnginePlugin.ReadyResult.Ready
-        }
         PersistentLoggers.warn(
             TAG,
             "awaitReady timeout reason=$failureReason attempts=$READY_PROBE_ATTEMPTS " +
                 "activePort=$activeSocksPort activeAuto=$activeAutoSelect " +
-                "activeTunAuto=$activeTunAutoSelect runtimeRunning=$runtimeRunningAfterAttempts " +
+                "activeTunAuto=$activeTunAutoSelect " +
                 "routedProbeFailure=$routedProbeFailure",
         )
         activeSocksPort = 0

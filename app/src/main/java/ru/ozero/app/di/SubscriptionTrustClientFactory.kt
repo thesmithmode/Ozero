@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
+import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
 
 object SubscriptionTrustClientFactory {
@@ -16,6 +17,13 @@ object SubscriptionTrustClientFactory {
         sslContext.init(null, arrayOf(trustManager), null)
         return timeoutBuilder()
             .sslSocketFactory(sslContext.socketFactory, trustManager)
+            .connectionSpecs(
+                listOf(
+                    ConnectionSpec.MODERN_TLS,
+                    ConnectionSpec.COMPATIBLE_TLS,
+                    ConnectionSpec.CLEARTEXT,
+                ),
+            )
             .build()
     }
 

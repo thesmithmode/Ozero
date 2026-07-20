@@ -518,7 +518,7 @@ class FptnEngine(
         private const val API_LOGIN_PATH = "/api/v1/login"
         internal const val AUTH_TIMEOUT_S = 15
         internal const val AUTO_AUTH_CANDIDATE_TIMEOUT_S = 5
-        private const val STARTUP_AUTH_BUDGET_MS = 15_000L
+        private const val STARTUP_AUTH_BUDGET_MS = 20_000L
         private const val READY_TIMEOUT_MS = 30_000L
         private const val READY_POLL_MS = 300L
         internal const val FPTN_INVALID_TOKEN = "Invalid FPTN token"

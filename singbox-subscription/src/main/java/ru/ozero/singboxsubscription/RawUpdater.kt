@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import okhttp3.ResponseBody
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -45,7 +46,7 @@ class RawUpdater(
                 .header("User-Agent", USER_AGENT)
                 .header("Accept", "text/plain, application/json, application/yaml, text/yaml, */*")
                 .build()
-            httpClientFor(group).newCall(request).execute().use { response ->
+            executeRequest(group, request).use { response ->
                 if (!response.isSuccessful) {
                     throw SubscriptionHttpException(response.code)
                 }
@@ -142,6 +143,16 @@ class RawUpdater(
     private fun httpClientFor(group: SubscriptionGroup): OkHttpClient =
         if (group.isBuiltin) okHttpClient else userCaOkHttpClient
 
+    private fun executeRequest(group: SubscriptionGroup, request: Request): Response {
+        val primary = httpClientFor(group)
+        return try {
+            primary.newCall(request).execute()
+        } catch (error: IOException) {
+            if (group.isBuiltin || primary === okHttpClient || !error.isSubscriptionCertificateFailure()) throw error
+            okHttpClient.newCall(request).execute()
+        }
+    }
+
     companion object {
         private const val TAG = "RawUpdater"
         const val PROTOCOL_VLESS = 0
@@ -149,9 +160,9 @@ class RawUpdater(
         const val PROTOCOL_TROJAN = 2
         const val PROTOCOL_SHADOWSOCKS = 3
 
-        private const val USER_AGENT = "Ozero/1 sing-box-subscription"
+        private const val USER_AGENT = "mihomo/1.19.23"
         private const val MAX_PROFILES_PER_GROUP = 2_000
-        private const val MAX_SUBSCRIPTION_BYTES = 4L * 1024 * 1024
+        private const val MAX_SUBSCRIPTION_BYTES = 16L * 1024 * 1024
 
         private fun normalizeError(e: Throwable): Throwable = when {
             e.isSubscriptionCertificateFailure() ->
