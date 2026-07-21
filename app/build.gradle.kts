@@ -1,3 +1,5 @@
+import binaries.StripGoClassesFromAarTask
+
 fun gitVersionNameFromGit(): String = runCatching {
     providers.exec {
         commandLine("git", "describe", "--tags", "--match", "v*.*.*", "--abbrev=0")
@@ -34,6 +36,12 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
         layout.buildDirectory.dir("robolectric-runtime-deps").get().asFile.absolutePath,
     )
     systemProperty("robolectric.offline", "true")
+}
+
+val strippedUrnetworkSdk = layout.buildDirectory.file("generated/urnetwork/URnetworkSdk.aar")
+val stripUrnetworkGoRuntime by tasks.registering(StripGoClassesFromAarTask::class) {
+    sourceAar.set(rootProject.layout.projectDirectory.file("engine-urnetwork/libs/URnetworkSdk.aar"))
+    outputAar.set(strippedUrnetworkSdk)
 }
 
 plugins {
@@ -158,14 +166,7 @@ dependencies {
     implementation(project(":singbox-subscription"))
     implementation(project(":core-backup"))
 
-    implementation(
-        fileTree(
-            mapOf(
-                "dir" to rootProject.file("engine-urnetwork/libs"),
-                "include" to listOf("*.aar", "*.jar"),
-            ),
-        ),
-    )
+    implementation(files(strippedUrnetworkSdk).builtBy(stripUrnetworkGoRuntime))
     val goStubsDir = "${rootProject.projectDir}/singbox-core/libs-stubs"
     compileOnly(fileTree(mapOf("dir" to goStubsDir, "include" to listOf("*.jar"))))
 

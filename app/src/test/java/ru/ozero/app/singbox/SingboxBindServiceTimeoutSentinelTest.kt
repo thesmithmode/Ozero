@@ -98,6 +98,20 @@ class SingboxBindServiceTimeoutSentinelTest {
     }
 
     @Test
+    fun `should strip URnetwork Go runtime before packaging SDK`() {
+        val root = locateRepoRoot()
+        val gradle = File(root, "app/build.gradle.kts")
+        val task = File(root, "buildSrc/src/main/kotlin/binaries/StripGoClassesFromAarTask.kt")
+        assertTrue(gradle.readText().contains("stripUrnetworkGoRuntime"))
+        assertTrue(task.readText().contains("entry.name.startsWith(\"go/\")"))
+        assertTrue(
+            gradle.readText().contains(
+                "implementation(files(strippedUrnetworkSdk).builtBy(stripUrnetworkGoRuntime))",
+            ),
+        )
+    }
+
+    @Test
     fun `should SingboxEngine call onProcessDied from DeathRecipient and service callbacks`() {
         val root = locateRepoRoot()
         val content = File(
