@@ -14,7 +14,7 @@ android {
 
 dependencies {
     implementation(project(":engines-core"))
-    implementation(fileTree(mapOf("dir" to "libs-stubs", "include" to listOf("*.jar"))))
+    compileOnly(fileTree(mapOf("dir" to "libs-stubs", "include" to listOf("*.jar"))))
     api(
         fileTree(
             mapOf(
