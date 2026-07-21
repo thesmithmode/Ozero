@@ -280,6 +280,21 @@ class ConfigBuilderVLESSTest {
     }
 
     @Test
+    fun `reality config preserves allow insecure`() {
+        val bean = makeBean(security = "reality").apply {
+            sni = "reality.example.com"
+            realityPublicKey = validRealityPublicKey
+            realityShortId = "ab12"
+            allowInsecure = true
+        }
+
+        val json = ConfigBuilder.buildSingboxConfig(bean)
+
+        assertContains(json, "\"reality\":{")
+        assertContains(json, "\"insecure\":true")
+    }
+
+    @Test
     fun `reality server name preserves host fronting when server address is domain`() {
         val bean = V2RayFmt.parseVLESS(
             "vless://12345678-1234-1234-1234-123456789abc@proxy.example.com:443" +

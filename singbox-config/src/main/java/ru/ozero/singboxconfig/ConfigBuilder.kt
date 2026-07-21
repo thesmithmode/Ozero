@@ -599,6 +599,9 @@ private fun buildTls(bean: StandardV2RayBean): String? {
         sb.append(""""short_id":${jsonString(bean.realityShortId)}},""")
         val fp = bean.realityFingerprint.ifEmpty { "chrome" }
         sb.append(""""utls":{"enabled":true,"fingerprint":${jsonString(fp)}},""")
+        if (bean.allowInsecure) {
+            sb.append(""""insecure":true,""")
+        }
     } else if (security == "tls") {
         if (bean.utlsFingerprint.isNotEmpty()) {
             sb.append(""""utls":{"enabled":true,"fingerprint":${jsonString(bean.utlsFingerprint)}},""")
