@@ -7,7 +7,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -381,35 +383,62 @@ class FptnEngine(
         perCandidateMaxTimeoutS: Int,
     ): FptnAuthResult {
         val failures = mutableListOf<String>()
-        for (index in candidates.indices) {
+        val parallelism = fptnStartupAuthParallelism(candidates.size)
+        for (batch in candidates.chunked(parallelism)) {
             currentCoroutineContext().ensureActive()
             val remainingMs = deadlineMs - System.currentTimeMillis()
             if (remainingMs <= 0L) break
-            val server = candidates[index]
             val timeoutS = authTimeoutSeconds(remainingMs, perCandidateMaxTimeoutS)
-            when (val auth = authenticate(server, data, bypassMethod, sniDomain, timeoutS)) {
-                is ServerAuthResult.Success -> {
-                    currentCoroutineContext().ensureActive()
-                    val resolveRemainingMs = deadlineMs - System.currentTimeMillis()
-                    if (resolveRemainingMs <= 0L) break
-                    val serverIp = withTimeoutOrNull(resolveRemainingMs) { resolveServerIp(server) }
-                    currentCoroutineContext().ensureActive()
-                    if (serverIp != null) {
-                        return FptnAuthResult.Success(AuthenticatedServer(server, serverIp, auth.accessToken))
+            val results = coroutineScope {
+                batch.map { server ->
+                    async {
+                        authenticateCandidate(
+                            server = server,
+                            data = data,
+                            bypassMethod = bypassMethod,
+                            sniDomain = sniDomain,
+                            timeoutS = timeoutS,
+                            deadlineMs = deadlineMs,
+                        )
                     }
-                    failures += FPTN_DNS_FAILED
-                    PersistentLoggers.warn(TAG, "authenticate: resolved IP missing")
-                }
-                is ServerAuthResult.Failure -> {
-                    failures += auth.reason
-                    if (auth.terminal) return FptnAuthResult.Failure(auth.reason)
-                }
+                }.map { it.await() }
             }
-            if (index < candidates.lastIndex) {
-                Log.d(TAG, "authenticate: fallback from ${server.name} to ${candidates[index + 1].name}")
+
+            results.filterIsInstance<FptnAuthResult.Success>().firstOrNull()?.let { return it }
+            val batchFailures = results.filterIsInstance<FptnAuthResult.Failure>().map { it.reason }
+            failures += batchFailures
+            if (FPTN_TOKEN_REJECTED in batchFailures) {
+                return FptnAuthResult.Failure(FPTN_TOKEN_REJECTED)
             }
         }
         return FptnAuthResult.Failure(startupFptnFailureReason(failures, candidates.size))
+    }
+
+    private suspend fun authenticateCandidate(
+        server: FptnServer,
+        data: FptnTokenData,
+        bypassMethod: String,
+        sniDomain: String,
+        timeoutS: Int,
+        deadlineMs: Long,
+    ): FptnAuthResult = when (
+        val auth = authenticate(server, data, bypassMethod, sniDomain, timeoutS)
+    ) {
+        is ServerAuthResult.Failure -> FptnAuthResult.Failure(auth.reason)
+        is ServerAuthResult.Success -> {
+            val resolveRemainingMs = deadlineMs - System.currentTimeMillis()
+            if (resolveRemainingMs <= 0L) {
+                FptnAuthResult.Failure(FPTN_AUTH_TIMEOUT)
+            } else {
+                val serverIp = withTimeoutOrNull(resolveRemainingMs) { resolveServerIp(server) }
+                if (serverIp != null) {
+                    FptnAuthResult.Success(AuthenticatedServer(server, serverIp, auth.accessToken))
+                } else {
+                    PersistentLoggers.warn(TAG, "authenticate: resolved IP missing")
+                    FptnAuthResult.Failure(FPTN_DNS_FAILED)
+                }
+            }
+        }
     }
 
     private fun authTimeoutSeconds(remainingMs: Long, perCandidateMaxTimeoutS: Int): Int =
@@ -518,6 +547,7 @@ class FptnEngine(
         private const val API_LOGIN_PATH = "/api/v1/login"
         internal const val AUTH_TIMEOUT_S = 15
         internal const val AUTO_AUTH_CANDIDATE_TIMEOUT_S = 5
+        internal const val AUTO_AUTH_PARALLELISM = 4
         private const val STARTUP_AUTH_BUDGET_MS = 20_000L
         private const val READY_TIMEOUT_MS = 30_000L
         private const val READY_POLL_MS = 300L
@@ -603,6 +633,9 @@ internal fun fptnStartupAuthCandidates(candidates: List<FptnServer>): List<FptnS
 
 internal fun fptnStartupAuthPerCandidateTimeoutS(candidateCount: Int): Int =
     if (candidateCount > 1) FptnEngine.AUTO_AUTH_CANDIDATE_TIMEOUT_S else FptnEngine.AUTH_TIMEOUT_S
+
+internal fun fptnStartupAuthParallelism(candidateCount: Int): Int =
+    candidateCount.coerceIn(1, FptnEngine.AUTO_AUTH_PARALLELISM)
 
 internal fun fptnExitNodeStrategy(
     server: FptnServer,

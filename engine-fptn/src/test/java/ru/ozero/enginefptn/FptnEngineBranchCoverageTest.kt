@@ -28,6 +28,8 @@ import ru.ozero.enginescore.Upstream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertIs
@@ -334,6 +336,28 @@ class FptnEngineBranchCoverageTest {
         assertEquals(FptnEngine.FPTN_AUTH_TIMEOUT, failure.reason)
     }
 
+    @Test
+    fun `auto start reaches a later live server without serial timeout starvation`() = runTest {
+        val tokenJson =
+            """{"version":1,"username":"u","password":"p","servers":[
+            |{"name":"S1","host":"127.0.0.1","port":443},
+            |{"name":"S2","host":"127.0.0.2","port":443},
+            |{"name":"S3","host":"127.0.0.3","port":443},
+            |{"name":"S4","host":"127.0.0.4","port":443},
+            |{"name":"S5","host":"127.0.0.5","port":443}]}
+            """.trimMargin()
+        val token = java.util.Base64.getEncoder().encodeToString(tokenJson.toByteArray())
+        val engine = FptnEngine(
+            configStore = InMemoryFptnConfigStore(),
+            wsClient = FakeFastWsClient(),
+            httpsClient = ParallelFallbackHttpsClient(),
+        )
+
+        val result = engine.start(EngineConfig.Fptn(token = "fptn:$token"), Upstream.None)
+
+        assertIs<StartResult.Success>(result)
+    }
+
     private class SlowPostHttpsClient(
         private val postDelayMs: Long = 16_000L,
     ) : FptnHttpsClient {
@@ -366,6 +390,39 @@ class FptnEngineBranchCoverageTest {
                 delay(postDelayMs)
             }
             return FptnNativeResponse(200, """{"access_token":"access"}""", "")
+        }
+    }
+
+    private class ParallelFallbackHttpsClient : FptnHttpsClient {
+        private val hosts = ConcurrentHashMap<Long, String>()
+        private val handles = AtomicLong()
+
+        override fun nativeCreate(
+            host: String,
+            port: Int,
+            sni: String,
+            md5Fingerprint: String,
+            censorshipStrategy: String,
+        ): Long = handles.incrementAndGet().also { hosts[it] = host }
+
+        override fun nativeDestroy(handle: Long) {
+            hosts.remove(handle)
+        }
+
+        override fun nativeGet(handle: Long, path: String, timeoutSeconds: Int): FptnNativeResponse =
+            error("GET is not used by auth path")
+
+        override fun nativePost(
+            handle: Long,
+            path: String,
+            body: String,
+            timeoutSeconds: Int,
+        ): FptnNativeResponse {
+            if (hosts[handle] == "127.0.0.5") {
+                return FptnNativeResponse(200, """{"access_token":"access"}""", "")
+            }
+            Thread.sleep(timeoutSeconds * 1_000L)
+            return FptnNativeResponse(608, "", "timeout")
         }
     }
 
