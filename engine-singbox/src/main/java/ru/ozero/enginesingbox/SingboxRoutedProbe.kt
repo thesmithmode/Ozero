@@ -6,7 +6,6 @@ import ru.ozero.enginescore.PersistentLoggers
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.io.InputStream
 import java.net.ConnectException
 import java.net.HttpURLConnection
 import java.net.InetSocketAddress
@@ -166,41 +165,13 @@ class SingboxHttp204RoutedProbe(
         val statusParts = statusLine.split(' ', limit = 3)
         if (statusParts.firstOrNull() !in SUPPORTED_HTTP_VERSIONS) return null
         val statusCode = statusParts.getOrNull(1)?.toIntOrNull() ?: return null
-        var contentLength: Int? = null
         repeat(MAX_HTTP_HEADER_LINES) {
             val line = input.readAsciiLine(MAX_HTTP_LINE_BYTES) ?: return null
             if (line.isEmpty()) {
-                if (statusCode != HttpURLConnection.HTTP_NO_CONTENT) {
-                    readBoundedAscii(input, contentLength) ?: return null
-                }
                 return RawHttpResponse(statusCode)
-            }
-            if (line.startsWith(CONTENT_LENGTH_HEADER, ignoreCase = true)) {
-                contentLength = line.substringAfter(':').trim().toIntOrNull() ?: return null
             }
         }
         return null
-    }
-
-    private fun readBoundedAscii(input: InputStream): String =
-        readBoundedAscii(input, contentLength = null).orEmpty()
-
-    private fun readBoundedAscii(input: InputStream, contentLength: Int?): String? {
-        if (contentLength != null && contentLength !in 0..MAX_HTTP_BODY_BYTES) return null
-        val output = ByteArrayOutputStream()
-        val buffer = ByteArray(64)
-        while (output.size() <= MAX_HTTP_BODY_BYTES) {
-            val remaining = MAX_HTTP_BODY_BYTES + 1 - output.size()
-            val expected = contentLength?.minus(output.size())
-            if (expected != null && expected <= 0) break
-            val readLimit = minOf(buffer.size, remaining, expected ?: remaining)
-            val count = input.read(buffer, 0, readLimit)
-            if (count < 0) break
-            output.write(buffer, 0, count)
-        }
-        if (output.size() > MAX_HTTP_BODY_BYTES) return null
-        if (contentLength != null && output.size() != contentLength) return null
-        return output.toString(StandardCharsets.US_ASCII.name())
     }
 
     private fun BufferedInputStream.readAsciiLine(maxBytes: Int): String? {
@@ -281,11 +252,9 @@ class SingboxHttp204RoutedProbe(
         private const val MSFT_CONNECT_TEST_PATH = "/connecttest.txt"
         private const val HTTP_SUCCESS_MIN = 200
         private const val HTTP_REDIRECT_MAX = 399
-        private const val CONTENT_LENGTH_HEADER = "Content-Length:"
         private const val HTTP_PORT = 80
         private const val MAX_HTTP_LINE_BYTES = 1_024
         private const val MAX_HTTP_HEADER_LINES = 64
-        private const val MAX_HTTP_BODY_BYTES = 128
         private const val MAX_CAUSE_DEPTH = 8
         private val SUPPORTED_HTTP_VERSIONS = setOf("HTTP/1.0", "HTTP/1.1")
     }
