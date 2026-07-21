@@ -469,7 +469,7 @@ private fun vlessOutbound(bean: VLESSBean, tag: String, detour: String? = null):
     }
 
     if (detour != null) sb.append(""""detour":${jsonString(detour)},""")
-    sb.append(""""packet_encoding":"xudp"}""")
+    appendPacketEncoding(sb, bean.packetEncoding)
     return sb.toString()
 }
 
@@ -496,8 +496,15 @@ private fun vmessOutbound(bean: VMessBean, tag: String, detour: String? = null):
     if (tls != null) sb.append(""""tls":$tls,""")
 
     if (detour != null) sb.append(""""detour":${jsonString(detour)},""")
-    sb.append(""""packet_encoding":"xudp"}""")
+    appendPacketEncoding(sb, bean.packetEncoding)
     return sb.toString()
+}
+
+private fun appendPacketEncoding(builder: StringBuilder, packetEncoding: String) {
+    val normalized = packetEncoding.trim().takeUnless { it.isEmpty() || it == "none" }
+    if (normalized != null) builder.append(""""packet_encoding":${jsonString(normalized)},""")
+    if (builder[builder.length - 1] == ',') builder.deleteCharAt(builder.length - 1)
+    builder.append('}')
 }
 
 private fun trojanOutbound(bean: TrojanBean, tag: String, detour: String? = null): String {

@@ -132,10 +132,19 @@ class ConfigBuilderVLESSTest {
     }
 
     @Test
-    fun `should include xudp packet encoding`() {
-        val json = ConfigBuilder.buildSingboxConfig(makeBean())
+    fun `should preserve configured packet encoding`() {
+        val bean = makeBean().apply { packetEncoding = "xudp" }
+
+        val json = ConfigBuilder.buildSingboxConfig(bean)
 
         assertContains(json, "\"packet_encoding\":\"xudp\"")
+    }
+
+    @Test
+    fun `should omit default packet encoding`() {
+        val json = ConfigBuilder.buildSingboxConfig(makeBean())
+
+        assertFalse(json.contains("\"packet_encoding\""))
     }
 
     @Test
