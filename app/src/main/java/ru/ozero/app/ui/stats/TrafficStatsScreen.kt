@@ -64,7 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
-import ru.ozero.app.ui.components.addSmooth
+import ru.ozero.app.ui.components.addPolyline
 import ru.ozero.app.ui.components.chartAxisLabels
 import ru.ozero.app.ui.components.chartNiceMax
 import ru.ozero.app.ui.theme.OzeroPalette
@@ -341,11 +341,7 @@ private fun TrafficLineChart(
                     if (data.buckets.size < 2 || niceMax <= 0f) return@Canvas
                     val step = w / (data.buckets.size - 1)
                     val curvePx = with(density) { 2.dp.toPx() }
-                    val stroke = Stroke(
-                        width = curvePx,
-                        cap = StrokeCap.Round,
-                        join = StrokeJoin.Round,
-                    )
+                    val stroke = Stroke(width = curvePx, cap = StrokeCap.Butt, join = StrokeJoin.Miter)
                     data.lines.forEach { (engineId, values) ->
                         val color = if (engineId == ENGINE_ID_ALL) {
                             ALL_LINE_COLOR
@@ -353,7 +349,7 @@ private fun TrafficLineChart(
                             engineLineColor(engineId)
                         }
                         val path = Path()
-                        path.addSmooth(values.map { it.toFloat() }, step, h, niceMax)
+                        path.addPolyline(values.map { it.toFloat() }, step, h, niceMax)
                         drawPath(path, color, style = stroke)
                     }
                 }

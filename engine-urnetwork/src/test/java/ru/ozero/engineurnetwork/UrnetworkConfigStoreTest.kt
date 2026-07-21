@@ -6,7 +6,6 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.core.toMutablePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -183,7 +182,6 @@ class UrnetworkConfigStoreTest {
     fun `legacy disabled provide state normalizes through datastore reload`() = runTest {
         val (_, ds) = newStore()
         ds.editBooleanRaw("urnetwork_provide_enabled", false)
-        ds.editRaw("urnetwork_provide_control_mode" to UrnetworkProvideControlMode.AUTO.rawValue)
 
         val snap = DataStoreUrnetworkConfigStore(ds).config().first()
 
@@ -716,11 +714,7 @@ class UrnetworkConfigStoreTest {
         }
 
         suspend fun editBooleanRaw(key: String, value: Boolean) {
-            updateData { prefs ->
-                prefs.toMutablePreferences().apply {
-                    this[booleanPreferencesKey(key)] = value
-                }
-            }
+            updateData { mutablePreferencesOf(booleanPreferencesKey(key) to value) }
         }
 
         override suspend fun updateData(

@@ -5,6 +5,7 @@ import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
+import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
@@ -23,7 +24,7 @@ abstract class StripGoClassesFromAarTask : DefaultTask() {
         val output = outputAar.get().asFile
         output.parentFile.mkdirs()
         ZipFile(sourceAar.get().asFile).use { aar ->
-            ZipOutputStream(output.outputStream().buffered()).use { destination ->
+            ZipOutputStream(BufferedOutputStream(output.outputStream())).use { destination ->
                 val entries = aar.entries()
                 while (entries.hasMoreElements()) {
                     val entry = entries.nextElement()
