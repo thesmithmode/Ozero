@@ -287,8 +287,10 @@ class FptnEngineTest {
         val result = engine.start(EngineConfig.Fptn(token = "fptn:${multiServerTokenB64()}"), Upstream.None)
 
         assertIs<StartResult.Success>(result)
-        assertEquals(listOf("203.0.113.1", "127.0.0.1"), https.createdHosts)
-        assertEquals(listOf(1L, 2L), https.destroyedHandles)
+        assertEquals(setOf("203.0.113.1", "127.0.0.1"), https.createdHosts.toSet())
+        assertEquals(2, https.createdHosts.size)
+        assertEquals(setOf(1L, 2L), https.destroyedHandles.toSet())
+        assertEquals(2, https.destroyedHandles.size)
     }
 
     @Test
@@ -309,7 +311,8 @@ class FptnEngineTest {
         )
 
         assertIs<StartResult.Success>(result)
-        assertEquals(listOf("203.0.113.1", "127.0.0.1"), https.createdHosts)
+        assertEquals(setOf("203.0.113.1", "127.0.0.1"), https.createdHosts.toSet())
+        assertEquals(2, https.createdHosts.size)
     }
 
     @Test
@@ -1726,13 +1729,17 @@ class FptnEngineTest {
             md5Fingerprint: String,
             censorshipStrategy: String,
         ): Long {
-            createFailure?.let { throw it }
-            createdHosts += host
-            return nextHandle++
+            return synchronized(this) {
+                createFailure?.let { throw it }
+                createdHosts += host
+                nextHandle++
+            }
         }
 
         override fun nativeDestroy(handle: Long) {
-            destroyedHandles += handle
+            synchronized(this) {
+                destroyedHandles += handle
+            }
         }
 
         override fun nativeGet(handle: Long, path: String, timeoutSeconds: Int): FptnNativeResponse =
@@ -1744,8 +1751,10 @@ class FptnEngineTest {
             body: String,
             timeoutSeconds: Int,
         ): FptnNativeResponse {
-            if (postFailures.isNotEmpty()) throw postFailures.removeFirst()
-            return postResponses.removeFirst()
+            return synchronized(this) {
+                if (postFailures.isNotEmpty()) throw postFailures.removeFirst()
+                postResponses.removeFirst()
+            }
         }
     }
 }
