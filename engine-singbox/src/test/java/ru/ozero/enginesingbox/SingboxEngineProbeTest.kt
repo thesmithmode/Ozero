@@ -561,7 +561,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `awaitReady fails when routed probe fails`() = runTest {
+    fun `awaitReady keeps a running runtime when routed probe fails`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = object : SingboxRoutedProbe {
             override suspend fun probeLatencyMs(socksPort: Int): Long = SingboxHttp204RoutedProbe.LATENCY_FAILED
@@ -573,12 +573,12 @@ class SingboxEngineProbeTest {
 
         val result = engine.awaitReady()
 
-        assertTrue(result is EnginePlugin.ReadyResult.Timeout)
-        assertEquals(0, engine.privateIntField("activeSocksPort"))
+        assertIs<EnginePlugin.ReadyResult.Ready>(result)
+        assertEquals(49408, engine.privateIntField("activeSocksPort"))
     }
 
     @Test
-    fun `awaitReady times out warm auto select runtime until routed probe succeeds`() = runTest {
+    fun `awaitReady keeps warm auto select runtime when routed probe fails`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
         val process = mockk<ISingboxEngineProcess>()
@@ -589,13 +589,13 @@ class SingboxEngineProbeTest {
 
         val result = engine.awaitReady()
 
-        assertIs<EnginePlugin.ReadyResult.Timeout>(result)
-        assertEquals(0, engine.privateIntField("activeSocksPort"))
-        assertEquals(false, engine.privateBooleanField("activeAutoSelect"))
+        assertIs<EnginePlugin.ReadyResult.Ready>(result)
+        assertEquals(49408, engine.privateIntField("activeSocksPort"))
+        assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
     }
 
     @Test
-    fun `awaitReady rejects live warm tun auto select runtime after routed probe failures`() = runTest {
+    fun `awaitReady keeps live warm tun auto select runtime after routed probe failures`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
         val process = mockk<ISingboxEngineProcess>()
@@ -607,10 +607,10 @@ class SingboxEngineProbeTest {
 
         val result = engine.awaitReady()
 
-        assertIs<EnginePlugin.ReadyResult.Timeout>(result)
-        assertEquals(0, engine.privateIntField("activeSocksPort"))
-        assertEquals(false, engine.privateBooleanField("activeAutoSelect"))
-        assertEquals(false, engine.privateBooleanField("activeTunAutoSelect"))
+        assertIs<EnginePlugin.ReadyResult.Ready>(result)
+        assertEquals(49408, engine.privateIntField("activeSocksPort"))
+        assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
+        assertEquals(true, engine.privateBooleanField("activeTunAutoSelect"))
     }
 
     @Test

@@ -568,12 +568,18 @@ class SingboxEngine @Inject constructor(
                 "activeTunAuto=$activeTunAutoSelect " +
                 "routedProbeFailure=$routedProbeFailure",
         )
+        if (routedProbeFailure && isRuntimeRunning()) {
+            PersistentLoggers.warn(TAG, "awaitReady: runtime is active but external probe is unavailable")
+            return EnginePlugin.ReadyResult.Ready
+        }
         activeSocksPort = 0
         activeAutoSelect = false
         activeTunAutoSelect = false
         attachReadinessVerified = false
         return EnginePlugin.ReadyResult.Timeout(failureReason)
     }
+
+    private fun isRuntimeRunning(): Boolean = runCatching { proxy?.runtimeRunning() == true }.getOrDefault(false)
 
     private fun ProbeResult.Failure.isRoutedProbeFailure(): Boolean =
         code == ProbeResult.Failure.Code.ROUTED_PROBE_FAILED
