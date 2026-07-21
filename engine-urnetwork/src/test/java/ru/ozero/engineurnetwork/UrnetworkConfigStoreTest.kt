@@ -2,9 +2,11 @@ package ru.ozero.engineurnetwork
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.toMutablePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -163,34 +165,30 @@ class UrnetworkConfigStoreTest {
     }
 
     @Test
-    fun `provide state defaults to opt-in`() = runTest {
+    fun `provide state defaults to always on`() = runTest {
         val (store, _) = newStore()
         val snap = store.config().first()
 
-        assertEquals(false, snap.provideEnabled)
-        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(true, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
     }
 
     @Test
-    fun `provideEnabled по умолчанию false`() = runTest {
+    fun `provideEnabled по умолчанию true`() = runTest {
         val (store, _) = newStore()
-        assertEquals(false, store.provideEnabled().first())
+        assertEquals(true, store.provideEnabled().first())
     }
 
     @Test
     fun `legacy disabled provide state normalizes through datastore reload`() = runTest {
-        val (store, ds) = newStore()
-        store.update {
-            it.copy(
-                provideEnabled = false,
-                provideControlMode = UrnetworkProvideControlMode.AUTO,
-            )
-        }
+        val (_, ds) = newStore()
+        ds.editBooleanRaw("urnetwork_provide_enabled", false)
+        ds.editRaw("urnetwork_provide_control_mode" to UrnetworkProvideControlMode.AUTO.rawValue)
 
         val snap = DataStoreUrnetworkConfigStore(ds).config().first()
 
-        assertEquals(false, snap.provideEnabled)
-        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(true, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
     }
 
     @Test
@@ -292,8 +290,8 @@ class UrnetworkConfigStoreTest {
         assertEquals(UrnetworkWindowType.SPEED, snap.windowType)
         assertEquals(true, snap.fixedIpSize)
         assertEquals(false, snap.allowDirect)
-        assertEquals(false, snap.provideEnabled)
-        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(true, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, snap.provideNetworkMode)
     }
 
@@ -449,8 +447,8 @@ class UrnetworkConfigStoreTest {
         assertEquals(UrnetworkWindowType.QUALITY, snap.windowType)
         assertEquals(true, snap.fixedIpSize)
         assertEquals(false, snap.allowDirect)
-        assertEquals(false, snap.provideEnabled)
-        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(true, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, snap.provideNetworkMode)
     }
 
@@ -506,8 +504,8 @@ class UrnetworkConfigStoreTest {
         assertEquals(UrnetworkWindowType.SPEED, snap.windowType)
         assertEquals(true, snap.fixedIpSize)
         assertEquals(false, snap.allowDirect)
-        assertEquals(false, snap.provideEnabled)
-        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(true, snap.provideEnabled)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, snap.provideNetworkMode)
         assertEquals(UrnetworkLocationSelection("DE", "Bavaria", "Munich"), snap.selectedLocation)
     }
@@ -693,7 +691,7 @@ class UrnetworkConfigStoreTest {
         val snap = DataStoreUrnetworkConfigStore(ds).config().first()
 
         assertEquals(UrnetworkWindowType.AUTO, snap.windowType)
-        assertEquals(UrnetworkProvideControlMode.AUTO, snap.provideControlMode)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, snap.provideControlMode)
         assertEquals(UrnetworkProvideNetworkMode.WIFI, snap.provideNetworkMode)
     }
 
@@ -713,6 +711,14 @@ class UrnetworkConfigStoreTest {
                     values.forEach { (key, value) ->
                         this[stringPreferencesKey(key)] = value
                     }
+                }
+            }
+        }
+
+        suspend fun editBooleanRaw(key: String, value: Boolean) {
+            updateData { prefs ->
+                prefs.toMutablePreferences().apply {
+                    this[booleanPreferencesKey(key)] = value
                 }
             }
         }

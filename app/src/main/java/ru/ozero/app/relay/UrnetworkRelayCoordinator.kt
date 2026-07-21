@@ -20,7 +20,6 @@ import ru.ozero.engineurnetwork.UrnetworkJwtBootstrapper
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.byClientJwt
-import ru.ozero.engineurnetwork.provideEnabled
 import ru.ozero.engineurnetwork.provideNetworkMode
 import ru.ozero.engineurnetwork.walletAddress
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
@@ -51,9 +50,8 @@ class UrnetworkRelayCoordinator(
             tunnelController.state,
             configStore.byClientJwt(),
             configStore.walletAddress(),
-            configStore.provideEnabled(),
-        ) { tunnelState, byClientJwt, walletAddress, provideEnabled ->
-            RelayState(tunnelState, byClientJwt, walletAddress, provideEnabled)
+        ) { tunnelState, byClientJwt, walletAddress ->
+            RelayState(tunnelState, byClientJwt, walletAddress)
         }
             .distinctUntilChanged()
             .onEach { state ->
@@ -81,17 +79,6 @@ class UrnetworkRelayCoordinator(
             relayOwned.set(false)
             return
         }
-        if (!state.provideEnabled) {
-            bootstrapAttemptedThisSession.set(false)
-            if (relayOwned.compareAndSet(true, false)) {
-                stopWatchdog()
-                runCatching { networkMonitor?.stop() }
-                runCatching { relayLockManager?.release() }
-                runCatching { bridge.stop() }
-                closeDummyPipe()
-            }
-            return
-        }
         if (state.byClientJwt == null) {
             if (bootstrapAttemptedThisSession.compareAndSet(false, true)) {
                 val result = jwtBootstrapper.ensureClientJwt()
@@ -107,8 +94,7 @@ class UrnetworkRelayCoordinator(
             attachDummyIoLoop()
             runCatching { bridge.setProvidePaused(false) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: worker pause toggle threw: ${it.message}") }
-            val controlMode = runCatching { configStore.config().first().provideControlMode }
-                .getOrDefault(UrnetworkProvideControlMode.AUTO)
+            val controlMode = UrnetworkProvideControlMode.ALWAYS
             runCatching { bridge.setProvideControlMode(controlMode) }
                 .onFailure { PersistentLoggers.warn(TAG, "mesh session: setProvideControlMode threw: ${it.message}") }
             val networkMode = runCatching { configStore.provideNetworkMode().first() }
@@ -224,7 +210,6 @@ class UrnetworkRelayCoordinator(
             val tunnelState: TunnelState,
             val byClientJwt: String?,
             val walletAddress: String,
-            val provideEnabled: Boolean,
         )
 
         const val TAG = "MeshSession"

@@ -373,11 +373,11 @@ class EngineUrnetworkContractTest {
     }
 
     @Test
-    fun `start с provideEnabled=false сохраняет provider paused`() = runTest {
+    fun `start игнорирует legacy provideEnabled false и включает provider`() = runTest {
         val bridge = FakeUrnetworkSdkBridge()
         val (e, _, _) = engine(byJwt = "j", byClientJwt = "cj", provideEnabled = false, bridge = bridge)
         e.start(baseConfig, Upstream.None)
-        assertEquals(true, bridge.lastProvidePaused)
+        assertEquals(false, bridge.lastProvidePaused)
     }
 
     private class FakeAuthService(

@@ -49,7 +49,6 @@ import ru.ozero.app.ui.theme.OzeroPalette
 import ru.ozero.app.ui.urnetwork.UrnetworkBalanceCard
 import ru.ozero.app.ui.utils.formatBytes
 import ru.ozero.app.urnetwork.UrnetworkBalanceState
-import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkWindowType
@@ -93,8 +92,6 @@ fun UrnetworkEngineSettingsScreen(
                 val windowType by settingsVm.windowType.collectAsStateWithLifecycle()
                 val fixedIp by settingsVm.fixedIpSize.collectAsStateWithLifecycle()
                 val allowDirect by settingsVm.allowDirect.collectAsStateWithLifecycle()
-                val provideEnabled by settingsVm.provideEnabled.collectAsStateWithLifecycle()
-                val provideControlMode by settingsVm.provideControlMode.collectAsStateWithLifecycle()
                 val provideNetworkMode by settingsVm.provideNetworkMode.collectAsStateWithLifecycle()
                 val balanceState by settingsVm.balanceState.collectAsStateWithLifecycle()
                 Column(
@@ -123,14 +120,11 @@ fun UrnetworkEngineSettingsScreen(
                         windowType = windowType,
                         fixedIp = fixedIp,
                         allowDirect = allowDirect,
-                        provideEnabled = provideEnabled,
-                        provideControlMode = provideControlMode,
                         provideNetworkMode = provideNetworkMode,
                         sharedTrafficBytes = 0L,
                         onSelectWindowType = settingsVm::selectWindowType,
                         onToggleFixedIp = settingsVm::toggleFixedIpSize,
                         onToggleAllowDirect = settingsVm::toggleAllowDirect,
-                        onSelectProvideMode = settingsVm::selectProvideMode,
                         onSelectProvideNetworkMode = settingsVm::selectProvideNetworkMode,
                         onOpenSharedTraffic = onOpenSharedTraffic,
                     )
@@ -141,8 +135,6 @@ fun UrnetworkEngineSettingsScreen(
                 val windowType by settingsVm.windowType.collectAsStateWithLifecycle()
                 val fixedIp by settingsVm.fixedIpSize.collectAsStateWithLifecycle()
                 val allowDirect by settingsVm.allowDirect.collectAsStateWithLifecycle()
-                val provideEnabled by settingsVm.provideEnabled.collectAsStateWithLifecycle()
-                val provideControlMode by settingsVm.provideControlMode.collectAsStateWithLifecycle()
                 val provideNetworkMode by settingsVm.provideNetworkMode.collectAsStateWithLifecycle()
                 val sharedTrafficBytes by settingsVm.sharedTrafficBytes.collectAsStateWithLifecycle()
                 val balanceState by settingsVm.balanceState.collectAsStateWithLifecycle()
@@ -157,8 +149,6 @@ fun UrnetworkEngineSettingsScreen(
                     windowType = windowType,
                     fixedIp = fixedIp,
                     allowDirect = allowDirect,
-                    provideEnabled = provideEnabled,
-                    provideControlMode = provideControlMode,
                     provideNetworkMode = provideNetworkMode,
                     sharedTrafficBytes = sharedTrafficBytes,
                     balanceState = balanceState,
@@ -168,7 +158,6 @@ fun UrnetworkEngineSettingsScreen(
                     onSelectWindowType = settingsVm::selectWindowType,
                     onToggleFixedIp = settingsVm::toggleFixedIpSize,
                     onToggleAllowDirect = settingsVm::toggleAllowDirect,
-                    onSelectProvideMode = settingsVm::selectProvideMode,
                     onSelectProvideNetworkMode = settingsVm::selectProvideNetworkMode,
                     onOpenSharedTraffic = onOpenSharedTraffic,
                 )
@@ -190,8 +179,6 @@ private fun LocationListContent(
     windowType: UrnetworkWindowType,
     fixedIp: Boolean,
     allowDirect: Boolean,
-    provideEnabled: Boolean,
-    provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
     sharedTrafficBytes: Long,
     balanceState: UrnetworkBalanceState,
@@ -201,7 +188,6 @@ private fun LocationListContent(
     onSelectWindowType: (UrnetworkWindowType) -> Unit,
     onToggleFixedIp: (Boolean) -> Unit,
     onToggleAllowDirect: (Boolean) -> Unit,
-    onSelectProvideMode: (Boolean, UrnetworkProvideControlMode) -> Unit,
     onSelectProvideNetworkMode: (UrnetworkProvideNetworkMode) -> Unit,
     onOpenSharedTraffic: () -> Unit,
 ) {
@@ -227,14 +213,11 @@ private fun LocationListContent(
                     windowType = windowType,
                     fixedIp = fixedIp,
                     allowDirect = allowDirect,
-                    provideEnabled = provideEnabled,
-                    provideControlMode = provideControlMode,
                     provideNetworkMode = provideNetworkMode,
                     sharedTrafficBytes = sharedTrafficBytes,
                     onSelectWindowType = onSelectWindowType,
                     onToggleFixedIp = onToggleFixedIp,
                     onToggleAllowDirect = onToggleAllowDirect,
-                    onSelectProvideMode = onSelectProvideMode,
                     onSelectProvideNetworkMode = onSelectProvideNetworkMode,
                     onOpenSharedTraffic = onOpenSharedTraffic,
                 )
@@ -377,14 +360,11 @@ private fun SettingsCard(
     windowType: UrnetworkWindowType,
     fixedIp: Boolean,
     allowDirect: Boolean,
-    provideEnabled: Boolean,
-    provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
     sharedTrafficBytes: Long,
     onSelectWindowType: (UrnetworkWindowType) -> Unit,
     onToggleFixedIp: (Boolean) -> Unit,
     onToggleAllowDirect: (Boolean) -> Unit,
-    onSelectProvideMode: (Boolean, UrnetworkProvideControlMode) -> Unit,
     onSelectProvideNetworkMode: (UrnetworkProvideNetworkMode) -> Unit,
     onOpenSharedTraffic: () -> Unit,
 ) {
@@ -396,10 +376,7 @@ private fun SettingsCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             ProvideSection(
-                provideEnabled = provideEnabled,
-                provideControlMode = provideControlMode,
                 provideNetworkMode = provideNetworkMode,
-                onSelectProvideMode = onSelectProvideMode,
                 onSelectProvideNetworkMode = onSelectProvideNetworkMode,
             )
             SharedTrafficSection(
@@ -423,59 +400,15 @@ private fun SettingsCard(
 
 @Composable
 private fun ProvideSection(
-    provideEnabled: Boolean,
-    provideControlMode: UrnetworkProvideControlMode,
     provideNetworkMode: UrnetworkProvideNetworkMode,
-    onSelectProvideMode: (Boolean, UrnetworkProvideControlMode) -> Unit,
     onSelectProvideNetworkMode: (UrnetworkProvideNetworkMode) -> Unit,
 ) {
     SectionLabel(stringResource(R.string.urnetwork_provide_title))
-    ProvideModeSection(
-        provideEnabled = provideEnabled,
-        provideControlMode = provideControlMode,
-        onSelect = onSelectProvideMode,
-    )
-    SectionDivider()
     ProvideNetworkModeSection(
         selected = provideNetworkMode,
         onSelect = onSelectProvideNetworkMode,
     )
     SectionDivider()
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ProvideModeSection(
-    provideEnabled: Boolean,
-    provideControlMode: UrnetworkProvideControlMode,
-    onSelect: (Boolean, UrnetworkProvideControlMode) -> Unit,
-) {
-    val modes = listOf(
-        Triple(false, UrnetworkProvideControlMode.AUTO, R.string.urnetwork_provide_mode_never),
-        Triple(true, UrnetworkProvideControlMode.AUTO, R.string.urnetwork_mode_auto),
-        Triple(true, UrnetworkProvideControlMode.ALWAYS, R.string.urnetwork_provide_mode_always),
-    )
-    SingleChoiceSegmentedButtonRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
-    ) {
-        modes.forEachIndexed { index, (enabled, controlMode, labelRes) ->
-            SegmentedButton(
-                selected = provideEnabled == enabled && (!enabled || provideControlMode == controlMode),
-                onClick = { onSelect(enabled, controlMode) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
-            ) {
-                Text(stringResource(labelRes))
-            }
-        }
-    }
-    Text(
-        text = stringResource(R.string.urnetwork_provide_mode_desc),
-        style = MaterialTheme.typography.bodySmall,
-        color = OzeroPalette.Text3,
-        modifier = Modifier.padding(top = 6.dp),
-    )
 }
 
 @Composable

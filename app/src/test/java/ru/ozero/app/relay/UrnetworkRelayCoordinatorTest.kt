@@ -126,13 +126,14 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay не запускается без явного opt in`() = relayTest {
+    fun `legacy opt out не отключает обязательный relay`() = relayTest {
         setByClientJwt("test-jwt")
         configStore.update { it.copy(provideEnabled = false) }
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        assertEquals(0, bridge.startCalls)
-        assertEquals(0, bridge.setProvidePausedCalls)
+        assertEquals(1, bridge.startCalls)
+        assertEquals(1, bridge.setProvidePausedCalls)
+        assertEquals(false, bridge.lastProvidePaused)
     }
 
     @Test
@@ -147,12 +148,12 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `bootstrap не запускается до opt in`() = relayTest {
+    fun `legacy opt out не блокирует bootstrap`() = relayTest {
         configStore.update { it.copy(provideEnabled = false) }
         setByClientJwt(null)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        assertEquals(0, bootstrapper.calls)
+        assertEquals(1, bootstrapper.calls)
     }
 
     @Test
@@ -306,13 +307,13 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay applies provide control and network modes from config`() = relayTest {
+    fun `relay forces always control mode and applies network mode`() = relayTest {
         setByClientJwt("test-jwt")
         configStore.update { it.copy(provideControlMode = UrnetworkProvideControlMode.AUTO) }
         configStore.setProvideNetworkMode(UrnetworkProvideNetworkMode.ALL)
         tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-        assertEquals(UrnetworkProvideControlMode.AUTO, bridge.lastControlMode)
+        assertEquals(UrnetworkProvideControlMode.ALWAYS, bridge.lastControlMode)
         assertEquals(UrnetworkProvideNetworkMode.ALL, bridge.lastNetworkMode)
     }
 
@@ -332,7 +333,7 @@ class UrnetworkRelayCoordinatorTest {
     }
 
     @Test
-    fun `relay does not start monitor or acquire lock when provide is disabled`() {
+    fun `legacy opt out does not block monitor or relay lock`() {
         val monitor = mockk<RelayNetworkMonitor>(relaxed = true)
         val locks = mockk<RelayLockManager>(relaxed = true)
         relayTest(networkMonitor = monitor, relayLockManager = locks) {
@@ -340,14 +341,14 @@ class UrnetworkRelayCoordinatorTest {
             configStore.update { it.copy(provideEnabled = false) }
             tunnelStateFlow.value = TunnelState.Connected(EngineId.BYEDPI, socksPort = 1080)
 
-            verify(exactly = 0) { monitor.start(any()) }
-            verify(exactly = 0) { locks.acquire() }
-            assertEquals(0, bridge.startCalls)
+            verify { monitor.start(UrnetworkProvideNetworkMode.WIFI) }
+            verify { locks.acquire() }
+            assertEquals(1, bridge.startCalls)
         }
     }
 
     @Test
-    fun `disabling provide stops owned relay and releases resources`() {
+    fun `legacy opt out cannot stop owned relay`() {
         val monitor = mockk<RelayNetworkMonitor>(relaxed = true)
         val locks = mockk<RelayLockManager>(relaxed = true)
         relayTest(networkMonitor = monitor, relayLockManager = locks) {
@@ -357,9 +358,9 @@ class UrnetworkRelayCoordinatorTest {
 
             configStore.update { it.copy(provideEnabled = false) }
 
-            assertEquals(1, bridge.stopCalls)
-            verify { monitor.stop() }
-            verify { locks.release() }
+            assertEquals(0, bridge.stopCalls)
+            verify(exactly = 0) { monitor.stop() }
+            verify(exactly = 0) { locks.release() }
         }
     }
 

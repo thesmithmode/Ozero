@@ -19,14 +19,11 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import ru.ozero.app.urnetwork.UrnetworkBalanceRepository
 import ru.ozero.app.urnetwork.UrnetworkBalanceState
-import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
 import ru.ozero.engineurnetwork.UrnetworkProvideNetworkMode
 import ru.ozero.engineurnetwork.UrnetworkSdkBridge
 import ru.ozero.engineurnetwork.UrnetworkWindowType
 import ru.ozero.engineurnetwork.allowDirect
 import ru.ozero.engineurnetwork.fixedIpSize
-import ru.ozero.engineurnetwork.provideControlMode
-import ru.ozero.engineurnetwork.provideEnabled
 import ru.ozero.engineurnetwork.provideNetworkMode
 import ru.ozero.engineurnetwork.setAllowDirect
 import ru.ozero.engineurnetwork.setFixedIpSize
@@ -146,35 +143,6 @@ class UrnetworkEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `selectProvideMode сохраняет opt in и применяет его к активному engine`() = runTest {
-        val bridge = FakeUrnetworkBridge()
-        val store = fakeUrnetworkConfigStore()
-        val v = vm(bridge = bridge, store = store, tunnel = activeTunnel())
-
-        v.selectProvideMode(true, UrnetworkProvideControlMode.AUTO)
-        advanceUntilIdle()
-
-        assertEquals(true, store.provideEnabled().first())
-        assertEquals(UrnetworkProvideControlMode.AUTO, store.provideControlMode().first())
-        assertEquals(false, bridge.lastPausedValue)
-        assertEquals(UrnetworkProvideControlMode.AUTO, bridge.lastProvideControlMode)
-    }
-
-    @Test
-    fun `selectProvideMode сохраняет opt out без обращения к idle engine`() = runTest {
-        val bridge = FakeUrnetworkBridge()
-        val store = fakeUrnetworkConfigStore()
-        val v = vm(bridge = bridge, store = store)
-
-        v.selectProvideMode(false, UrnetworkProvideControlMode.AUTO)
-        advanceUntilIdle()
-
-        assertEquals(false, store.provideEnabled().first())
-        assertNull(bridge.lastPausedValue)
-        assertNull(bridge.lastProvideControlMode)
-    }
-
-    @Test
     fun `selectProvideNetworkMode не вызывает bridge при idle engine — только persist в store`() = runTest {
         val bridge = FakeUrnetworkBridge()
         val store = fakeUrnetworkConfigStore()
@@ -215,6 +183,18 @@ class UrnetworkEngineSettingsViewModelTest {
         assertTrue(checkIpBlock.contains("openUri"), "CheckIpRow обязан вызывать openUri")
         assertTrue(checkIpBlock.contains("https://ur.io/ip"), "CheckIpRow обязан передавать https://ur.io/ip")
         assertTrue(checkIpBlock.contains("LocalUriHandler"), "CheckIpRow обязан использовать LocalUriHandler")
+    }
+
+    @Test
+    fun `sentinel — settings expose only network choice for traffic sharing`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/app/ui/settings/engines/UrnetworkEngineSettingsScreen.kt",
+        ).readText()
+        assertTrue(!source.contains("ProvideModeSection"))
+        assertTrue(source.contains("ProvideNetworkModeSection"))
+        assertTrue(!source.contains("urnetwork_provide_mode_never"))
+        assertTrue(!source.contains("urnetwork_provide_mode_always"))
     }
 
     @Test

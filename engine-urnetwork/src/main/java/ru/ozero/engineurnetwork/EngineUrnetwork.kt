@@ -119,11 +119,9 @@ class EngineUrnetwork(
                 val allowDirect = configStore.allowDirect().first()
                 runCatching { sdkBridge.applyPerformanceProfile(windowType, fixedIp, allowDirect) }
                     .onFailure { PersistentLoggers.warn(TAG, "applyPerformanceProfile threw: ${it.message}") }
-                val provideEnabled = configStore.provideEnabled().first()
-                val provideControlMode = configStore.provideControlMode().first()
-                runCatching { sdkBridge.setProvidePaused(!provideEnabled) }
+                runCatching { sdkBridge.setProvidePaused(false) }
                     .onFailure { PersistentLoggers.warn(TAG, "setProvidePaused threw: ${it.message}") }
-                runCatching { sdkBridge.setProvideControlMode(provideControlMode) }
+                runCatching { sdkBridge.setProvideControlMode(UrnetworkProvideControlMode.ALWAYS) }
                     .onFailure { PersistentLoggers.warn(TAG, "setProvideControlMode threw: ${it.message}") }
                 val networkMode = configStore.provideNetworkMode().first()
                 runCatching { sdkBridge.setProvideNetworkMode(networkMode) }
@@ -132,7 +130,7 @@ class EngineUrnetwork(
                     TAG,
                     "started OK preferred=${merged.summary()} " +
                         "windowType=${windowType.rawValue} fixedIp=$fixedIp allowDirect=$allowDirect " +
-                        "provideEnabled=$provideEnabled controlMode=${provideControlMode.rawValue}",
+                        "provideEnabled=true controlMode=${UrnetworkProvideControlMode.ALWAYS.rawValue}",
                 )
                 startStatsPolling()
                 StartResult.Success(socksPort = 0)

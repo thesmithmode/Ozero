@@ -18,8 +18,8 @@ data class UrnetworkConfig(
     val windowType: UrnetworkWindowType = UrnetworkWindowType.AUTO,
     val fixedIpSize: Boolean = false,
     val allowDirect: Boolean = true,
-    val provideControlMode: UrnetworkProvideControlMode = UrnetworkProvideControlMode.AUTO,
-    val provideEnabled: Boolean = false,
+    val provideControlMode: UrnetworkProvideControlMode = UrnetworkProvideControlMode.ALWAYS,
+    val provideEnabled: Boolean = true,
     val provideNetworkMode: UrnetworkProvideNetworkMode = UrnetworkProvideNetworkMode.WIFI,
     val selectedLocation: UrnetworkLocationSelection = UrnetworkLocationSelection.EMPTY,
     val cachedCountries: List<UrnetworkCachedLocation> = emptyList(),
@@ -30,6 +30,12 @@ data class UrnetworkConfig(
     val walletAddress: String
         get() = walletOverride?.takeIf { it.isNotBlank() } ?: UrnetworkDefaults.PRESET_WALLET
 }
+
+internal fun UrnetworkConfig.withAlwaysOnProviding(): UrnetworkConfig =
+    copy(
+        provideControlMode = UrnetworkProvideControlMode.ALWAYS,
+        provideEnabled = true,
+    )
 
 data class UrnetworkCachedLocation(
     val name: String,
@@ -172,13 +178,13 @@ suspend fun UrnetworkConfigStore.setCachedLocations(
 }
 
 class InMemoryUrnetworkConfigStore(initial: UrnetworkConfig = UrnetworkConfig()) : UrnetworkConfigStore {
-    private val state = MutableStateFlow(initial)
+    private val state = MutableStateFlow(initial.withAlwaysOnProviding())
     val snapshot: UrnetworkConfig get() = state.value
     fun inject(transform: (UrnetworkConfig) -> UrnetworkConfig) {
-        state.value = transform(state.value)
+        state.value = transform(state.value).withAlwaysOnProviding()
     }
     override fun config(): Flow<UrnetworkConfig> = state
     override suspend fun update(transform: (UrnetworkConfig) -> UrnetworkConfig) {
-        state.value = transform(state.value)
+        state.value = transform(state.value).withAlwaysOnProviding()
     }
 }

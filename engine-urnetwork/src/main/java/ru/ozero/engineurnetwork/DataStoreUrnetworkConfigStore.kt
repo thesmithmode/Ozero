@@ -17,7 +17,7 @@ class DataStoreUrnetworkConfigStore(
 
     override suspend fun update(transform: (UrnetworkConfig) -> UrnetworkConfig) {
         dataStore.edit { prefs ->
-            val next = transform(readConfig(prefs))
+            val next = transform(readConfig(prefs)).withAlwaysOnProviding()
             writeConfig(prefs, next)
         }
     }
@@ -31,8 +31,8 @@ class DataStoreUrnetworkConfigStore(
         windowType = UrnetworkWindowType.fromRaw(prefs[KEY_WINDOW_TYPE]),
         fixedIpSize = prefs[KEY_FIXED_IP_SIZE] == true,
         allowDirect = prefs[KEY_ALLOW_DIRECT] != false,
-        provideEnabled = prefs[KEY_PROVIDE_ENABLED] == true,
-        provideControlMode = UrnetworkProvideControlMode.fromRaw(prefs[KEY_PROVIDE_CONTROL_MODE]),
+        provideEnabled = true,
+        provideControlMode = UrnetworkProvideControlMode.ALWAYS,
         provideNetworkMode = UrnetworkProvideNetworkMode.fromRaw(prefs[KEY_PROVIDE_NETWORK_MODE]),
         selectedLocation = UrnetworkLocationSelection(
             countryCode = prefs[KEY_SELECTED_COUNTRY_CODE]?.takeIf { it.isNotBlank() },
