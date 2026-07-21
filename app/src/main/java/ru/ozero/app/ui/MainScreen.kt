@@ -43,7 +43,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
-import ru.ozero.app.ui.components.addSmooth
+import ru.ozero.app.ui.components.addPolyline
 import ru.ozero.app.ui.components.chartNiceMax
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -837,12 +837,12 @@ private fun LiveTrafficChart(
                 if (history.size < 2 || niceMax <= 0f) return@Canvas
                 val step = w / (history.size - 1)
                 val curvePx = with(density) { 2.dp.toPx() }
-                val stroke = Stroke(width = curvePx, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                val stroke = Stroke(width = curvePx, cap = StrokeCap.Butt, join = StrokeJoin.Miter)
                 val pathRx = Path()
-                pathRx.addSmooth(history.map { it.first }, step, h, niceMax)
+                pathRx.addPolyline(history.map { it.first }, step, h, niceMax)
                 drawPath(pathRx, colorRx, style = stroke)
                 val pathTx = Path()
-                pathTx.addSmooth(history.map { it.second }, step, h, niceMax)
+                pathTx.addPolyline(history.map { it.second }, step, h, niceMax)
                 drawPath(pathTx, colorTx, style = stroke)
             }
         }

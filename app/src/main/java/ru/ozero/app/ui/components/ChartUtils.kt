@@ -33,8 +33,8 @@ private val CHART_NICE_LEVELS = CHART_NICE_UNITS
 
 fun chartNiceMax(bps: Float): Float {
     if (bps <= 0f) return 10_240f
-    val target = bps * 1.03f
-    return CHART_NICE_LEVELS.firstOrNull { it >= target } ?: target
+    val maxAllowed = bps * 1.05f
+    return CHART_NICE_LEVELS.firstOrNull { it >= bps && it <= maxAllowed } ?: maxAllowed
 }
 
 fun chartAxisLabels(max: Float, steps: Int): List<Long> {
@@ -42,7 +42,7 @@ fun chartAxisLabels(max: Float, steps: Int): List<Long> {
     return (steps downTo 0).map { index -> ((max / steps) * index).roundToLong() }
 }
 
-fun Path.addSmooth(values: List<Float>, step: Float, height: Float, safeMax: Float) {
+fun Path.addPolyline(values: List<Float>, step: Float, height: Float, safeMax: Float) {
     if (values.size < 2) {
         if (values.size == 1) moveTo(0f, height - (values[0] / safeMax) * height)
         return
@@ -50,11 +50,7 @@ fun Path.addSmooth(values: List<Float>, step: Float, height: Float, safeMax: Flo
     val xs = List(values.size) { i -> i * step }
     val ys = values.map { height - (it / safeMax) * height }
     moveTo(xs[0], ys[0])
-    val midXs = List(values.size - 1) { i -> (xs[i] + xs[i + 1]) / 2f }
-    val midYs = List(values.size - 1) { i -> (ys[i] + ys[i + 1]) / 2f }
-    lineTo(midXs[0], midYs[0])
-    for (i in 1 until values.size - 1) {
-        quadraticBezierTo(xs[i], ys[i], midXs[i], midYs[i])
+    for (i in 1 until values.size) {
+        lineTo(xs[i], ys[i])
     }
-    lineTo(xs.last(), ys.last())
 }

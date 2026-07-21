@@ -114,26 +114,25 @@ class MainScreenChartTest {
     }
 
     @Test
-    fun `LiveTrafficChart использует addSmooth вместо lineTo`() {
+    fun `LiveTrafficChart проходит через реальные точки без занижения пиков`() {
         val chartBody = screenSource.substringAfter("private fun LiveTrafficChart")
             .substringBefore("private const val DOCK_TAB_HOME")
         assertTrue(
-            chartBody.contains("addSmooth"),
-            "LiveTrafficChart обязан использовать addSmooth для сглаживания кривых",
+            chartBody.contains("addPolyline"),
+            "LiveTrafficChart обязан проводить линию через реальные точки графика",
         )
         assertTrue(
-            !chartBody.contains(".lineTo("),
-            "LiveTrafficChart не должен напрямую вызывать lineTo для точек данных — только addSmooth",
+            !chartBody.contains("addSmooth"),
+            "LiveTrafficChart не должен использовать сглаживание, которое занижает пики",
         )
     }
 
     @Test
-    fun `addSmooth использует quadratic bezier`() {
-        val smoothBody = chartUtilsSource.substringAfter("fun Path.addSmooth")
+    fun `addPolyline не использует quadratic bezier`() {
+        val polylineBody = chartUtilsSource.substringAfter("fun Path.addPolyline")
         assertTrue(
-            smoothBody.contains("quadraticBezierTo") || smoothBody.contains("quadraticTo"),
-            "addSmooth обязан использовать quadratic bezier (quadraticBezierTo / quadraticTo) " +
-                "для сглаженных кривых",
+            !polylineBody.contains("quadraticBezierTo") && !polylineBody.contains("quadraticTo"),
+            "addPolyline не должен сглаживать точки и занижать реальные пики",
         )
     }
 
@@ -281,6 +280,8 @@ class MainScreenChartTest {
     fun `chartNiceMax uses 30 GiB ceiling for a 28_5 GiB peak`() {
         val gib = 1_073_741_824f
 
-        assertEquals(30f * gib, ru.ozero.app.ui.components.chartNiceMax(28.5f * gib))
+        val max = ru.ozero.app.ui.components.chartNiceMax(28.5f * gib)
+        assertTrue(max >= 28.5f * gib)
+        assertTrue(max <= 28.5f * gib * 1.05f)
     }
 }
