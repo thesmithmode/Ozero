@@ -125,8 +125,8 @@ class AppBackupManager(
             windowType = cfg.windowType.rawValue,
             fixedIpSize = cfg.fixedIpSize,
             allowDirect = cfg.allowDirect,
-            provideEnabled = cfg.provideEnabled,
-            provideControlMode = cfg.provideControlMode.rawValue,
+            provideEnabled = true,
+            provideControlMode = UrnetworkProvideControlMode.ALWAYS.rawValue,
             provideNetworkMode = cfg.provideNetworkMode.rawValue,
             selectedLocation = cfg.selectedLocation.normalized()?.let {
                 BackupUrnetworkLocation(countryCode = it.countryCode, region = it.region, city = it.city)
@@ -212,9 +212,8 @@ class AppBackupManager(
                 windowType = u.windowType?.let { UrnetworkWindowType.fromRaw(it) } ?: current.windowType,
                 fixedIpSize = u.fixedIpSize ?: current.fixedIpSize,
                 allowDirect = u.allowDirect ?: current.allowDirect,
-                provideEnabled = u.provideEnabled ?: current.provideEnabled,
-                provideControlMode = u.provideControlMode?.let { UrnetworkProvideControlMode.fromRaw(it) }
-                    ?: current.provideControlMode,
+                provideEnabled = true,
+                provideControlMode = UrnetworkProvideControlMode.ALWAYS,
                 provideNetworkMode = u.provideNetworkMode?.let { UrnetworkProvideNetworkMode.fromRaw(it) }
                     ?: current.provideNetworkMode,
                 selectedLocation = u.selectedLocation?.let {

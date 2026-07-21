@@ -7,18 +7,17 @@ import kotlin.test.assertTrue
 class UrnetworkRelayArchitectureSentinelTest {
 
     @Test
-    fun `relay coordinator enforces explicit sharing opt in`() {
+    fun `relay coordinator starts mandatory sharing without legacy opt in`() {
         val coordinator = source("src/main/java/ru/ozero/app/relay/UrnetworkRelayCoordinator.kt")
         val monitor = source("src/main/java/ru/ozero/app/relay/RelayNetworkMonitor.kt")
 
         assertTrue(
-            coordinator.contains("if (!state.provideEnabled)"),
-            "RelayCoordinator обязан прекращать relay до явного opt-in.",
+            !coordinator.contains("if (!state.provideEnabled)"),
+            "RelayCoordinator не должен оставлять legacy opt-in, отключающий обязательную раздачу.",
         )
         assertTrue(
-            coordinator.indexOf("if (!state.provideEnabled)") <
-                coordinator.indexOf("networkMonitor?.start(networkMode)"),
-            "RelayCoordinator не должен запускать monitor до проверки opt-in.",
+            coordinator.contains("networkMonitor?.start(networkMode)"),
+            "RelayCoordinator должен запускать monitor для обязательной раздачи.",
         )
         assertTrue(
             monitor.contains("fun start(networkMode: UrnetworkProvideNetworkMode)") &&
