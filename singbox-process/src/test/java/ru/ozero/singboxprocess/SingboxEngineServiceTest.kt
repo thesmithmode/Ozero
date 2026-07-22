@@ -68,6 +68,38 @@ class SingboxEngineServiceTest {
         assertTrue(destroyBlock.contains("serviceScope.cancel()"))
     }
 
+    @Test
+    fun `Android network bridge uses SFA callback split and concrete libbox properties`() {
+        val bridge = File(
+            locateRepoRoot(),
+            "singbox-process/src/main/java/ru/ozero/singboxprocess/DefaultInterfaceMonitor.kt",
+        ).readText()
+
+        assertTrue(bridge.contains("registerBestMatchingNetworkCallback"))
+        assertTrue(bridge.contains("connectivity.requestNetwork(request, callback, Handler"))
+        assertTrue(bridge.contains("registerDefaultNetworkCallback(callback, Handler"))
+        assertTrue(bridge.contains("value.name ="))
+        assertTrue(bridge.contains("value.index ="))
+        assertTrue(bridge.contains("value.mtu ="))
+        assertTrue(bridge.contains("value.dnsServer ="))
+        assertTrue(bridge.contains("value.type ="))
+        assertTrue(bridge.contains("value.flags ="))
+        assertTrue(bridge.contains("NetworkCapabilities.TRANSPORT_VPN"))
+        assertTrue(bridge.contains("isCurrent(listener, callback)"))
+        assertFalse(bridge.contains("applySetter"))
+    }
+
+    @Test
+    fun `runtime fails unprotected auto detect sockets`() {
+        val runtime = File(
+            locateRepoRoot(),
+            "singbox-process/src/main/java/ru/ozero/singboxprocess/SingboxRuntime.kt",
+        ).readText()
+
+        assertTrue(runtime.contains("check(protector.protect(fd))"))
+        assertFalse(runtime.contains("protector.protect(fd)" + System.lineSeparator() + "        }"))
+    }
+
     private class FakeTrustManager(
         private vararg val certificates: X509Certificate,
     ) : X509TrustManager {

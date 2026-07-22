@@ -1,5 +1,7 @@
 package ru.ozero.singboxprocess
 
+import android.content.Context
+import android.net.ConnectivityManager
 import android.util.Base64
 import io.nekohasekai.libbox.CommandServer
 import io.nekohasekai.libbox.CommandServerHandler
@@ -27,8 +29,6 @@ import javax.net.ssl.TrustManagerFactory
 
 internal object SingboxRuntime {
     private const val TAG = "SingboxRuntime"
-    private val UUID_REDACT_REGEX = Regex(""""uuid":"[^"]*"""")
-
     private val mutex = Mutex()
 
     @Volatile
@@ -57,7 +57,12 @@ internal object SingboxRuntime {
         PersistentLoggers.debug(TAG, "libbox setup basePath=$basePath")
     }
 
-    suspend fun start(tunFd: Int, singboxJsonConfig: String, protectorBridge: SingboxProtectorBridge) =
+    suspend fun start(
+        context: Context,
+        tunFd: Int,
+        singboxJsonConfig: String,
+        protectorBridge: SingboxProtectorBridge,
+    ) =
         withContext(Dispatchers.Main.immediate) {
             mutex.withLock {
                 val oldServer = commandServer
@@ -69,12 +74,9 @@ internal object SingboxRuntime {
                     lastStatus = null
                 }
 
-                // uuid редактируется из логов — репо публичный, subscription UUID = личные данные
-                val configPreview = singboxJsonConfig.take(200).replace(UUID_REDACT_REGEX, """"uuid":"***"""")
                 PersistentLoggers.debug(
                     TAG,
-                    "start configLen=${singboxJsonConfig.length} fd=$tunFd" +
-                        " configPreview=$configPreview",
+                    "start configLen=${singboxJsonConfig.length} fd=$tunFd",
                 )
 
                 val socketFile = java.io.File(basePath, "command.sock")
@@ -83,7 +85,7 @@ internal object SingboxRuntime {
                     PersistentLoggers.debug(TAG, "cleaned stale command.sock")
                 }
 
-                val platform = OzeroPlatformInterface(tunFd, protectorBridge)
+                val platform = OzeroPlatformInterface(context.applicationContext, tunFd, protectorBridge)
                 val handler = OzeroCommandServerHandler()
 
                 PersistentLoggers.debug(TAG, "checkpoint: pre-CommandServer")
@@ -157,14 +159,17 @@ internal object SingboxRuntime {
     }
 
     private class OzeroPlatformInterface(
+        context: Context,
         private val tunFd: Int,
         private val protector: SingboxProtectorBridge,
     ) : PlatformInterface {
+        private val connectivity = context.getSystemService(ConnectivityManager::class.java)
+        private val defaultInterfaceMonitor = DefaultInterfaceMonitor(connectivity)
 
         override fun usePlatformAutoDetectInterfaceControl(): Boolean = true
 
         override fun autoDetectInterfaceControl(fd: Int) {
-            protector.protect(fd)
+            check(protector.protect(fd)) { "VpnService.protect($fd) failed" }
         }
 
         override fun openTun(options: TunOptions): Int {
@@ -187,16 +192,15 @@ internal object SingboxRuntime {
             return owner
         }
 
-        override fun startDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {}
+        override fun startDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
+            defaultInterfaceMonitor.start(listener)
+        }
 
-        override fun closeDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {}
+        override fun closeDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
+            defaultInterfaceMonitor.close(listener)
+        }
 
-        override fun getInterfaces(): NetworkInterfaceIterator =
-            object : NetworkInterfaceIterator {
-                override fun hasNext(): Boolean = false
-                override fun next(): io.nekohasekai.libbox.NetworkInterface =
-                    error("empty iterator")
-            }
+        override fun getInterfaces(): NetworkInterfaceIterator = singboxNetworkInterfaces(connectivity)
 
         override fun underNetworkExtension(): Boolean = false
 
