@@ -24,6 +24,7 @@ import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyChainStep
 import ru.ozero.singboxroom.entity.ProxyProfile
+import java.net.ServerSocket
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -71,12 +72,26 @@ class SingboxEngineWarmReadinessTest {
                 Upstream.None,
             ),
         )
-        val ready = engine.awaitReady()
+        openLocalListener().use { listener ->
+            engine.setPrivateField("activeSocksPort", listener.localPort)
 
-        assertIs<EnginePlugin.ReadyResult.Timeout>(ready)
-        assertTrue(engine.privateIntField("activeSocksPort") > 0)
-        assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
+            val ready = engine.awaitReady()
+
+            assertIs<EnginePlugin.ReadyResult.Ready>(ready)
+            assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
+            assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
+        }
         verify(exactly = 0) { process.stopAndWait(any()) }
+    }
+
+    private fun openLocalListener(): ServerSocket {
+        val server = ServerSocket(0)
+        Thread {
+            while (!server.isClosed) {
+                runCatching { server.accept().close() }
+            }
+        }.apply { isDaemon = true }.start()
+        return server
     }
 
     private fun buildEngine(): SingboxEngine =

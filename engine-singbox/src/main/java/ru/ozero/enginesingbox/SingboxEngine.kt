@@ -47,6 +47,8 @@ import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyProfile
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -513,6 +515,9 @@ class SingboxEngine @Inject constructor(
             clearRuntimeState()
             return EnginePlugin.ReadyResult.Timeout("sing-box runtime is not running")
         }
+        if (isRuntimeRunning() && localSocksAcceptsConnection(activeSocksPort)) {
+            return EnginePlugin.ReadyResult.Ready
+        }
         var lastFailure: ProbeResult.Failure? = null
         for (attempt in 0 until READY_PROBE_ATTEMPTS) {
             when (val result = probeInternal()) {
@@ -537,9 +542,9 @@ class SingboxEngine @Inject constructor(
                 "activeTunAuto=$activeTunAutoSelect " +
                 "routedProbeFailure=$routedProbeFailure",
         )
-        if (routedProbeFailure && isRuntimeRunning()) {
+        if (routedProbeFailure && isRuntimeRunning() && localSocksAcceptsConnection(activeSocksPort)) {
             PersistentLoggers.warn(TAG, "awaitReady: runtime is active but external probe is unavailable")
-            return EnginePlugin.ReadyResult.Timeout(failureReason)
+            return EnginePlugin.ReadyResult.Ready
         }
         activeSocksPort = 0
         activeAutoSelect = false
@@ -549,6 +554,15 @@ class SingboxEngine @Inject constructor(
     }
 
     private fun isRuntimeRunning(): Boolean = runCatching { proxy?.runtimeRunning() == true }.getOrDefault(false)
+
+    private fun localSocksAcceptsConnection(port: Int): Boolean {
+        if (port <= 0) return false
+        return runCatching {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(LOCAL_SOCKS_HOST, port), LOCAL_SOCKS_CONNECT_TIMEOUT_MS)
+            }
+        }.isSuccess
+    }
 
     private fun ProbeResult.Failure.isRoutedProbeFailure(): Boolean =
         code == ProbeResult.Failure.Code.ROUTED_PROBE_FAILED
@@ -834,6 +848,8 @@ class SingboxEngine @Inject constructor(
         private const val ENGINE_STOP_TIMEOUT_MS = 4_000L
         private const val READY_PROBE_ATTEMPTS = 5
         private const val READY_PROBE_RETRY_MS = 500L
+        private const val LOCAL_SOCKS_HOST = "127.0.0.1"
+        private const val LOCAL_SOCKS_CONNECT_TIMEOUT_MS = 400
         private const val MAX_AUTO_SELECT_OUTBOUNDS = 50
         private const val MAX_AUTO_SELECT_BLOB_BYTES = 64 * 1024
         private const val MAX_AUTO_PROFILE_SCAN = 2_000

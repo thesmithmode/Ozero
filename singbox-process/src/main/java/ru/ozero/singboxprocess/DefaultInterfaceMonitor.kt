@@ -38,7 +38,10 @@ internal class DefaultInterfaceMonitor(private val connectivity: ConnectivityMan
                 network: Network,
                 linkProperties: LinkProperties,
             ) = publish(network, listener, this)
-            override fun onLost(network: Network) = publish(bestPhysicalNetwork(), listener, this)
+            override fun onLost(network: Network) {
+                if (lastPhysicalNetwork == network) lastPhysicalNetwork = null
+                publish(bestPhysicalNetwork(exclude = network), listener, this)
+            }
         }
         callbacks[listener] = callback
         register(callback)
@@ -91,13 +94,15 @@ internal class DefaultInterfaceMonitor(private val connectivity: ConnectivityMan
         )
     }
 
-    private fun bestPhysicalNetwork(): Network? =
-        lastPhysicalNetwork?.takeIf { it.isPhysical(connectivity) }
-            ?: connectivity.allNetworks.firstOrNull { it.isPhysical(connectivity) }
+    private fun bestPhysicalNetwork(exclude: Network? = null): Network? =
+        lastPhysicalNetwork?.takeIf { it != exclude && it.isPhysical(connectivity) }
+            ?: connectivity.allNetworks.firstOrNull { it != exclude && it.isPhysical(connectivity) }
 }
 
 internal fun singboxNetworkInterfaces(connectivity: ConnectivityManager): NetworkInterfaceIterator {
-    val javaInterfaces = NetworkInterface.getNetworkInterfaces().toList()
+    val javaInterfaces = NetworkInterface.getNetworkInterfaces()
+        ?.let(Collections::list)
+        .orEmpty()
     val values = connectivity.allNetworks
         .filter { network -> network.isPhysical(connectivity) }
         .mapNotNull { network -> network.toLibboxInterface(connectivity, javaInterfaces) }
@@ -115,7 +120,11 @@ private fun Network.isPhysical(connectivity: ConnectivityManager): Boolean {
 }
 
 private fun Network.toJavaInterface(connectivity: ConnectivityManager): NetworkInterface? =
-    connectivity.getLinkProperties(this)?.interfaceName?.let { NetworkInterface.getByName(it) }
+    connectivity.getLinkProperties(this)?.interfaceName?.let { name ->
+        runCatching { NetworkInterface.getByName(name) }
+            .onFailure { PersistentLoggers.warn(TAG, "default interface unavailable: ${it::class.java.simpleName}") }
+            .getOrNull()
+    }
 
 private fun Network.toLibboxInterface(
     connectivity: ConnectivityManager,
@@ -184,8 +193,6 @@ private fun InterfaceAddress.toPrefix(): String = if (address is Inet6Address) {
 } else {
     "${address.hostAddress}/$networkPrefixLength"
 }
-
-private fun <T> java.util.Enumeration<T>.toList(): List<T> = Collections.list(this)
 
 private const val TAG = "SingboxNetwork"
 
