@@ -24,6 +24,7 @@ import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyChainStep
 import ru.ozero.singboxroom.entity.ProxyProfile
+import java.net.ServerSocket
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -71,12 +72,38 @@ class SingboxEngineWarmReadinessTest {
                 Upstream.None,
             ),
         )
-        val ready = engine.awaitReady()
+        openLocalSocksListener().use { listener ->
+            engine.setPrivateField("activeSocksPort", listener.localPort)
 
-        assertIs<EnginePlugin.ReadyResult.Ready>(ready)
-        assertTrue(engine.privateIntField("activeSocksPort") > 0)
-        assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
+            val ready = engine.awaitReady()
+
+            assertIs<EnginePlugin.ReadyResult.Ready>(ready)
+            assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
+            assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
+        }
         verify(exactly = 0) { process.stopAndWait(any()) }
+    }
+
+    private fun openLocalSocksListener(): ServerSocket {
+        val server = ServerSocket(0)
+        Thread {
+            while (!server.isClosed) {
+                runCatching {
+                    server.accept().use { socket ->
+                        val input = socket.getInputStream()
+                        val output = socket.getOutputStream()
+                        val version = input.read()
+                        val methodsCount = input.read()
+                        repeat(methodsCount.coerceAtLeast(0)) { input.read() }
+                        if (version == 0x05) {
+                            output.write(byteArrayOf(0x05, 0x00))
+                            output.flush()
+                        }
+                    }
+                }
+            }
+        }.apply { isDaemon = true }.start()
+        return server
     }
 
     private fun buildEngine(): SingboxEngine =

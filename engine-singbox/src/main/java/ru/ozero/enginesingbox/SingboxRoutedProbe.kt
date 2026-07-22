@@ -7,7 +7,6 @@ import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.ConnectException
-import java.net.HttpURLConnection
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.Socket
@@ -95,7 +94,7 @@ class SingboxHttp204RoutedProbe(
         val start = nanoTime()
         return runCatching {
             when (url.protocol.lowercase()) {
-                "https" -> probeHttps(url, socksPort, remainingTimeoutMs, expectation)
+                "https" -> false
                 "http" -> probeHttpOverSocks(url, socksPort, remainingTimeoutMs, expectation)
                 else -> false
             }
@@ -109,27 +108,6 @@ class SingboxHttp204RoutedProbe(
             },
             onFailure = { error -> ProbeAttempt(LATENCY_FAILED, classifyFailure(error)) },
         )
-    }
-
-    private fun probeHttps(
-        url: URL,
-        socksPort: Int,
-        remainingTimeoutMs: Int,
-        expectation: ResponseExpectation,
-    ): Boolean {
-        val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress(socksHost, socksPort))
-        val connection = url.openConnection(proxy) as HttpURLConnection
-        return try {
-            connection.requestMethod = "GET"
-            connection.instanceFollowRedirects = false
-            connection.useCaches = false
-            connection.connectTimeout = remainingTimeoutMs
-            connection.readTimeout = remainingTimeoutMs
-            val code = connection.responseCode
-            expectation.matches(code)
-        } finally {
-            connection.disconnect()
-        }
     }
 
     private fun probeHttpOverSocks(
