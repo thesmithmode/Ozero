@@ -10,6 +10,7 @@ import okhttp3.ResponseBody
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.SocketTimeoutException
+import java.net.URI
 import java.net.UnknownHostException
 import java.security.cert.CertPathValidatorException
 import java.security.cert.CertificateException
@@ -25,6 +26,7 @@ import ru.ozero.singboxfmt.StandardV2RayBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.protocolLabel
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
@@ -139,7 +141,11 @@ class RawUpdater(
             }.onFailure { statusFailure ->
                 if (statusFailure !== failure) failure.addSuppressed(statusFailure)
             }
-            Log.w(TAG, "refresh failed groupId=${group.id} code=$errorCode")
+            Log.w(
+                TAG,
+                "refresh failed groupId=${group.id} code=$errorCode " +
+                    "causes=${failure.safeCauseDiagnostics(group.subscriptionUrl)}",
+            )
         }
         result
     }
@@ -198,14 +204,6 @@ class RawUpdater(
         private fun Map<String, Int>.stableDiagnosticString(): String =
             entries.sortedBy { it.key }.joinToString(prefix = "{", postfix = "}") { "${it.key}=${it.value}" }
 
-        private fun AbstractBean.protocolLabel(): String = when (this) {
-            is VLESSBean -> "VLESS"
-            is VMessBean -> "VMESS"
-            is TrojanBean -> "TROJAN"
-            is ShadowsocksBean -> "SHADOWSOCKS"
-            else -> this::class.simpleName ?: "UNKNOWN"
-        }
-
         private fun normalizeError(e: Throwable): Throwable = when {
             e.isSubscriptionCertificateFailure() ->
                 SSLHandshakeException("Subscription TLS certificate validation failed").initCause(e)
@@ -224,6 +222,32 @@ class RawUpdater(
             error.causeChain().any { it is IllegalArgumentException } -> SubscriptionRefreshErrorCode.INVALID_URL
             error.causeChain().any { it is IOException } -> SubscriptionRefreshErrorCode.NETWORK
             else -> SubscriptionRefreshErrorCode.UNKNOWN
+        }
+
+        private fun Throwable.safeCauseDiagnostics(subscriptionUrl: String): String {
+            val host = runCatching { URI(subscriptionUrl).host }.getOrNull().orEmpty()
+            val causes = causeChain()
+                .map { cause -> cause.safeCauseLabel() }
+                .distinct()
+                .joinToString(prefix = "[", postfix = "]")
+            return "host=${host.ifBlank { "unknown" }} chain=$causes"
+        }
+
+        private fun Throwable.safeCauseLabel(): String {
+            val text = message.orEmpty().lowercase()
+            val flags = listOfNotNull(
+                "expired".takeIf { text.contains("expired") || text.contains("not after") },
+                "hostname_mismatch".takeIf { text.contains("hostname") || text.contains("peer not authenticated") },
+                "trust_anchor".takeIf { text.contains("trust anchor") },
+                "certificate_path_validation".takeIf {
+                    this is CertPathValidatorException || text.contains("certpath") || text.contains("pkix")
+                },
+            )
+            return if (flags.isEmpty()) {
+                javaClass.simpleName
+            } else {
+                "${javaClass.simpleName}:${flags.joinToString(",")}"
+            }
         }
 
         private fun Throwable.isSubscriptionCertificateFailure(): Boolean {

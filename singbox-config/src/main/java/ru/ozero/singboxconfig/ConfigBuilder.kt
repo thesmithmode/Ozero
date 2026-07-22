@@ -32,7 +32,6 @@ enum class BeanSupportError {
     UNSUPPORTED_ECH,
     UNSUPPORTED_MTLS,
     UNSUPPORTED_CERTIFICATE_PINNING,
-    UNSUPPORTED_REQUIRED_FIELD,
 }
 
 sealed interface BeanSupportDecision {
@@ -483,7 +482,7 @@ private fun AbstractBean.hasRoutableServerAddress(): Boolean {
 }
 
 private fun StandardV2RayBean.hasUnsupportedTcpHeader(): Boolean =
-    type == "tcp" && headerType !in setOf("", "none", "http")
+    type == "tcp" && headerType !in setOf("", "none")
 
 private fun StandardV2RayBean.hasUnsupportedQuicSecurity(): Boolean =
     type == "quic" && quicSecurity !in setOf("", "none")

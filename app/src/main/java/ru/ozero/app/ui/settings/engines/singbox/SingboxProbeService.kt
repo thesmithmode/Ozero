@@ -41,6 +41,7 @@ import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxfmt.protocolLabel
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import java.net.InetAddress
@@ -463,12 +464,4 @@ private fun logRejectedProfile(profileId: Long, bean: AbstractBean, decision: Be
             "headerType=${standard?.headerType.orEmpty()} hasSni=${standard?.sni?.isNotBlank() == true} " +
             "hasHost=${standard?.host?.isNotBlank() == true} reason=${decision.error}",
     )
-}
-
-private fun AbstractBean.protocolLabel(): String = when (this) {
-    is ru.ozero.singboxfmt.VLESSBean -> "VLESS"
-    is ru.ozero.singboxfmt.VMessBean -> "VMESS"
-    is ru.ozero.singboxfmt.TrojanBean -> "TROJAN"
-    is ru.ozero.singboxfmt.ShadowsocksBean -> "SHADOWSOCKS"
-    else -> this::class.simpleName ?: "UNKNOWN"
 }

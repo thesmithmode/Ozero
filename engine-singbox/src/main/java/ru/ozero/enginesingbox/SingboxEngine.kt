@@ -46,6 +46,7 @@ import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxfmt.protocolLabel
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyProfile
@@ -656,15 +657,17 @@ class SingboxEngine @Inject constructor(
             ?: false
     }
 
-    private fun AbstractBean.takeIfSupported(profileId: Long?, source: String): AbstractBean? {
-        val decision = ConfigBuilder.supportDecision(this)
-        return if (decision is BeanSupportDecision.Supported) {
-            this
-        } else {
-            logRejectedProfile(profileId, this, decision, source)
-            null
+    private fun AbstractBean.takeIfSupported(
+        profileId: Long?,
+        source: String,
+    ): AbstractBean? =
+        when (val decision = ConfigBuilder.supportDecision(this)) {
+            BeanSupportDecision.Supported -> this
+            is BeanSupportDecision.Unsupported -> {
+                logRejectedProfile(profileId, this, decision, source)
+                null
+            }
         }
-    }
 
     private fun logRejectedProfile(
         profileId: Long?,
@@ -698,14 +701,6 @@ class SingboxEngine @Inject constructor(
                 proxyChainDao.getAll().map { it.profileId }
             }
         }
-
-    private fun AbstractBean.protocolLabel(): String = when (this) {
-        is VLESSBean -> "VLESS"
-        is VMessBean -> "VMESS"
-        is TrojanBean -> "TROJAN"
-        is ShadowsocksBean -> "SHADOWSOCKS"
-        else -> this::class.simpleName ?: "UNKNOWN"
-    }
 
     private fun protocolTypeOf(bean: AbstractBean): Int = when (bean) {
         is VLESSBean -> PROTOCOL_VLESS

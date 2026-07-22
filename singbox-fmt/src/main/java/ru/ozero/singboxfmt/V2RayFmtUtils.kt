@@ -4,10 +4,11 @@ import java.util.Base64 as JBase64
 
 internal object V2RayFmtUtils {
 
-    fun mapTransportType(raw: String): String = when (raw) {
+    fun mapTransportType(raw: String): String = when (val normalized = raw.trim().lowercase()) {
+        "", "raw" -> "tcp"
         "h2" -> "http"
         "xhttp" -> "splithttp"
-        else -> raw
+        else -> normalized
     }
 
     fun parseSecurityParams(bean: StandardV2RayBean, parsed: UriCompat, defaultSecurity: String = "none") {

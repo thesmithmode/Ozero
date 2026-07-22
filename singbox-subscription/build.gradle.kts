@@ -7,6 +7,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":singbox-config"))
     implementation(project(":singbox-fmt"))
     implementation(project(":singbox-room"))
     implementation(libs.bundles.coroutines)
