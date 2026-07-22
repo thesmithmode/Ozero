@@ -227,21 +227,8 @@ class SingboxEngine @Inject constructor(
             .getOrNull() ?: return null
         val wrappers = chainWrapperBeans(config)
         if (!ConfigBuilder.isSupportedBean(bean) || !bean.hasRoutableServerAddress()) {
-            val fallbackBeans = supportedBeans(cachedAutoBlobs).take(MAX_AUTO_SELECT_OUTBOUNDS)
-            if (fallbackBeans.isEmpty()) {
-                PersistentLoggers.warn(TAG, "selected bean unsupported and no supported fallback profiles")
-                return null
-            }
-            return runCatching {
-                ConfigBuilder.buildSingboxAutoConfig(
-                    fallbackBeans,
-                    probeSocksPort,
-                    config.dnsServers,
-                    config.ipv6Enabled,
-                )
-            }
-                .onFailure { PersistentLoggers.warn(TAG, "build fallback auto config: ${it.message}") }
-                .getOrNull()
+            PersistentLoggers.warn(TAG, "selected bean unsupported or unroutable")
+            return null
         }
         return runCatching {
             ConfigBuilder.buildSingboxConfig(
@@ -315,18 +302,7 @@ class SingboxEngine @Inject constructor(
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
                 .getOrElse { return StartResult.Failure("chain deserialize: ${it.message}") }
             if (!ConfigBuilder.isSupportedBean(bean) || !bean.hasRoutableServerAddress()) {
-                val fallbackBeans = supportedBeans(cachedAutoBlobs).take(MAX_AUTO_SELECT_OUTBOUNDS)
-                if (fallbackBeans.isEmpty()) return StartResult.Failure("chain selected transport unsupported")
-                runCatching {
-                    ConfigBuilder.buildAutoChainConfig(
-                        fallbackBeans,
-                        port,
-                        upstream,
-                        config.dnsServers,
-                        config.ipv6Enabled,
-                    )
-                }
-                    .getOrElse { return StartResult.Failure("chain fallback auto config: ${it.message}") }
+                return StartResult.Failure("chain selected transport unsupported")
             } else {
                 val wrappers = if (upstream == null) chainWrapperBeans(config) else emptyList()
                 runCatching {
@@ -563,7 +539,7 @@ class SingboxEngine @Inject constructor(
         )
         if (routedProbeFailure && isRuntimeRunning()) {
             PersistentLoggers.warn(TAG, "awaitReady: runtime is active but external probe is unavailable")
-            return EnginePlugin.ReadyResult.Ready
+            return EnginePlugin.ReadyResult.Timeout(failureReason)
         }
         activeSocksPort = 0
         activeAutoSelect = false

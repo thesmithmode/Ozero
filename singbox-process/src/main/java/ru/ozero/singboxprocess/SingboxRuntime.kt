@@ -29,8 +29,6 @@ import javax.net.ssl.TrustManagerFactory
 
 internal object SingboxRuntime {
     private const val TAG = "SingboxRuntime"
-    private val UUID_REDACT_REGEX = Regex(""""uuid":"[^"]*"""")
-
     private val mutex = Mutex()
 
     @Volatile
@@ -76,12 +74,9 @@ internal object SingboxRuntime {
                     lastStatus = null
                 }
 
-                // uuid редактируется из логов — репо публичный, subscription UUID = личные данные
-                val configPreview = singboxJsonConfig.take(200).replace(UUID_REDACT_REGEX, """"uuid":"***"""")
                 PersistentLoggers.debug(
                     TAG,
-                    "start configLen=${singboxJsonConfig.length} fd=$tunFd" +
-                        " configPreview=$configPreview",
+                    "start configLen=${singboxJsonConfig.length} fd=$tunFd",
                 )
 
                 val socketFile = java.io.File(basePath, "command.sock")

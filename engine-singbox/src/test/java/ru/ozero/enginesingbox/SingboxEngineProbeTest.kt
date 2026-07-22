@@ -33,6 +33,7 @@ import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyChainStep
 import ru.ozero.singboxroom.entity.ProxyProfile
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -132,7 +133,7 @@ class SingboxEngineProbeTest {
 
         val failure = assertIs<StartResult.Failure>(result)
         assertTrue(failure.reason.contains("bindService failed"))
-        assertEquals(49408, engine.privateIntField("activeSocksPort"))
+        assertEquals(0, engine.privateIntField("activeSocksPort"))
     }
 
     @Test
@@ -561,7 +562,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `awaitReady keeps a running runtime when routed probe fails`() = runTest {
+    fun `awaitReady reports timeout but keeps a running runtime when routed probe fails`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = object : SingboxRoutedProbe {
             override suspend fun probeLatencyMs(socksPort: Int): Long = SingboxHttp204RoutedProbe.LATENCY_FAILED
@@ -573,12 +574,12 @@ class SingboxEngineProbeTest {
 
         val result = engine.awaitReady()
 
-        assertIs<EnginePlugin.ReadyResult.Ready>(result)
+        assertIs<EnginePlugin.ReadyResult.Timeout>(result)
         assertEquals(49408, engine.privateIntField("activeSocksPort"))
     }
 
     @Test
-    fun `awaitReady keeps warm auto select runtime when routed probe fails`() = runTest {
+    fun `awaitReady reports timeout but keeps warm auto select runtime when routed probe fails`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
         val process = mockk<ISingboxEngineProcess>()
@@ -589,13 +590,13 @@ class SingboxEngineProbeTest {
 
         val result = engine.awaitReady()
 
-        assertIs<EnginePlugin.ReadyResult.Ready>(result)
+        assertIs<EnginePlugin.ReadyResult.Timeout>(result)
         assertEquals(49408, engine.privateIntField("activeSocksPort"))
         assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
     }
 
     @Test
-    fun `awaitReady keeps live warm tun auto select runtime after routed probe failures`() = runTest {
+    fun `awaitReady reports timeout but keeps warm tun auto select runtime after probe failures`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
         val process = mockk<ISingboxEngineProcess>()
@@ -607,7 +608,7 @@ class SingboxEngineProbeTest {
 
         val result = engine.awaitReady()
 
-        assertIs<EnginePlugin.ReadyResult.Ready>(result)
+        assertIs<EnginePlugin.ReadyResult.Timeout>(result)
         assertEquals(49408, engine.privateIntField("activeSocksPort"))
         assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
         assertEquals(true, engine.privateBooleanField("activeTunAutoSelect"))
@@ -671,6 +672,22 @@ class SingboxEngineProbeTest {
         assertEquals(true, spec.allowFamilyV6)
         assertEquals(true, spec.routeAllV4)
         assertEquals(true, spec.routeAllV6)
+    }
+
+    @Test
+    fun `manual unsupported profile is rejected instead of replaced by cached auto profiles`() {
+        val source = File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginesingbox/SingboxEngine.kt",
+        ).readText()
+
+        val pendingBlock = source.substringAfter("private fun buildPendingConfig")
+            .substringBefore("private suspend fun startProxyMode")
+        val chainBlock = source.substringAfter("private suspend fun startProxyMode")
+            .substringBefore("bindOrFail()?.let")
+
+        assertFalse(pendingBlock.contains("build fallback auto config"))
+        assertFalse(chainBlock.contains("chain fallback auto config"))
     }
 
     private fun buildEngine(): SingboxEngine =

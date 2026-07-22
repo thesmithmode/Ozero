@@ -84,6 +84,8 @@ class SingboxEngineServiceTest {
         assertTrue(bridge.contains("value.dnsServer ="))
         assertTrue(bridge.contains("value.type ="))
         assertTrue(bridge.contains("value.flags ="))
+        assertTrue(bridge.contains("!capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)"))
+        assertTrue(bridge.contains("callbacks[listener] !== callback"))
         assertFalse(bridge.contains("applySetter"))
     }
 
