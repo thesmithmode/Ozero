@@ -72,7 +72,7 @@ class SingboxEngineWarmReadinessTest {
                 Upstream.None,
             ),
         )
-        openLocalListener().use { listener ->
+        openLocalSocksListener().use { listener ->
             engine.setPrivateField("activeSocksPort", listener.localPort)
 
             val ready = engine.awaitReady()
@@ -84,11 +84,23 @@ class SingboxEngineWarmReadinessTest {
         verify(exactly = 0) { process.stopAndWait(any()) }
     }
 
-    private fun openLocalListener(): ServerSocket {
+    private fun openLocalSocksListener(): ServerSocket {
         val server = ServerSocket(0)
         Thread {
             while (!server.isClosed) {
-                runCatching { server.accept().close() }
+                runCatching {
+                    server.accept().use { socket ->
+                        val input = socket.getInputStream()
+                        val output = socket.getOutputStream()
+                        val version = input.read()
+                        val methodsCount = input.read()
+                        repeat(methodsCount.coerceAtLeast(0)) { input.read() }
+                        if (version == 0x05) {
+                            output.write(byteArrayOf(0x05, 0x00))
+                            output.flush()
+                        }
+                    }
+                }
             }
         }.apply { isDaemon = true }.start()
         return server

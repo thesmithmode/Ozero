@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -155,9 +156,6 @@ class SingboxEngine @Inject constructor(
     @Volatile
     private var activeAutoSelect: Boolean = false
 
-    @Volatile
-    private var attachReadinessVerified: Boolean = false
-
     private val bindLock = Any()
 
     private val localProtector = object : ISingboxProtector.Stub() {
@@ -167,7 +165,6 @@ class SingboxEngine @Inject constructor(
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
 
-        attachReadinessVerified = false
         chainMode = upstream !is Upstream.None || config.proxyMode
         PersistentLoggers.debug(
             TAG,
@@ -270,7 +267,6 @@ class SingboxEngine @Inject constructor(
         activeSocksPort = 0
         activeAutoSelect = false
         activeTunAutoSelect = false
-        attachReadinessVerified = false
         pendingSocksPort = 0
         pendingConfig = null
         val port = allocateChainPort()
@@ -400,14 +396,8 @@ class SingboxEngine @Inject constructor(
                 clearPendingStart()
                 return TunAttachResult.Failure("sing-box runtime failed to start")
             }
-            val autoSelect = pendingTunAutoSelect
-            val routedReady = warmTrafficProbe(pendingSocksPort, autoSelect)
-            if (!routedReady) {
-                PersistentLoggers.warn(TAG, "attachTun: runtime is active but external routed probe is unavailable")
-            }
             activeSocksPort = pendingSocksPort
-            activeTunAutoSelect = autoSelect
-            attachReadinessVerified = routedReady
+            activeTunAutoSelect = pendingTunAutoSelect
             pendingTunAutoSelect = false
             pendingSocksPort = 0
             pendingConfig = null
@@ -425,21 +415,6 @@ class SingboxEngine @Inject constructor(
         }
     }
 
-    private suspend fun warmTrafficProbe(socksPort: Int, autoSelect: Boolean): Boolean {
-        if (socksPort <= 0) return false
-        repeat(READY_PROBE_ATTEMPTS) { attempt ->
-            val latency = routedProbe.probeLatencyMs(socksPort)
-            if (latency >= 0) return true
-            PersistentLoggers.debug(
-                TAG,
-                "routed probe warmup failed attempt=${attempt + 1}/$READY_PROBE_ATTEMPTS autoSelect=$autoSelect",
-            )
-            if (attempt != READY_PROBE_ATTEMPTS - 1) delay(READY_PROBE_RETRY_MS)
-        }
-        PersistentLoggers.warn(TAG, "routed probe warmup failed port=$socksPort autoSelect=$autoSelect")
-        return false
-    }
-
     private fun stopRuntimeAfterFailedReadiness(p: ISingboxEngineProcess) {
         runCatching {
             val stopped = p.stopAndWait(REMOTE_STOP_TIMEOUT_MS)
@@ -454,7 +429,6 @@ class SingboxEngine @Inject constructor(
         chainMode = false
         activeAutoSelect = false
         activeTunAutoSelect = false
-        attachReadinessVerified = false
         activeSocksPort = 0
         val p = proxy
         if (p != null) {
@@ -485,6 +459,10 @@ class SingboxEngine @Inject constructor(
             clearRuntimeState()
             return ProbeResult.Failure("sing-box runtime is not running")
         }
+        if (!localSocksHandshake(port)) {
+            clearRuntimeState()
+            return ProbeResult.Failure("sing-box SOCKS5 listener is unavailable")
+        }
         val latency = routedProbe.probeLatencyMs(port)
         return if (latency >= 0) {
             ProbeResult.Success(latencyMs = latency)
@@ -501,71 +479,51 @@ class SingboxEngine @Inject constructor(
         }
     }
 
-    override suspend fun awaitReady(): EnginePlugin.ReadyResult = awaitRoutedReady()
-
-    private suspend fun awaitRoutedReady(): EnginePlugin.ReadyResult {
-        if (attachReadinessVerified) {
-            attachReadinessVerified = false
-            val p = proxy ?: run {
-                clearRuntimeState()
-                return EnginePlugin.ReadyResult.Timeout("sing-box process is not connected")
-            }
-            val runtimeRunning = runCatching { p.runtimeRunning() }.getOrDefault(false)
-            if (runtimeRunning) return EnginePlugin.ReadyResult.Ready
+    override suspend fun awaitReady(): EnginePlugin.ReadyResult {
+        val process = proxy ?: return EnginePlugin.ReadyResult.Timeout("sing-box process is not connected")
+        val runtimeRunning = runCatching { process.runtimeRunning() }.getOrDefault(false)
+        if (!runtimeRunning) {
             clearRuntimeState()
             return EnginePlugin.ReadyResult.Timeout("sing-box runtime is not running")
         }
-        if (isRuntimeRunning() && localSocksAcceptsConnection(activeSocksPort)) {
-            return EnginePlugin.ReadyResult.Ready
+        val port = activeSocksPort
+        if (!awaitLocalSocksReady(port)) {
+            clearRuntimeState()
+            return EnginePlugin.ReadyResult.Timeout("sing-box SOCKS5 listener is not ready")
         }
-        var lastFailure: ProbeResult.Failure? = null
-        for (attempt in 0 until READY_PROBE_ATTEMPTS) {
-            when (val result = probeInternal()) {
-                is ProbeResult.Success -> return EnginePlugin.ReadyResult.Ready
-                is ProbeResult.Failure -> {
-                    lastFailure = result
-                    PersistentLoggers.debug(
-                        TAG,
-                        "awaitReady probe failed attempt=${attempt + 1}/$READY_PROBE_ATTEMPTS reason=${result.reason}",
-                    )
-                    if (!result.isRoutedProbeFailure()) break
-                    if (attempt != READY_PROBE_ATTEMPTS - 1) delay(READY_PROBE_RETRY_MS)
-                }
-            }
-        }
-        val failureReason = lastFailure?.reason ?: "sing-box routed probe failed"
-        val routedProbeFailure = lastFailure?.isRoutedProbeFailure() == true
-        PersistentLoggers.warn(
-            TAG,
-            "awaitReady timeout reason=$failureReason attempts=$READY_PROBE_ATTEMPTS " +
-                "activePort=$activeSocksPort activeAuto=$activeAutoSelect " +
-                "activeTunAuto=$activeTunAutoSelect " +
-                "routedProbeFailure=$routedProbeFailure",
-        )
-        if (routedProbeFailure && isRuntimeRunning() && localSocksAcceptsConnection(activeSocksPort)) {
-            PersistentLoggers.warn(TAG, "awaitReady: runtime is active but external probe is unavailable")
-            return EnginePlugin.ReadyResult.Ready
-        }
-        activeSocksPort = 0
-        activeAutoSelect = false
-        activeTunAutoSelect = false
-        attachReadinessVerified = false
-        return EnginePlugin.ReadyResult.Timeout(failureReason)
+        return EnginePlugin.ReadyResult.Ready
     }
 
-    private fun isRuntimeRunning(): Boolean = runCatching { proxy?.runtimeRunning() == true }.getOrDefault(false)
+    private suspend fun awaitLocalSocksReady(port: Int): Boolean {
+        repeat(LOCAL_SOCKS_READY_ATTEMPTS) { attempt ->
+            if (localSocksHandshake(port)) return true
+            if (attempt != LOCAL_SOCKS_READY_ATTEMPTS - 1) delay(LOCAL_SOCKS_READY_RETRY_MS)
+        }
+        return false
+    }
 
-    private fun localSocksAcceptsConnection(port: Int): Boolean {
+    private suspend fun localSocksHandshake(port: Int): Boolean {
         if (port <= 0) return false
-        return runCatching {
-            Socket().use { socket ->
-                socket.connect(InetSocketAddress(LOCAL_SOCKS_HOST, port), LOCAL_SOCKS_CONNECT_TIMEOUT_MS)
-            }
-        }.isSuccess
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                Socket().use { socket ->
+                    socket.soTimeout = LOCAL_SOCKS_IO_TIMEOUT_MS
+                    socket.connect(
+                        InetSocketAddress(LOCAL_SOCKS_HOST, port),
+                        LOCAL_SOCKS_CONNECT_TIMEOUT_MS,
+                    )
+                    socket.getOutputStream().apply {
+                        write(byteArrayOf(0x05, 0x01, 0x00))
+                        flush()
+                    }
+                    val input = socket.getInputStream()
+                    val version = input.read()
+                    val method = input.read()
+                    version == SOCKS5_VERSION && method == SOCKS5_NO_AUTH
+                }
+            }.getOrDefault(false)
+        }
     }
-
-    private fun ProbeResult.Failure.isRoutedProbeFailure(): Boolean =
-        code == ProbeResult.Failure.Code.ROUTED_PROBE_FAILED
 
     override fun stats(): Flow<EngineStats> = flow {
         while (true) {
@@ -812,7 +770,6 @@ class SingboxEngine @Inject constructor(
         pendingSocksPort = 0
         activeAutoSelect = false
         activeTunAutoSelect = false
-        attachReadinessVerified = false
         activeSocksPort = 0
     }
 
@@ -846,10 +803,13 @@ class SingboxEngine @Inject constructor(
         private const val STATS_POLL_MS = 1_000L
         private const val REMOTE_STOP_TIMEOUT_MS = 3_000L
         private const val ENGINE_STOP_TIMEOUT_MS = 4_000L
-        private const val READY_PROBE_ATTEMPTS = 5
-        private const val READY_PROBE_RETRY_MS = 500L
         private const val LOCAL_SOCKS_HOST = "127.0.0.1"
         private const val LOCAL_SOCKS_CONNECT_TIMEOUT_MS = 400
+        private const val LOCAL_SOCKS_IO_TIMEOUT_MS = 400
+        private const val LOCAL_SOCKS_READY_ATTEMPTS = 10
+        private const val LOCAL_SOCKS_READY_RETRY_MS = 100L
+        private const val SOCKS5_VERSION = 0x05
+        private const val SOCKS5_NO_AUTH = 0x00
         private const val MAX_AUTO_SELECT_OUTBOUNDS = 50
         private const val MAX_AUTO_SELECT_BLOB_BYTES = 64 * 1024
         private const val MAX_AUTO_PROFILE_SCAN = 2_000

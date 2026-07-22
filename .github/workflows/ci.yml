@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main
+      - dev
     types:
       - opened
       - synchronize
@@ -28,7 +29,7 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - name: Check open PR to main for current SHA
+      - name: Check open PR to protected base for current SHA
         id: detect-open-pr
         uses: actions/github-script@v9
         with:
@@ -43,22 +44,23 @@ jobs:
                 commit_sha: commitSha
               }
             );
-            const hasOpenPrToMain = pulls.some(
+            const protectedBases = new Set(['main', 'dev']);
+            const hasOpenPrToProtectedBase = pulls.some(
               (pr) =>
                 pr.state === 'open' &&
-                pr.base?.ref === 'main' &&
+                protectedBases.has(pr.base?.ref) &&
                 pr.head?.sha === commitSha
             );
             const skipPush =
-              context.eventName === 'push' && hasOpenPrToMain;
-            const isPullRequestToMain =
+              context.eventName === 'push' && hasOpenPrToProtectedBase;
+            const isPullRequestToProtectedBase =
               context.eventName === 'pull_request' &&
-              context.payload.pull_request?.base?.ref === 'main';
+              protectedBases.has(context.payload.pull_request?.base?.ref);
             const isNonMainNonPullRequest =
               context.eventName !== 'pull_request' &&
               context.ref !== 'refs/heads/main';
             const runCi =
-              isPullRequestToMain || (isNonMainNonPullRequest && !skipPush);
+              isPullRequestToProtectedBase || (isNonMainNonPullRequest && !skipPush);
             core.setOutput('skip_push', skipPush ? 'true' : 'false');
             core.setOutput('run_ci', runCi ? 'true' : 'false');
 
@@ -92,6 +94,94 @@ jobs:
 
       - name: ktlint + detekt
         run: ./gradlew ktlintCheck detekt --stacktrace --continue
+
+
+  test-singbox:
+    name: Tests — Sing-box modules
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle with caching
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
+
+      - name: Cache Singbox libs
+        uses: actions/cache@v6
+        id: singbox-aar-cache
+        with:
+          path: |
+            singbox-core/libs
+            singbox-core/libs-stubs
+            singbox-core/src/main/jniLibs
+          key: singbox-libbox-1.13.12-exploded-v7-sha256-7a5fa900e73352a18d55ef7ae55427e3e60ba7208b5848ccf64ec5acdf154867
+
+      - name: Download and explode Singbox AAR
+        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMPAAR=/tmp/libbox.aar
+          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber -R "${{ github.repository }}"
+          .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
+          mkdir -p singbox-core/libs
+          unzip -o "$TMPAAR" classes.jar -d /tmp
+          cp /tmp/classes.jar singbox-core/libs/libbox.jar
+          mkdir -p singbox-core/libs-stubs /tmp/go-stubs
+          unzip -o /tmp/classes.jar 'go/*.class' -d /tmp/go-stubs 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C /tmp/go-stubs . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$TMPAAR" 'jni/*' -d /tmp/aar-exploded || true
+          if [ -d /tmp/aar-exploded/jni ]; then
+            cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
+          fi
+
+      - name: Sing-box module unit tests
+        run: >
+          ./gradlew
+          :engine-singbox:testDebugUnitTest
+          :singbox-config:testDebugUnitTest
+          :singbox-process:testDebugUnitTest
+          --stacktrace --continue
+
+      - name: Verify Sing-box tests were discovered
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py engine-singbox singbox-config singbox-process
+
+      - name: Upload Sing-box test reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-reports-singbox
+          path: |
+            engine-singbox/build/reports/tests/**
+            singbox-config/build/reports/tests/**
+            singbox-process/build/reports/tests/**
+          retention-days: 14
 
   extra-checks:
     name: Python + shell + Dockerfile
