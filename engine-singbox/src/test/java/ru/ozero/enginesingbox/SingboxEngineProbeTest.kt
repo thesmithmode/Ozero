@@ -132,7 +132,7 @@ class SingboxEngineProbeTest {
 
         val failure = assertIs<StartResult.Failure>(result)
         assertTrue(failure.reason.contains("bindService failed"))
-        assertEquals(0, engine.privateIntField("activeSocksPort"))
+        assertEquals(49408, engine.privateIntField("activeSocksPort"))
     }
 
     @Test
@@ -543,7 +543,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `probe rejects running runtime when routed probe fails and clears stale port`() = runTest {
+    fun `probe rejects running runtime when routed probe fails and keeps active port`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = object : SingboxRoutedProbe {
             override suspend fun probeLatencyMs(socksPort: Int): Long = SingboxHttp204RoutedProbe.LATENCY_FAILED
@@ -557,7 +557,7 @@ class SingboxEngineProbeTest {
 
         assertTrue(result is ProbeResult.Failure)
         assertTrue(result.reason.contains("routed probe"))
-        assertEquals(0, engine.privateIntField("activeSocksPort"))
+        assertEquals(49408, engine.privateIntField("activeSocksPort"))
     }
 
     @Test

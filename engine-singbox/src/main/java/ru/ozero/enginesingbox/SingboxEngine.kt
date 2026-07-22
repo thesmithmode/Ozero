@@ -424,10 +424,8 @@ class SingboxEngine @Inject constructor(
             }
             val autoSelect = pendingTunAutoSelect
             val routedReady = warmTrafficProbe(pendingSocksPort, autoSelect)
-            if (!routedReady && !autoSelect) {
-                stopRuntimeAfterFailedReadiness(p)
-                clearPendingStart()
-                return TunAttachResult.Failure("sing-box routed probe failed")
+            if (!routedReady) {
+                PersistentLoggers.warn(TAG, "attachTun: runtime is active but external routed probe is unavailable")
             }
             activeSocksPort = pendingSocksPort
             activeTunAutoSelect = autoSelect
@@ -493,10 +491,10 @@ class SingboxEngine @Inject constructor(
     override fun stopTimeoutMs(): Long = ENGINE_STOP_TIMEOUT_MS
 
     override suspend fun probe(): ProbeResult {
-        return probeInternal(clearOnRoutedFailure = true)
+        return probeInternal()
     }
 
-    private suspend fun probeInternal(clearOnRoutedFailure: Boolean): ProbeResult {
+    private suspend fun probeInternal(): ProbeResult {
         val p = proxy ?: return ProbeResult.Failure("sing-box process is not connected")
         val port = activeSocksPort.takeIf { it > 0 }
             ?: return ProbeResult.Failure("sing-box SOCKS probe port is not active")
@@ -518,11 +516,6 @@ class SingboxEngine @Inject constructor(
                 "probe failed: routed probe returned $latency port=$port " +
                     "chainMode=$chainMode runtimeRunning=$runtimeRunning",
             )
-            if (clearOnRoutedFailure) {
-                activeSocksPort = 0
-                activeTunAutoSelect = false
-                attachReadinessVerified = false
-            }
             ProbeResult.Failure(
                 "sing-box routed probe failed",
                 code = ProbeResult.Failure.Code.ROUTED_PROBE_FAILED,
@@ -546,7 +539,7 @@ class SingboxEngine @Inject constructor(
         }
         var lastFailure: ProbeResult.Failure? = null
         for (attempt in 0 until READY_PROBE_ATTEMPTS) {
-            when (val result = probeInternal(clearOnRoutedFailure = false)) {
+            when (val result = probeInternal()) {
                 is ProbeResult.Success -> return EnginePlugin.ReadyResult.Ready
                 is ProbeResult.Failure -> {
                     lastFailure = result

@@ -36,7 +36,12 @@ class SingboxEngineService : Service() {
             )
             try {
                 kotlinx.coroutines.runBlocking {
-                    SingboxRuntime.start(rawFd, singboxJsonConfig, SingboxProtectorBridge(protector))
+                    SingboxRuntime.start(
+                        this@SingboxEngineService,
+                        rawFd,
+                        singboxJsonConfig,
+                        SingboxProtectorBridge(protector),
+                    )
                 }
             } catch (t: Throwable) {
                 PersistentLoggers.error(TAG, "startWithConfig failed: ${t::class.java.simpleName}: ${t.message}", t)
@@ -58,7 +63,12 @@ class SingboxEngineService : Service() {
             )
             try {
                 kotlinx.coroutines.runBlocking {
-                    SingboxRuntime.start(rawFd, json, SingboxProtectorBridge(protector))
+                    SingboxRuntime.start(
+                        this@SingboxEngineService,
+                        rawFd,
+                        json,
+                        SingboxProtectorBridge(protector),
+                    )
                 }
             } catch (t: Throwable) {
                 PersistentLoggers.error(TAG, "startWithConfigFile failed: ${t::class.java.simpleName}: ${t.message}", t)
@@ -77,7 +87,12 @@ class SingboxEngineService : Service() {
             )
             try {
                 kotlinx.coroutines.runBlocking {
-                    SingboxRuntime.start(NO_TUN_FD, singboxJsonConfig, SingboxProtectorBridge(protector))
+                    SingboxRuntime.start(
+                        this@SingboxEngineService,
+                        NO_TUN_FD,
+                        singboxJsonConfig,
+                        SingboxProtectorBridge(protector),
+                    )
                 }
             } catch (t: Throwable) {
                 PersistentLoggers.error(TAG, "startProxyMode failed: ${t::class.java.simpleName}: ${t.message}", t)

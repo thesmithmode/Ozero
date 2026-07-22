@@ -50,8 +50,8 @@ class ConfigBuilderDnsTest {
 
         assertContains(json, "\"server\":\"1.1.1.1\"")
         assertContains(json, "\"server\":\"8.8.8.8\"")
-        assertFalse(json.contains("domain_resolver"))
-        assertFalse(json.contains("dns-domain-resolver"))
+        assertContains(json, "\"default_domain_resolver\":\"dns-0\"")
+        assertFalse(json.contains("domain_resolver\":\"dns-domain-resolver"))
     }
 
     @Test
@@ -76,6 +76,22 @@ class ConfigBuilderDnsTest {
         assertContains(json, "\"type\":\"udp\"")
         assertContains(json, "\"server\":\"9.9.9.9\"")
         assertFalse(json.contains("\"detour\":\"proxy\""))
+    }
+
+    @Test
+    fun `route uses first configured DNS as domain resolver in every config shape`() {
+        val tun = ConfigBuilder.buildSingboxConfig(bean(), dnsServers = listOf("8.8.8.8"))
+        val chain = ConfigBuilder.buildChainConfig(bean(), socksPort = 2080, dnsServers = listOf("8.8.8.8"))
+        val auto = ConfigBuilder.buildSingboxAutoConfig(listOf(bean()), dnsServers = listOf("8.8.8.8"))
+        val probe = ConfigBuilder.buildProbeConfig(
+            listOf(ConfigBuilder.ProbeTarget(bean(), 2081)),
+            dnsServers = listOf("8.8.8.8"),
+        )
+
+        listOf(tun, chain, auto, probe).forEach { json ->
+            assertContains(json, "\"default_domain_resolver\":\"dns-0\"")
+            assertContains(json, "\"auto_detect_interface\":true")
+        }
     }
 
     @Test
