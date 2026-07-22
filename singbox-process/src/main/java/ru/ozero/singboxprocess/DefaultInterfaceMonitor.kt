@@ -264,7 +264,7 @@ private fun NetworkInterface.toLibboxInterface(
     return value
 }
 
-private fun NetworkCapabilities.interfaceType(): Long = when {
+private fun NetworkCapabilities.interfaceType(): Int = when {
     hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> Libbox.InterfaceTypeWIFI
     hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> Libbox.InterfaceTypeCellular
     hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> Libbox.InterfaceTypeEthernet

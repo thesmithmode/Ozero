@@ -10,6 +10,7 @@ import java.net.Socket
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -52,7 +53,7 @@ class SingboxHttp204RoutedProbeTest {
 
     @Test
     fun `HTTPS handshake failure falls back to HTTP 204 through SOCKS`() = runTest {
-        SocksHttpServer(statusCode = 204, reason = "No Content", failuresBeforeResponse = 1).use { socks ->
+        SocksHttpServer(statusCode = 204, reason = "No Content").use { socks ->
             val probe = SingboxHttp204RoutedProbe(
                 probeUrl = URL("https://first.example/generate_204"),
                 fallbackProbeUrls = listOf(URL("http://second.example/generate_204")),
@@ -331,12 +332,12 @@ class SingboxHttp204RoutedProbeTest {
         private val body: String = "",
     ) : AutoCloseable {
         private val server = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
-        private val attemptsBeforeSuccess = failuresBeforeResponse + 1
+        private val failuresRemaining = AtomicInteger(failuresBeforeResponse)
         private val worker = thread(start = true, isDaemon = true) {
-            repeat(attemptsBeforeSuccess + 1) { attempt ->
+            while (!server.isClosed) {
                 runCatching {
                     server.accept().use { socket ->
-                        handle(socket, shouldRespond = attempt > failuresBeforeResponse)
+                        handle(socket)
                     }
                 }
             }
@@ -347,7 +348,7 @@ class SingboxHttp204RoutedProbeTest {
 
         val port: Int = server.localPort
 
-        private fun handle(socket: Socket, shouldRespond: Boolean) {
+        private fun handle(socket: Socket) {
             val input = DataInputStream(socket.getInputStream())
             val output = socket.getOutputStream()
             assertEquals(5, input.readUnsignedByte())
@@ -365,10 +366,11 @@ class SingboxHttp204RoutedProbeTest {
                 4 -> input.skipNBytesCompat(16)
                 else -> error("unsupported address type")
             }
-            input.skipNBytesCompat(2)
+            val destinationPort = input.readUnsignedShort()
             output.write(byteArrayOf(5, 0, 0, 1, 127, 0, 0, 1, 0, 0))
             output.flush()
-            if (!shouldRespond) return
+            if (destinationPort == HTTPS_PORT) return
+            if (failuresRemaining.getAndUpdate { (it - 1).coerceAtLeast(0) } > 0) return
 
             requestText = input.readHttpHeaders()
             val responseBody = body.toByteArray(StandardCharsets.US_ASCII)
@@ -383,6 +385,10 @@ class SingboxHttp204RoutedProbeTest {
         override fun close() {
             runCatching { server.close() }
             runCatching { worker.join(1_000) }
+        }
+
+        private companion object {
+            private const val HTTPS_PORT = 443
         }
     }
 
