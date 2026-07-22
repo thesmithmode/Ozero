@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 internal class DefaultInterfaceMonitor(private val connectivity: ConnectivityManager) {
     private val callbacks = ConcurrentHashMap<InterfaceUpdateListener, ConnectivityManager.NetworkCallback>()
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     @Volatile
     private var lastPhysicalNetwork: Network? = null
@@ -41,12 +42,12 @@ internal class DefaultInterfaceMonitor(private val connectivity: ConnectivityMan
             override fun onLost(network: Network) {
                 if (!isCurrent(listener, this)) return
                 if (lastPhysicalNetwork == network) lastPhysicalNetwork = null
-                publish(bestPhysicalNetwork(exclude = network), listener, this)
+                publish(callbackNetwork = null, listener, this, exclude = network)
             }
         }
         callbacks[listener] = callback
         register(callback)
-        publish(bestPhysicalNetwork(), listener, callback)
+        publish(callbackNetwork = null, listener, callback)
     }
 
     fun close(listener: InterfaceUpdateListener) {
@@ -89,32 +90,56 @@ internal class DefaultInterfaceMonitor(private val connectivity: ConnectivityMan
     }
 
     private fun publish(
-        network: Network?,
+        callbackNetwork: Network?,
         listener: InterfaceUpdateListener,
         callback: ConnectivityManager.NetworkCallback,
+        exclude: Network? = null,
+        attempt: Int = 0,
     ) {
         if (!isCurrent(listener, callback)) return
-        val physicalNetwork = network?.takeIf { it.isEligiblePhysical(connectivity) } ?: bestPhysicalNetwork()
+        val physicalNetwork = selectPhysicalNetwork(callbackNetwork, exclude) ?: run {
+            lastPhysicalNetwork = null
+            listener.updateDefaultInterface("", -1, false, false)
+            return
+        }
+        val netIf = physicalNetwork.toJavaInterface(connectivity)
+        if (netIf == null && attempt < INTERFACE_LOOKUP_ATTEMPTS - 1) {
+            mainHandler.postDelayed(
+                { publish(physicalNetwork, listener, callback, exclude, attempt + 1) },
+                INTERFACE_LOOKUP_RETRY_MS,
+            )
+            return
+        }
+        if (netIf == null) {
+            PersistentLoggers.warn(TAG, "default physical interface lookup exhausted")
+            listener.updateDefaultInterface("", -1, false, false)
+            return
+        }
         lastPhysicalNetwork = physicalNetwork
-        val netIf = physicalNetwork?.toJavaInterface(connectivity)
-        val capabilities = physicalNetwork?.let { connectivity.getNetworkCapabilities(it) }
+        val capabilities = runCatching { connectivity.getNetworkCapabilities(physicalNetwork) }.getOrNull()
         listener.updateDefaultInterface(
-            netIf?.name.orEmpty(),
-            netIf?.index ?: -1,
+            netIf.name,
+            netIf.index,
             capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) != true,
             capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED) != true,
         )
     }
 
-    private fun bestPhysicalNetwork(exclude: Network? = null): Network? {
+    private fun selectPhysicalNetwork(
+        callbackNetwork: Network?,
+        exclude: Network? = null,
+    ): Network? {
         val activeNetwork = runCatching { connectivity.activeNetwork }.getOrNull()
-        val allNetworks = runCatching { connectivity.allNetworks.toList() }.getOrDefault(emptyList())
+        val allNetworks = androidNetworks(connectivity)
         val candidates = buildList {
-            lastPhysicalNetwork?.let { network ->
-                add(network.toCandidate(active = network == activeNetwork, source = NetworkCandidateSource.LAST))
+            callbackNetwork?.let { network ->
+                add(network.toCandidate(active = network == activeNetwork, source = NetworkCandidateSource.CALLBACK))
             }
             activeNetwork?.let { network ->
                 add(network.toCandidate(active = true, source = NetworkCandidateSource.ACTIVE))
+            }
+            lastPhysicalNetwork?.let { network ->
+                add(network.toCandidate(active = network == activeNetwork, source = NetworkCandidateSource.LAST))
             }
             allNetworks.forEach { network ->
                 add(network.toCandidate(active = network == activeNetwork, source = NetworkCandidateSource.ALL))
@@ -139,10 +164,8 @@ internal class DefaultInterfaceMonitor(private val connectivity: ConnectivityMan
 }
 
 internal fun singboxNetworkInterfaces(connectivity: ConnectivityManager): NetworkInterfaceIterator {
-    val javaInterfaces = NetworkInterface.getNetworkInterfaces()
-        ?.let(Collections::list)
-        .orEmpty()
-    val values = connectivity.allNetworks
+    val javaInterfaces = javaNetworkInterfaces()
+    val values = androidNetworks(connectivity)
         .filter { network -> network.isEligiblePhysical(connectivity) }
         .mapNotNull { network -> network.toLibboxInterface(connectivity, javaInterfaces) }
     return object : NetworkInterfaceIterator {
@@ -151,6 +174,20 @@ internal fun singboxNetworkInterfaces(connectivity: ConnectivityManager): Networ
         override fun next(): io.nekohasekai.libbox.NetworkInterface = values[index++]
     }
 }
+
+private fun javaNetworkInterfaces(): List<NetworkInterface> = runCatching {
+    NetworkInterface.getNetworkInterfaces()
+        ?.let(Collections::list)
+        .orEmpty()
+}
+    .onFailure { PersistentLoggers.warn(TAG, "Java interface enumeration failed: ${it::class.java.simpleName}") }
+    .getOrDefault(emptyList())
+
+private fun androidNetworks(connectivity: ConnectivityManager): List<Network> = runCatching {
+    connectivity.allNetworks.toList()
+}
+    .onFailure { PersistentLoggers.warn(TAG, "Android network enumeration failed: ${it::class.java.simpleName}") }
+    .getOrDefault(emptyList())
 
 private fun Network.isEligiblePhysical(connectivity: ConnectivityManager): Boolean =
     runCatching { connectivity.getNetworkCapabilities(this) }
@@ -164,18 +201,23 @@ private fun NetworkCapabilities?.isEligiblePhysical(): Boolean =
         !hasTransport(NetworkCapabilities.TRANSPORT_VPN)
 
 private fun Network.toJavaInterface(connectivity: ConnectivityManager): NetworkInterface? =
-    connectivity.getLinkProperties(this)?.interfaceName?.let { name ->
-        runCatching { NetworkInterface.getByName(name) }
-            .onFailure { PersistentLoggers.warn(TAG, "default interface unavailable: ${it::class.java.simpleName}") }
-            .getOrNull()
-    }
+    runCatching { connectivity.getLinkProperties(this) }
+        .getOrNull()
+        ?.interfaceName
+        ?.let { name ->
+            runCatching { NetworkInterface.getByName(name) }
+                .onFailure {
+                    PersistentLoggers.warn(TAG, "default interface unavailable: ${it::class.java.simpleName}")
+                }
+                .getOrNull()
+        }
 
 private fun Network.toLibboxInterface(
     connectivity: ConnectivityManager,
     javaInterfaces: List<NetworkInterface>,
 ): io.nekohasekai.libbox.NetworkInterface? {
-    val linkProperties = connectivity.getLinkProperties(this) ?: return null
-    val capabilities = connectivity.getNetworkCapabilities(this) ?: return null
+    val linkProperties = runCatching { connectivity.getLinkProperties(this) }.getOrNull() ?: return null
+    val capabilities = runCatching { connectivity.getNetworkCapabilities(this) }.getOrNull() ?: return null
     val interfaceName = linkProperties.interfaceName
         ?.takeIf { it.isNotBlank() }
         ?: return null
@@ -255,8 +297,9 @@ internal data class NetworkCandidate(
 )
 
 internal enum class NetworkCandidateSource {
-    LAST,
+    CALLBACK,
     ACTIVE,
+    LAST,
     ALL,
 }
 
@@ -268,9 +311,10 @@ internal fun selectDefaultNetwork(
     .filter { it.network != exclude && it.eligible }
     .distinctBy { it.network }
     .sortedWith(
-        compareByDescending<NetworkCandidate> { it.source == NetworkCandidateSource.LAST }
-            .thenByDescending { it.active }
-            .thenByDescending { it.validated },
+        compareByDescending<NetworkCandidate> { it.active }
+            .thenByDescending { it.validated }
+            .thenByDescending { it.source == NetworkCandidateSource.CALLBACK }
+            .thenByDescending { it.source == NetworkCandidateSource.LAST },
     )
     .firstOrNull()
     ?.network
@@ -282,6 +326,8 @@ private fun InterfaceAddress.toPrefix(): String = if (address is Inet6Address) {
 }
 
 private const val TAG = "SingboxNetwork"
+private const val INTERFACE_LOOKUP_ATTEMPTS = 10
+private const val INTERFACE_LOOKUP_RETRY_MS = 100L
 
 private class StringListIterator(private val values: List<String>) : StringIterator {
     private var index = 0
