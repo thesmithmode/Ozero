@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.prioritizeSingboxAutoProfiles
+import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
@@ -54,19 +55,8 @@ private const val MAX_AUTO_SELECT_FINGERPRINT_PROFILES = 50
 private fun isSupportedRoutableBlob(blob: ByteArray): Boolean =
     runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
         .getOrNull()
-        ?.let { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
+        ?.let { ConfigBuilder.supportDecision(it) is BeanSupportDecision.Supported }
         ?: false
-
-private fun AbstractBean.hasRoutableServerAddress(): Boolean {
-    val host = serverAddress.trim().trim('[', ']').lowercase()
-    return host.isNotEmpty() &&
-        host != "localhost" &&
-        host != "0.0.0.0" &&
-        host != "::" &&
-        host != "::0" &&
-        host != "::1" &&
-        !host.startsWith("127.")
-}
 
 internal suspend fun singboxRuntimeFingerprint(
     prefs: Preferences,

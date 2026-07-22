@@ -18,6 +18,28 @@ private const val DNS_DOMAIN_RESOLVER_TAG = "dns-domain-resolver"
 private val DNS_DOMAIN_RESOLVER_TYPES = setOf("https", "tls")
 private const val AUTO_SELECT_PROBE_URL = "http://www.gstatic.com/generate_204"
 
+enum class BeanSupportError {
+    INVALID_PORT,
+    INVALID_SERVER,
+    MISSING_CREDENTIALS,
+    UNSUPPORTED_BEAN_TYPE,
+    UNSUPPORTED_TRANSPORT,
+    UNSUPPORTED_TCP_HEADER,
+    UNSUPPORTED_QUIC_SECURITY,
+    INVALID_REALITY_PUBLIC_KEY,
+    INVALID_REALITY_SHORT_ID,
+    UNSUPPORTED_GRPC_MULTI_MODE,
+    UNSUPPORTED_ECH,
+    UNSUPPORTED_MTLS,
+    UNSUPPORTED_CERTIFICATE_PINNING,
+    UNSUPPORTED_REQUIRED_FIELD,
+}
+
+sealed interface BeanSupportDecision {
+    data object Supported : BeanSupportDecision
+    data class Unsupported(val error: BeanSupportError) : BeanSupportDecision
+}
+
 @Suppress("TooManyFunctions")
 object ConfigBuilder {
 
@@ -64,20 +86,39 @@ object ConfigBuilder {
             }
     }
 
-    fun isSupportedBean(bean: AbstractBean): Boolean {
-        if (bean.serverPort !in MIN_PORT..MAX_PORT) return false
-        if (!bean.hasRequiredOutboundCredentials()) return false
+    fun isSupportedBean(bean: AbstractBean): Boolean =
+        supportDecision(bean) is BeanSupportDecision.Supported
+
+    fun supportDecision(bean: AbstractBean): BeanSupportDecision {
+        if (bean.serverPort !in MIN_PORT..MAX_PORT) return unsupported(BeanSupportError.INVALID_PORT)
+        if (!bean.hasRoutableServerAddress()) return unsupported(BeanSupportError.INVALID_SERVER)
+        if (!bean.hasRequiredOutboundCredentials()) return unsupported(BeanSupportError.MISSING_CREDENTIALS)
         return when (bean) {
-            is VLESSBean -> isSupportedStandardBean(bean)
-            is VMessBean -> isSupportedStandardBean(bean)
-            is TrojanBean -> isSupportedStandardBean(bean)
-            is ShadowsocksBean -> true
-            else -> false
+            is VLESSBean -> supportDecision(bean)
+            is VMessBean -> supportDecision(bean)
+            is TrojanBean -> supportDecision(bean)
+            is ShadowsocksBean -> BeanSupportDecision.Supported
+            else -> unsupported(BeanSupportError.UNSUPPORTED_BEAN_TYPE)
         }
     }
 
-    private fun isSupportedStandardBean(bean: StandardV2RayBean): Boolean =
-        bean.type in SUPPORTED_TRANSPORTS && bean.hasSupportedSecurity()
+    private fun supportDecision(bean: StandardV2RayBean): BeanSupportDecision {
+        val error = listOfNotNull(
+            BeanSupportError.UNSUPPORTED_TRANSPORT.takeIf { bean.type !in SUPPORTED_TRANSPORTS },
+            BeanSupportError.UNSUPPORTED_TCP_HEADER.takeIf { bean.hasUnsupportedTcpHeader() },
+            BeanSupportError.UNSUPPORTED_GRPC_MULTI_MODE.takeIf { bean.type == "grpc" && bean.grpcMultiMode },
+            BeanSupportError.UNSUPPORTED_QUIC_SECURITY.takeIf { bean.hasUnsupportedQuicSecurity() },
+            BeanSupportError.UNSUPPORTED_ECH.takeIf { bean.echEnabled || bean.echConfig.isNotBlank() },
+            BeanSupportError.UNSUPPORTED_MTLS.takeIf { bean.hasMtls() },
+            BeanSupportError.UNSUPPORTED_CERTIFICATE_PINNING.takeIf { bean.hasCertificatePinning() },
+            BeanSupportError.INVALID_REALITY_PUBLIC_KEY.takeIf { bean.hasInvalidRealityPublicKey() },
+            BeanSupportError.INVALID_REALITY_SHORT_ID.takeIf { bean.hasInvalidRealityShortId() },
+        ).firstOrNull()
+        return error?.let(::unsupported) ?: BeanSupportDecision.Supported
+    }
+
+    private fun unsupported(error: BeanSupportError): BeanSupportDecision.Unsupported =
+        BeanSupportDecision.Unsupported(error)
 
     fun buildChainConfig(
         bean: AbstractBean,
@@ -430,10 +471,36 @@ object ConfigBuilder {
         }
 }
 
-private fun StandardV2RayBean.hasSupportedSecurity(): Boolean {
-    if (security != "reality") return true
-    return realityPublicKey.isValidRealityPublicKey() && realityShortId.isValidRealityShortId()
+private fun AbstractBean.hasRoutableServerAddress(): Boolean {
+    val host = serverAddress.trim().trim('[', ']').lowercase()
+    return host.isNotEmpty() &&
+        host != "localhost" &&
+        host != "0.0.0.0" &&
+        host != "::" &&
+        host != "::0" &&
+        host != "::1" &&
+        !host.startsWith("127.")
 }
+
+private fun StandardV2RayBean.hasUnsupportedTcpHeader(): Boolean =
+    type == "tcp" && headerType !in setOf("", "none", "http")
+
+private fun StandardV2RayBean.hasUnsupportedQuicSecurity(): Boolean =
+    type == "quic" && quicSecurity !in setOf("", "none")
+
+private fun StandardV2RayBean.hasMtls(): Boolean =
+    mtlsCertificate.isNotBlank() || mtlsCertificatePrivateKey.isNotBlank()
+
+private fun StandardV2RayBean.hasInvalidRealityPublicKey(): Boolean =
+    security == "reality" && !realityPublicKey.isValidRealityPublicKey()
+
+private fun StandardV2RayBean.hasInvalidRealityShortId(): Boolean =
+    security == "reality" && !realityShortId.isValidRealityShortId()
+
+private fun StandardV2RayBean.hasCertificatePinning(): Boolean =
+    pinnedPeerCertificateChainSha256.isNotBlank() ||
+        pinnedPeerCertificatePublicKeySha256.isNotBlank() ||
+        pinnedPeerCertificateSha256.isNotBlank()
 
 private fun String.isValidRealityPublicKey(): Boolean {
     val key = trim()

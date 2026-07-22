@@ -38,6 +38,7 @@ import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.VpnSocketProtectorHolder
 import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
@@ -225,8 +226,9 @@ class SingboxEngine @Inject constructor(
             .onFailure { PersistentLoggers.warn(TAG, "beanBlob deserialize: ${it.message}") }
             .getOrNull() ?: return null
         val wrappers = chainWrapperBeans(config)
-        if (!ConfigBuilder.isSupportedBean(bean) || !bean.hasRoutableServerAddress()) {
-            PersistentLoggers.warn(TAG, "selected bean unsupported or unroutable")
+        val decision = ConfigBuilder.supportDecision(bean)
+        if (decision is BeanSupportDecision.Unsupported) {
+            logRejectedProfile(null, bean, decision, "selected")
             return null
         }
         return runCatching {
@@ -299,8 +301,10 @@ class SingboxEngine @Inject constructor(
         } else {
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
                 .getOrElse { return StartResult.Failure("chain deserialize: ${it.message}") }
-            if (!ConfigBuilder.isSupportedBean(bean) || !bean.hasRoutableServerAddress()) {
-                return StartResult.Failure("chain selected transport unsupported")
+            val decision = ConfigBuilder.supportDecision(bean)
+            if (decision is BeanSupportDecision.Unsupported) {
+                logRejectedProfile(null, bean, decision, "chain selected")
+                return StartResult.Failure("chain selected profile rejected: ${decision.error}")
             } else {
                 val wrappers = if (upstream == null) chainWrapperBeans(config) else emptyList()
                 runCatching {
@@ -625,22 +629,22 @@ class SingboxEngine @Inject constructor(
     }
 
     private fun chainWrapperBeans(config: EngineConfig.Singbox): List<AbstractBean> =
-        config.chainBeanBlobs.mapNotNull { blob ->
+        config.chainBeanBlobs.mapIndexedNotNull { index, blob ->
             runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
                 .onFailure { PersistentLoggers.warn(TAG, "chain bean deserialize: ${it.message}") }
                 .getOrNull()
-                ?.takeIf { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
+                ?.takeIfSupported(index.toLong(), "chain")
         }
 
     private fun supportedBeans(blobs: List<ByteArray>): List<AbstractBean> =
         blobs.asSequence()
             .filter { it.size <= MAX_AUTO_SELECT_BLOB_BYTES }
             .take(MAX_AUTO_SELECT_OUTBOUNDS)
-            .mapNotNull { blob ->
+            .mapIndexedNotNull { index, blob ->
                 runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
                     .onFailure { e -> PersistentLoggers.warn(TAG, "bean deserialize: ${e.message}") }
                     .getOrNull()
-                    ?.takeIf { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
+                    ?.takeIfSupported(index.toLong(), "auto-select")
             }
             .toList()
 
@@ -648,8 +652,35 @@ class SingboxEngine @Inject constructor(
         if (blob.size > MAX_AUTO_SELECT_BLOB_BYTES) return false
         return runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
             .getOrNull()
-            ?.let { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
+            ?.let { ConfigBuilder.supportDecision(it) is BeanSupportDecision.Supported }
             ?: false
+    }
+
+    private fun AbstractBean.takeIfSupported(profileId: Long?, source: String): AbstractBean? {
+        val decision = ConfigBuilder.supportDecision(this)
+        return if (decision is BeanSupportDecision.Supported) {
+            this
+        } else {
+            logRejectedProfile(profileId, this, decision, source)
+            null
+        }
+    }
+
+    private fun logRejectedProfile(
+        profileId: Long?,
+        bean: AbstractBean,
+        decision: BeanSupportDecision.Unsupported,
+        source: String,
+    ) {
+        val standard = bean as? ru.ozero.singboxfmt.StandardV2RayBean
+        PersistentLoggers.warn(
+            TAG,
+            "singbox profile rejected source=$source id=${profileId ?: "unknown"} " +
+                "protocol=${bean.protocolLabel()} transport=${standard?.type.orEmpty()} " +
+                "security=${standard?.security.orEmpty()} headerType=${standard?.headerType.orEmpty()} " +
+                "hasSni=${standard?.sni?.isNotBlank() == true} hasHost=${standard?.host?.isNotBlank() == true} " +
+                "reason=${decision.error}",
+        )
     }
 
     private fun autoSelectBlobWindow(profiles: List<ProxyProfile>): List<ByteArray> =
@@ -668,15 +699,12 @@ class SingboxEngine @Inject constructor(
             }
         }
 
-    private fun AbstractBean.hasRoutableServerAddress(): Boolean {
-        val host = serverAddress.trim().trim('[', ']').lowercase()
-        return host.isNotEmpty() &&
-            host != "localhost" &&
-            host != "0.0.0.0" &&
-            host != "::" &&
-            host != "::0" &&
-            host != "::1" &&
-            !host.startsWith("127.")
+    private fun AbstractBean.protocolLabel(): String = when (this) {
+        is VLESSBean -> "VLESS"
+        is VMessBean -> "VMESS"
+        is TrojanBean -> "TROJAN"
+        is ShadowsocksBean -> "SHADOWSOCKS"
+        else -> this::class.simpleName ?: "UNKNOWN"
     }
 
     private fun protocolTypeOf(bean: AbstractBean): Int = when (bean) {

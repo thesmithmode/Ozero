@@ -15,6 +15,9 @@ import java.security.cert.CertPathValidatorException
 import java.security.cert.CertificateException
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLPeerUnverifiedException
+import ru.ozero.singboxconfig.BeanSupportDecision
+import ru.ozero.singboxconfig.BeanSupportError
+import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
@@ -56,6 +59,7 @@ class RawUpdater(
                 val beans = Base64BundleParser.parse(body)
                     .ifEmpty { RawShareLinksParser.parse(body) }
                 if (beans.isEmpty()) throw SubscriptionNoProfilesException()
+                logSupportDiagnostics(group.id, beans)
 
                 val profiles = beans.take(MAX_PROFILES_PER_GROUP).mapIndexed { idx, bean ->
                     ProxyProfile(
@@ -163,6 +167,44 @@ class RawUpdater(
         private const val USER_AGENT = "mihomo/1.19.23"
         private const val MAX_PROFILES_PER_GROUP = 2_000
         private const val MAX_SUBSCRIPTION_BYTES = 16L * 1024 * 1024
+
+        private fun logSupportDiagnostics(groupId: Long, beans: List<AbstractBean>) {
+            val decisions = beans.map { bean -> bean to ConfigBuilder.supportDecision(bean) }
+            val supportedCount = decisions.count { it.second is BeanSupportDecision.Supported }
+            val rejected = decisions.mapNotNull { (bean, decision) ->
+                (decision as? BeanSupportDecision.Unsupported)?.let { RejectedBean(bean, it.error) }
+            }
+            Log.i(
+                TAG,
+                "subscription parsed groupId=$groupId parsed=${beans.size} supported=$supportedCount " +
+                    "rejected=${rejected.size} byProtocol=${rejected.groupByProtocol()} " +
+                    "byTransport=${rejected.groupByTransport()} byReason=${rejected.groupByReason()}",
+            )
+        }
+
+        private data class RejectedBean(val bean: AbstractBean, val error: BeanSupportError)
+
+        private fun List<RejectedBean>.groupByProtocol(): String =
+            groupingBy { it.bean.protocolLabel() }.eachCount().stableDiagnosticString()
+
+        private fun List<RejectedBean>.groupByTransport(): String =
+            groupingBy { (it.bean as? StandardV2RayBean)?.type.orEmpty().ifBlank { "none" } }
+                .eachCount()
+                .stableDiagnosticString()
+
+        private fun List<RejectedBean>.groupByReason(): String =
+            groupingBy { it.error.name }.eachCount().stableDiagnosticString()
+
+        private fun Map<String, Int>.stableDiagnosticString(): String =
+            entries.sortedBy { it.key }.joinToString(prefix = "{", postfix = "}") { "${it.key}=${it.value}" }
+
+        private fun AbstractBean.protocolLabel(): String = when (this) {
+            is VLESSBean -> "VLESS"
+            is VMessBean -> "VMESS"
+            is TrojanBean -> "TROJAN"
+            is ShadowsocksBean -> "SHADOWSOCKS"
+            else -> this::class.simpleName ?: "UNKNOWN"
+        }
 
         private fun normalizeError(e: Throwable): Throwable = when {
             e.isSubscriptionCertificateFailure() ->
