@@ -10,7 +10,9 @@ import ru.ozero.singboxfmt.StandardV2RayBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxfmt.canonicalBeanOrSelf
 import ru.ozero.singboxfmt.hasRequiredOutboundCredentials
+import ru.ozero.singboxfmt.normalizeSingboxTransport
 
 object ClashYamlParser {
     private const val MAX_YAML_CODE_POINTS = 16 * 1024 * 1024
@@ -40,7 +42,7 @@ object ClashYamlParser {
                 is Map<*, *> -> parseProxy(item.toStringKeyMap())
                 else -> null
             }
-        }
+        }.map { it.canonicalBeanOrSelf() }
     }
 
     private fun parseProxy(fields: Map<String, Any?>): AbstractBean? = when (fields.string("type").lowercase()) {
@@ -86,8 +88,33 @@ object ClashYamlParser {
     private fun StandardV2RayBean.applyV2Ray(fields: Map<String, Any?>, defaultSecurity: String = "none") {
         type = normalizeNetwork(fields.string("network", "net"))
         val reality = fields.mapValue("reality-opts", "reality_opts")
-        val realityPublicKey = fields.string("pbk", "public-key").ifBlank { reality.string("public-key") }
-        val realityShortId = fields.string("sid", "short-id").ifBlank { reality.string("short-id") }
+        val realityPublicKey = fields.string(
+            "pbk",
+            "publicKey",
+            "public-key",
+            "public_key",
+            "realityPublicKey",
+            "reality_public_key",
+        ).ifBlank {
+            reality.string(
+                "pbk",
+                "publicKey",
+                "public-key",
+                "public_key",
+                "realityPublicKey",
+                "reality_public_key",
+            )
+        }
+        val realityShortId = fields.string(
+            "sid",
+            "shortId",
+            "short-id",
+            "short_id",
+            "realityShortId",
+            "reality_short_id",
+        ).ifBlank {
+            reality.string("sid", "shortId", "short-id", "short_id", "realityShortId", "reality_short_id")
+        }
         val explicitSecurity = fields.string("security")
         security = when {
             fields.bool("reality") || realityPublicKey.isNotBlank() || realityShortId.isNotBlank() -> "reality"
@@ -96,10 +123,10 @@ object ClashYamlParser {
             fields.containsKey("tls") -> "none"
             else -> defaultSecurity
         }
-        sni = fields.string("servername", "sni")
+        sni = fields.string("sni", "serverName", "servername", "server_name", "peer")
         alpn = fields.listString("alpn")
         allowInsecure = fields.bool("skip-cert-verify") || fields.bool("allowInsecure")
-        utlsFingerprint = fields.string("client-fingerprint", "fingerprint", "fp")
+        utlsFingerprint = fields.string("fp", "fingerprint", "client-fingerprint", "client_fingerprint")
         applyNestedTransport(fields)
         applyReality(fields, realityPublicKey, realityShortId)
         initializeDefaultValues()
@@ -127,7 +154,15 @@ object ClashYamlParser {
                 ws.string("Host", "host").ifBlank { http.listString("host").ifBlank { httpUpgrade.string("host") } }
             }
         }
-        grpcServiceName = fields.string("serviceName", "service-name").ifBlank { grpc.string("grpc-service-name") }
+        grpcServiceName = fields.string(
+            "serviceName",
+            "service-name",
+            "service_name",
+            "grpc-service-name",
+            "grpc_service_name",
+        ).ifBlank {
+            grpc.string("serviceName", "service-name", "service_name", "grpc-service-name", "grpc_service_name")
+        }
     }
 
     private fun StandardV2RayBean.applyReality(
@@ -137,15 +172,11 @@ object ClashYamlParser {
     ) {
         realityPublicKey = publicKey
         realityShortId = shortId
-        realityFingerprint = fields.string("client-fingerprint", "fingerprint", "fp").ifBlank { realityFingerprint }
+        realityFingerprint = fields.string("fp", "fingerprint", "client-fingerprint", "client_fingerprint")
+            .ifBlank { realityFingerprint }
     }
 
-    private fun normalizeNetwork(network: String): String = when (network.lowercase()) {
-        "h2" -> "http"
-        "xhttp" -> "splithttp"
-        "" -> "tcp"
-        else -> network.lowercase()
-    }
+    private fun normalizeNetwork(network: String): String = normalizeSingboxTransport(network)
 
     private fun Map<*, *>.toStringKeyMap(): Map<String, Any?> = entries.associate { (key, value) ->
         key.toString() to value

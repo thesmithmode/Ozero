@@ -8,7 +8,9 @@ import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.V2RayFmt
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxfmt.canonicalBeanOrSelf
 import ru.ozero.singboxfmt.hasRequiredOutboundCredentials
+import ru.ozero.singboxfmt.normalizeSingboxTransport
 
 object RawShareLinksParser {
     private const val MIN_PORT = 1
@@ -16,7 +18,9 @@ object RawShareLinksParser {
 
     fun parse(text: String): List<AbstractBean> {
         val links = parseShareLinks(text)
-        return links.ifEmpty { parseSingboxJson(text) }.ifEmpty { ClashYamlParser.parse(text) }
+        return links.ifEmpty { parseSingboxJson(text) }
+            .ifEmpty { ClashYamlParser.parse(text) }
+            .map { it.canonicalBeanOrSelf() }
     }
 
     private fun parseShareLinks(text: String): List<AbstractBean> =
@@ -38,6 +42,7 @@ object RawShareLinksParser {
                 }.getOrNull()
             }
             .filter { it.hasValidPort() }
+            .map { it.canonicalBeanOrSelf() }
 
     private fun extractShareLinks(line: String): List<String> {
         val starts = SHARE_LINK_START.findAll(line)
@@ -83,6 +88,7 @@ object RawShareLinksParser {
                 uuid = outbound.optString("uuid")
                 flow = outbound.optString("flow")
                 packetEncoding = outbound.optString("packet_encoding", packetEncoding)
+                mux = outbound.optJSONObject("multiplex")?.optBoolean("enabled", false) ?: mux
                 applyTransport(this, outbound)
                 applyTls(this, outbound)
             }
@@ -92,6 +98,7 @@ object RawShareLinksParser {
                 alterId = outbound.optInt("alter_id", 0)
                 encryption = outbound.optString("security", encryption)
                 packetEncoding = outbound.optString("packet_encoding", packetEncoding)
+                mux = outbound.optJSONObject("multiplex")?.optBoolean("enabled", false) ?: mux
                 applyTransport(this, outbound)
                 applyTls(this, outbound)
             }
@@ -126,21 +133,33 @@ object RawShareLinksParser {
     }
 
     private fun applyTransport(bean: StandardV2RayBean, outbound: JSONObject) {
+        bean.type = normalizeSingboxTransport(outbound.optString("network", bean.type))
         val transport = outbound.optJSONObject("transport") ?: return
-        bean.type = when (val type = transport.optString("type", bean.type)) {
-            "xhttp" -> "splithttp"
-            else -> type
-        }
+        bean.type = normalizeSingboxTransport(transport.optString("type", bean.type))
         bean.path = transport.optString("path", bean.path)
-        bean.host = transport.optString("host", bean.host)
+        bean.host = transport.hostString(bean.host)
         transport.optJSONObject("headers")
-            ?.optString("Host")
+            ?.hostHeader()
             ?.takeIf { it.isNotBlank() }
             ?.let { bean.host = it }
         bean.grpcServiceName = transport.optString("service_name", bean.grpcServiceName)
         bean.maxEarlyData = transport.optInt("max_early_data", bean.maxEarlyData)
         bean.earlyDataHeaderName = transport.optString("early_data_header_name", bean.earlyDataHeaderName)
     }
+
+    private fun JSONObject.hostString(default: String): String {
+        val value = opt("host") ?: return default
+        if (value is org.json.JSONArray) {
+            return buildList {
+                for (i in 0 until value.length()) {
+                    value.optString(i).takeIf { it.isNotBlank() }?.let(::add)
+                }
+            }.joinToString(",")
+        }
+        return value.toString()
+    }
+
+    private fun JSONObject.hostHeader(): String = optString("Host").ifBlank { optString("host") }
 
     private fun applyTls(bean: StandardV2RayBean, outbound: JSONObject) {
         val tls = outbound.optJSONObject("tls") ?: return
@@ -156,6 +175,10 @@ object RawShareLinksParser {
             }.joinToString(",")
         }.orEmpty()
         bean.allowInsecure = tls.optBoolean("insecure", bean.allowInsecure)
+        bean.pinnedPeerCertificatePublicKeySha256 = tls.optString(
+            "certificate_public_key_sha256",
+            bean.pinnedPeerCertificatePublicKeySha256,
+        )
         val fingerprint = tls.optJSONObject("utls")?.optString("fingerprint").orEmpty()
         bean.utlsFingerprint = fingerprint
         if (reality != null) {

@@ -496,7 +496,12 @@ class SingboxEngine @Inject constructor(
             clearRuntimeState()
             return EnginePlugin.ReadyResult.Timeout("sing-box SOCKS5 listener is not ready")
         }
-        return EnginePlugin.ReadyResult.Ready
+        val latency = routedProbe.probeLatencyMs(port)
+        return if (latency >= 0) {
+            EnginePlugin.ReadyResult.Ready
+        } else {
+            EnginePlugin.ReadyResult.Timeout("sing-box outbound verification failed")
+        }
     }
 
     private suspend fun awaitLocalSocksReady(port: Int): Boolean {

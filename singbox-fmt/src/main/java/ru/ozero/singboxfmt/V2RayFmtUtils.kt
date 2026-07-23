@@ -4,24 +4,35 @@ import java.util.Base64 as JBase64
 
 internal object V2RayFmtUtils {
 
-    fun mapTransportType(raw: String): String = when (val normalized = raw.trim().lowercase()) {
-        "", "raw" -> "tcp"
-        "h2" -> "http"
-        "xhttp" -> "splithttp"
-        else -> normalized
-    }
+    fun mapTransportType(raw: String): String = normalizeSingboxTransport(raw)
 
     fun parseSecurityParams(bean: StandardV2RayBean, parsed: UriCompat, defaultSecurity: String = "none") {
-        val publicKey = parsed.getQueryParameter("pbk") ?: ""
-        val shortId = parsed.getQueryParameter("sid") ?: ""
+        val publicKey = parsed.firstQueryParameter(
+            "pbk",
+            "publicKey",
+            "public-key",
+            "public_key",
+            "realityPublicKey",
+            "reality_public_key",
+        ) ?: ""
+        val shortId = parsed.firstQueryParameter(
+            "sid",
+            "shortId",
+            "short-id",
+            "short_id",
+            "realityShortId",
+            "reality_short_id",
+        ) ?: ""
+        val fingerprint =
+            parsed.firstQueryParameter("fp", "fingerprint", "client-fingerprint", "client_fingerprint") ?: ""
         val rawSecurity = parsed.getQueryParameter("security") ?: defaultSecurity
         bean.security = if (publicKey.isNotBlank()) "reality" else rawSecurity.trim().lowercase()
-        bean.sni = parsed.firstQueryParameter("sni", "serverName", "servername", "server_name") ?: ""
+        bean.sni = parsed.firstQueryParameter("sni", "serverName", "servername", "server_name", "peer") ?: ""
         bean.alpn = parsed.getQueryParameter("alpn") ?: ""
-        bean.utlsFingerprint = parsed.getQueryParameter("fp") ?: ""
+        bean.utlsFingerprint = fingerprint
         bean.realityPublicKey = publicKey
         bean.realityShortId = shortId
-        bean.realityFingerprint = parsed.getQueryParameter("fp") ?: "chrome"
+        bean.realityFingerprint = fingerprint.ifBlank { "chrome" }
         bean.allowInsecure = listOf(
             "allowInsecure",
             "allow-insecure",
@@ -35,7 +46,7 @@ internal object V2RayFmtUtils {
     }
 
     fun parseTransportParams(bean: StandardV2RayBean, parsed: UriCompat) {
-        bean.type = mapTransportType(parsed.getQueryParameter("type") ?: "tcp")
+        bean.type = mapTransportType(parsed.firstQueryParameter("type", "network", "net") ?: "tcp")
         when (bean.type) {
             "ws", "httpupgrade" -> {
                 bean.host = parsed.getQueryParameter("host") ?: ""
@@ -47,14 +58,20 @@ internal object V2RayFmtUtils {
             }
             "grpc" -> {
                 bean.grpcServiceName =
-                    parsed.getQueryParameter("serviceName") ?: ""
+                    parsed.firstQueryParameter(
+                        "serviceName",
+                        "service-name",
+                        "service_name",
+                        "grpc-service-name",
+                        "grpc_service_name",
+                    ) ?: ""
             }
             "tcp" -> parseTcpParams(bean, parsed)
         }
     }
 
     fun parseTcpParams(bean: StandardV2RayBean, parsed: UriCompat) {
-        bean.headerType = parsed.getQueryParameter("headerType") ?: "none"
+        bean.headerType = parsed.firstQueryParameter("headerType", "header-type", "header_type") ?: "none"
         val host = parsed.getQueryParameter("host") ?: ""
         if (bean.headerType == "http") {
             bean.host = host
@@ -84,7 +101,7 @@ internal object V2RayFmtUtils {
         "1", "true", "yes" -> true
         else -> false
     }
-
-    private fun UriCompat.firstQueryParameter(vararg keys: String): String? =
-        keys.firstNotNullOfOrNull { getQueryParameter(it)?.takeIf(String::isNotBlank) }
 }
+
+internal fun UriCompat.firstQueryParameter(vararg keys: String): String? =
+    keys.firstNotNullOfOrNull { getQueryParameter(it)?.takeIf(String::isNotBlank) }

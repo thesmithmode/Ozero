@@ -17,7 +17,10 @@ import java.security.cert.CertificateException
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLException
 import javax.net.ssl.SSLHandshakeException
+import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLPeerUnverifiedException
+import javax.net.ssl.SSLSocket
+import javax.net.ssl.SSLSocketFactory
 
 fun interface SingboxRoutedProbe {
     suspend fun probeLatencyMs(socksPort: Int): Long
@@ -94,7 +97,7 @@ class SingboxHttp204RoutedProbe(
         val start = nanoTime()
         return runCatching {
             when (url.protocol.lowercase()) {
-                "https" -> false
+                "https" -> probeHttpsOverSocks(url, socksPort, remainingTimeoutMs, expectation)
                 "http" -> probeHttpOverSocks(url, socksPort, remainingTimeoutMs, expectation)
                 else -> false
             }
@@ -121,20 +124,48 @@ class SingboxHttp204RoutedProbe(
             val destinationPort = url.port.takeIf { it > 0 } ?: HTTP_PORT
             socket.connect(InetSocketAddress.createUnresolved(url.host, destinationPort), remainingTimeoutMs)
             socket.soTimeout = remainingTimeoutMs
-            val requestTarget = url.file.ifEmpty { "/" }
-            val hostHeader = if (destinationPort == HTTP_PORT) url.host else "${url.host}:$destinationPort"
-            val request = buildString {
-                append("GET $requestTarget HTTP/1.1\r\n")
-                append("Host: $hostHeader\r\n")
-                append("Accept: */*\r\n")
-                append("Connection: close\r\n\r\n")
-            }
-            socket.getOutputStream().apply {
-                write(request.toByteArray(StandardCharsets.US_ASCII))
-                flush()
-            }
+            writeHttpGet(socket, url, destinationPort, HTTP_PORT)
             val response = readRawHttpResponse(BufferedInputStream(socket.getInputStream())) ?: return@use false
-            expectation.matches(response.statusCode)
+            expectation.matches(response)
+        }
+    }
+
+    private fun probeHttpsOverSocks(
+        url: URL,
+        socksPort: Int,
+        remainingTimeoutMs: Int,
+        expectation: ResponseExpectation,
+    ): Boolean {
+        val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress(socksHost, socksPort))
+        Socket(proxy).use { tcpSocket ->
+            val destinationPort = url.port.takeIf { it > 0 } ?: HTTPS_PORT
+            tcpSocket.connect(InetSocketAddress.createUnresolved(url.host, destinationPort), remainingTimeoutMs)
+            tcpSocket.soTimeout = remainingTimeoutMs
+            val sslSocket = (SSLSocketFactory.getDefault() as SSLSocketFactory)
+                .createSocket(tcpSocket, url.host, destinationPort, true) as SSLSocket
+            sslSocket.use { socket ->
+                socket.soTimeout = remainingTimeoutMs
+                socket.startHandshake()
+                if (!HttpsURLConnection.getDefaultHostnameVerifier().verify(url.host, socket.session)) return false
+                writeHttpGet(socket, url, destinationPort, HTTPS_PORT)
+                val response = readRawHttpResponse(BufferedInputStream(socket.getInputStream())) ?: return false
+                return expectation.matches(response)
+            }
+        }
+    }
+
+    private fun writeHttpGet(socket: Socket, url: URL, destinationPort: Int, defaultPort: Int) {
+        val requestTarget = url.file.ifEmpty { "/" }
+        val hostHeader = if (destinationPort == defaultPort) url.host else "${url.host}:$destinationPort"
+        val request = buildString {
+            append("GET $requestTarget HTTP/1.1\r\n")
+            append("Host: $hostHeader\r\n")
+            append("Accept: */*\r\n")
+            append("Connection: close\r\n\r\n")
+        }
+        socket.getOutputStream().apply {
+            write(request.toByteArray(StandardCharsets.US_ASCII))
+            flush()
         }
     }
 
@@ -146,7 +177,7 @@ class SingboxHttp204RoutedProbe(
         repeat(MAX_HTTP_HEADER_LINES) {
             val line = input.readAsciiLine(MAX_HTTP_LINE_BYTES) ?: return null
             if (line.isEmpty()) {
-                return RawHttpResponse(statusCode)
+                return RawHttpResponse(statusCode, input.readBody(MAX_HTTP_BODY_BYTES))
             }
         }
         return null
@@ -165,6 +196,16 @@ class SingboxHttp204RoutedProbe(
             output.write(next)
         }
         return null
+    }
+
+    private fun BufferedInputStream.readBody(maxBytes: Int): String {
+        val output = ByteArrayOutputStream()
+        while (output.size() < maxBytes) {
+            val next = read()
+            if (next < 0) break
+            output.write(next)
+        }
+        return output.toString(StandardCharsets.UTF_8.name())
     }
 
     private fun responseExpectation(url: URL): ResponseExpectation? = when {
@@ -194,7 +235,11 @@ class SingboxHttp204RoutedProbe(
         MSFT_CONNECT_TEST,
         ;
 
-        fun matches(code: Int): Boolean = code in HTTP_SUCCESS_MIN..HTTP_REDIRECT_MAX
+        fun matches(response: RawHttpResponse): Boolean = when (this) {
+            NO_CONTENT -> response.statusCode == HTTP_NO_CONTENT
+            MSFT_CONNECT_TEST ->
+                response.statusCode == HTTP_OK && response.body.startsWith(MSFT_CONNECT_TEST_BODY)
+        }
     }
 
     private enum class ProbeFailure(val label: String) {
@@ -210,15 +255,15 @@ class SingboxHttp204RoutedProbe(
         UNEXPECTED_ERROR("unexpected-error"),
     }
 
-    private data class RawHttpResponse(val statusCode: Int)
+    private data class RawHttpResponse(val statusCode: Int, val body: String)
 
     private data class ProbeAttempt(val latencyMs: Long, val failure: ProbeFailure)
 
     companion object {
         private const val TAG = "SingboxRoutedProbe"
-        const val PROBE_URL = "http://www.gstatic.com/generate_204"
+        const val PROBE_URL = "https://www.gstatic.com/generate_204"
         val FALLBACK_PROBE_URLS = listOf(
-            "http://cp.cloudflare.com/generate_204",
+            "https://cp.cloudflare.com/generate_204",
             "http://www.msftconnecttest.com/connecttest.txt",
         )
         const val LATENCY_FAILED = -1L
@@ -228,11 +273,14 @@ class SingboxHttp204RoutedProbe(
         private const val GENERATE_204_PATH = "/generate_204"
         private const val MSFT_CONNECT_TEST_HOST = "www.msftconnecttest.com"
         private const val MSFT_CONNECT_TEST_PATH = "/connecttest.txt"
-        private const val HTTP_SUCCESS_MIN = 200
-        private const val HTTP_REDIRECT_MAX = 399
         private const val HTTP_PORT = 80
+        private const val HTTPS_PORT = 443
+        private const val HTTP_OK = 200
+        private const val HTTP_NO_CONTENT = 204
+        private const val MSFT_CONNECT_TEST_BODY = "Microsoft Connect Test"
         private const val MAX_HTTP_LINE_BYTES = 1_024
         private const val MAX_HTTP_HEADER_LINES = 64
+        private const val MAX_HTTP_BODY_BYTES = 256
         private const val MAX_CAUSE_DEPTH = 8
         private val SUPPORTED_HTTP_VERSIONS = setOf("HTTP/1.0", "HTTP/1.1")
     }

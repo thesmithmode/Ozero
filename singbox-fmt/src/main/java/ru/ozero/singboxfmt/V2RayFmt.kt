@@ -4,6 +4,7 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
 object V2RayFmt {
+    private val transportAliases = mapOf("h2" to "http", "xhttp" to "splithttp")
 
     fun parseVLESS(uri: String): VLESSBean {
         require(uri.startsWith("vless://")) { "Not a vless:// URI" }
@@ -33,15 +34,20 @@ object V2RayFmt {
     }
 
     private fun parseTransportParams(bean: VLESSBean, parsed: UriCompat) {
-        bean.type = V2RayFmtUtils.mapTransportType(
-            parsed.getQueryParameter("type") ?: "tcp",
-        )
+        val rawType = parsed.firstQueryParameter("type", "network", "net") ?: "tcp"
+        bean.type = transportAliases[rawType.trim().lowercase()] ?: V2RayFmtUtils.mapTransportType(rawType)
         when (bean.type) {
             "ws", "httpupgrade" -> parseWsParams(bean, parsed)
             "http" -> parseHttpParams(bean, parsed)
             "grpc" -> {
                 bean.grpcServiceName =
-                    parsed.getQueryParameter("serviceName") ?: ""
+                    parsed.firstQueryParameter(
+                        "serviceName",
+                        "service-name",
+                        "service_name",
+                        "grpc-service-name",
+                        "grpc_service_name",
+                    ) ?: ""
             }
             "splithttp" -> parseSplithttpParams(bean, parsed)
             "kcp", "mkcp" -> parseKcpParams(bean, parsed)
@@ -70,12 +76,12 @@ object V2RayFmt {
 
     private fun parseKcpParams(bean: VLESSBean, parsed: UriCompat) {
         bean.type = "kcp"
-        bean.headerType = parsed.getQueryParameter("headerType") ?: "none"
+        bean.headerType = parsed.firstQueryParameter("headerType", "header-type", "header_type") ?: "none"
         bean.mKcpSeed = parsed.getQueryParameter("seed") ?: ""
     }
 
     private fun parseQuicParams(bean: VLESSBean, parsed: UriCompat) {
-        bean.headerType = parsed.getQueryParameter("headerType") ?: "none"
+        bean.headerType = parsed.firstQueryParameter("headerType", "header-type", "header_type") ?: "none"
         bean.quicSecurity =
             parsed.getQueryParameter("quicSecurity") ?: "none"
         bean.quicKey = parsed.getQueryParameter("key") ?: ""

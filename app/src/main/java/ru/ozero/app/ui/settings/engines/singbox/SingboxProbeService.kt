@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
-import android.util.Log
+import ru.ozero.app.logging.PersistentLoggers
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
@@ -457,7 +457,7 @@ private class SingboxServiceProfileProbe(
 }
 private fun logRejectedProfile(profileId: Long, bean: AbstractBean, decision: BeanSupportDecision.Unsupported) {
     val standard = bean as? ru.ozero.singboxfmt.StandardV2RayBean
-    Log.w(
+    PersistentLoggers.warn(
         "SingboxProbeService",
         "singbox profile rejected id=$profileId protocol=${bean.protocolLabel()} " +
             "transport=${standard?.type.orEmpty()} security=${standard?.security.orEmpty()} " +

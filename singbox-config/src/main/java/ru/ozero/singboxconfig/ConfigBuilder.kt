@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package ru.ozero.singboxconfig
 
 import java.net.URI
@@ -10,11 +12,13 @@ import ru.ozero.singboxfmt.StandardV2RayBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxfmt.canonicalBeanOrSelf
 import ru.ozero.singboxfmt.hasRequiredOutboundCredentials
 
 private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
 private const val REALITY_PUBLIC_KEY_BYTES = 32
 private const val DNS_DOMAIN_RESOLVER_TAG = "dns-domain-resolver"
+private const val DNS_LOCAL_TAG = "dns-local"
 private val DNS_DOMAIN_RESOLVER_TYPES = setOf("https", "tls")
 private const val AUTO_SELECT_PROBE_URL = "http://www.gstatic.com/generate_204"
 
@@ -32,6 +36,14 @@ enum class BeanSupportError {
     UNSUPPORTED_ECH,
     UNSUPPORTED_MTLS,
     UNSUPPORTED_CERTIFICATE_PINNING,
+    MISSING_REALITY_SERVER_NAME,
+    UNSUPPORTED_VLESS_FLOW,
+    UNSUPPORTED_PACKET_ENCODING,
+    UNSUPPORTED_MUX,
+    UNSUPPORTED_BROWSER_FORWARDER,
+    UNSUPPORTED_REALITY_OPTIONS,
+    UNSUPPORTED_SHADOWSOCKS_PLUGIN,
+    UNSUPPORTED_CORE_FEATURE,
 }
 
 sealed interface BeanSupportDecision {
@@ -55,8 +67,9 @@ object ConfigBuilder {
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
-        require(isSupportedBean(bean)) { "Unsupported transport: ${(bean as? StandardV2RayBean)?.type}" }
-        val outbound = beanOutbound(bean, "proxy")
+        val canonical = bean.canonicalBeanOrSelf()
+        require(isSupportedBean(canonical)) { "Unsupported transport: ${(canonical as? StandardV2RayBean)?.type}" }
+        val outbound = beanOutbound(canonical, "proxy")
         return buildFullConfig(listOf(outbound), probeSocksPort, dnsServers, ipv6Enabled)
     }
 
@@ -88,7 +101,9 @@ object ConfigBuilder {
     fun isSupportedBean(bean: AbstractBean): Boolean =
         supportDecision(bean) is BeanSupportDecision.Supported
 
-    fun supportDecision(bean: AbstractBean): BeanSupportDecision {
+    fun supportDecision(bean: AbstractBean): BeanSupportDecision = supportDecisionCanonical(bean.canonicalBeanOrSelf())
+
+    private fun supportDecisionCanonical(bean: AbstractBean): BeanSupportDecision {
         if (bean.serverPort !in MIN_PORT..MAX_PORT) return unsupported(BeanSupportError.INVALID_PORT)
         if (!bean.hasRoutableServerAddress()) return unsupported(BeanSupportError.INVALID_SERVER)
         if (!bean.hasRequiredOutboundCredentials()) return unsupported(BeanSupportError.MISSING_CREDENTIALS)
@@ -96,7 +111,7 @@ object ConfigBuilder {
             is VLESSBean -> supportDecision(bean)
             is VMessBean -> supportDecision(bean)
             is TrojanBean -> supportDecision(bean)
-            is ShadowsocksBean -> BeanSupportDecision.Supported
+            is ShadowsocksBean -> supportDecision(bean)
             else -> unsupported(BeanSupportError.UNSUPPORTED_BEAN_TYPE)
         }
     }
@@ -106,6 +121,11 @@ object ConfigBuilder {
             BeanSupportError.UNSUPPORTED_TRANSPORT.takeIf { bean.type !in SUPPORTED_TRANSPORTS },
             BeanSupportError.UNSUPPORTED_TCP_HEADER.takeIf { bean.hasUnsupportedTcpHeader() },
             BeanSupportError.UNSUPPORTED_GRPC_MULTI_MODE.takeIf { bean.type == "grpc" && bean.grpcMultiMode },
+            BeanSupportError.MISSING_REALITY_SERVER_NAME.takeIf { bean.hasMissingRealityServerName() },
+            BeanSupportError.UNSUPPORTED_PACKET_ENCODING.takeIf { bean.hasUnsupportedPacketEncoding() },
+            BeanSupportError.UNSUPPORTED_MUX.takeIf { bean.hasUnsupportedMux() },
+            BeanSupportError.UNSUPPORTED_BROWSER_FORWARDER.takeIf { bean.hasBrowserForwarder() },
+            BeanSupportError.UNSUPPORTED_REALITY_OPTIONS.takeIf { bean.hasUnsupportedRealityOptions() },
             BeanSupportError.UNSUPPORTED_QUIC_SECURITY.takeIf { bean.hasUnsupportedQuicSecurity() },
             BeanSupportError.UNSUPPORTED_ECH.takeIf { bean.echEnabled || bean.echConfig.isNotBlank() },
             BeanSupportError.UNSUPPORTED_MTLS.takeIf { bean.hasMtls() },
@@ -115,6 +135,9 @@ object ConfigBuilder {
         ).firstOrNull()
         return error?.let(::unsupported) ?: BeanSupportDecision.Supported
     }
+
+    private fun supportDecision(bean: ShadowsocksBean): BeanSupportDecision =
+        bean.run { BeanSupportDecision.Supported }
 
     private fun unsupported(error: BeanSupportError): BeanSupportDecision.Unsupported =
         BeanSupportDecision.Unsupported(error)
@@ -357,6 +380,7 @@ object ConfigBuilder {
         val endpoints = normalized.map(DnsEndpoint::from)
         val needsDomainResolver = endpoints.any(DnsEndpoint::needsDomainResolver)
         val servers = buildList {
+            add("{\"type\":\"local\",\"tag\":\"$DNS_LOCAL_TAG\"}")
             endpoints.mapIndexedTo(this) { index, endpoint -> dnsServer(endpoint, "dns-$index", detour) }
             if (needsDomainResolver) add(dnsServer(DnsEndpoint.domainResolver(), DNS_DOMAIN_RESOLVER_TAG, detour))
         }.joinToString(",")
@@ -486,6 +510,21 @@ private fun StandardV2RayBean.hasUnsupportedTcpHeader(): Boolean =
 
 private fun StandardV2RayBean.hasUnsupportedQuicSecurity(): Boolean =
     type == "quic" && quicSecurity !in setOf("", "none")
+
+private fun StandardV2RayBean.hasMissingRealityServerName(): Boolean =
+    security == "reality" && serverAddress.trim().trim('[', ']').isIpAddressForSni() && sni.isBlank() && host.isBlank()
+
+private fun StandardV2RayBean.hasUnsupportedPacketEncoding(): Boolean =
+    packetEncoding.trim().lowercase() !in setOf("", "none", "xudp", "packetaddr")
+
+private fun StandardV2RayBean.hasUnsupportedMux(): Boolean =
+    mux || singMux
+
+private fun StandardV2RayBean.hasBrowserForwarder(): Boolean =
+    wsUseBrowserForwarder || shUseBrowserForwarder
+
+private fun StandardV2RayBean.hasUnsupportedRealityOptions(): Boolean =
+    security == "reality" && realityDisableX25519Mlkem768
 
 private fun StandardV2RayBean.hasMtls(): Boolean =
     mtlsCertificate.isNotBlank() || mtlsCertificatePrivateKey.isNotBlank()
