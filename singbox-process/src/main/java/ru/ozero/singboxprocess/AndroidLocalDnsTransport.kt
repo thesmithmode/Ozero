@@ -66,14 +66,14 @@ internal class AndroidLocalDnsTransport(
         val cancellation = CancellationSignal()
         context.onCancel(Func { cancellation.cancel() })
         runBlocking {
-            awaitDnsCallback(
+            awaitDnsCallback<Collection<InetAddress>>(
                 start = { callback ->
-                    val type = when {
+                    val queryType = when {
                         network.endsWith('4') -> DnsResolver.TYPE_A
                         network.endsWith('6') -> DnsResolver.TYPE_AAAA
                         else -> null
                     }
-                    if (type == null) {
+                    if (queryType == null) {
                         DnsResolver.getInstance().query(
                             physicalNetwork,
                             domain,
@@ -86,8 +86,7 @@ internal class AndroidLocalDnsTransport(
                         DnsResolver.getInstance().query(
                             physicalNetwork,
                             domain,
-                            DnsResolver.CLASS_IN,
-                            type,
+                            queryType,
                             DnsResolver.FLAG_NO_RETRY,
                             IO_EXECUTOR,
                             cancellation,
@@ -97,7 +96,11 @@ internal class AndroidLocalDnsTransport(
                 },
                 onAnswer = { answer, rcode ->
                     if (rcode == RCODE_SUCCESS) {
-                        context.success(answer.filterNetwork(network).joinToString("\n") { it.hostAddress.orEmpty() })
+                        context.success(
+                            answer
+                                .filterNetwork(network)
+                                .joinToString("\n") { it.hostAddress.orEmpty() },
+                        )
                     } else {
                         context.errorCode(rcode)
                     }
@@ -111,7 +114,9 @@ internal class AndroidLocalDnsTransport(
         context.success(addresses.filterNetwork(network).joinToString("\n") { it.hostAddress.orEmpty() })
     }
 
-    private fun List<InetAddress>.filterNetwork(network: String): List<InetAddress> = when (network.lowercase()) {
+    private fun Collection<InetAddress>.filterNetwork(
+        network: String,
+    ): Collection<InetAddress> = when (network.lowercase()) {
         "ip4", "ipv4" -> filterIsInstance<Inet4Address>()
         "ip6", "ipv6" -> filterIsInstance<Inet6Address>()
         else -> this
@@ -124,7 +129,7 @@ internal class AndroidLocalDnsTransport(
     }
 }
 
-internal suspend fun <T> awaitDnsCallback(
+internal suspend fun <T : Any> awaitDnsCallback(
     start: (DnsResolver.Callback<T>) -> Unit,
     onAnswer: (T, Int) -> Unit,
     onErrno: (Int) -> Unit,
