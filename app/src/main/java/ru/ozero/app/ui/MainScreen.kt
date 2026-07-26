@@ -165,9 +165,10 @@ fun MainScreen(
 }
 
 internal fun boundedMainScreenFontScale(fontScale: Float): Float =
-    fontScale.coerceAtMost(MAX_MAIN_SCREEN_FONT_SCALE)
+    fontScale.coerceAtMost(MAX_FIXED_DASHBOARD_FONT_SCALE)
 
-private const val MAX_MAIN_SCREEN_FONT_SCALE = 1.3f
+// Highest scale that keeps every fixed dashboard section visible on a compact 720dp viewport.
+private const val MAX_FIXED_DASHBOARD_FONT_SCALE = 1.3f
 
 data class SimpleMainState(
     val tunnelState: TunnelState,
