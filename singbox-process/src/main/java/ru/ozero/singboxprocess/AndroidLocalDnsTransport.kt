@@ -9,10 +9,15 @@ import io.nekohasekai.libbox.Func
 import io.nekohasekai.libbox.LocalDNSTransport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
+import kotlinx.coroutines.runBlocking
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.UnknownHostException
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 
 internal class AndroidLocalDnsTransport(
     private val defaultInterfaceMonitor: DefaultInterfaceMonitor,
@@ -26,20 +31,24 @@ internal class AndroidLocalDnsTransport(
         }
         val cancellation = CancellationSignal()
         context.onCancel(Func { cancellation.cancel() })
-        DnsResolver.getInstance().rawQuery(
-            network,
-            message,
-            DnsResolver.FLAG_NO_RETRY,
-            IO_EXECUTOR,
-            cancellation,
-            object : DnsResolver.Callback<ByteArray> {
-                override fun onAnswer(answer: ByteArray, rcode: Int) {
+        runBlocking {
+            awaitDnsCallback(
+                start = { callback ->
+                    DnsResolver.getInstance().rawQuery(
+                        network,
+                        message,
+                        DnsResolver.FLAG_NO_RETRY,
+                        IO_EXECUTOR,
+                        cancellation,
+                        callback,
+                    )
+                },
+                onAnswer = { answer, rcode ->
                     if (rcode == RCODE_SUCCESS) context.rawSuccess(answer) else context.errorCode(rcode)
-                }
-
-                override fun onError(error: DnsResolver.DnsException) = context.report(error)
-            },
-        )
+                },
+                onErrno = context::errnoCode,
+            )
+        }
     }
 
     override fun lookup(context: ExchangeContext, network: String, domain: String) {
@@ -56,33 +65,50 @@ internal class AndroidLocalDnsTransport(
         }
         val cancellation = CancellationSignal()
         context.onCancel(Func { cancellation.cancel() })
-        DnsResolver.getInstance().query(
-            physicalNetwork,
-            domain,
-            DnsResolver.FLAG_NO_RETRY,
-            IO_EXECUTOR,
-            cancellation,
-            object : DnsResolver.Callback<List<InetAddress>> {
-                override fun onAnswer(answer: List<InetAddress>, rcode: Int) {
-                    if (rcode != RCODE_SUCCESS) {
-                        context.errorCode(rcode)
-                        return
+        runBlocking {
+            awaitDnsCallback(
+                start = { callback ->
+                    val type = when {
+                        network.endsWith('4') -> DnsResolver.TYPE_A
+                        network.endsWith('6') -> DnsResolver.TYPE_AAAA
+                        else -> null
                     }
-                    context.success(answer.filterNetwork(network).joinToString("\n") { it.hostAddress.orEmpty() })
-                }
-
-                override fun onError(error: DnsResolver.DnsException) = context.report(error)
-            },
-        )
+                    if (type == null) {
+                        DnsResolver.getInstance().query(
+                            physicalNetwork,
+                            domain,
+                            DnsResolver.FLAG_NO_RETRY,
+                            IO_EXECUTOR,
+                            cancellation,
+                            callback,
+                        )
+                    } else {
+                        DnsResolver.getInstance().query(
+                            physicalNetwork,
+                            domain,
+                            DnsResolver.CLASS_IN,
+                            type,
+                            DnsResolver.FLAG_NO_RETRY,
+                            IO_EXECUTOR,
+                            cancellation,
+                            callback,
+                        )
+                    }
+                },
+                onAnswer = { answer, rcode ->
+                    if (rcode == RCODE_SUCCESS) {
+                        context.success(answer.filterNetwork(network).joinToString("\n") { it.hostAddress.orEmpty() })
+                    } else {
+                        context.errorCode(rcode)
+                    }
+                },
+                onErrno = context::errnoCode,
+            )
+        }
     }
 
     private fun lookupLegacy(context: ExchangeContext, addresses: List<InetAddress>, network: String) {
         context.success(addresses.filterNetwork(network).joinToString("\n") { it.hostAddress.orEmpty() })
-    }
-
-    private fun ExchangeContext.report(error: DnsResolver.DnsException) {
-        val cause = error.cause
-        if (cause is ErrnoException) errnoCode(cause.errno) else errorCode(error.code)
     }
 
     private fun List<InetAddress>.filterNetwork(network: String): List<InetAddress> = when (network.lowercase()) {
@@ -96,4 +122,37 @@ internal class AndroidLocalDnsTransport(
         const val RCODE_NXDOMAIN = 3
         val IO_EXECUTOR = Dispatchers.IO.asExecutor()
     }
+}
+
+internal suspend fun <T> awaitDnsCallback(
+    start: (DnsResolver.Callback<T>) -> Unit,
+    onAnswer: (T, Int) -> Unit,
+    onErrno: (Int) -> Unit,
+) = suspendCoroutine { continuation ->
+    val completed = AtomicBoolean(false)
+    fun complete(action: () -> Unit) {
+        if (!completed.compareAndSet(false, true)) return
+        try {
+            action()
+            continuation.resume(Unit)
+        } catch (error: Throwable) {
+            continuation.resumeWithException(error)
+        }
+    }
+    start(
+        object : DnsResolver.Callback<T> {
+            override fun onAnswer(answer: T, rcode: Int) {
+                complete { onAnswer(answer, rcode) }
+            }
+
+            override fun onError(error: DnsResolver.DnsException) {
+                val cause = error.cause
+                if (cause is ErrnoException) {
+                    complete { onErrno(cause.errno) }
+                } else {
+                    complete { throw error }
+                }
+            }
+        },
+    )
 }

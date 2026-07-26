@@ -468,19 +468,19 @@ class SingboxEngine @Inject constructor(
             clearRuntimeState()
             return ProbeResult.Failure("sing-box SOCKS5 listener is unavailable")
         }
-        val latency = routedProbe.probeLatencyMs(port)
-        return if (latency >= 0) {
-            ProbeResult.Success(latencyMs = latency)
-        } else {
-            PersistentLoggers.warn(
-                TAG,
-                "probe failed: routed probe returned $latency port=$port " +
-                    "chainMode=$chainMode runtimeRunning=$runtimeRunning",
-            )
-            ProbeResult.Failure(
-                "sing-box routed probe failed",
-                code = ProbeResult.Failure.Code.ROUTED_PROBE_FAILED,
-            )
+        return when (val result = routedProbe.probe(port)) {
+            is RoutedProbeResult.Success -> ProbeResult.Success(latencyMs = result.latencyMs)
+            is RoutedProbeResult.Failure -> {
+                PersistentLoggers.warn(
+                    TAG,
+                    "probe failed: reason=${result.reason} port=$port " +
+                        "chainMode=$chainMode runtimeRunning=$runtimeRunning",
+                )
+                ProbeResult.Failure(
+                    result.reason.probeFailureMessage(),
+                    code = ProbeResult.Failure.Code.ROUTED_PROBE_FAILED,
+                )
+            }
         }
     }
 
@@ -496,10 +496,7 @@ class SingboxEngine @Inject constructor(
             clearRuntimeState()
             return EnginePlugin.ReadyResult.Timeout("sing-box SOCKS5 listener is not ready")
         }
-        return when (val result = routedProbe.probe(port)) {
-            is RoutedProbeResult.Success -> EnginePlugin.ReadyResult.Ready
-            is RoutedProbeResult.Failure -> EnginePlugin.ReadyResult.Timeout(result.reason.readinessMessage())
-        }
+        return EnginePlugin.ReadyResult.Ready
     }
 
     private suspend fun awaitLocalSocksReady(port: Int): Boolean {
@@ -854,7 +851,7 @@ class SingboxEngine @Inject constructor(
     }
 }
 
-private fun RoutedProbeResult.Reason.readinessMessage(): String = when (this) {
+private fun RoutedProbeResult.Reason.probeFailureMessage(): String = when (this) {
     RoutedProbeResult.Reason.DNS -> "sing-box outbound DNS failed"
     RoutedProbeResult.Reason.CONNECT -> "sing-box outbound connect failed"
     RoutedProbeResult.Reason.TLS_CERTIFICATE -> "sing-box TLS certificate verification failed"

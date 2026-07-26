@@ -56,11 +56,8 @@ internal class DefaultInterfaceMonitor(private val connectivity: ConnectivityMan
         publish(callbackNetwork = null, listener, callback)
     }
 
-    fun currentPhysicalNetwork(): Network? {
-        val current = lastPhysicalNetwork
-        if (current != null && current.isEligiblePhysical(connectivity)) return current
-        return selectPhysicalNetwork(callbackNetwork = null).also { lastPhysicalNetwork = it }
-    }
+    fun currentPhysicalNetwork(): Network? =
+        selectPhysicalNetwork(callbackNetwork = null).also { lastPhysicalNetwork = it }
 
     fun close(listener: InterfaceUpdateListener) {
         callbacks.remove(listener)?.let { callback ->

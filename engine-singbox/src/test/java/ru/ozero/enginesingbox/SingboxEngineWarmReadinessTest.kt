@@ -50,7 +50,7 @@ class SingboxEngineWarmReadinessTest {
     }
 
     @Test
-    fun `proxy mode auto select waits for routed probe when runtime is available`() = runTest {
+    fun `proxy mode auto select readiness ignores routed probe when runtime is available`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
         val process = mockk<ISingboxEngineProcess>()
@@ -77,7 +77,7 @@ class SingboxEngineWarmReadinessTest {
 
             val ready = engine.awaitReady()
 
-            assertIs<EnginePlugin.ReadyResult.Timeout>(ready)
+            assertIs<EnginePlugin.ReadyResult.Ready>(ready)
             assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
             assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
         }
