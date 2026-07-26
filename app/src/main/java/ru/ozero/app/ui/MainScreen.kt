@@ -30,6 +30,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -51,6 +52,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
@@ -98,62 +100,75 @@ fun MainScreen(
     val powerState by viewModel.powerDiscState.collectAsStateWithLifecycle()
     val backgroundState = powerState.toBackgroundState()
     val isConnected = state is TunnelState.Connected
+    val systemDensity = LocalDensity.current
+    val mainScreenDensity = Density(
+        density = systemDensity.density,
+        fontScale = boundedMainScreenFontScale(systemDensity.fontScale),
+    )
 
     OzeroBackground(state = backgroundState) {
-        AnimatedContent(
-            targetState = appMode,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
-            label = "mode_switch",
-        ) { mode ->
-            when (mode) {
-                AppMode.SIMPLE -> SimpleMainContent(
-                    state = SimpleMainState(
-                        tunnelState = state,
-                        switching = switching,
-                        powerState = powerState,
-                        isConnected = isConnected,
-                        manualEngine = manualEngine,
-                        urnetworkPeerCount = urnetworkPeerCount,
-                        urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
-                        isReconnecting = isReconnecting,
-                    ),
-                    callbacks = SimpleMainCallbacks(
-                        onConnectClick = onConnectClick,
-                        onOpenSplitTunnel = onOpenSplitTunnel,
-                        onOpenSettings = onOpenSettings,
-                    ),
-                )
-                AppMode.EXPERT -> ExpertMainContent(
-                    state = ExpertMainState(
-                        tunnelState = state,
-                        switching = switching,
-                        stats = stats,
-                        speedHistory = speedHistory,
-                        stagnant = stagnant,
-                        healthStatus = healthStatus,
-                        powerState = powerState,
-                        isConnected = isConnected,
-                        manualEngine = manualEngine,
-                        engineAutoPriority = engineAutoPriority,
-                        urnetworkPeerCount = urnetworkPeerCount,
-                        urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
-                        ipInfo = ipInfo,
-                        killswitchActive = killswitchActive,
-                        isReconnecting = isReconnecting,
-                    ),
-                    callbacks = ExpertMainCallbacks(
-                        onConnectClick = onConnectClick,
-                        onManualEngineSelect = viewModel::onManualEngineSelect,
-                        onRefreshIpInfo = viewModel::refreshIpInfo,
-                        onOpenEngineParams = onOpenEngineParams,
-                        onOpenSplitTunnel = onOpenSplitTunnel,
-                        onOpenSettings = onOpenSettings,
-                    ),
-                )
+        CompositionLocalProvider(LocalDensity provides mainScreenDensity) {
+            AnimatedContent(
+                targetState = appMode,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "mode_switch",
+            ) { mode ->
+                when (mode) {
+                    AppMode.SIMPLE -> SimpleMainContent(
+                        state = SimpleMainState(
+                            tunnelState = state,
+                            switching = switching,
+                            powerState = powerState,
+                            isConnected = isConnected,
+                            manualEngine = manualEngine,
+                            urnetworkPeerCount = urnetworkPeerCount,
+                            urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                            isReconnecting = isReconnecting,
+                        ),
+                        callbacks = SimpleMainCallbacks(
+                            onConnectClick = onConnectClick,
+                            onOpenSplitTunnel = onOpenSplitTunnel,
+                            onOpenSettings = onOpenSettings,
+                        ),
+                    )
+                    AppMode.EXPERT -> ExpertMainContent(
+                        state = ExpertMainState(
+                            tunnelState = state,
+                            switching = switching,
+                            stats = stats,
+                            speedHistory = speedHistory,
+                            stagnant = stagnant,
+                            healthStatus = healthStatus,
+                            powerState = powerState,
+                            isConnected = isConnected,
+                            manualEngine = manualEngine,
+                            engineAutoPriority = engineAutoPriority,
+                            urnetworkPeerCount = urnetworkPeerCount,
+                            urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                            ipInfo = ipInfo,
+                            killswitchActive = killswitchActive,
+                            isReconnecting = isReconnecting,
+                        ),
+                        callbacks = ExpertMainCallbacks(
+                            onConnectClick = onConnectClick,
+                            onManualEngineSelect = viewModel::onManualEngineSelect,
+                            onRefreshIpInfo = viewModel::refreshIpInfo,
+                            onOpenEngineParams = onOpenEngineParams,
+                            onOpenSplitTunnel = onOpenSplitTunnel,
+                            onOpenSettings = onOpenSettings,
+                        ),
+                    )
+                }
             }
         }
     }
 }
+
+internal fun boundedMainScreenFontScale(fontScale: Float): Float =
+    fontScale.coerceAtMost(MAX_FIXED_DASHBOARD_FONT_SCALE)
+
+// Highest scale that keeps every fixed dashboard section visible on a compact 720dp viewport.
+private const val MAX_FIXED_DASHBOARD_FONT_SCALE = 1.3f
 
 data class SimpleMainState(
     val tunnelState: TunnelState,
