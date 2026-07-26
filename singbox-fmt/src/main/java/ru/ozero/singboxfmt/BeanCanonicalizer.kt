@@ -6,17 +6,21 @@ sealed interface CanonicalizationResult {
 }
 
 object BeanCanonicalizer {
-    fun canonicalize(bean: AbstractBean): CanonicalizationResult = runCatching {
+    fun canonicalizeOrError(bean: AbstractBean): CanonicalizationResult = runCatching {
         val copy = KryoSerializer.copy(bean)
         copy.applyCanonicalDefaults()
         CanonicalizationResult.Canonical(copy)
     }.getOrElse { error -> CanonicalizationResult.Rejected(error.javaClass.simpleName) }
+
+    fun canonicalize(bean: AbstractBean): CanonicalizationResult = canonicalizeOrError(bean)
 }
 
-fun AbstractBean.canonicalBeanOrSelf(): AbstractBean =
-    when (val result = BeanCanonicalizer.canonicalize(this)) {
+fun AbstractBean.canonicalBeanOrThrow(): AbstractBean =
+    when (val result = BeanCanonicalizer.canonicalizeOrError(this)) {
         is CanonicalizationResult.Canonical -> result.bean
-        is CanonicalizationResult.Rejected -> this
+        is CanonicalizationResult.Rejected -> throw IllegalArgumentException(
+            "Bean canonicalization failed: ${result.reason}",
+        )
     }
 
 fun AbstractBean.applyCanonicalDefaults(): AbstractBean {

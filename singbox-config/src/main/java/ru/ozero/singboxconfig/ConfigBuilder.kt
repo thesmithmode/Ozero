@@ -12,12 +12,13 @@ import ru.ozero.singboxfmt.StandardV2RayBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
-import ru.ozero.singboxfmt.canonicalBeanOrSelf
+import ru.ozero.singboxfmt.BeanCanonicalizer
+import ru.ozero.singboxfmt.CanonicalizationResult
+import ru.ozero.singboxfmt.canonicalBeanOrThrow
 import ru.ozero.singboxfmt.hasRequiredOutboundCredentials
 
 private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
 private const val REALITY_PUBLIC_KEY_BYTES = 32
-private const val DNS_DOMAIN_RESOLVER_TAG = "dns-domain-resolver"
 private const val DNS_LOCAL_TAG = "dns-local"
 private val DNS_DOMAIN_RESOLVER_TYPES = setOf("https", "tls")
 private const val AUTO_SELECT_PROBE_URL = "http://www.gstatic.com/generate_204"
@@ -67,7 +68,7 @@ object ConfigBuilder {
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
-        val canonical = bean.canonicalBeanOrSelf()
+        val canonical = bean.canonicalBeanOrThrow()
         require(isSupportedBean(canonical)) { "Unsupported transport: ${(canonical as? StandardV2RayBean)?.type}" }
         val outbound = beanOutbound(canonical, "proxy")
         return buildFullConfig(listOf(outbound), probeSocksPort, dnsServers, ipv6Enabled)
@@ -79,7 +80,7 @@ object ConfigBuilder {
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
-        val supported = beans.filter { isSupportedBean(it) }
+        val supported = beans.map(AbstractBean::canonicalBeanOrThrow).filter { isSupportedBean(it) }
         require(supported.size <= MAX_AUTO_OUTBOUNDS) { "auto-select supports at most $MAX_AUTO_OUTBOUNDS outbounds" }
         require(supported.isNotEmpty()) { "no beans with supported transport types" }
         val proxyOutbounds = supported.mapIndexed { index, bean -> beanOutbound(bean, "proxy-$index") }
@@ -101,7 +102,11 @@ object ConfigBuilder {
     fun isSupportedBean(bean: AbstractBean): Boolean =
         supportDecision(bean) is BeanSupportDecision.Supported
 
-    fun supportDecision(bean: AbstractBean): BeanSupportDecision = supportDecisionCanonical(bean.canonicalBeanOrSelf())
+    fun supportDecision(bean: AbstractBean): BeanSupportDecision =
+        when (val canonical = BeanCanonicalizer.canonicalizeOrError(bean)) {
+            is CanonicalizationResult.Canonical -> supportDecisionCanonical(canonical.bean)
+            is CanonicalizationResult.Rejected -> unsupported(BeanSupportError.UNSUPPORTED_CORE_FEATURE)
+        }
 
     private fun supportDecisionCanonical(bean: AbstractBean): BeanSupportDecision {
         if (bean.serverPort !in MIN_PORT..MAX_PORT) return unsupported(BeanSupportError.INVALID_PORT)
@@ -118,6 +123,9 @@ object ConfigBuilder {
 
     private fun supportDecision(bean: StandardV2RayBean): BeanSupportDecision {
         val error = listOfNotNull(
+            BeanSupportError.UNSUPPORTED_VLESS_FLOW.takeIf {
+                bean is VLESSBean && normalizeVlessFlow(bean.flow) == null
+            },
             BeanSupportError.UNSUPPORTED_TRANSPORT.takeIf { bean.type !in SUPPORTED_TRANSPORTS },
             BeanSupportError.UNSUPPORTED_TCP_HEADER.takeIf { bean.hasUnsupportedTcpHeader() },
             BeanSupportError.UNSUPPORTED_GRPC_MULTI_MODE.takeIf { bean.type == "grpc" && bean.grpcMultiMode },
@@ -136,8 +144,11 @@ object ConfigBuilder {
         return error?.let(::unsupported) ?: BeanSupportDecision.Supported
     }
 
-    private fun supportDecision(bean: ShadowsocksBean): BeanSupportDecision =
-        bean.run { BeanSupportDecision.Supported }
+    private fun supportDecision(bean: ShadowsocksBean): BeanSupportDecision = when {
+        bean.plugin.isNotBlank() || bean.pluginOpts.isNotBlank() ->
+            unsupported(BeanSupportError.UNSUPPORTED_SHADOWSOCKS_PLUGIN)
+        else -> BeanSupportDecision.Supported
+    }
 
     private fun unsupported(error: BeanSupportError): BeanSupportDecision.Unsupported =
         BeanSupportDecision.Unsupported(error)
@@ -149,8 +160,9 @@ object ConfigBuilder {
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
-        require(isSupportedBean(bean)) { "Unsupported transport: ${(bean as? StandardV2RayBean)?.type}" }
-        val outbound = beanOutbound(bean, "proxy", detour = upstream?.let { "upstream" })
+        val canonical = bean.canonicalBeanOrThrow()
+        require(isSupportedBean(canonical)) { "Unsupported transport: ${(canonical as? StandardV2RayBean)?.type}" }
+        val outbound = beanOutbound(canonical, "proxy", detour = upstream?.let { "upstream" })
         return buildChainFullConfig(socksPort, listOf(outbound), upstream, dnsServers, ipv6Enabled)
     }
 
@@ -162,7 +174,7 @@ object ConfigBuilder {
         ipv6Enabled: Boolean = true,
     ): String {
         require(beans.isNotEmpty()) { "beans must not be empty for auto-select chain config" }
-        val supported = beans.filter { isSupportedBean(it) }
+        val supported = beans.map(AbstractBean::canonicalBeanOrThrow).filter { isSupportedBean(it) }
         require(supported.size <= MAX_AUTO_OUTBOUNDS) { "auto-select supports at most $MAX_AUTO_OUTBOUNDS outbounds" }
         require(supported.isNotEmpty()) { "no beans with supported transport types" }
         val detourTag = upstream?.let { "upstream" }
@@ -191,18 +203,19 @@ object ConfigBuilder {
         require(targets.map { it.socksPort }.distinct().size == targets.size) {
             "probe socks ports must be unique"
         }
-        targets.forEach { target ->
+        val canonicalTargets = targets.map { it.copy(bean = it.bean.canonicalBeanOrThrow()) }
+        canonicalTargets.forEach { target ->
             require(target.socksPort in MIN_PORT..MAX_PORT) { "invalid probe socks port" }
             require(isSupportedBean(target.bean)) { "unsupported probe target" }
         }
 
-        val inbounds = targets.mapIndexed { index, target ->
+        val inbounds = canonicalTargets.mapIndexed { index, target ->
             socksInbound(target.socksPort, "probe-in-$index")
         }
-        val outbounds = targets.mapIndexed { index, target ->
+        val outbounds = canonicalTargets.mapIndexed { index, target ->
             beanOutbound(target.bean, "probe-out-$index")
         }
-        val routeRules = targets.indices.map { index ->
+        val routeRules = canonicalTargets.indices.map { index ->
             """{"inbound":["probe-in-$index"],"outbound":"probe-out-$index"}"""
         }
         return buildProbeFullConfig(inbounds, outbounds, routeRules, dnsServers, ipv6Enabled)
@@ -255,14 +268,16 @@ object ConfigBuilder {
         selected: AbstractBean,
         wrappers: List<AbstractBean>,
     ): List<String> {
-        require(isSupportedBean(selected)) { "Unsupported selected transport" }
-        val supportedWrappers = wrappers.filter { isSupportedBean(it) }
+        val canonicalSelected = selected.canonicalBeanOrThrow()
+        val supportedWrappers = wrappers.map(AbstractBean::canonicalBeanOrThrow)
+        require(isSupportedBean(canonicalSelected)) { "Unsupported selected transport" }
+        require(supportedWrappers.all(::isSupportedBean)) { "Unsupported wrapper transport" }
         val wrapperOutbounds = supportedWrappers.mapIndexed { index, bean ->
             val detour = if (index == 0) null else "chain-${index - 1}"
             beanOutbound(bean, "chain-$index", detour)
         }
         val selectedDetour = supportedWrappers.lastIndex.takeIf { it >= 0 }?.let { "chain-$it" }
-        val selectedOutbound = beanOutbound(selected, "proxy", selectedDetour)
+        val selectedOutbound = beanOutbound(canonicalSelected, "proxy", selectedDetour)
         return wrapperOutbounds + selectedOutbound
     }
 
@@ -298,9 +313,9 @@ object ConfigBuilder {
         sb.append(""",{"type":"direct","tag":"direct"}""")
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
-        sb.append(dnsConfig(dnsServers, detour = null, ipv6Enabled = ipv6Enabled))
+        sb.append(dnsConfig(dnsServers, detour = "proxy", ipv6Enabled = ipv6Enabled))
         sb.append(""""route":{""")
-        sb.append(""""default_domain_resolver":"dns-0",""")
+        sb.append(""""default_domain_resolver":"$DNS_LOCAL_TAG",""")
         sb.append(""""final":"proxy",""")
         sb.append(""""auto_detect_interface":true,""")
         sb.append(""""rules":[{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}]""")
@@ -334,9 +349,9 @@ object ConfigBuilder {
         sb.append(""",{"type":"direct","tag":"direct"}""")
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
-        sb.append(dnsConfig(dnsServers, detour = upstream?.let { "upstream" }, ipv6Enabled = ipv6Enabled))
+        sb.append(dnsConfig(dnsServers, detour = "proxy", ipv6Enabled = ipv6Enabled))
         sb.append(""""route":{""")
-        sb.append(""""default_domain_resolver":"dns-0",""")
+        sb.append(""""default_domain_resolver":"$DNS_LOCAL_TAG",""")
         sb.append(""""final":"proxy",""")
         sb.append(""""auto_detect_interface":true,""")
         sb.append(""""rules":[{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}]""")
@@ -364,7 +379,7 @@ object ConfigBuilder {
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
         sb.append(dnsConfig(dnsServers, detour = null, ipv6Enabled = ipv6Enabled))
-        sb.append(""""route":{"default_domain_resolver":"dns-0",""")
+        sb.append(""""route":{"default_domain_resolver":"$DNS_LOCAL_TAG",""")
         sb.append(""""final":"block","auto_detect_interface":true,"rules":[""")
         sb.append("""{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}""")
         routeRules.forEach { rule ->
@@ -378,13 +393,12 @@ object ConfigBuilder {
     private fun dnsConfig(dnsServers: List<String>, detour: String?, ipv6Enabled: Boolean): String {
         val normalized = normalizeDnsServers(dnsServers, ipv6Enabled)
         val endpoints = normalized.map(DnsEndpoint::from)
-        val needsDomainResolver = endpoints.any(DnsEndpoint::needsDomainResolver)
+        val finalTag = endpoints.indices.firstOrNull()?.let { "dns-$it" } ?: DNS_LOCAL_TAG
         val servers = buildList {
             add("{\"type\":\"local\",\"tag\":\"$DNS_LOCAL_TAG\"}")
             endpoints.mapIndexedTo(this) { index, endpoint -> dnsServer(endpoint, "dns-$index", detour) }
-            if (needsDomainResolver) add(dnsServer(DnsEndpoint.domainResolver(), DNS_DOMAIN_RESOLVER_TAG, detour))
         }.joinToString(",")
-        return "\"dns\":{\"servers\":[$servers]},"
+        return "\"dns\":{\"servers\":[$servers],\"final\":${jsonString(finalTag)}},"
     }
 
     private fun normalizeDnsServers(dnsServers: List<String>, ipv6Enabled: Boolean): List<String> =
@@ -393,7 +407,7 @@ object ConfigBuilder {
             .filter { it.isNotEmpty() }
             .filter { it.isValidDnsServer() }
             .filter { ipv6Enabled || !it.isPlainIpv6Dns() }
-            .ifEmpty { EngineConfig.Singbox.DEFAULT_DNS_SERVERS }
+            .ifEmpty { emptyList() }
 
     private fun String.isPlainIpv6Dns(): Boolean = ':' in this && !startsWith("https://") && !startsWith("tls://")
 
@@ -421,7 +435,7 @@ object ConfigBuilder {
         append("\"server\":${jsonString(endpoint.server)}")
         endpoint.serverPort?.let { append(",\"server_port\":$it") }
         endpoint.path?.let { append(",\"path\":${jsonString(it)}") }
-        if (endpoint.needsDomainResolver()) append(",\"domain_resolver\":${jsonString(DNS_DOMAIN_RESOLVER_TAG)}")
+        if (endpoint.needsDomainResolver()) append(",\"domain_resolver\":${jsonString(DNS_LOCAL_TAG)}")
         detour?.let { append(",\"detour\":${jsonString(it)}") }
         append('}')
     }
@@ -431,13 +445,6 @@ object ConfigBuilder {
             type in DNS_DOMAIN_RESOLVER_TYPES && server.isDnsHostname()
 
         companion object {
-            fun domainResolver(): DnsEndpoint = DnsEndpoint(
-                "udp",
-                EngineConfig.Singbox.DEFAULT_DNS_SERVERS.first(),
-                null,
-                null,
-            )
-
             fun from(server: String): DnsEndpoint = when {
                 server.startsWith("https://") -> fromUri(server, "https")
                 server.startsWith("tls://") -> fromUri(server, "tls")
@@ -561,7 +568,7 @@ private fun vlessOutbound(bean: VLESSBean, tag: String, detour: String? = null):
     sb.append(""""server":${jsonString(bean.serverAddress)},""")
     sb.append(""""server_port":${bean.serverPort},""")
     sb.append(""""uuid":${jsonString(bean.uuid)},""")
-    val flow = normalizeVlessFlow(bean.flow)
+    val flow = requireNotNull(normalizeVlessFlow(bean.flow)) { "Unsupported VLESS flow" }
     if (flow.isNotEmpty()) {
         sb.append(""""flow":${jsonString(flow)},""")
     }
@@ -581,11 +588,10 @@ private fun vlessOutbound(bean: VLESSBean, tag: String, detour: String? = null):
     return sb.toString()
 }
 
-private fun normalizeVlessFlow(flow: String): String = when {
-    flow.isBlank() -> ""
-    flow == VLESS_FLOW_XTLS_VISION -> flow
-    flow.startsWith("$VLESS_FLOW_XTLS_VISION-") -> VLESS_FLOW_XTLS_VISION
-    else -> ""
+private fun normalizeVlessFlow(flow: String): String? = when (val normalized = flow.trim().lowercase()) {
+    "", "none" -> ""
+    VLESS_FLOW_XTLS_VISION -> normalized
+    else -> VLESS_FLOW_XTLS_VISION.takeIf { normalized.startsWith("$VLESS_FLOW_XTLS_VISION-") }
 }
 
 private fun vmessOutbound(bean: VMessBean, tag: String, detour: String? = null): String {

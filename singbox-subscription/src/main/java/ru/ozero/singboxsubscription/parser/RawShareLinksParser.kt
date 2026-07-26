@@ -8,7 +8,7 @@ import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.V2RayFmt
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
-import ru.ozero.singboxfmt.canonicalBeanOrSelf
+import ru.ozero.singboxfmt.canonicalBeanOrThrow
 import ru.ozero.singboxfmt.hasRequiredOutboundCredentials
 import ru.ozero.singboxfmt.normalizeSingboxTransport
 
@@ -20,7 +20,7 @@ object RawShareLinksParser {
         val links = parseShareLinks(text)
         return links.ifEmpty { parseSingboxJson(text) }
             .ifEmpty { ClashYamlParser.parse(text) }
-            .map { it.canonicalBeanOrSelf() }
+            .map { it.canonicalBeanOrThrow() }
     }
 
     private fun parseShareLinks(text: String): List<AbstractBean> =
@@ -42,7 +42,7 @@ object RawShareLinksParser {
                 }.getOrNull()
             }
             .filter { it.hasValidPort() }
-            .map { it.canonicalBeanOrSelf() }
+            .map { it.canonicalBeanOrThrow() }
 
     private fun extractShareLinks(line: String): List<String> {
         val starts = SHARE_LINK_START.findAll(line)

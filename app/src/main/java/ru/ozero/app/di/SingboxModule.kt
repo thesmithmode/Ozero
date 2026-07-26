@@ -58,8 +58,8 @@ object SingboxModule {
                 SingboxDatabase.MIGRATION_1_2,
                 SingboxDatabase.MIGRATION_2_3,
                 SingboxDatabase.MIGRATION_3_4,
+                SingboxDatabase.MIGRATION_4_5,
             )
-            .fallbackToDestructiveMigration()
             .build()
 
     @Provides
@@ -103,6 +103,7 @@ object SingboxModule {
             groupDao = groupDao,
             profileDao = profileDao,
             userCaOkHttpClient = SubscriptionTrustClientFactory.create(),
+            insecureOkHttpClient = SubscriptionTrustClientFactory.createInsecure(),
         )
 
     @Provides

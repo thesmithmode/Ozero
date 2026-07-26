@@ -40,6 +40,7 @@ class RawUpdater(
     private val groupDao: SubscriptionGroupDao,
     private val profileDao: ProxyProfileDao,
     private val userCaOkHttpClient: OkHttpClient = okHttpClient,
+    private val insecureOkHttpClient: OkHttpClient = okHttpClient,
 ) {
     suspend fun refresh(group: SubscriptionGroup): Result<Int> = withContext(Dispatchers.IO) {
         val lastAttemptAt = System.currentTimeMillis()
@@ -150,17 +151,14 @@ class RawUpdater(
         result
     }
 
-    private fun httpClientFor(group: SubscriptionGroup): OkHttpClient =
-        if (group.isBuiltin) okHttpClient else userCaOkHttpClient
+    private fun httpClientFor(group: SubscriptionGroup): OkHttpClient = when {
+        group.isBuiltin -> okHttpClient
+        group.allowInsecureTls -> insecureOkHttpClient
+        else -> userCaOkHttpClient
+    }
 
     private fun executeRequest(group: SubscriptionGroup, request: Request): Response {
-        val primary = httpClientFor(group)
-        return try {
-            primary.newCall(request).execute()
-        } catch (error: IOException) {
-            if (group.isBuiltin || primary === okHttpClient || !error.isSubscriptionCertificateFailure()) throw error
-            okHttpClient.newCall(request).execute()
-        }
+        return httpClientFor(group).newCall(request).execute()
     }
 
     companion object {

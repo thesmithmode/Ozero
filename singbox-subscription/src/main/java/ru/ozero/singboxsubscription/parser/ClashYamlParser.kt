@@ -10,7 +10,7 @@ import ru.ozero.singboxfmt.StandardV2RayBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
-import ru.ozero.singboxfmt.canonicalBeanOrSelf
+import ru.ozero.singboxfmt.canonicalBeanOrThrow
 import ru.ozero.singboxfmt.hasRequiredOutboundCredentials
 import ru.ozero.singboxfmt.normalizeSingboxTransport
 
@@ -42,7 +42,7 @@ object ClashYamlParser {
                 is Map<*, *> -> parseProxy(item.toStringKeyMap())
                 else -> null
             }
-        }.map { it.canonicalBeanOrSelf() }
+        }.map { it.canonicalBeanOrThrow() }
     }
 
     private fun parseProxy(fields: Map<String, Any?>): AbstractBean? = when (fields.string("type").lowercase()) {

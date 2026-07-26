@@ -580,4 +580,6 @@
     <string name="singbox_chain_add">Añadir paso</string>
     <string name="singbox_chain_remove">Eliminar</string>
     <string name="singbox_chain_empty">No hay cadena configurada</string>
+    <string name="singbox_subscription_allow_insecure_tls">Permitir un certificado TLS no confiable</string>
+    <string name="singbox_subscription_allow_insecure_tls_warning">Reduce la protección MITM solo para esta suscripción</string>
 </resources>

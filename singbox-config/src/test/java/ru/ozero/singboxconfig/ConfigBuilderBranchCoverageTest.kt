@@ -105,20 +105,18 @@ class ConfigBuilderBranchCoverageTest {
     }
 
     @Test
-    fun `profile chain rejects unsupported selected transport but filters unsupported wrappers`() {
+    fun `profile chain rejects unsupported selected transport and wrappers`() {
         assertFailsWith<IllegalArgumentException> {
             ConfigBuilder.buildProfileChainConfig(vless().apply { type = "splithttp" }, wrappers = emptyList())
         }
 
-        val json = ConfigBuilder.buildProfileChainProxyConfig(
-            selected = vless(),
-            wrappers = listOf(vless(uuid = "unsupported").apply { type = "splithttp" }, vmess()),
-            socksPort = 2082,
-        )
-
-        assertFalse(json.contains("unsupported"))
-        assertContains(json, "\"listen_port\":2082")
-        assertContains(json, "\"detour\":\"chain-0\"")
+        assertFailsWith<IllegalArgumentException> {
+            ConfigBuilder.buildProfileChainProxyConfig(
+                selected = vless(),
+                wrappers = listOf(vless(uuid = "unsupported").apply { type = "splithttp" }, vmess()),
+                socksPort = 2082,
+            )
+        }
     }
 
     @Test
@@ -308,10 +306,7 @@ class ConfigBuilderBranchCoverageTest {
             type = "tcp"
             security = "none"
         }
-        val shadowsocks = shadowsocks().apply {
-            plugin = "v2ray-plugin"
-            pluginOpts = "mode=websocket"
-        }
+        val shadowsocks = shadowsocks()
         val vmessJson = ConfigBuilder.buildSingboxConfig(vmess)
         val trojanJson = ConfigBuilder.buildSingboxConfig(trojan)
         val shadowsocksJson = ConfigBuilder.buildChainConfig(
@@ -328,8 +323,7 @@ class ConfigBuilderBranchCoverageTest {
         assertContains(trojanJson, "\"type\":\"trojan\"")
         assertFalse(trojanJson.contains("\"packet_encoding\""))
         assertFalse(trojanJson.contains("\"tls\""))
-        assertContains(shadowsocksJson, "\"plugin\":\"v2ray-plugin\"")
-        assertContains(shadowsocksJson, "\"plugin_opts\":\"mode=websocket\"")
+        assertFalse(shadowsocksJson.contains("\"plugin\""))
         assertContains(shadowsocksJson, "\"detour\":\"upstream\"")
     }
 
@@ -348,12 +342,13 @@ class ConfigBuilderBranchCoverageTest {
         val blank = ConfigBuilder.buildSingboxConfig(vless().apply { flow = " " })
         val exact = ConfigBuilder.buildSingboxConfig(vless().apply { flow = "xtls-rprx-vision" })
         val suffixed = ConfigBuilder.buildSingboxConfig(vless().apply { flow = "xtls-rprx-vision-udp443" })
-        val unsupported = ConfigBuilder.buildSingboxConfig(vless().apply { flow = "unknown-flow" })
+        assertFailsWith<IllegalArgumentException> {
+            ConfigBuilder.buildSingboxConfig(vless().apply { flow = "unknown-flow" })
+        }
 
         assertFalse(blank.contains("\"flow\""))
         assertContains(exact, "\"flow\":\"xtls-rprx-vision\"")
         assertContains(suffixed, "\"flow\":\"xtls-rprx-vision\"")
-        assertFalse(unsupported.contains("\"flow\""))
     }
 
     @Test
@@ -429,11 +424,9 @@ class ConfigBuilderBranchCoverageTest {
             pluginOpts = "mode=websocket"
         }
         val emptySecurityJson = ConfigBuilder.buildSingboxConfig(emptySecurity)
-        val pluginOptsWithoutPluginJson = ConfigBuilder.buildSingboxConfig(pluginOptsWithoutPlugin)
+        assertFailsWith<IllegalArgumentException> { ConfigBuilder.buildSingboxConfig(pluginOptsWithoutPlugin) }
 
         assertFalse(emptySecurityJson.contains("\"tls\""))
-        assertFalse(pluginOptsWithoutPluginJson.contains("\"plugin\""))
-        assertFalse(pluginOptsWithoutPluginJson.contains("\"plugin_opts\""))
     }
 
     @Test
@@ -491,7 +484,5 @@ class ConfigBuilderBranchCoverageTest {
         password = "secret"
         serverAddress = "ss.example.com"
         serverPort = 8388
-        plugin = "v2ray-plugin"
-        pluginOpts = "mode=websocket"
     }
 }

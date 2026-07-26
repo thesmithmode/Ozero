@@ -11,6 +11,10 @@ import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import javax.net.ssl.HandshakeCompletedListener
+import javax.net.ssl.SSLSession
+import javax.net.ssl.SSLSocket
+import javax.net.ssl.SSLSocketFactory
 import kotlin.concurrent.thread
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -63,6 +67,32 @@ class SingboxHttp204RoutedProbeTest {
             val latency = probe.probeLatencyMs(socks.port)
 
             assertTrue(latency >= 1L)
+            assertTrue(socks.requestText.startsWith("GET /generate_204 "))
+        }
+    }
+
+    @Test
+    fun `successful HTTPS branch performs SOCKS TLS verification and GET without fallback`() = runTest {
+        val handshakeCalled = AtomicBoolean(false)
+        val hostnameVerified = AtomicBoolean(false)
+        SocksHttpServer(statusCode = 204, reason = "No Content", acceptPlainHttps = true).use { socks ->
+            val probe = SingboxHttp204RoutedProbe(
+                probeUrl = URL("https://secure.example/generate_204"),
+                fallbackProbeUrls = listOf(URL("http://fallback.example/generate_204")),
+                timeoutMs = 1_000,
+                sslSocketFactory = TestSslSocketFactory(handshakeCalled),
+                hostnameVerifier = { host, _ ->
+                    hostnameVerified.set(host == "secure.example")
+                    true
+                },
+            )
+
+            val result = probe.probe(socks.port)
+
+            assertTrue(result is RoutedProbeResult.Success)
+            assertTrue(handshakeCalled.get())
+            assertTrue(hostnameVerified.get())
+            assertEquals(listOf(443), socks.destinationPorts)
             assertTrue(socks.requestText.startsWith("GET /generate_204 "))
         }
     }
@@ -330,6 +360,7 @@ class SingboxHttp204RoutedProbeTest {
         private val reason: String,
         failuresBeforeResponse: Int = 0,
         private val body: String = "",
+        private val acceptPlainHttps: Boolean = false,
     ) : AutoCloseable {
         private val server = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
         private val failuresRemaining = AtomicInteger(failuresBeforeResponse)
@@ -345,6 +376,8 @@ class SingboxHttp204RoutedProbeTest {
 
         @Volatile
         var requestText: String = ""
+
+        val destinationPorts = mutableListOf<Int>()
 
         val port: Int = server.localPort
 
@@ -367,9 +400,10 @@ class SingboxHttp204RoutedProbeTest {
                 else -> error("unsupported address type")
             }
             val destinationPort = input.readUnsignedShort()
+            synchronized(destinationPorts) { destinationPorts += destinationPort }
             output.write(byteArrayOf(5, 0, 0, 1, 127, 0, 0, 1, 0, 0))
             output.flush()
-            if (destinationPort == HTTPS_PORT) return
+            if (destinationPort == HTTPS_PORT && !acceptPlainHttps) return
             if (failuresRemaining.getAndUpdate { (it - 1).coerceAtLeast(0) } > 0) return
 
             requestText = input.readHttpHeaders()
@@ -390,6 +424,58 @@ class SingboxHttp204RoutedProbeTest {
         private companion object {
             private const val HTTPS_PORT = 443
         }
+    }
+
+    private class TestSslSocketFactory(
+        private val handshakeCalled: AtomicBoolean,
+    ) : SSLSocketFactory() {
+        override fun getDefaultCipherSuites(): Array<String> = emptyArray()
+        override fun getSupportedCipherSuites(): Array<String> = emptyArray()
+
+        override fun createSocket(socket: Socket, host: String, port: Int, autoClose: Boolean): Socket =
+            TestSslSocket(socket, handshakeCalled)
+
+        override fun createSocket(host: String, port: Int): Socket = error("unused")
+        override fun createSocket(host: String, port: Int, localHost: InetAddress, localPort: Int): Socket =
+            error("unused")
+        override fun createSocket(host: InetAddress, port: Int): Socket = error("unused")
+        override fun createSocket(
+            address: InetAddress,
+            port: Int,
+            localAddress: InetAddress,
+            localPort: Int,
+        ): Socket = error("unused")
+    }
+
+    private class TestSslSocket(
+        private val delegate: Socket,
+        private val handshakeCalled: AtomicBoolean,
+    ) : SSLSocket() {
+        override fun startHandshake() = handshakeCalled.set(true)
+        override fun getSession(): SSLSession = javax.net.ssl.SSLContext.getDefault().createSSLEngine().session
+        override fun getInputStream() = delegate.getInputStream()
+        override fun getOutputStream() = delegate.getOutputStream()
+        override fun close() = delegate.close()
+        override fun setSoTimeout(timeout: Int) {
+            delegate.soTimeout = timeout
+        }
+        override fun getSoTimeout(): Int = delegate.soTimeout
+        override fun getSupportedCipherSuites(): Array<String> = emptyArray()
+        override fun getEnabledCipherSuites(): Array<String> = emptyArray()
+        override fun setEnabledCipherSuites(suites: Array<out String>) = Unit
+        override fun getSupportedProtocols(): Array<String> = emptyArray()
+        override fun getEnabledProtocols(): Array<String> = emptyArray()
+        override fun setEnabledProtocols(protocols: Array<out String>) = Unit
+        override fun addHandshakeCompletedListener(listener: HandshakeCompletedListener) = Unit
+        override fun removeHandshakeCompletedListener(listener: HandshakeCompletedListener) = Unit
+        override fun setUseClientMode(mode: Boolean) = Unit
+        override fun getUseClientMode(): Boolean = true
+        override fun setNeedClientAuth(need: Boolean) = Unit
+        override fun getNeedClientAuth(): Boolean = false
+        override fun setWantClientAuth(want: Boolean) = Unit
+        override fun getWantClientAuth(): Boolean = false
+        override fun setEnableSessionCreation(flag: Boolean) = Unit
+        override fun getEnableSessionCreation(): Boolean = true
     }
 
     private class DirectHttpServer : AutoCloseable {

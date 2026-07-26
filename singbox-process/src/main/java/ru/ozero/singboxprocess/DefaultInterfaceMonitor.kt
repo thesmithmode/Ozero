@@ -46,8 +46,20 @@ internal class DefaultInterfaceMonitor(private val connectivity: ConnectivityMan
             }
         }
         callbacks[listener] = callback
-        register(callback)
+        try {
+            register(callback)
+        } catch (error: Throwable) {
+            callbacks.remove(listener, callback)
+            if (callbacks.isEmpty()) lastPhysicalNetwork = null
+            throw IllegalStateException("Failed to register physical network callback", error)
+        }
         publish(callbackNetwork = null, listener, callback)
+    }
+
+    fun currentPhysicalNetwork(): Network? {
+        val current = lastPhysicalNetwork
+        if (current != null && current.isEligiblePhysical(connectivity)) return current
+        return selectPhysicalNetwork(callbackNetwork = null).also { lastPhysicalNetwork = it }
     }
 
     fun close(listener: InterfaceUpdateListener) {

@@ -593,4 +593,6 @@
     <string name="singbox_chain_add">Добавить звено</string>
     <string name="singbox_chain_remove">Удалить</string>
     <string name="singbox_chain_empty">Цепочка не настроена</string>
+    <string name="singbox_subscription_allow_insecure_tls">Разрешить недоверенный TLS-сертификат</string>
+    <string name="singbox_subscription_allow_insecure_tls_warning">Снижает защиту от MITM только для этой подписки</string>
 </resources>

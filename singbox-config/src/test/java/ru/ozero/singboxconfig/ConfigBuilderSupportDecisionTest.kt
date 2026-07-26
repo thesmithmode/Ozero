@@ -2,9 +2,11 @@ package ru.ozero.singboxconfig
 
 import org.junit.jupiter.api.Test
 import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.ShadowsocksBean
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertFalse
 
 class ConfigBuilderSupportDecisionTest {
     private val validRealityPublicKey = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA"
@@ -50,6 +52,33 @@ class ConfigBuilderSupportDecisionTest {
 
         assertEquals(BeanSupportDecision.Supported, bean.supportDecision())
         assertContains(ConfigBuilder.buildSingboxConfig(bean), "\"reality\":")
+    }
+
+    @Test
+    fun `unknown VLESS flow is rejected`() {
+        val decision = vless().apply { flow = "xtls-rprx-direct" }.supportDecision()
+
+        assertSupportError(BeanSupportError.UNSUPPORTED_VLESS_FLOW, decision)
+    }
+
+    @Test
+    fun `Shadowsocks plugin is rejected`() {
+        val bean = ShadowsocksBean().apply {
+            serverAddress = "proxy.example.com"
+            serverPort = 443
+            method = "aes-128-gcm"
+            password = "secret"
+            plugin = "unknown"
+        }
+
+        assertSupportError(BeanSupportError.UNSUPPORTED_SHADOWSOCKS_PLUGIN, ConfigBuilder.supportDecision(bean))
+    }
+
+    @Test
+    fun `legacy raw transport builds canonical TCP without transport object`() {
+        val json = ConfigBuilder.buildSingboxConfig(vless(type = " RAW "))
+
+        assertFalse(json.contains("\"transport\""))
     }
 
     private fun assertSupportError(error: BeanSupportError, decision: BeanSupportDecision) {

@@ -170,6 +170,7 @@ internal object SingboxRuntime {
     ) : PlatformInterface {
         private val connectivity: ConnectivityManager = requireConnectivityManager(context)
         private val defaultInterfaceMonitor = DefaultInterfaceMonitor(connectivity)
+        private val localDnsTransport = AndroidLocalDnsTransport(defaultInterfaceMonitor)
 
         override fun usePlatformAutoDetectInterfaceControl(): Boolean = true
 
@@ -213,7 +214,7 @@ internal object SingboxRuntime {
 
         override fun readWIFIState(): WIFIState? = null
 
-        override fun localDNSTransport(): LocalDNSTransport? = null
+        override fun localDNSTransport(): LocalDNSTransport = localDnsTransport
 
         override fun systemCertificates(): StringIterator = stringIterator(systemCertificatePem)
 

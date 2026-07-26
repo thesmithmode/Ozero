@@ -496,11 +496,9 @@ class SingboxEngine @Inject constructor(
             clearRuntimeState()
             return EnginePlugin.ReadyResult.Timeout("sing-box SOCKS5 listener is not ready")
         }
-        val latency = routedProbe.probeLatencyMs(port)
-        return if (latency >= 0) {
-            EnginePlugin.ReadyResult.Ready
-        } else {
-            EnginePlugin.ReadyResult.Timeout("sing-box outbound verification failed")
+        return when (val result = routedProbe.probe(port)) {
+            is RoutedProbeResult.Success -> EnginePlugin.ReadyResult.Ready
+            is RoutedProbeResult.Failure -> EnginePlugin.ReadyResult.Timeout(result.reason.readinessMessage())
         }
     }
 
@@ -854,4 +852,17 @@ class SingboxEngine @Inject constructor(
         const val PROTOCOL_TROJAN = 2
         const val PROTOCOL_SHADOWSOCKS = 3
     }
+}
+
+private fun RoutedProbeResult.Reason.readinessMessage(): String = when (this) {
+    RoutedProbeResult.Reason.DNS -> "sing-box outbound DNS failed"
+    RoutedProbeResult.Reason.CONNECT -> "sing-box outbound connect failed"
+    RoutedProbeResult.Reason.TLS_CERTIFICATE -> "sing-box TLS certificate verification failed"
+    RoutedProbeResult.Reason.TLS_HANDSHAKE -> "sing-box TLS handshake failed"
+    RoutedProbeResult.Reason.TLS -> "sing-box outbound TLS failed"
+    RoutedProbeResult.Reason.TIMEOUT -> "sing-box outbound timed out"
+    RoutedProbeResult.Reason.UNEXPECTED_RESPONSE ->
+        "sing-box connectivity endpoint returned unexpected response"
+    RoutedProbeResult.Reason.IO -> "sing-box outbound I/O failed"
+    RoutedProbeResult.Reason.SOCKS_NOT_READY -> "sing-box SOCKS5 listener is not ready"
 }

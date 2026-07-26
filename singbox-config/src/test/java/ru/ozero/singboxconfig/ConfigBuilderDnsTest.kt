@@ -25,9 +25,9 @@ class ConfigBuilderDnsTest {
         assertContains(json, "\"server\":\"dns.example\"")
         assertContains(json, "\"path\":\"/dns-query\"")
         assertContains(json, "\"type\":\"https\"")
-        assertContains(json, "\"domain_resolver\":\"dns-domain-resolver\"")
-        assertContains(json, "\"tag\":\"dns-domain-resolver\"")
-        assertFalse(json.contains("\"detour\":\"proxy\""))
+        assertContains(json, "\"domain_resolver\":\"dns-local\"")
+        assertContains(json, "\"tag\":\"dns-local\"")
+        assertContains(json, "\"detour\":\"proxy\"")
         assertFalse(json.contains("https://dns.example/dns-query"))
     }
 
@@ -37,7 +37,7 @@ class ConfigBuilderDnsTest {
 
         assertContains(json, "\"type\":\"tls\"")
         assertContains(json, "\"server\":\"dns.example\"")
-        assertContains(json, "\"domain_resolver\":\"dns-domain-resolver\"")
+        assertContains(json, "\"domain_resolver\":\"dns-local\"")
         assertFalse(json.contains("tls://dns.example"))
     }
 
@@ -50,8 +50,8 @@ class ConfigBuilderDnsTest {
 
         assertContains(json, "\"server\":\"1.1.1.1\"")
         assertContains(json, "\"server\":\"8.8.8.8\"")
-        assertContains(json, "\"default_domain_resolver\":\"dns-0\"")
-        assertFalse(json.contains("domain_resolver\":\"dns-domain-resolver"))
+        assertContains(json, "\"default_domain_resolver\":\"dns-local\"")
+        assertFalse(json.contains("\"domain_resolver\":\"dns-local\""))
     }
 
     @Test
@@ -68,18 +68,16 @@ class ConfigBuilderDnsTest {
     }
 
     @Test
-    fun `chain hostname secure DNS resolver uses direct bootstrap DNS`() {
+    fun `chain hostname secure DNS uses Android local bootstrap`() {
         val json = ConfigBuilder.buildChainConfig(bean(), socksPort = 2080, dnsServers = listOf("tls://dns.example"))
 
-        assertContains(json, "\"domain_resolver\":\"dns-domain-resolver\"")
-        assertContains(json, "\"tag\":\"dns-domain-resolver\"")
-        assertContains(json, "\"type\":\"udp\"")
-        assertContains(json, "\"server\":\"9.9.9.9\"")
-        assertFalse(json.contains("\"detour\":\"proxy\""))
+        assertContains(json, "\"domain_resolver\":\"dns-local\"")
+        assertContains(json, "\"tag\":\"dns-local\"")
+        assertFalse(json.contains("dns-domain-resolver"))
     }
 
     @Test
-    fun `route uses first configured DNS as domain resolver in every config shape`() {
+    fun `route uses Android local DNS as domain resolver in every config shape`() {
         val tun = ConfigBuilder.buildSingboxConfig(bean(), dnsServers = listOf("8.8.8.8"))
         val chain = ConfigBuilder.buildChainConfig(bean(), socksPort = 2080, dnsServers = listOf("8.8.8.8"))
         val auto = ConfigBuilder.buildSingboxAutoConfig(listOf(bean()), dnsServers = listOf("8.8.8.8"))
@@ -89,24 +87,25 @@ class ConfigBuilderDnsTest {
         )
 
         listOf(tun, chain, auto, probe).forEach { json ->
-            assertContains(json, "\"default_domain_resolver\":\"dns-0\"")
+            assertContains(json, "\"default_domain_resolver\":\"dns-local\"")
+            assertContains(json, "\"tag\":\"dns-local\"")
             assertContains(json, "\"auto_detect_interface\":true")
         }
     }
 
     @Test
-    fun `empty DNS servers fall back to safe defaults`() {
+    fun `empty DNS servers fall back to Android local DNS`() {
         val json = ConfigBuilder.buildSingboxConfig(bean(), dnsServers = emptyList())
 
-        assertContains(json, "\"server\":\"9.9.9.9\"")
-        assertContains(json, "\"server\":\"149.112.112.112\"")
+        assertContains(json, "\"final\":\"dns-local\"")
+        assertFalse(json.contains("\"tag\":\"dns-0\""))
     }
 
     @Test
-    fun `invalid DNS servers fall back to safe defaults`() {
+    fun `invalid DNS servers fall back to Android local DNS`() {
         val json = ConfigBuilder.buildSingboxConfig(bean(), dnsServers = listOf("not a dns server"))
 
-        assertContains(json, "\"server\":\"9.9.9.9\"")
+        assertContains(json, "\"final\":\"dns-local\"")
         assertFalse(json.contains("not a dns server"))
     }
 
@@ -116,7 +115,7 @@ class ConfigBuilderDnsTest {
 
         assertContains(json, "\"type\":\"udp\"")
         assertContains(json, "\"server\":\"8.8.8.8\"")
-        assertFalse(json.contains("\"detour\":\"proxy\""))
+        assertContains(json, "\"detour\":\"proxy\"")
         assertFalse(json.contains("\"address\""))
         assertFalse(json.contains("legacy DoH fallback"))
     }

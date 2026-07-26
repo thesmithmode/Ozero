@@ -12,18 +12,42 @@ import java.net.Proxy
 import java.net.Socket
 import java.net.SocketTimeoutException
 import java.net.URL
+import java.net.UnknownHostException
 import java.nio.charset.StandardCharsets
 import java.security.cert.CertificateException
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLException
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 
 fun interface SingboxRoutedProbe {
     suspend fun probeLatencyMs(socksPort: Int): Long
+
+    suspend fun probe(socksPort: Int): RoutedProbeResult =
+        probeLatencyMs(socksPort).takeIf { it >= 0 }
+            ?.let(RoutedProbeResult::Success)
+            ?: RoutedProbeResult.Failure(RoutedProbeResult.Reason.IO)
+}
+
+sealed interface RoutedProbeResult {
+    data class Success(val latencyMs: Long) : RoutedProbeResult
+    data class Failure(val reason: Reason, val safeDetail: String? = null) : RoutedProbeResult
+
+    enum class Reason {
+        DNS,
+        CONNECT,
+        TLS_CERTIFICATE,
+        TLS_HANDSHAKE,
+        TLS,
+        TIMEOUT,
+        UNEXPECTED_RESPONSE,
+        IO,
+        SOCKS_NOT_READY,
+    }
 }
 
 class SingboxHttp204RoutedProbe(
@@ -33,24 +57,37 @@ class SingboxHttp204RoutedProbe(
     private val timeoutMs: Int = DEFAULT_TIMEOUT_MS,
     private val maxProbeUrls: Int = DEFAULT_MAX_PROBE_URLS,
     private val nanoTime: () -> Long = System::nanoTime,
+    private val sslSocketFactory: SSLSocketFactory = SSLSocketFactory.getDefault() as SSLSocketFactory,
+    private val hostnameVerifier: HostnameVerifier = HttpsURLConnection.getDefaultHostnameVerifier(),
 ) : SingboxRoutedProbe {
 
-    override suspend fun probeLatencyMs(socksPort: Int): Long = withContext(Dispatchers.IO) {
-        probeLatencyMsUntil(socksPort, deadlineNanos = nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs.toLong()))
+    override suspend fun probeLatencyMs(socksPort: Int): Long = when (val result = probe(socksPort)) {
+        is RoutedProbeResult.Success -> result.latencyMs
+        is RoutedProbeResult.Failure -> LATENCY_FAILED
     }
 
-    fun probeLatencyMsUntil(socksPort: Int, deadlineNanos: Long): Long {
-        if (maxProbeUrls <= 0) return LATENCY_FAILED
+    override suspend fun probe(socksPort: Int): RoutedProbeResult = withContext(Dispatchers.IO) {
+        probeUntil(socksPort, deadlineNanos = nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs.toLong()))
+    }
+
+    fun probeLatencyMsUntil(socksPort: Int, deadlineNanos: Long): Long =
+        when (val result = probeUntil(socksPort, deadlineNanos)) {
+            is RoutedProbeResult.Success -> result.latencyMs
+            is RoutedProbeResult.Failure -> LATENCY_FAILED
+        }
+
+    fun probeUntil(socksPort: Int, deadlineNanos: Long): RoutedProbeResult {
+        if (maxProbeUrls <= 0) return RoutedProbeResult.Failure(RoutedProbeResult.Reason.UNEXPECTED_RESPONSE)
         if (socksPort <= 0) {
             PersistentLoggers.warn(TAG, "routed probe failed: invalid socksPort=$socksPort")
-            return LATENCY_FAILED
+            return RoutedProbeResult.Failure(RoutedProbeResult.Reason.SOCKS_NOT_READY)
         }
         if (!isSocksPortReady(socksPort, deadlineNanos)) {
             PersistentLoggers.debug(
                 TAG,
                 "routed probe failed: socks not ready socksPort=$socksPort timeoutMs=$timeoutMs",
             )
-            return LATENCY_FAILED
+            return RoutedProbeResult.Failure(RoutedProbeResult.Reason.SOCKS_NOT_READY)
         }
         val urls = listOf(probeUrl) + fallbackProbeUrls
         val endpoints = urls.distinctBy { it.toString() }.take(maxProbeUrls)
@@ -61,7 +98,7 @@ class SingboxHttp204RoutedProbe(
             val attemptTimeoutMs = (remainingTimeoutMs / attemptsLeft).coerceAtLeast(1)
             val result = probeSingleUrl(url, socksPort, attemptTimeoutMs)
             val latency = result.latencyMs
-            if (latency >= 0) return latency
+            if (latency >= 0) return RoutedProbeResult.Success(latency)
             failures += result.failure
         }
         val failureSummary = if (failures.isEmpty()) {
@@ -78,7 +115,9 @@ class SingboxHttp204RoutedProbe(
             TAG,
             "routed probe failed: socksPort=$socksPort timeoutMs=$timeoutMs failures=$failureSummary",
         )
-        return LATENCY_FAILED
+        return RoutedProbeResult.Failure(
+            failures.lastOrNull()?.reason ?: RoutedProbeResult.Reason.TIMEOUT,
+        )
     }
 
     private fun isSocksPortReady(socksPort: Int, deadlineNanos: Long): Boolean {
@@ -141,12 +180,13 @@ class SingboxHttp204RoutedProbe(
             val destinationPort = url.port.takeIf { it > 0 } ?: HTTPS_PORT
             tcpSocket.connect(InetSocketAddress.createUnresolved(url.host, destinationPort), remainingTimeoutMs)
             tcpSocket.soTimeout = remainingTimeoutMs
-            val sslSocket = (SSLSocketFactory.getDefault() as SSLSocketFactory)
-                .createSocket(tcpSocket, url.host, destinationPort, true) as SSLSocket
+            val sslSocket = sslSocketFactory.createSocket(tcpSocket, url.host, destinationPort, true) as SSLSocket
             sslSocket.use { socket ->
                 socket.soTimeout = remainingTimeoutMs
                 socket.startHandshake()
-                if (!HttpsURLConnection.getDefaultHostnameVerifier().verify(url.host, socket.session)) return false
+                if (!hostnameVerifier.verify(url.host, socket.session)) {
+                    throw SSLPeerUnverifiedException("Hostname verification failed")
+                }
                 writeHttpGet(socket, url, destinationPort, HTTPS_PORT)
                 val response = readRawHttpResponse(BufferedInputStream(socket.getInputStream())) ?: return false
                 return expectation.matches(response)
@@ -218,6 +258,7 @@ class SingboxHttp204RoutedProbe(
     private fun classifyFailure(error: Throwable): ProbeFailure {
         val causes = generateSequence(error) { it.cause }.take(MAX_CAUSE_DEPTH).toList()
         return when {
+            causes.any { it is UnknownHostException } -> ProbeFailure.DNS
             causes.any {
                 it is CertificateException || it is SSLPeerUnverifiedException
             } -> ProbeFailure.TLS_CERTIFICATE
@@ -242,17 +283,18 @@ class SingboxHttp204RoutedProbe(
         }
     }
 
-    private enum class ProbeFailure(val label: String) {
-        NONE("none"),
-        TLS_CERTIFICATE("tls-certificate"),
-        TLS_HANDSHAKE("tls-handshake"),
-        TLS("tls"),
-        TIMEOUT("timeout"),
-        CONNECT("connect"),
-        IO("io"),
-        UNEXPECTED_RESPONSE("unexpected-response"),
-        UNSUPPORTED_RESPONSE("unsupported-response"),
-        UNEXPECTED_ERROR("unexpected-error"),
+    private enum class ProbeFailure(val label: String, val reason: RoutedProbeResult.Reason) {
+        NONE("none", RoutedProbeResult.Reason.IO),
+        DNS("dns", RoutedProbeResult.Reason.DNS),
+        TLS_CERTIFICATE("tls-certificate", RoutedProbeResult.Reason.TLS_CERTIFICATE),
+        TLS_HANDSHAKE("tls-handshake", RoutedProbeResult.Reason.TLS_HANDSHAKE),
+        TLS("tls", RoutedProbeResult.Reason.TLS),
+        TIMEOUT("timeout", RoutedProbeResult.Reason.TIMEOUT),
+        CONNECT("connect", RoutedProbeResult.Reason.CONNECT),
+        IO("io", RoutedProbeResult.Reason.IO),
+        UNEXPECTED_RESPONSE("unexpected-response", RoutedProbeResult.Reason.UNEXPECTED_RESPONSE),
+        UNSUPPORTED_RESPONSE("unsupported-response", RoutedProbeResult.Reason.UNEXPECTED_RESPONSE),
+        UNEXPECTED_ERROR("unexpected-error", RoutedProbeResult.Reason.IO),
     }
 
     private data class RawHttpResponse(val statusCode: Int, val body: String)
@@ -268,7 +310,7 @@ class SingboxHttp204RoutedProbe(
         )
         const val LATENCY_FAILED = -1L
         private const val LOOPBACK = "127.0.0.1"
-        private const val DEFAULT_TIMEOUT_MS = 3_000
+        private const val DEFAULT_TIMEOUT_MS = 12_000
         private const val DEFAULT_MAX_PROBE_URLS = 3
         private const val GENERATE_204_PATH = "/generate_204"
         private const val MSFT_CONNECT_TEST_HOST = "www.msftconnecttest.com"

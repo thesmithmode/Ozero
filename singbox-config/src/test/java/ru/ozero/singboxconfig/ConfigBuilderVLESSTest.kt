@@ -5,6 +5,7 @@ import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.V2RayFmt
 import kotlin.test.assertContains
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class ConfigBuilderVLESSTest {
@@ -75,10 +76,10 @@ class ConfigBuilderVLESSTest {
     }
 
     @Test
-    fun `should omit unknown VLESS flow instead of generating invalid config`() {
-        val json = ConfigBuilder.buildSingboxConfig(makeBean(flow = "unsupported-flow"))
-
-        assertFalse(json.contains("\"flow\""), "unsupported flow must not brick the whole sing-box config")
+    fun `should reject unknown VLESS flow instead of generating invalid config`() {
+        assertFailsWith<IllegalArgumentException> {
+            ConfigBuilder.buildSingboxConfig(makeBean(flow = "unsupported-flow"))
+        }
     }
 
     @Test
@@ -128,7 +129,7 @@ class ConfigBuilderVLESSTest {
 
         assertContains(json, "\"type\":\"udp\"")
         assertContains(json, "\"server\":\"9.9.9.9\"")
-        assertFalse(json.contains("\"detour\":\"proxy\""))
+        assertContains(json, "\"detour\":\"proxy\"")
     }
 
     @Test
