@@ -10,7 +10,6 @@ import okhttp3.ResponseBody
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.SocketTimeoutException
-import java.net.URI
 import java.net.UnknownHostException
 import java.security.cert.CertPathValidatorException
 import java.security.cert.CertificateException
@@ -145,7 +144,7 @@ class RawUpdater(
             Log.w(
                 TAG,
                 "refresh failed groupId=${group.id} code=$errorCode " +
-                    "causes=${failure.safeCauseDiagnostics(group.subscriptionUrl)}",
+                    "causes=${failure.safeCauseDiagnostics()}",
             )
         }
         result
@@ -222,13 +221,12 @@ class RawUpdater(
             else -> SubscriptionRefreshErrorCode.UNKNOWN
         }
 
-        private fun Throwable.safeCauseDiagnostics(subscriptionUrl: String): String {
-            val host = runCatching { URI(subscriptionUrl).host }.getOrNull().orEmpty()
+        private fun Throwable.safeCauseDiagnostics(): String {
             val causes = causeChain()
                 .map { cause -> cause.safeCauseLabel() }
                 .distinct()
                 .joinToString(prefix = "[", postfix = "]")
-            return "host=${host.ifBlank { "unknown" }} chain=$causes"
+            return "chain=$causes"
         }
 
         private fun Throwable.safeCauseLabel(): String {
