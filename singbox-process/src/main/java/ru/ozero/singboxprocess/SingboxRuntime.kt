@@ -154,7 +154,12 @@ internal object SingboxRuntime {
         override fun setSystemProxyEnabled(enabled: Boolean) {}
 
         override fun writeDebugMessage(message: String) {
-            PersistentLoggers.trace(TAG, "debug: $message")
+            val safe = redactSingboxMessage(message)
+            if (safe.shouldPromoteSingboxMessage()) {
+                PersistentLoggers.warn(TAG, "libbox: $safe")
+            } else {
+                PersistentLoggers.trace(TAG, "libbox: $safe")
+            }
         }
     }
 
@@ -163,8 +168,9 @@ internal object SingboxRuntime {
         private val tunFd: Int,
         private val protector: SingboxProtectorBridge,
     ) : PlatformInterface {
-        private val connectivity = context.getSystemService(ConnectivityManager::class.java)
+        private val connectivity: ConnectivityManager = requireConnectivityManager(context)
         private val defaultInterfaceMonitor = DefaultInterfaceMonitor(connectivity)
+        private val localDnsTransport = AndroidLocalDnsTransport(defaultInterfaceMonitor)
 
         override fun usePlatformAutoDetectInterfaceControl(): Boolean = true
 
@@ -208,7 +214,7 @@ internal object SingboxRuntime {
 
         override fun readWIFIState(): WIFIState? = null
 
-        override fun localDNSTransport(): LocalDNSTransport? = null
+        override fun localDNSTransport(): LocalDNSTransport = localDnsTransport
 
         override fun systemCertificates(): StringIterator = stringIterator(systemCertificatePem)
 
@@ -234,3 +240,34 @@ internal object SingboxRuntime {
             override fun next(): String = values[index++]
         }
 }
+
+internal fun requireConnectivityManager(context: Context): ConnectivityManager =
+    checkNotNull(
+        context.getSystemService(ConnectivityManager::class.java),
+    ) {
+        "ConnectivityManager unavailable in :engine_singbox process"
+    }
+
+internal fun redactSingboxMessage(message: String): String {
+    val noJson = message.replace(Regex("\\{.*}"), "<redacted-json>")
+    val noSubscriptionQuery = noJson.replace(Regex("(https?://[^\\s?#]+)\\?[^\\s]+"), "$1?<redacted-query>")
+    return noSubscriptionQuery
+        .replace(Regex("(?i)(password[\\\"'=:\\s]+)([^\\\",&\\s}]+)"), "$1<redacted>")
+        .replace(Regex("(?i)((?:private_key|public_key)[\\\"'=:\\s]+)([^\\\",&\\s}]+)"), "$1<redacted>")
+        .replace(Regex("(?i)((?:serverAddress|server_address|server)[\\\"'=:\\s]+)([^\\\",&\\s}]+)"), "$1<redacted>")
+        .replace(
+            Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"),
+            "<redacted-uuid>",
+        )
+}
+
+internal fun String.shouldPromoteSingboxMessage(): Boolean =
+    contains("error", ignoreCase = true) ||
+        contains("failed", ignoreCase = true) ||
+        contains("tls", ignoreCase = true) ||
+        contains("reality", ignoreCase = true) ||
+        contains("certificate", ignoreCase = true) ||
+        contains("handshake", ignoreCase = true) ||
+        contains("dns", ignoreCase = true) ||
+        contains("dial", ignoreCase = true) ||
+        contains("connection closed", ignoreCase = true)

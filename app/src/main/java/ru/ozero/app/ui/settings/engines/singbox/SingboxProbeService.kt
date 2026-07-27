@@ -28,6 +28,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.VpnSocketProtectorHolder
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -36,9 +37,11 @@ import ru.ozero.enginesingbox.ISingboxProtector
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.SingboxHttp204RoutedProbe
 import ru.ozero.enginesingbox.SingboxPrefs
+import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxfmt.protocolLabel
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import java.net.InetAddress
@@ -85,15 +88,21 @@ class SingboxProbeService internal constructor(
                 ?: EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
             ipv6Enabled = settings.ipv6Enabled,
         )
+        val rejectedProfiles = mutableListOf<RejectedProfile>()
         val probeCandidates = profiles.mapNotNull { profile ->
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(profile.beanBlob) }.getOrNull()
-            if (bean == null || !ConfigBuilder.isSupportedBean(bean) || !bean.hasRoutableServerAddress()) {
+            val decision = bean?.let { ConfigBuilder.supportDecision(it) }
+            if (bean == null || decision is BeanSupportDecision.Unsupported) {
+                if (bean != null && decision is BeanSupportDecision.Unsupported) {
+                    rejectedProfiles += RejectedProfile(bean.protocolLabel(), decision.error.name)
+                }
                 profileDao.updateProbeResult(profile.id, LATENCY_FAILED, PROBE_ERROR_UNSUPPORTED)
                 null
             } else {
                 profile to bean
             }
         }
+        logRejectedProfiles(rejectedProfiles)
         val results = ConcurrentLinkedQueue<ProbeResult>()
         val batchProbe = profileProbe as? SingboxBatchProfileProbe
         probeCandidates.chunked(MAX_CONCURRENT_PROFILE_PROBES).forEachIndexed { batchIndex, batch ->
@@ -448,14 +457,17 @@ private class SingboxServiceProfileProbe(
         const val SINGLE_PROFILE_ID = 0L
     }
 }
+private data class RejectedProfile(val protocol: String, val reason: String)
 
-private fun AbstractBean.hasRoutableServerAddress(): Boolean {
-    val host = serverAddress.trim().trim('[', ']').lowercase()
-    return host.isNotEmpty() &&
-        host != "localhost" &&
-        host != "0.0.0.0" &&
-        host != "::" &&
-        host != "::0" &&
-        host != "::1" &&
-        !host.startsWith("127.")
+private fun logRejectedProfiles(rejectedProfiles: List<RejectedProfile>) {
+    if (rejectedProfiles.isEmpty()) return
+    val protocols = rejectedProfiles.groupingBy { it.protocol }.eachCount().toStableDiagnosticString()
+    val reasons = rejectedProfiles.groupingBy { it.reason }.eachCount().toStableDiagnosticString()
+    PersistentLoggers.warn(
+        "SingboxProbeService",
+        "singbox profiles rejected count=${rejectedProfiles.size} byProtocol=$protocols byReason=$reasons",
+    )
 }
+
+private fun Map<String, Int>.toStableDiagnosticString(): String =
+    entries.sortedBy { it.key }.joinToString(prefix = "{", postfix = "}") { "${it.key}=${it.value}" }

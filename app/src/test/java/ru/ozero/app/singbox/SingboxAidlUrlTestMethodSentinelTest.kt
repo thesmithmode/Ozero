@@ -51,7 +51,7 @@ class SingboxAidlUrlTestMethodSentinelTest {
         )
         assertTrue(
             !engineContent.contains("urlTest(") &&
-                engineContent.contains("routedProbe.probeLatencyMs"),
+                engineContent.contains("routedProbe.probe("),
             "SingboxEngine.probe must use routed HTTP probe and must not treat urlTest=-1 stub as success",
         )
     }

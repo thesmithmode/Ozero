@@ -23,4 +23,6 @@ data class SubscriptionGroup(
     val expiryDate: Long = 0,
     val userOrder: Int = 0,
     val updateWhenConnectedOnly: Boolean = false,
+    @field:ColumnInfo(defaultValue = "0")
+    val allowInsecureTls: Boolean = false,
 )

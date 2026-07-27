@@ -371,6 +371,11 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         viewModelScope.launch { groupDao.delete(group) }
     }
 
+    fun onAllowInsecureSubscriptionTls(group: SubscriptionGroup, enabled: Boolean) {
+        if (group.isBuiltin) return
+        viewModelScope.launch { groupDao.update(group.copy(allowInsecureTls = enabled)) }
+    }
+
     fun onShowAddMenu(show: Boolean) = _uiState.update { it.copy(showAddMenu = show) }
 
     fun onShowAddManualLinksDialog(show: Boolean) = _uiState.update {
