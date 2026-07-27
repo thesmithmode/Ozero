@@ -84,6 +84,33 @@ class LoggingContractTest {
         assertTrue(source.contains("fun error"), "PersistentLoggers должен иметь fun error")
     }
 
+    @Test
+    fun `probe rejection diagnostics are aggregated into one persistent warning`() {
+        val source = File(
+            locateRepoRoot(),
+            "app/src/main/java/ru/ozero/app/ui/settings/engines/singbox/SingboxProbeService.kt",
+        ).readText()
+
+        assertEquals(1, Regex("PersistentLoggers\\.warn\\(").findAll(source).count())
+        assertEquals(2, Regex("logRejectedProfiles\\(").findAll(source).count())
+        assertTrue(source.contains("singbox profiles rejected count="))
+        assertTrue(source.contains("groupingBy { it.reason }.eachCount()"))
+    }
+
+    @Test
+    fun `subscription failure diagnostics omit subscription hostname`() {
+        val source = File(
+            locateRepoRoot(),
+            "singbox-subscription/src/main/java/ru/ozero/singboxsubscription/RawUpdater.kt",
+        ).readText()
+        val diagnostics = source.substringAfter("private fun Throwable.safeCauseDiagnostics()")
+            .substringBefore("private fun Throwable.safeCauseLabel()")
+
+        assertTrue(diagnostics.contains("return \"chain=\$causes\""))
+        assertTrue(diagnostics.contains("subscriptionUrl").not())
+        assertTrue(diagnostics.contains("host=").not())
+    }
+
     private fun locateRepoRoot(): File {
         var dir = File(System.getProperty("user.dir") ?: ".").absoluteFile
         repeat(5) {
