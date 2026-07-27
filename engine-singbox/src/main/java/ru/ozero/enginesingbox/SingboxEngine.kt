@@ -38,6 +38,7 @@ import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.VpnSocketProtectorHolder
 import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
@@ -45,6 +46,7 @@ import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxfmt.protocolLabel
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyProfile
@@ -225,8 +227,9 @@ class SingboxEngine @Inject constructor(
             .onFailure { PersistentLoggers.warn(TAG, "beanBlob deserialize: ${it.message}") }
             .getOrNull() ?: return null
         val wrappers = chainWrapperBeans(config)
-        if (!ConfigBuilder.isSupportedBean(bean) || !bean.hasRoutableServerAddress()) {
-            PersistentLoggers.warn(TAG, "selected bean unsupported or unroutable")
+        val decision = ConfigBuilder.supportDecision(bean)
+        if (decision is BeanSupportDecision.Unsupported) {
+            logRejectedProfile(null, bean, decision, "selected")
             return null
         }
         return runCatching {
@@ -299,8 +302,10 @@ class SingboxEngine @Inject constructor(
         } else {
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
                 .getOrElse { return StartResult.Failure("chain deserialize: ${it.message}") }
-            if (!ConfigBuilder.isSupportedBean(bean) || !bean.hasRoutableServerAddress()) {
-                return StartResult.Failure("chain selected transport unsupported")
+            val decision = ConfigBuilder.supportDecision(bean)
+            if (decision is BeanSupportDecision.Unsupported) {
+                logRejectedProfile(null, bean, decision, "chain selected")
+                return StartResult.Failure("chain selected profile rejected: ${decision.error}")
             } else {
                 val wrappers = if (upstream == null) chainWrapperBeans(config) else emptyList()
                 runCatching {
@@ -463,19 +468,19 @@ class SingboxEngine @Inject constructor(
             clearRuntimeState()
             return ProbeResult.Failure("sing-box SOCKS5 listener is unavailable")
         }
-        val latency = routedProbe.probeLatencyMs(port)
-        return if (latency >= 0) {
-            ProbeResult.Success(latencyMs = latency)
-        } else {
-            PersistentLoggers.warn(
-                TAG,
-                "probe failed: routed probe returned $latency port=$port " +
-                    "chainMode=$chainMode runtimeRunning=$runtimeRunning",
-            )
-            ProbeResult.Failure(
-                "sing-box routed probe failed",
-                code = ProbeResult.Failure.Code.ROUTED_PROBE_FAILED,
-            )
+        return when (val result = routedProbe.probe(port)) {
+            is RoutedProbeResult.Success -> ProbeResult.Success(latencyMs = result.latencyMs)
+            is RoutedProbeResult.Failure -> {
+                PersistentLoggers.warn(
+                    TAG,
+                    "probe failed: reason=${result.reason} port=$port " +
+                        "chainMode=$chainMode runtimeRunning=$runtimeRunning",
+                )
+                ProbeResult.Failure(
+                    result.reason.probeFailureMessage(),
+                    code = ProbeResult.Failure.Code.ROUTED_PROBE_FAILED,
+                )
+            }
         }
     }
 
@@ -625,22 +630,22 @@ class SingboxEngine @Inject constructor(
     }
 
     private fun chainWrapperBeans(config: EngineConfig.Singbox): List<AbstractBean> =
-        config.chainBeanBlobs.mapNotNull { blob ->
+        config.chainBeanBlobs.mapIndexedNotNull { index, blob ->
             runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
                 .onFailure { PersistentLoggers.warn(TAG, "chain bean deserialize: ${it.message}") }
                 .getOrNull()
-                ?.takeIf { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
+                ?.takeIfSupported(index.toLong(), "chain")
         }
 
     private fun supportedBeans(blobs: List<ByteArray>): List<AbstractBean> =
         blobs.asSequence()
             .filter { it.size <= MAX_AUTO_SELECT_BLOB_BYTES }
             .take(MAX_AUTO_SELECT_OUTBOUNDS)
-            .mapNotNull { blob ->
+            .mapIndexedNotNull { index, blob ->
                 runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
                     .onFailure { e -> PersistentLoggers.warn(TAG, "bean deserialize: ${e.message}") }
                     .getOrNull()
-                    ?.takeIf { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
+                    ?.takeIfSupported(index.toLong(), "auto-select")
             }
             .toList()
 
@@ -648,8 +653,37 @@ class SingboxEngine @Inject constructor(
         if (blob.size > MAX_AUTO_SELECT_BLOB_BYTES) return false
         return runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
             .getOrNull()
-            ?.let { ConfigBuilder.isSupportedBean(it) && it.hasRoutableServerAddress() }
+            ?.let { ConfigBuilder.supportDecision(it) is BeanSupportDecision.Supported }
             ?: false
+    }
+
+    private fun AbstractBean.takeIfSupported(
+        profileId: Long?,
+        source: String,
+    ): AbstractBean? =
+        when (val decision = ConfigBuilder.supportDecision(this)) {
+            BeanSupportDecision.Supported -> this
+            is BeanSupportDecision.Unsupported -> {
+                logRejectedProfile(profileId, this, decision, source)
+                null
+            }
+        }
+
+    private fun logRejectedProfile(
+        profileId: Long?,
+        bean: AbstractBean,
+        decision: BeanSupportDecision.Unsupported,
+        source: String,
+    ) {
+        val standard = bean as? ru.ozero.singboxfmt.StandardV2RayBean
+        PersistentLoggers.warn(
+            TAG,
+            "singbox profile rejected source=$source id=${profileId ?: "unknown"} " +
+                "protocol=${bean.protocolLabel()} transport=${standard?.type.orEmpty()} " +
+                "security=${standard?.security.orEmpty()} headerType=${standard?.headerType.orEmpty()} " +
+                "hasSni=${standard?.sni?.isNotBlank() == true} hasHost=${standard?.host?.isNotBlank() == true} " +
+                "reason=${decision.error}",
+        )
     }
 
     private fun autoSelectBlobWindow(profiles: List<ProxyProfile>): List<ByteArray> =
@@ -667,17 +701,6 @@ class SingboxEngine @Inject constructor(
                 proxyChainDao.getAll().map { it.profileId }
             }
         }
-
-    private fun AbstractBean.hasRoutableServerAddress(): Boolean {
-        val host = serverAddress.trim().trim('[', ']').lowercase()
-        return host.isNotEmpty() &&
-            host != "localhost" &&
-            host != "0.0.0.0" &&
-            host != "::" &&
-            host != "::0" &&
-            host != "::1" &&
-            !host.startsWith("127.")
-    }
 
     private fun protocolTypeOf(bean: AbstractBean): Int = when (bean) {
         is VLESSBean -> PROTOCOL_VLESS
@@ -826,4 +849,17 @@ class SingboxEngine @Inject constructor(
         const val PROTOCOL_TROJAN = 2
         const val PROTOCOL_SHADOWSOCKS = 3
     }
+}
+
+private fun RoutedProbeResult.Reason.probeFailureMessage(): String = when (this) {
+    RoutedProbeResult.Reason.DNS -> "sing-box outbound DNS failed"
+    RoutedProbeResult.Reason.CONNECT -> "sing-box outbound connect failed"
+    RoutedProbeResult.Reason.TLS_CERTIFICATE -> "sing-box TLS certificate verification failed"
+    RoutedProbeResult.Reason.TLS_HANDSHAKE -> "sing-box TLS handshake failed"
+    RoutedProbeResult.Reason.TLS -> "sing-box outbound TLS failed"
+    RoutedProbeResult.Reason.TIMEOUT -> "sing-box outbound timed out"
+    RoutedProbeResult.Reason.UNEXPECTED_RESPONSE ->
+        "sing-box connectivity endpoint returned unexpected response"
+    RoutedProbeResult.Reason.IO -> "sing-box outbound I/O failed"
+    RoutedProbeResult.Reason.SOCKS_NOT_READY -> "sing-box SOCKS5 listener is not ready"
 }

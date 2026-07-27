@@ -10,8 +10,13 @@ class V2RayFmtUtilsTest {
 
     @Test
     fun `mapTransportType normalizes sing-box aliases`() {
+        assertEquals("tcp", V2RayFmtUtils.mapTransportType("raw"))
+        assertEquals("tcp", V2RayFmtUtils.mapTransportType(" RAW "))
+        assertEquals("tcp", V2RayFmtUtils.mapTransportType(""))
         assertEquals("http", V2RayFmtUtils.mapTransportType("h2"))
+        assertEquals("http", V2RayFmtUtils.mapTransportType(" H2 "))
         assertEquals("splithttp", V2RayFmtUtils.mapTransportType("xhttp"))
+        assertEquals("splithttp", V2RayFmtUtils.mapTransportType(" XHTTP "))
         assertEquals("grpc", V2RayFmtUtils.mapTransportType("grpc"))
     }
 

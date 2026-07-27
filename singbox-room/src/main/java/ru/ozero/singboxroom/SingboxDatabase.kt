@@ -13,7 +13,7 @@ import ru.ozero.singboxroom.entity.SubscriptionGroup
 
 @Database(
     entities = [SubscriptionGroup::class, ProxyProfile::class, ProxyChainStep::class],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class SingboxDatabase : RoomDatabase() {
@@ -67,6 +67,15 @@ abstract class SingboxDatabase : RoomDatabase() {
                 db.execSQL(
                     "UPDATE `subscription_groups` SET `autoUpdate` = 1 " +
                         "WHERE `subscriptionUrl` != ''",
+                )
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `subscription_groups` ADD COLUMN `allowInsecureTls` " +
+                        "INTEGER NOT NULL DEFAULT 0",
                 )
             }
         }

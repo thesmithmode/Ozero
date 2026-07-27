@@ -10,11 +10,15 @@ import okhttp3.ResponseBody
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.SocketTimeoutException
+import java.net.URI
 import java.net.UnknownHostException
 import java.security.cert.CertPathValidatorException
 import java.security.cert.CertificateException
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLPeerUnverifiedException
+import ru.ozero.singboxconfig.BeanSupportDecision
+import ru.ozero.singboxconfig.BeanSupportError
+import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
@@ -22,6 +26,7 @@ import ru.ozero.singboxfmt.StandardV2RayBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.protocolLabel
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
@@ -35,6 +40,7 @@ class RawUpdater(
     private val groupDao: SubscriptionGroupDao,
     private val profileDao: ProxyProfileDao,
     private val userCaOkHttpClient: OkHttpClient = okHttpClient,
+    private val insecureOkHttpClient: OkHttpClient = okHttpClient,
 ) {
     suspend fun refresh(group: SubscriptionGroup): Result<Int> = withContext(Dispatchers.IO) {
         val lastAttemptAt = System.currentTimeMillis()
@@ -56,6 +62,7 @@ class RawUpdater(
                 val beans = Base64BundleParser.parse(body)
                     .ifEmpty { RawShareLinksParser.parse(body) }
                 if (beans.isEmpty()) throw SubscriptionNoProfilesException()
+                logSupportDiagnostics(group.id, beans)
 
                 val profiles = beans.take(MAX_PROFILES_PER_GROUP).mapIndexed { idx, bean ->
                     ProxyProfile(
@@ -135,22 +142,23 @@ class RawUpdater(
             }.onFailure { statusFailure ->
                 if (statusFailure !== failure) failure.addSuppressed(statusFailure)
             }
-            Log.w(TAG, "refresh failed groupId=${group.id} code=$errorCode")
+            Log.w(
+                TAG,
+                "refresh failed groupId=${group.id} code=$errorCode " +
+                    "causes=${failure.safeCauseDiagnostics(group.subscriptionUrl)}",
+            )
         }
         result
     }
 
-    private fun httpClientFor(group: SubscriptionGroup): OkHttpClient =
-        if (group.isBuiltin) okHttpClient else userCaOkHttpClient
+    private fun httpClientFor(group: SubscriptionGroup): OkHttpClient = when {
+        group.isBuiltin -> okHttpClient
+        group.allowInsecureTls -> insecureOkHttpClient
+        else -> userCaOkHttpClient
+    }
 
     private fun executeRequest(group: SubscriptionGroup, request: Request): Response {
-        val primary = httpClientFor(group)
-        return try {
-            primary.newCall(request).execute()
-        } catch (error: IOException) {
-            if (group.isBuiltin || primary === okHttpClient || !error.isSubscriptionCertificateFailure()) throw error
-            okHttpClient.newCall(request).execute()
-        }
+        return httpClientFor(group).newCall(request).execute()
     }
 
     companion object {
@@ -163,6 +171,36 @@ class RawUpdater(
         private const val USER_AGENT = "mihomo/1.19.23"
         private const val MAX_PROFILES_PER_GROUP = 2_000
         private const val MAX_SUBSCRIPTION_BYTES = 16L * 1024 * 1024
+
+        private fun logSupportDiagnostics(groupId: Long, beans: List<AbstractBean>) {
+            val decisions = beans.map { bean -> bean to ConfigBuilder.supportDecision(bean) }
+            val supportedCount = decisions.count { it.second is BeanSupportDecision.Supported }
+            val rejected = decisions.mapNotNull { (bean, decision) ->
+                (decision as? BeanSupportDecision.Unsupported)?.let { RejectedBean(bean, it.error) }
+            }
+            Log.i(
+                TAG,
+                "subscription parsed groupId=$groupId parsed=${beans.size} supported=$supportedCount " +
+                    "rejected=${rejected.size} byProtocol=${rejected.groupByProtocol()} " +
+                    "byTransport=${rejected.groupByTransport()} byReason=${rejected.groupByReason()}",
+            )
+        }
+
+        private data class RejectedBean(val bean: AbstractBean, val error: BeanSupportError)
+
+        private fun List<RejectedBean>.groupByProtocol(): String =
+            groupingBy { it.bean.protocolLabel() }.eachCount().stableDiagnosticString()
+
+        private fun List<RejectedBean>.groupByTransport(): String =
+            groupingBy { (it.bean as? StandardV2RayBean)?.type.orEmpty().ifBlank { "none" } }
+                .eachCount()
+                .stableDiagnosticString()
+
+        private fun List<RejectedBean>.groupByReason(): String =
+            groupingBy { it.error.name }.eachCount().stableDiagnosticString()
+
+        private fun Map<String, Int>.stableDiagnosticString(): String =
+            entries.sortedBy { it.key }.joinToString(prefix = "{", postfix = "}") { "${it.key}=${it.value}" }
 
         private fun normalizeError(e: Throwable): Throwable = when {
             e.isSubscriptionCertificateFailure() ->
@@ -182,6 +220,32 @@ class RawUpdater(
             error.causeChain().any { it is IllegalArgumentException } -> SubscriptionRefreshErrorCode.INVALID_URL
             error.causeChain().any { it is IOException } -> SubscriptionRefreshErrorCode.NETWORK
             else -> SubscriptionRefreshErrorCode.UNKNOWN
+        }
+
+        private fun Throwable.safeCauseDiagnostics(subscriptionUrl: String): String {
+            val host = runCatching { URI(subscriptionUrl).host }.getOrNull().orEmpty()
+            val causes = causeChain()
+                .map { cause -> cause.safeCauseLabel() }
+                .distinct()
+                .joinToString(prefix = "[", postfix = "]")
+            return "host=${host.ifBlank { "unknown" }} chain=$causes"
+        }
+
+        private fun Throwable.safeCauseLabel(): String {
+            val text = message.orEmpty().lowercase()
+            val flags = listOfNotNull(
+                "expired".takeIf { text.contains("expired") || text.contains("not after") },
+                "hostname_mismatch".takeIf { text.contains("hostname") || text.contains("peer not authenticated") },
+                "trust_anchor".takeIf { text.contains("trust anchor") },
+                "certificate_path_validation".takeIf {
+                    this is CertPathValidatorException || text.contains("certpath") || text.contains("pkix")
+                },
+            )
+            return if (flags.isEmpty()) {
+                javaClass.simpleName
+            } else {
+                "${javaClass.simpleName}:${flags.joinToString(",")}"
+            }
         }
 
         private fun Throwable.isSubscriptionCertificateFailure(): Boolean {

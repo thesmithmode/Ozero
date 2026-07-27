@@ -86,7 +86,7 @@ class ConfigBuilderDefaultCoverageTest {
 
         val wsJson = ConfigBuilder.buildSingboxConfig(ws)
         val grpcJson = ConfigBuilder.buildSingboxConfig(grpcReality)
-        val ssJson = ConfigBuilder.buildSingboxConfig(ss)
+        assertFailsWith<IllegalArgumentException> { ConfigBuilder.buildSingboxConfig(ss) }
 
         assertContains(wsJson, "\"max_early_data\":2048")
         assertContains(wsJson, "\"early_data_header_name\":\"Sec-WebSocket-Protocol\"")
@@ -94,7 +94,6 @@ class ConfigBuilderDefaultCoverageTest {
         assertContains(wsJson, "\"certificate\":\"pem\"")
         assertContains(grpcJson, "\"type\":\"grpc\"")
         assertContains(grpcJson, "\"reality\":{\"enabled\":true")
-        assertContains(ssJson, "\"plugin_opts\":\"obfs=http;obfs-host=edge.example\"")
     }
 
     @Test

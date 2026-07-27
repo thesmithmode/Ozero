@@ -358,7 +358,7 @@ class RawUpdaterTest {
     }
 
     @Test
-    fun `should retry custom subscription with system trust after certificate failure`() = runBlocking {
+    fun `should keep custom subscription strict after certificate failure`() = runBlocking {
         val systemCalls = AtomicInteger(0)
         val userCaCalls = AtomicInteger(0)
         rawUpdater = RawUpdater(
@@ -377,14 +377,38 @@ class RawUpdaterTest {
                 }
                 .build(),
         )
-        server.enqueue(MockResponse().setBody(vless1))
         val g = group().copy(isBuiltin = false)
 
         val result = rawUpdater.refresh(g)
 
-        assertTrue(result.isSuccess, "Expected success but got ${result.exceptionOrNull()}")
+        assertTrue(result.isFailure)
         assertEquals(1, userCaCalls.get())
-        assertEquals(1, systemCalls.get())
+        assertEquals(0, systemCalls.get())
+    }
+
+    @Test
+    fun `should use isolated insecure client only when user enables it`() = runBlocking {
+        val insecureCalls = AtomicInteger(0)
+        rawUpdater = RawUpdater(
+            okHttpClient = OkHttpClient(),
+            groupDao = groupDao,
+            profileDao = profileDao,
+            userCaOkHttpClient = OkHttpClient.Builder()
+                .addInterceptor { throw SSLHandshakeException("certificate path") }
+                .build(),
+            insecureOkHttpClient = OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    insecureCalls.incrementAndGet()
+                    chain.proceed(chain.request())
+                }
+                .build(),
+        )
+        server.enqueue(MockResponse().setBody(vless1))
+
+        val result = rawUpdater.refresh(group().copy(isBuiltin = false, allowInsecureTls = true))
+
+        assertTrue(result.isSuccess)
+        assertEquals(1, insecureCalls.get())
     }
 
     @Test

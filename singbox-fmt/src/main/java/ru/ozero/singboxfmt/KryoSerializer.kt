@@ -34,11 +34,28 @@ object KryoSerializer {
     }
 
     @Suppress("UNCHECKED_CAST")
+    fun <T : AbstractBean> copy(bean: T): T {
+        val kryo = pool.obtain()
+        return try {
+            val baos = ByteArrayOutputStream(256)
+            ByteBufferOutput(baos).use { out ->
+                kryo.writeClassAndObject(out, bean)
+                out.flush()
+            }
+            ByteBufferInput(baos.toByteArray()).use { inp ->
+                kryo.readClassAndObject(inp) as T
+            }
+        } finally {
+            pool.free(kryo)
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
     fun <T : AbstractBean> deserialize(bytes: ByteArray): T {
         val kryo = pool.obtain()
         return try {
             ByteBufferInput(bytes).use { inp ->
-                kryo.readClassAndObject(inp) as T
+                (kryo.readClassAndObject(inp) as T).applyCanonicalDefaults() as T
             }
         } finally {
             pool.free(kryo)

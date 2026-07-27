@@ -557,6 +557,8 @@ class SingboxEngineProbeTest {
         val engine = buildEngine()
         engine.routedProbe = object : SingboxRoutedProbe {
             override suspend fun probeLatencyMs(socksPort: Int): Long = SingboxHttp204RoutedProbe.LATENCY_FAILED
+            override suspend fun probe(socksPort: Int): RoutedProbeResult =
+                RoutedProbeResult.Failure(RoutedProbeResult.Reason.DNS)
         }
         val process = mockk<ISingboxEngineProcess>()
         every { process.runtimeRunning() } returns true
@@ -567,13 +569,13 @@ class SingboxEngineProbeTest {
             val result = engine.probe()
 
             assertTrue(result is ProbeResult.Failure)
-            assertTrue(result.reason.contains("routed probe"))
+            assertTrue(result.reason.contains("DNS"))
             assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
         }
     }
 
     @Test
-    fun `awaitReady accepts local socks listener when routed probe fails`() = runTest {
+    fun `awaitReady accepts local socks listener without routed probe`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = object : SingboxRoutedProbe {
             override suspend fun probeLatencyMs(socksPort: Int): Long = SingboxHttp204RoutedProbe.LATENCY_FAILED
@@ -592,7 +594,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `awaitReady accepts warm auto select runtime when local socks is available`() = runTest {
+    fun `awaitReady accepts warm auto select runtime without routed probe`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
         val process = mockk<ISingboxEngineProcess>()
@@ -611,7 +613,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `awaitReady accepts warm tun auto select runtime when local socks is available`() = runTest {
+    fun `awaitReady accepts warm tun auto select runtime without routed probe`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
         val process = mockk<ISingboxEngineProcess>()
@@ -632,7 +634,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `awaitReady ignores external routed probe when socks5 is ready`() = runTest {
+    fun `awaitReady does not call external routed probe when socks5 is ready`() = runTest {
         val engine = buildEngine()
         var calls = 0
         engine.routedProbe = SingboxRoutedProbe {

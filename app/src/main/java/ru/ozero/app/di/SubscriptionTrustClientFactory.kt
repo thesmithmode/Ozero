@@ -27,6 +27,19 @@ object SubscriptionTrustClientFactory {
             .build()
     }
 
+    fun createInsecure(): OkHttpClient {
+        val trustManager = object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
+            override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
+            override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = emptyArray()
+        }
+        val context = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trustManager), null) }
+        return timeoutBuilder()
+            .sslSocketFactory(context.socketFactory, trustManager)
+            .hostnameVerifier { _, _ -> true }
+            .build()
+    }
+
     private fun timeoutBuilder(): OkHttpClient.Builder = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)

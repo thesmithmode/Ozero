@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
+import ru.ozero.enginescore.PersistentLoggers
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
@@ -36,9 +37,11 @@ import ru.ozero.enginesingbox.ISingboxProtector
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.SingboxHttp204RoutedProbe
 import ru.ozero.enginesingbox.SingboxPrefs
+import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxfmt.protocolLabel
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import java.net.InetAddress
@@ -87,7 +90,11 @@ class SingboxProbeService internal constructor(
         )
         val probeCandidates = profiles.mapNotNull { profile ->
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(profile.beanBlob) }.getOrNull()
-            if (bean == null || !ConfigBuilder.isSupportedBean(bean) || !bean.hasRoutableServerAddress()) {
+            val decision = bean?.let { ConfigBuilder.supportDecision(it) }
+            if (bean == null || decision is BeanSupportDecision.Unsupported) {
+                if (bean != null && decision is BeanSupportDecision.Unsupported) {
+                    logRejectedProfile(profile.id, bean, decision)
+                }
                 profileDao.updateProbeResult(profile.id, LATENCY_FAILED, PROBE_ERROR_UNSUPPORTED)
                 null
             } else {
@@ -448,14 +455,13 @@ private class SingboxServiceProfileProbe(
         const val SINGLE_PROFILE_ID = 0L
     }
 }
-
-private fun AbstractBean.hasRoutableServerAddress(): Boolean {
-    val host = serverAddress.trim().trim('[', ']').lowercase()
-    return host.isNotEmpty() &&
-        host != "localhost" &&
-        host != "0.0.0.0" &&
-        host != "::" &&
-        host != "::0" &&
-        host != "::1" &&
-        !host.startsWith("127.")
+private fun logRejectedProfile(profileId: Long, bean: AbstractBean, decision: BeanSupportDecision.Unsupported) {
+    val standard = bean as? ru.ozero.singboxfmt.StandardV2RayBean
+    PersistentLoggers.warn(
+        "SingboxProbeService",
+        "singbox profile rejected id=$profileId protocol=${bean.protocolLabel()} " +
+            "transport=${standard?.type.orEmpty()} security=${standard?.security.orEmpty()} " +
+            "headerType=${standard?.headerType.orEmpty()} hasSni=${standard?.sni?.isNotBlank() == true} " +
+            "hasHost=${standard?.host?.isNotBlank() == true} reason=${decision.error}",
+    )
 }
