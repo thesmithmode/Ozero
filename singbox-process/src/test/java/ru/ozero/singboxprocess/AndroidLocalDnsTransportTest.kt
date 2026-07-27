@@ -2,6 +2,7 @@ package ru.ozero.singboxprocess
 
 import android.net.DnsResolver
 import android.system.ErrnoException
+import android.system.OsConstants
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
@@ -80,8 +81,11 @@ class AndroidLocalDnsTransportTest {
 
     @Test
     fun `ErrnoException reports errno and completes request`() = runBlocking {
-        val error = mockk<DnsResolver.DnsException>()
-        every { error.cause } returns ErrnoException("dns", 13)
+        val expectedErrno = OsConstants.EACCES
+        val error = DnsResolver.DnsException(
+            DnsResolver.ERROR_SYSTEM,
+            ErrnoException("dns", expectedErrno),
+        )
         var errno = 0
 
         awaitDnsCallback<ByteArray>(
@@ -90,7 +94,7 @@ class AndroidLocalDnsTransportTest {
             onErrno = { errno = it },
         )
 
-        assertEquals(13, errno)
+        assertEquals(expectedErrno, errno)
     }
 
     @Test

@@ -28,17 +28,20 @@ enum class BeanSupportError {
     INVALID_SERVER,
     MISSING_CREDENTIALS,
     UNSUPPORTED_BEAN_TYPE,
+    UNSUPPORTED_SECURITY,
     UNSUPPORTED_TRANSPORT,
     UNSUPPORTED_TCP_HEADER,
     UNSUPPORTED_QUIC_SECURITY,
     INVALID_REALITY_PUBLIC_KEY,
     INVALID_REALITY_SHORT_ID,
     UNSUPPORTED_GRPC_MULTI_MODE,
+    UNSUPPORTED_GRPC_COMPAT_MODE,
     UNSUPPORTED_ECH,
     UNSUPPORTED_MTLS,
     UNSUPPORTED_CERTIFICATE_PINNING,
     MISSING_REALITY_SERVER_NAME,
     UNSUPPORTED_VLESS_FLOW,
+    UNSUPPORTED_VLESS_ENCRYPTION,
     UNSUPPORTED_PACKET_ENCODING,
     UNSUPPORTED_MUX,
     UNSUPPORTED_BROWSER_FORWARDER,
@@ -56,6 +59,8 @@ sealed interface BeanSupportDecision {
 object ConfigBuilder {
 
     private val SUPPORTED_TRANSPORTS = setOf("tcp", "ws", "grpc", "http", "h2", "httpupgrade", "")
+    private val SUPPORTED_SECURITY = setOf("", "none", "tls", "reality")
+    private val SUPPORTED_VLESS_ENCRYPTION = setOf("", "none")
     private const val MIN_PORT = 1
     private const val MAX_PORT = 65_535
     private const val MAX_AUTO_OUTBOUNDS = 50
@@ -123,12 +128,21 @@ object ConfigBuilder {
 
     private fun supportDecision(bean: StandardV2RayBean): BeanSupportDecision {
         val error = listOfNotNull(
+            BeanSupportError.UNSUPPORTED_SECURITY.takeIf {
+                bean.security.trim().lowercase() !in SUPPORTED_SECURITY
+            },
             BeanSupportError.UNSUPPORTED_VLESS_FLOW.takeIf {
                 bean is VLESSBean && normalizeVlessFlow(bean.flow) == null
+            },
+            BeanSupportError.UNSUPPORTED_VLESS_ENCRYPTION.takeIf {
+                bean is VLESSBean && bean.encryption.trim().lowercase() !in SUPPORTED_VLESS_ENCRYPTION
             },
             BeanSupportError.UNSUPPORTED_TRANSPORT.takeIf { bean.type !in SUPPORTED_TRANSPORTS },
             BeanSupportError.UNSUPPORTED_TCP_HEADER.takeIf { bean.hasUnsupportedTcpHeader() },
             BeanSupportError.UNSUPPORTED_GRPC_MULTI_MODE.takeIf { bean.type == "grpc" && bean.grpcMultiMode },
+            BeanSupportError.UNSUPPORTED_GRPC_COMPAT_MODE.takeIf {
+                bean.type == "grpc" && bean.grpcServiceNameCompat
+            },
             BeanSupportError.MISSING_REALITY_SERVER_NAME.takeIf { bean.hasMissingRealityServerName() },
             BeanSupportError.UNSUPPORTED_PACKET_ENCODING.takeIf { bean.hasUnsupportedPacketEncoding() },
             BeanSupportError.UNSUPPORTED_MUX.takeIf { bean.hasUnsupportedMux() },
@@ -591,7 +605,7 @@ private fun vlessOutbound(bean: VLESSBean, tag: String, detour: String? = null):
 private fun normalizeVlessFlow(flow: String): String? = when (val normalized = flow.trim().lowercase()) {
     "", "none" -> ""
     VLESS_FLOW_XTLS_VISION -> normalized
-    else -> VLESS_FLOW_XTLS_VISION.takeIf { normalized.startsWith("$VLESS_FLOW_XTLS_VISION-") }
+    else -> null
 }
 
 private fun vmessOutbound(bean: VMessBean, tag: String, detour: String? = null): String {

@@ -62,6 +62,45 @@ class ConfigBuilderSupportDecisionTest {
     }
 
     @Test
+    fun `only stock V2Ray security modes are supported`() {
+        listOf("", "none", "tls").forEach { security ->
+            assertEquals(BeanSupportDecision.Supported, vless(security = security).supportDecision())
+        }
+        assertEquals(BeanSupportDecision.Supported, reality().supportDecision())
+        listOf("xtls", "provider-security").forEach { security ->
+            assertSupportError(BeanSupportError.UNSUPPORTED_SECURITY, vless(security = security).supportDecision())
+        }
+    }
+
+    @Test
+    fun `unsupported VLESS encryption is rejected`() {
+        listOf("", "none").forEach { encryption ->
+            assertEquals(
+                BeanSupportDecision.Supported,
+                vless().apply { this.encryption = encryption }.supportDecision(),
+            )
+        }
+        assertSupportError(
+            BeanSupportError.UNSUPPORTED_VLESS_ENCRYPTION,
+            vless().apply { encryption = "aes-128-gcm" }.supportDecision(),
+        )
+    }
+
+    @Test
+    fun `gRPC compatibility mode is rejected`() {
+        val decision = vless(type = "grpc").apply { grpcServiceNameCompat = true }.supportDecision()
+
+        assertSupportError(BeanSupportError.UNSUPPORTED_GRPC_COMPAT_MODE, decision)
+    }
+
+    @Test
+    fun `VLESS vision suffix is rejected`() {
+        val decision = vless().apply { flow = "xtls-rprx-vision-provider" }.supportDecision()
+
+        assertSupportError(BeanSupportError.UNSUPPORTED_VLESS_FLOW, decision)
+    }
+
+    @Test
     fun `Shadowsocks plugin is rejected`() {
         val bean = ShadowsocksBean().apply {
             serverAddress = "proxy.example.com"
