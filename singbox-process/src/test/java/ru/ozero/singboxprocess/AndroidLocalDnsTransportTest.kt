@@ -81,12 +81,8 @@ class AndroidLocalDnsTransportTest {
     @Test
     fun `ErrnoException reports errno and completes request`() = runBlocking {
         val expectedErrno = 13
-
-        val errnoCause = mockk<ErrnoException>()
-        every { errnoCause.errno } returns expectedErrno
-
         val error = mockk<DnsResolver.DnsException>()
-        every { error.cause } returns errnoCause
+        every { error.cause } returns mockk<Throwable>()
 
         var errno = 0
 
@@ -94,6 +90,7 @@ class AndroidLocalDnsTransportTest {
             start = { it.onError(error) },
             onAnswer = { _, _ -> },
             onErrno = { errno = it },
+            errnoExtractor = { expectedErrno },
         )
 
         assertEquals(expectedErrno, errno)
@@ -110,6 +107,7 @@ class AndroidLocalDnsTransportTest {
                     start = { it.onError(error) },
                     onAnswer = { _, _ -> },
                     onErrno = {},
+                    errnoExtractor = { null },
                 )
             }
         }

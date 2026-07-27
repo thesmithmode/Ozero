@@ -338,17 +338,19 @@ class ConfigBuilderBranchCoverageTest {
     }
 
     @Test
-    fun `vless flow normalization keeps vision variants only`() {
-        val blank = ConfigBuilder.buildSingboxConfig(vless().apply { flow = " " })
-        val exact = ConfigBuilder.buildSingboxConfig(vless().apply { flow = "xtls-rprx-vision" })
-        val suffixed = ConfigBuilder.buildSingboxConfig(vless().apply { flow = "xtls-rprx-vision-udp443" })
-        assertFailsWith<IllegalArgumentException> {
-            ConfigBuilder.buildSingboxConfig(vless().apply { flow = "unknown-flow" })
+    fun `vless flow accepts only blank none and exact vision`() {
+        listOf(" ", "none", "xtls-rprx-vision").forEach { flow ->
+            assertEquals(
+                BeanSupportDecision.Supported,
+                ConfigBuilder.supportDecision(vless().apply { this.flow = flow }),
+            )
         }
-
-        assertFalse(blank.contains("\"flow\""))
-        assertContains(exact, "\"flow\":\"xtls-rprx-vision\"")
-        assertContains(suffixed, "\"flow\":\"xtls-rprx-vision\"")
+        listOf("xtls-rprx-vision-provider", "xtls-rprx-direct").forEach { flow ->
+            assertEquals(
+                BeanSupportDecision.Unsupported(BeanSupportError.UNSUPPORTED_VLESS_FLOW),
+                ConfigBuilder.supportDecision(vless().apply { this.flow = flow }),
+            )
+        }
     }
 
     @Test

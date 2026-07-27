@@ -133,6 +133,9 @@ internal suspend fun <T : Any> awaitDnsCallback(
     start: (DnsResolver.Callback<T>) -> Unit,
     onAnswer: (T, Int) -> Unit,
     onErrno: (Int) -> Unit,
+    errnoExtractor: (Throwable?) -> Int? = { cause ->
+        (cause as? ErrnoException)?.errno
+    },
 ) = suspendCoroutine { continuation ->
     val completed = AtomicBoolean(false)
     fun complete(action: () -> Unit) {
@@ -151,9 +154,9 @@ internal suspend fun <T : Any> awaitDnsCallback(
             }
 
             override fun onError(error: DnsResolver.DnsException) {
-                val cause = error.cause
-                if (cause is ErrnoException) {
-                    complete { onErrno(cause.errno) }
+                val errno = errnoExtractor(error.cause)
+                if (errno != null) {
+                    complete { onErrno(errno) }
                 } else {
                     complete { throw error }
                 }
