@@ -62,4 +62,13 @@ class SingboxRuntimeDiagnosticsTest {
         assertEquals("remote-closed", nativeLogCategory("upstream EOF from private.example"))
         assertEquals(null, nativeLogCategory("listener started at private.example"))
     }
+
+    @Test
+    fun `native log classification prioritizes terminal transport state`() {
+        assertEquals("remote-closed", nativeLogCategory("connection closed"))
+        assertEquals("connect", nativeLogCategory("connect: connection refused"))
+        assertEquals("dial", nativeLogCategory("dial tcp: timeout"))
+        assertEquals("network-unavailable", nativeLogCategory("network unavailable"))
+        assertEquals("remote-closed", nativeLogCategory("write: broken pipe"))
+    }
 }

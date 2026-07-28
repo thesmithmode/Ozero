@@ -16,6 +16,7 @@ import io.nekohasekai.libbox.LocalDNSTransport
 import io.nekohasekai.libbox.LogIterator
 import io.nekohasekai.libbox.NetworkInterfaceIterator
 import io.nekohasekai.libbox.Notification
+import io.nekohasekai.libbox.OutboundGroupItemIterator
 import io.nekohasekai.libbox.OutboundGroupIterator
 import io.nekohasekai.libbox.OverrideOptions
 import io.nekohasekai.libbox.PlatformInterface
@@ -121,7 +122,7 @@ internal object SingboxRuntime {
                     // Go код дёргает options.AutoRedirect без nil-check → SIGABRT при null
                     server.startOrReloadService(singboxJsonConfig, OverrideOptions())
                     PersistentLoggers.debug(TAG, "checkpoint: post-startOrReloadService (box running)")
-                    withContext(Dispatchers.IO) { startNativeLogSubscription() }
+                    startNativeLogSubscription()
                 } catch (e: Exception) {
                     PersistentLoggers.error(TAG, "startOrReloadService failed: ${e.message}")
                     server.close()
@@ -151,29 +152,33 @@ internal object SingboxRuntime {
 
     fun getLastStatus(): StatusMessage? = lastStatus
 
-    private fun startNativeLogSubscription() {
-        stopNativeLogSubscription()
-        val options = CommandClientOptions()
-        options.addCommand(Libbox.CommandLog)
-        options.addCommand(Libbox.CommandStatus)
-        options.statusInterval = STATUS_INTERVAL_NANOS
-        val client = CommandClient(NativeLogHandler(), options)
-        runCatching { client.connect() }
-            .onSuccess {
-                logClient = client
-                PersistentLoggers.debug(TAG, "native log subscription connected")
-            }
-            .onFailure {
-                runCatching { client.disconnect() }
-                PersistentLoggers.warn(TAG, "native log subscription failed")
-            }
+    private suspend fun startNativeLogSubscription() {
+        withContext(Dispatchers.IO) {
+            stopNativeLogSubscription()
+            val options = CommandClientOptions()
+            options.addCommand(Libbox.CommandLog)
+            options.addCommand(Libbox.CommandStatus)
+            options.statusInterval = STATUS_INTERVAL_NANOS
+            val client = CommandClient(NativeLogHandler(), options)
+            runCatching { client.connect() }
+                .onSuccess {
+                    logClient = client
+                    PersistentLoggers.debug(TAG, "native log subscription connected")
+                }
+                .onFailure {
+                    runCatching { client.disconnect() }
+                    PersistentLoggers.warn(TAG, "native log subscription failed")
+                }
+        }
     }
 
-    private fun stopNativeLogSubscription() {
-        val client = logClient ?: return
-        logClient = null
-        runCatching { client.disconnect() }
-            .onFailure { PersistentLoggers.warn(TAG, "native log subscription stop failed") }
+    private suspend fun stopNativeLogSubscription() {
+        withContext(Dispatchers.IO) {
+            val client = logClient ?: return@withContext
+            logClient = null
+            runCatching { client.disconnect() }
+                .onFailure { PersistentLoggers.warn(TAG, "native log subscription stop failed") }
+        }
     }
 
     private class NativeLogHandler : CommandClientHandler {
@@ -206,6 +211,8 @@ internal object SingboxRuntime {
         }
 
         override fun writeGroups(message: OutboundGroupIterator?) {}
+
+        override fun writeOutbounds(message: OutboundGroupItemIterator?) {}
 
         override fun initializeClashMode(modeList: StringIterator, currentMode: String) {}
 
@@ -369,6 +376,7 @@ internal fun nativeLogCategory(message: String): String? {
         "eof",
         "reset",
         "closed",
+        "broken pipe",
         "rejected",
     ).any(normalized::contains)
     if (!failure) return null
@@ -379,10 +387,11 @@ internal fun nativeLogCategory(message: String): String? {
         "tls" in normalized && "handshake" in normalized -> "tls-handshake"
         "default interface" in normalized -> "default-interface"
         "dns" in normalized || "resolve" in normalized -> "dns"
-        "dial" in normalized -> "dial"
-        "connect" in normalized -> "connect"
         "no route" in normalized || "route" in normalized -> "route"
-        "eof" in normalized || "reset" in normalized || "closed" in normalized -> "remote-closed"
+        "eof" in normalized || "reset" in normalized || "closed" in normalized || "broken pipe" in normalized ->
+            "remote-closed"
+        "connect" in normalized || "refused" in normalized -> "connect"
+        "dial" in normalized -> "dial"
         "network" in normalized && ("unavailable" in normalized || "down" in normalized) ->
             "network-unavailable"
         else -> null
