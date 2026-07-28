@@ -23,6 +23,61 @@ import kotlin.test.assertTrue
 class SingboxHttp204RoutedProbeTest {
 
     @Test
+    fun `dominant failure wins over last endpoint failure`() {
+        val result = representativeProbeFailure(
+            listOf(
+                RoutedProbeFailureSample(
+                    RoutedProbeResult.Reason.REMOTE_CLOSED,
+                    "remote-closed",
+                    "EOFException",
+                    "gstatic",
+                ),
+                RoutedProbeFailureSample(
+                    RoutedProbeResult.Reason.REMOTE_CLOSED,
+                    "remote-closed",
+                    "SocketException",
+                    "cloudflare",
+                ),
+                RoutedProbeFailureSample(
+                    RoutedProbeResult.Reason.UNEXPECTED_RESPONSE,
+                    "unexpected-response",
+                    "none",
+                    "msft",
+                ),
+            ),
+        )
+
+        assertEquals(RoutedProbeResult.Reason.REMOTE_CLOSED, result.reason)
+        assertEquals(
+            "endpoints=3 dominant=remote-closed counts=remote-closed:2,unexpected-response:1 " +
+                "sampleRoot=EOFException sampleEndpoint=gstatic",
+            result.safeDetail,
+        )
+    }
+
+    @Test
+    fun `diagnostic priority breaks equal failure counts`() {
+        val result = representativeProbeFailure(
+            listOf(
+                RoutedProbeFailureSample(
+                    RoutedProbeResult.Reason.TIMEOUT,
+                    "timeout",
+                    "SocketTimeoutException",
+                    "gstatic",
+                ),
+                RoutedProbeFailureSample(
+                    RoutedProbeResult.Reason.TLS_CERTIFICATE,
+                    "tls-certificate",
+                    "CertificateException",
+                    "cloudflare",
+                ),
+            ),
+        )
+
+        assertEquals(RoutedProbeResult.Reason.TLS_CERTIFICATE, result.reason)
+    }
+
+    @Test
     fun `routed probe rejects non positive socks ports without opening connection`() = runTest {
         val probe = SingboxHttp204RoutedProbe(
             probeUrl = URL("http://127.0.0.1/generate_204"),

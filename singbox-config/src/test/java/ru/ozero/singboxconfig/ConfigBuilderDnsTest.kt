@@ -137,6 +137,8 @@ class ConfigBuilderDnsTest {
 
         assertContains(disabled, "\"server\":\"8.8.8.8\"")
         assertFalse(disabled.contains("2001:4860:4860::8888"))
+        assertContains(disabled, "\"strategy\":\"ipv4_only\"")
         assertContains(enabled, "\"server\":\"2001:4860:4860::8888\"")
+        assertFalse(enabled.contains("\"strategy\":\"ipv4_only\""))
     }
 }

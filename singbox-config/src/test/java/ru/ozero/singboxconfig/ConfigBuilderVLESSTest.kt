@@ -55,6 +55,7 @@ class ConfigBuilderVLESSTest {
         val json = ConfigBuilder.buildSingboxConfig(makeBean(uuid = uuid))
 
         assertContains(json, uuid)
+        assertContains(json, "\"log\":{\"level\":\"warn\"")
     }
 
     @Test

@@ -54,6 +54,50 @@ sealed interface RoutedProbeResult {
     }
 }
 
+internal data class RoutedProbeFailureSample(
+    val reason: RoutedProbeResult.Reason,
+    val label: String,
+    val rootClass: String,
+    val endpoint: String,
+)
+
+internal fun representativeProbeFailure(
+    failures: List<RoutedProbeFailureSample>,
+): RoutedProbeResult.Failure {
+    if (failures.isEmpty()) return RoutedProbeResult.Failure(RoutedProbeResult.Reason.TIMEOUT)
+    val counts = failures.groupingBy(RoutedProbeFailureSample::reason).eachCount()
+    val dominant = counts.entries.maxWithOrNull(
+        compareBy<Map.Entry<RoutedProbeResult.Reason, Int>> { it.value }
+            .thenByDescending { FAILURE_PRIORITY.indexOf(it.key) },
+    )?.key ?: RoutedProbeResult.Reason.TIMEOUT
+    val sample = failures.first { it.reason == dominant }
+    val countDetail = failures
+        .groupingBy(RoutedProbeFailureSample::label)
+        .eachCount()
+        .toSortedMap()
+        .entries
+        .joinToString(",") { (label, count) -> "$label:$count" }
+    return RoutedProbeResult.Failure(
+        reason = dominant,
+        safeDetail = "endpoints=${failures.size} dominant=${sample.label} counts=$countDetail " +
+            "sampleRoot=${sample.rootClass} sampleEndpoint=${sample.endpoint}",
+    )
+}
+
+private val FAILURE_PRIORITY = listOf(
+    RoutedProbeResult.Reason.TLS_CERTIFICATE,
+    RoutedProbeResult.Reason.SOCKS_REPLY,
+    RoutedProbeResult.Reason.DNS,
+    RoutedProbeResult.Reason.CONNECT,
+    RoutedProbeResult.Reason.REMOTE_CLOSED,
+    RoutedProbeResult.Reason.TLS_HANDSHAKE,
+    RoutedProbeResult.Reason.TLS,
+    RoutedProbeResult.Reason.TIMEOUT,
+    RoutedProbeResult.Reason.UNEXPECTED_RESPONSE,
+    RoutedProbeResult.Reason.IO,
+    RoutedProbeResult.Reason.SOCKS_NOT_READY,
+)
+
 @Suppress("TooManyFunctions")
 class SingboxHttp204RoutedProbe(
     private val probeUrl: URL = URL(PROBE_URL),
@@ -96,7 +140,7 @@ class SingboxHttp204RoutedProbe(
         }
         val urls = listOf(probeUrl) + fallbackProbeUrls
         val endpoints = urls.distinctBy { it.toString() }.take(maxProbeUrls)
-        val failures = mutableListOf<ProbeFailure>()
+        val failures = mutableListOf<ClassifiedFailure>()
         for ((index, url) in endpoints.withIndex()) {
             val remainingTimeoutMs = remainingTimeoutMs(deadlineNanos) ?: break
             val attemptsLeft = endpoints.size - index
@@ -106,24 +150,12 @@ class SingboxHttp204RoutedProbe(
             if (latency >= 0) return RoutedProbeResult.Success(latency)
             failures += result.failure
         }
-        val failureSummary = if (failures.isEmpty()) {
-            "deadline=1"
-        } else {
-            failures
-                .groupingBy(ClassifiedFailure::label)
-                .eachCount()
-                .toSortedMap()
-                .entries
-                .joinToString(",") { (reason, count) -> "$reason=$count" }
-        }
+        val representative = representativeProbeFailure(failures.map(ClassifiedFailure::sample))
         PersistentLoggers.debug(
             TAG,
-            "routed probe failed: socksPort=$socksPort timeoutMs=$timeoutMs failures=$failureSummary",
+            "routed probe failed: socksPort=$socksPort timeoutMs=$timeoutMs ${representative.safeDetail}",
         )
-        return RoutedProbeResult.Failure(
-            failures.lastOrNull()?.reason ?: RoutedProbeResult.Reason.TIMEOUT,
-            failures.lastOrNull()?.safeDetail,
-        )
+        return representative
     }
 
     private fun isSocksPortReady(socksPort: Int, deadlineNanos: Long): Boolean {
@@ -319,21 +351,20 @@ class SingboxHttp204RoutedProbe(
     private data class ClassifiedFailure(
         val label: String,
         val reason: RoutedProbeResult.Reason,
-        val safeDetail: String,
-    )
+        val rootClass: String,
+        val endpoint: String,
+    ) {
+        fun sample(): RoutedProbeFailureSample = RoutedProbeFailureSample(reason, label, rootClass, endpoint)
+    }
 
     private fun ProbeFailure.withDetail(url: URL, error: Throwable?): ClassifiedFailure {
         val root = generateSequence(error) { it.cause }.take(MAX_CAUSE_DEPTH).lastOrNull()
         val rootClass = root?.javaClass?.simpleName ?: "none"
-        val message = when {
-            error == null && this == ProbeFailure.UNEXPECTED_RESPONSE -> "unexpected HTTP status"
-            error == null && this == ProbeFailure.UNSUPPORTED_RESPONSE -> "unsupported probe endpoint"
-            else -> sanitizeProbeMessage(root?.message)
-        }
         return ClassifiedFailure(
             label = label,
             reason = reason,
-            safeDetail = "endpoint=${endpointLabel(url)} root=$rootClass category=$label message=$message",
+            rootClass = rootClass,
+            endpoint = endpointLabel(url),
         )
     }
 
@@ -343,20 +374,6 @@ class SingboxHttp204RoutedProbe(
         url.host.contains("msft", true) -> "msft"
         else -> "custom"
     }
-
-    private fun sanitizeProbeMessage(message: String?): String = message
-        ?.lowercase()
-        ?.let { value ->
-            when {
-                value.isSocksReplyMessage() -> "SOCKS proxy rejected connection"
-                value.isRemoteCloseMessage() -> "remote closed connection"
-                "certificate" in value || "hostname" in value -> "certificate validation failed"
-                "handshake" in value -> "TLS protocol handshake failed"
-                "timed out" in value || "timeout" in value -> "operation timed out"
-                else -> "transport operation failed"
-            }
-        }
-        ?: "none"
 
     private fun String?.isRemoteCloseMessage(): Boolean {
         val value = this?.lowercase() ?: return false

@@ -383,7 +383,7 @@ object ConfigBuilder {
     ): String {
         val sb = StringBuilder()
         sb.append('{')
-        sb.append(""""log":{"level":"warn","timestamp":true},""")
+        sb.append(""""log":{"level":"debug","timestamp":true},""")
         sb.append(""""inbounds":[""")
         sb.append(inbounds.joinToString(","))
         sb.append("""],""")
@@ -413,7 +413,8 @@ object ConfigBuilder {
             add("{\"type\":\"local\",\"tag\":\"$DNS_LOCAL_TAG\"}")
             endpoints.mapIndexedTo(this) { index, endpoint -> dnsServer(endpoint, "dns-$index", detour) }
         }.joinToString(",")
-        return "\"dns\":{\"servers\":[$servers],\"final\":${jsonString(finalTag)}},"
+        val strategy = if (ipv6Enabled) "" else ",\"strategy\":\"ipv4_only\""
+        return "\"dns\":{\"servers\":[$servers],\"final\":${jsonString(finalTag)}$strategy},"
     }
 
     private fun normalizeDnsServers(dnsServers: List<String>, ipv6Enabled: Boolean): List<String> =

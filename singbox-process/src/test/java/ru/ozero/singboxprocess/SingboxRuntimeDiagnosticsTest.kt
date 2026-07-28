@@ -6,6 +6,7 @@ import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
 import kotlin.test.assertContains
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -47,5 +48,18 @@ class SingboxRuntimeDiagnosticsTest {
         assertTrue("connection closed".shouldPromoteSingboxMessage())
         assertTrue("TLS handshake failed".shouldPromoteSingboxMessage())
         assertFalse("started listener".shouldPromoteSingboxMessage())
+    }
+
+    @Test
+    fun `native log categories discard raw endpoint and credentials`() {
+        assertEquals(
+            "reality-handshake",
+            nativeLogCategory(
+                "reality handshake failed server=private.example uuid=12345678-1234-1234-1234-123456789abc",
+            ),
+        )
+        assertEquals("tls-certificate", nativeLogCategory("TLS certificate rejected for private.example"))
+        assertEquals("remote-closed", nativeLogCategory("upstream EOF from private.example"))
+        assertEquals(null, nativeLogCategory("listener started at private.example"))
     }
 }

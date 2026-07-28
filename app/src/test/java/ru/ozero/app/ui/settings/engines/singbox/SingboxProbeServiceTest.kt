@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import ru.ozero.enginesingbox.RoutedProbeResult
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.VpnSocketProtector
@@ -43,6 +44,17 @@ class SingboxProbeServiceTest {
     private val selectedProfileKey = longPreferencesKey("singbox_selected_profile_id")
     private val beanKey = byteArrayPreferencesKey("singbox_vless_bean")
     private val dnsServersKey = stringSetPreferencesKey("singbox_dns_servers")
+
+    @Test
+    fun `profile status stores stable category instead of diagnostic detail`() {
+        assertEquals("Remote closed", RoutedProbeResult.Reason.REMOTE_CLOSED.profileProbeStatus())
+        assertEquals("SOCKS rejected", RoutedProbeResult.Reason.SOCKS_REPLY.profileProbeStatus())
+        assertEquals("DNS failed", RoutedProbeResult.Reason.DNS.profileProbeStatus())
+        assertEquals("TLS certificate", RoutedProbeResult.Reason.TLS_CERTIFICATE.profileProbeStatus())
+        assertEquals("TLS handshake", RoutedProbeResult.Reason.TLS_HANDSHAKE.profileProbeStatus())
+        assertEquals("Timeout", RoutedProbeResult.Reason.TIMEOUT.profileProbeStatus())
+        assertEquals("Unexpected response", RoutedProbeResult.Reason.UNEXPECTED_RESPONSE.profileProbeStatus())
+    }
 
     @Test
     fun `profile protector permits proxy-only probe without active VPN`() {

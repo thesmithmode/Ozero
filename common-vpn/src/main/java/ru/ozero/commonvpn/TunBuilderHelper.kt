@@ -25,9 +25,10 @@ import ru.ozero.enginescore.TunSpec
 class TunBuilderHelper(
     private val service: VpnService,
     private val builderFactory: () -> VpnService.Builder = { service.Builder() },
+    private val ipv4Family: Int = android.system.OsConstants.AF_INET,
+    private val ipv6Family: Int = android.system.OsConstants.AF_INET6,
 ) {
 
-    @Suppress("UnusedParameter")
     fun applyEngineTunSpec(spec: TunSpec, ipv6Enabled: Boolean): VpnService.Builder {
         val builder = builderFactory()
             .setSession(spec.sessionName)
@@ -39,9 +40,10 @@ class TunBuilderHelper(
             runCatching { builder.addDnsServer(dns) }
                 .onFailure { PersistentLoggers.warn(TAG, "spec addDnsServer rejected '$dns': ${it.message}") }
         }
-        // Calling only one allowFamily makes Android drop the other family in split-tunnel blocklist mode.
-        builder.allowFamily(android.system.OsConstants.AF_INET)
-        builder.allowFamily(android.system.OsConstants.AF_INET6)
+        val ipv4Allowed = spec.allowFamilyV4
+        val ipv6Allowed = ipv6Enabled && spec.allowFamilyV6
+        if (ipv4Allowed) builder.allowFamily(ipv4Family)
+        if (ipv6Allowed) builder.allowFamily(ipv6Family)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching { builder.setMetered(false) }
         }
@@ -66,7 +68,7 @@ class TunBuilderHelper(
             addCidrRoutes(builder, spec.routeCidrsV4, "v4")
         }
         val v6 = spec.ipv6Address
-        if (spec.allowFamilyV6 && v6 != null) {
+        if (ipv6Allowed && v6 != null) {
             builder.addAddress(v6, spec.ipv6PrefixLength)
             if (spec.routeAllV6) {
                 builder.addRoute("::", 0)

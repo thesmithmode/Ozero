@@ -20,5 +20,10 @@ object VpnSocketProtectorHolder : VpnSocketProtector {
 
     fun isBound(): Boolean = current != null
 
+    fun protectIfBound(socketFd: Int): Boolean? {
+        val protector = current ?: return null
+        return protector.protect(socketFd)
+    }
+
     override fun protect(socketFd: Int): Boolean = current?.protect(socketFd) ?: false
 }

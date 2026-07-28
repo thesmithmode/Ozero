@@ -26,6 +26,7 @@ class ConfigBuilderProbeTest {
         assertContains(json, "\"inbound\":[\"probe-in-0\"],\"outbound\":\"probe-out-0\"")
         assertContains(json, "\"inbound\":[\"probe-in-1\"],\"outbound\":\"probe-out-1\"")
         assertContains(json, "\"final\":\"block\"")
+        assertContains(json, "\"log\":{\"level\":\"debug\"")
         assertFalse(json.contains("\"type\":\"tun\""))
     }
 

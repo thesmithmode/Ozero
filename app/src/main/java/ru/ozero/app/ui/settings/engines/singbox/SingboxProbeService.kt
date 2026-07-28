@@ -387,7 +387,7 @@ private class SingboxServiceProfileProbe(
                         "profile probe outbound failed ${result.safeDetail ?: "category=${result.reason.name.lowercase()}"}",
                     )
                     if (attempt == PROBE_ATTEMPTS - 1 && result.safeDetail != null) {
-                        return SingboxProbeOutcome.Failure(result.safeDetail)
+                        return SingboxProbeOutcome.Failure(result.reason.profileProbeStatus())
                     }
                 }
             }
@@ -468,25 +468,50 @@ private class SingboxServiceProfileProbe(
     }
 }
 
+internal fun ru.ozero.enginesingbox.RoutedProbeResult.Reason.profileProbeStatus(): String = when (this) {
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.REMOTE_CLOSED -> "Remote closed"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.SOCKS_REPLY -> "SOCKS rejected"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.DNS -> "DNS failed"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.TLS_CERTIFICATE -> "TLS certificate"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.TLS_HANDSHAKE,
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.TLS,
+    -> "TLS handshake"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.TIMEOUT -> "Timeout"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.UNEXPECTED_RESPONSE -> "Unexpected response"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.CONNECT,
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.IO,
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.SOCKS_NOT_READY,
+    -> "Connect failed"
+}
+
 internal class ProfileProbeProtector : ISingboxProtector.Stub() {
+    private val modeLogged = AtomicBoolean(false)
     private val failureLogged = AtomicBoolean(false)
 
-    init {
-        val mode = if (VpnSocketProtectorHolder.isBound()) {
-            "active VPN protector"
-        } else {
-            "no Ozero VPN, protection not required"
+    override fun protect(fd: Int): Boolean {
+        return when (val result = VpnSocketProtectorHolder.protectIfBound(fd)) {
+            null -> {
+                logModeOnce("no Ozero VPN, protection not required")
+                true
+            }
+            true -> {
+                logModeOnce("active VPN protector")
+                true
+            }
+            false -> {
+                logModeOnce("active VPN protector")
+                if (failureLogged.compareAndSet(false, true)) {
+                    PersistentLoggers.warn("SingboxProbeService", "active VPN protect failed")
+                }
+                false
+            }
         }
-        PersistentLoggers.info("SingboxProbeService", "profile probe protector: $mode")
     }
 
-    override fun protect(fd: Int): Boolean {
-        if (!VpnSocketProtectorHolder.isBound()) return true
-        val protected = VpnSocketProtectorHolder.protect(fd)
-        if (!protected && failureLogged.compareAndSet(false, true)) {
-            PersistentLoggers.warn("SingboxProbeService", "active VPN protect failed")
+    private fun logModeOnce(mode: String) {
+        if (modeLogged.compareAndSet(false, true)) {
+            PersistentLoggers.info("SingboxProbeService", "profile probe protector: $mode")
         }
-        return protected
     }
 }
 private data class RejectedProfile(val protocol: String, val reason: String)
