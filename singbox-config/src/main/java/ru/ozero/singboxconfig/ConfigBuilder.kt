@@ -313,7 +313,7 @@ object ConfigBuilder {
         sb.append('{')
         sb.append(""""log":{"level":"warn","timestamp":true},""")
         sb.append(""""inbounds":[""")
-        sb.append(tunInbound())
+        sb.append(tunInbound(ipv6Enabled))
         if (probeSocksPort != null && probeSocksPort > 0) {
             sb.append(',')
             sb.append(socksInbound(probeSocksPort))
@@ -328,8 +328,8 @@ object ConfigBuilder {
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
         sb.append(dnsConfig(dnsServers, detour = "proxy", ipv6Enabled = ipv6Enabled))
-        sb.append(""""route":{""")
-        sb.append(""""default_domain_resolver":"$DNS_LOCAL_TAG",""")
+        sb.append("\"route\":{")
+        sb.append(defaultDomainResolver(ipv6Enabled))
         sb.append(""""final":"proxy",""")
         sb.append(""""auto_detect_interface":true,""")
         sb.append(""""rules":[{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}]""")
@@ -364,8 +364,8 @@ object ConfigBuilder {
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
         sb.append(dnsConfig(dnsServers, detour = "proxy", ipv6Enabled = ipv6Enabled))
-        sb.append(""""route":{""")
-        sb.append(""""default_domain_resolver":"$DNS_LOCAL_TAG",""")
+        sb.append("\"route\":{")
+        sb.append(defaultDomainResolver(ipv6Enabled))
         sb.append(""""final":"proxy",""")
         sb.append(""""auto_detect_interface":true,""")
         sb.append(""""rules":[{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}]""")
@@ -393,7 +393,8 @@ object ConfigBuilder {
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
         sb.append(dnsConfig(dnsServers, detour = null, ipv6Enabled = ipv6Enabled))
-        sb.append(""""route":{"default_domain_resolver":"$DNS_LOCAL_TAG",""")
+        sb.append("\"route\":{")
+        sb.append(defaultDomainResolver(ipv6Enabled))
         sb.append(""""final":"block","auto_detect_interface":true,"rules":[""")
         sb.append("""{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}""")
         routeRules.forEach { rule ->
@@ -477,12 +478,24 @@ object ConfigBuilder {
 
     private fun String.isDnsHostname(): Boolean = !isValidIpv4Dns() && !isValidPlainIpv6Dns()
 
-    private fun tunInbound(): String {
+    private fun defaultDomainResolver(ipv6Enabled: Boolean): String =
+        if (ipv6Enabled) {
+            "\"default_domain_resolver\":\"$DNS_LOCAL_TAG\","
+        } else {
+            "\"default_domain_resolver\":{\"server\":\"$DNS_LOCAL_TAG\",\"strategy\":\"ipv4_only\"},"
+        }
+
+    private fun tunInbound(ipv6Enabled: Boolean): String {
         val sb = StringBuilder()
         sb.append('{')
         sb.append(""""type":"tun",""")
         sb.append(""""tag":"tun-in",""")
-        sb.append(""""address":["172.19.0.1/30","fdfe:dcba:9876::1/126"],""")
+        val addresses = if (ipv6Enabled) {
+            "\"172.19.0.1/30\",\"fdfe:dcba:9876::1/126\""
+        } else {
+            "\"172.19.0.1/30\""
+        }
+        sb.append("\"address\":[$addresses],")
         sb.append(""""mtu":9000,""")
         sb.append(""""auto_route":false,""")
         sb.append(""""strict_route":false""")
@@ -806,7 +819,8 @@ private fun jsonString(s: String): String {
             '\r' -> sb.append("\\r")
             '\t' -> sb.append("\\t")
             '\b' -> sb.append("\\b")
-            '' -> sb.append("\\f")
+            '\u000C' -> sb.append("\\f")
+' -> sb.append("\\f")
             else -> if (c.code < 0x20) {
                 sb.append("\\u%04x".format(c.code))
             } else {

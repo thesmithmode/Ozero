@@ -16,6 +16,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.VpnSocketProtector
+import ru.ozero.enginescore.VpnSocketProtectorHolder
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.HostsMode
@@ -41,6 +43,29 @@ class SingboxProbeServiceTest {
     private val selectedProfileKey = longPreferencesKey("singbox_selected_profile_id")
     private val beanKey = byteArrayPreferencesKey("singbox_vless_bean")
     private val dnsServersKey = stringSetPreferencesKey("singbox_dns_servers")
+
+    @Test
+    fun `profile protector permits proxy-only probe without active VPN`() {
+        assertTrue(ProfileProbeProtector().protect(7))
+    }
+
+    @Test
+    fun `profile protector delegates success and failure to active VPN`() {
+        val accepting = VpnSocketProtector { true }
+        VpnSocketProtectorHolder.bind(accepting)
+        try {
+            assertTrue(ProfileProbeProtector().protect(8))
+        } finally {
+            VpnSocketProtectorHolder.unbind(accepting)
+        }
+        val rejecting = VpnSocketProtector { false }
+        VpnSocketProtectorHolder.bind(rejecting)
+        try {
+            assertEquals(false, ProfileProbeProtector().protect(9))
+        } finally {
+            VpnSocketProtectorHolder.unbind(rejecting)
+        }
+    }
 
     @Test
     fun `probeAndAutoSelect preserves auto-select mode while updating latency`() = runTest {

@@ -26,6 +26,7 @@ import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.PersistentLoggers
 import java.security.KeyStore
 import javax.net.ssl.TrustManagerFactory
+import java.util.concurrent.atomic.AtomicBoolean
 
 internal object SingboxRuntime {
     private const val TAG = "SingboxRuntime"
@@ -171,11 +172,16 @@ internal object SingboxRuntime {
         private val connectivity: ConnectivityManager = requireConnectivityManager(context)
         private val defaultInterfaceMonitor = DefaultInterfaceMonitor(connectivity)
         private val localDnsTransport = AndroidLocalDnsTransport(defaultInterfaceMonitor)
+        private val protectFailureLogged = AtomicBoolean(false)
 
         override fun usePlatformAutoDetectInterfaceControl(): Boolean = true
 
         override fun autoDetectInterfaceControl(fd: Int) {
-            check(protector.protect(fd)) { "VpnService.protect($fd) failed" }
+            val protected = protector.protect(fd)
+            if (!protected && protectFailureLogged.compareAndSet(false, true)) {
+                PersistentLoggers.warn(TAG, "active VPN protect failed")
+            }
+            check(protected) { "active VPN protect failed" }
         }
 
         override fun openTun(options: TunOptions): Int {

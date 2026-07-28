@@ -5,11 +5,13 @@ import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.PersistentLoggers
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
+import java.io.EOFException
 import java.io.IOException
 import java.net.ConnectException
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.Socket
+import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.UnknownHostException
@@ -43,13 +45,16 @@ sealed interface RoutedProbeResult {
         TLS_CERTIFICATE,
         TLS_HANDSHAKE,
         TLS,
+        REMOTE_CLOSED,
         TIMEOUT,
+        SOCKS_REPLY,
         UNEXPECTED_RESPONSE,
         IO,
         SOCKS_NOT_READY,
     }
 }
 
+@Suppress("TooManyFunctions")
 class SingboxHttp204RoutedProbe(
     private val probeUrl: URL = URL(PROBE_URL),
     private val fallbackProbeUrls: List<URL> = FALLBACK_PROBE_URLS.map(::URL),
@@ -105,7 +110,7 @@ class SingboxHttp204RoutedProbe(
             "deadline=1"
         } else {
             failures
-                .groupingBy(ProbeFailure::label)
+                .groupingBy(ClassifiedFailure::label)
                 .eachCount()
                 .toSortedMap()
                 .entries
@@ -117,6 +122,7 @@ class SingboxHttp204RoutedProbe(
         )
         return RoutedProbeResult.Failure(
             failures.lastOrNull()?.reason ?: RoutedProbeResult.Reason.TIMEOUT,
+            failures.lastOrNull()?.safeDetail,
         )
     }
 
@@ -132,7 +138,7 @@ class SingboxHttp204RoutedProbe(
 
     private fun probeSingleUrl(url: URL, socksPort: Int, remainingTimeoutMs: Int): ProbeAttempt {
         val expectation = responseExpectation(url)
-            ?: return ProbeAttempt(LATENCY_FAILED, ProbeFailure.UNSUPPORTED_RESPONSE)
+            ?: return ProbeAttempt(LATENCY_FAILED, ProbeFailure.UNSUPPORTED_RESPONSE.withDetail(url, null))
         val start = nanoTime()
         return runCatching {
             when (url.protocol.lowercase()) {
@@ -143,12 +149,18 @@ class SingboxHttp204RoutedProbe(
         }.fold(
             onSuccess = { success ->
                 if (success) {
-                    ProbeAttempt(TimeUnit.NANOSECONDS.toMillis(nanoTime() - start).coerceAtLeast(1L), ProbeFailure.NONE)
+                    ProbeAttempt(
+                        TimeUnit.NANOSECONDS.toMillis(nanoTime() - start).coerceAtLeast(1L),
+                        ProbeFailure.NONE.withDetail(url, null),
+                    )
                 } else {
-                    ProbeAttempt(LATENCY_FAILED, ProbeFailure.UNEXPECTED_RESPONSE)
+                    ProbeAttempt(LATENCY_FAILED, ProbeFailure.UNEXPECTED_RESPONSE.withDetail(url, null))
                 }
             },
-            onFailure = { error -> ProbeAttempt(LATENCY_FAILED, classifyFailure(error)) },
+            onFailure = { error ->
+                val failure = classifyFailure(error)
+                ProbeAttempt(LATENCY_FAILED, failure.withDetail(url, error))
+            },
         )
     }
 
@@ -262,8 +274,11 @@ class SingboxHttp204RoutedProbe(
             causes.any {
                 it is CertificateException || it is SSLPeerUnverifiedException
             } -> ProbeFailure.TLS_CERTIFICATE
-            causes.any { it is SSLHandshakeException } -> ProbeFailure.TLS_HANDSHAKE
             causes.any { it is SocketTimeoutException } -> ProbeFailure.TIMEOUT
+            causes.any { it is EOFException || it.message.isRemoteCloseMessage() } ->
+                ProbeFailure.REMOTE_CLOSED
+            causes.any { it is SocketException && it.message.isSocksReplyMessage() } -> ProbeFailure.SOCKS_REPLY
+            causes.any { it is SSLHandshakeException } -> ProbeFailure.TLS_HANDSHAKE
             causes.any { it is ConnectException } -> ProbeFailure.CONNECT
             causes.any { it is SSLException } -> ProbeFailure.TLS
             causes.any { it is IOException } -> ProbeFailure.IO
@@ -289,7 +304,9 @@ class SingboxHttp204RoutedProbe(
         TLS_CERTIFICATE("tls-certificate", RoutedProbeResult.Reason.TLS_CERTIFICATE),
         TLS_HANDSHAKE("tls-handshake", RoutedProbeResult.Reason.TLS_HANDSHAKE),
         TLS("tls", RoutedProbeResult.Reason.TLS),
+        REMOTE_CLOSED("remote-closed", RoutedProbeResult.Reason.REMOTE_CLOSED),
         TIMEOUT("timeout", RoutedProbeResult.Reason.TIMEOUT),
+        SOCKS_REPLY("socks-reply", RoutedProbeResult.Reason.SOCKS_REPLY),
         CONNECT("connect", RoutedProbeResult.Reason.CONNECT),
         IO("io", RoutedProbeResult.Reason.IO),
         UNEXPECTED_RESPONSE("unexpected-response", RoutedProbeResult.Reason.UNEXPECTED_RESPONSE),
@@ -299,7 +316,59 @@ class SingboxHttp204RoutedProbe(
 
     private data class RawHttpResponse(val statusCode: Int, val body: String)
 
-    private data class ProbeAttempt(val latencyMs: Long, val failure: ProbeFailure)
+    private data class ClassifiedFailure(
+        val label: String,
+        val reason: RoutedProbeResult.Reason,
+        val safeDetail: String,
+    )
+
+    private fun ProbeFailure.withDetail(url: URL, error: Throwable?): ClassifiedFailure {
+        val root = generateSequence(error) { it.cause }.take(MAX_CAUSE_DEPTH).lastOrNull()
+        val rootClass = root?.javaClass?.simpleName ?: "none"
+        val message = when {
+            error == null && this == ProbeFailure.UNEXPECTED_RESPONSE -> "unexpected HTTP status"
+            error == null && this == ProbeFailure.UNSUPPORTED_RESPONSE -> "unsupported probe endpoint"
+            else -> sanitizeProbeMessage(root?.message)
+        }
+        return ClassifiedFailure(
+            label = label,
+            reason = reason,
+            safeDetail = "endpoint=${endpointLabel(url)} root=$rootClass category=$label message=$message",
+        )
+    }
+
+    private fun endpointLabel(url: URL): String = when {
+        url.host.contains("gstatic", true) -> "gstatic"
+        url.host.contains("cloudflare", true) -> "cloudflare"
+        url.host.contains("msft", true) -> "msft"
+        else -> "custom"
+    }
+
+    private fun sanitizeProbeMessage(message: String?): String = message
+        ?.lowercase()
+        ?.let { value ->
+            when {
+                value.isSocksReplyMessage() -> "SOCKS proxy rejected connection"
+                value.isRemoteCloseMessage() -> "remote closed connection"
+                "certificate" in value || "hostname" in value -> "certificate validation failed"
+                "handshake" in value -> "TLS protocol handshake failed"
+                "timed out" in value || "timeout" in value -> "operation timed out"
+                else -> "transport operation failed"
+            }
+        }
+        ?: "none"
+
+    private fun String?.isRemoteCloseMessage(): Boolean {
+        val value = this?.lowercase() ?: return false
+        return "eof" in value || "reset" in value || "closed" in value || "broken pipe" in value
+    }
+
+    private fun String?.isSocksReplyMessage(): Boolean {
+        val value = this?.lowercase() ?: return false
+        return "socks" in value || "proxy" in value && "connect" in value
+    }
+
+    private data class ProbeAttempt(val latencyMs: Long, val failure: ClassifiedFailure)
 
     companion object {
         private const val TAG = "SingboxRoutedProbe"

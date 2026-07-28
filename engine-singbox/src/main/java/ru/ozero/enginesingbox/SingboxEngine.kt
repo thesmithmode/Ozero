@@ -43,6 +43,7 @@ import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
+import ru.ozero.singboxfmt.StandardV2RayBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
@@ -232,6 +233,7 @@ class SingboxEngine @Inject constructor(
             logRejectedProfile(null, bean, decision, "selected")
             return null
         }
+        logCanonicalProfileSummary(cachedSelectedProfileId, bean)
         return runCatching {
             ConfigBuilder.buildSingboxConfig(
                 bean,
@@ -307,6 +309,7 @@ class SingboxEngine @Inject constructor(
                 logRejectedProfile(null, bean, decision, "chain selected")
                 return StartResult.Failure("chain selected profile rejected: ${decision.error}")
             } else {
+                logCanonicalProfileSummary(cachedSelectedProfileId, bean)
                 val wrappers = if (upstream == null) chainWrapperBeans(config) else emptyList()
                 runCatching {
                     if (wrappers.isNotEmpty()) {
@@ -557,11 +560,11 @@ class SingboxEngine @Inject constructor(
         ipv4PrefixLength = 30,
         dnsServers = effectiveDnsServers(),
         allowFamilyV4 = true,
-        allowFamilyV6 = true,
-        ipv6Address = "fdfe:dcba:9876::1",
+        allowFamilyV6 = cachedIpv6Enabled,
+        ipv6Address = "fdfe:dcba:9876::1".takeIf { cachedIpv6Enabled },
         ipv6PrefixLength = 126,
         routeAllV4 = true,
-        routeAllV6 = true,
+        routeAllV6 = cachedIpv6Enabled,
     )
 
     private fun effectiveDnsServers(): List<String> =
@@ -683,6 +686,35 @@ class SingboxEngine @Inject constructor(
                 "security=${standard?.security.orEmpty()} headerType=${standard?.headerType.orEmpty()} " +
                 "hasSni=${standard?.sni?.isNotBlank() == true} hasHost=${standard?.host?.isNotBlank() == true} " +
                 "reason=${decision.error}",
+        )
+    }
+
+    private fun logCanonicalProfileSummary(profileId: Long?, bean: AbstractBean) {
+        val standard = bean as? StandardV2RayBean ?: return
+        val publicKeyLength = standard.realityPublicKey.length
+        val shortIdLength = standard.realityShortId.length
+        val publicKeyValid = runCatching {
+            val padded = standard.realityPublicKey + "=".repeat((4 - publicKeyLength % 4) % 4)
+            java.util.Base64.getUrlDecoder().decode(padded).size == 32
+        }.getOrDefault(false)
+        val shortIdValid = shortIdLength <= 16 &&
+            shortIdLength % 2 == 0 &&
+            standard.realityShortId.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
+        val serverIsIp = standard.serverAddress.trim('[', ']').let { address ->
+            ':' in address ||
+                address.split('.').let { parts ->
+                    parts.size == 4 && parts.all { it.toIntOrNull() in 0..255 }
+                }
+        }
+        val flow = (bean as? VLESSBean)?.flow.orEmpty()
+        PersistentLoggers.info(
+            TAG,
+            "singbox profile summary profileId=${profileId ?: "unknown"} protocol=${bean.protocolLabel()} " +
+                "transport=${standard.type} security=${standard.security} flow=$flow serverIsIp=$serverIsIp " +
+                "hasSni=${standard.sni.isNotBlank()} hasHost=${standard.host.isNotBlank()} " +
+                "publicKeyLength=$publicKeyLength publicKeyValid=$publicKeyValid " +
+                "shortIdLength=$shortIdLength shortIdValid=$shortIdValid fingerprint=${standard.realityFingerprint} " +
+                "packetEncoding=${standard.packetEncoding} allowInsecure=${standard.allowInsecure}",
         )
     }
 
@@ -857,7 +889,9 @@ private fun RoutedProbeResult.Reason.probeFailureMessage(): String = when (this)
     RoutedProbeResult.Reason.TLS_CERTIFICATE -> "sing-box TLS certificate verification failed"
     RoutedProbeResult.Reason.TLS_HANDSHAKE -> "sing-box TLS handshake failed"
     RoutedProbeResult.Reason.TLS -> "sing-box outbound TLS failed"
+    RoutedProbeResult.Reason.REMOTE_CLOSED -> "sing-box outbound closed by remote"
     RoutedProbeResult.Reason.TIMEOUT -> "sing-box outbound timed out"
+    RoutedProbeResult.Reason.SOCKS_REPLY -> "sing-box SOCKS proxy rejected outbound"
     RoutedProbeResult.Reason.UNEXPECTED_RESPONSE ->
         "sing-box connectivity endpoint returned unexpected response"
     RoutedProbeResult.Reason.IO -> "sing-box outbound I/O failed"

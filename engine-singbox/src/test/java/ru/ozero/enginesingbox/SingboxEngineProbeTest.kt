@@ -692,9 +692,10 @@ class SingboxEngineProbeTest {
         assertEquals(9000, spec.mtu)
         assertEquals(false, spec.blocking)
         assertEquals(true, spec.allowFamilyV4)
-        assertEquals(true, spec.allowFamilyV6)
+        assertEquals(false, spec.allowFamilyV6)
         assertEquals(true, spec.routeAllV4)
-        assertEquals(true, spec.routeAllV6)
+        assertEquals(false, spec.routeAllV6)
+        assertEquals(null, spec.ipv6Address)
     }
 
     @Test

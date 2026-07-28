@@ -24,6 +24,7 @@ class VpnSocketProtectorHolderTest {
 
     @Test
     fun `protect returns false when no protector bound`() {
+        assertFalse(VpnSocketProtectorHolder.isBound())
         assertFalse(VpnSocketProtectorHolder.protect(42))
     }
 
@@ -39,6 +40,7 @@ class VpnSocketProtectorHolderTest {
 
         val result = VpnSocketProtectorHolder.protect(7)
 
+        assertTrue(VpnSocketProtectorHolder.isBound())
         assertTrue(result)
         assertEquals(listOf(7), captured)
     }
