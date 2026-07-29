@@ -386,7 +386,7 @@ private class SingboxServiceProfileProbe(
                         "SingboxProbeService",
                         "profile probe outbound failed ${result.safeDetail ?: "category=${result.reason.name.lowercase()}"}",
                     )
-                    if (attempt == PROBE_ATTEMPTS - 1 && result.safeDetail != null) {
+                    if (attempt == PROBE_ATTEMPTS - 1) {
                         return SingboxProbeOutcome.Failure(result.reason.profileProbeStatus())
                     }
                 }

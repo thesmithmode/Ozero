@@ -228,15 +228,18 @@ class SingboxEngine @Inject constructor(
             .onFailure { PersistentLoggers.warn(TAG, "beanBlob deserialize: ${it.message}") }
             .getOrNull() ?: return null
         val wrappers = chainWrapperBeans(config)
-        val decision = ConfigBuilder.supportDecision(bean)
+        val canonicalBean = runCatching { ConfigBuilder.canonicalBean(bean) }
+            .onFailure { PersistentLoggers.warn(TAG, "canonical profile rejected") }
+            .getOrNull() ?: return null
+        val decision = ConfigBuilder.supportDecisionCanonical(canonicalBean)
         if (decision is BeanSupportDecision.Unsupported) {
-            logRejectedProfile(null, bean, decision, "selected")
+            logRejectedProfile(null, canonicalBean, decision, "selected")
             return null
         }
-        logCanonicalProfileSummary(cachedSelectedProfileId, bean)
+        logCanonicalProfileSummary(cachedSelectedProfileId, canonicalBean)
         return runCatching {
-            ConfigBuilder.buildSingboxConfig(
-                bean,
+            ConfigBuilder.buildSingboxConfigFromCanonical(
+                canonicalBean,
                 probeSocksPort,
                 config.dnsServers,
                 config.ipv6Enabled
@@ -245,7 +248,7 @@ class SingboxEngine @Inject constructor(
             .mapCatching {
                 if (wrappers.isNotEmpty()) {
                     ConfigBuilder.buildProfileChainConfig(
-                        bean,
+                        canonicalBean,
                         wrappers,
                         probeSocksPort,
                         config.dnsServers,
@@ -558,7 +561,10 @@ class SingboxEngine @Inject constructor(
         blocking = false,
         ipv4Address = "172.19.0.1",
         ipv4PrefixLength = 30,
-        dnsServers = effectiveDnsServers(),
+        dnsServers = buildList {
+            add(TUN_DNS_V4)
+            if (cachedIpv6Enabled) add(TUN_DNS_V6)
+        },
         allowFamilyV4 = true,
         allowFamilyV6 = cachedIpv6Enabled,
         ipv6Address = "fdfe:dcba:9876::1".takeIf { cachedIpv6Enabled },
@@ -566,14 +572,6 @@ class SingboxEngine @Inject constructor(
         routeAllV4 = true,
         routeAllV6 = cachedIpv6Enabled,
     )
-
-    private fun effectiveDnsServers(): List<String> =
-        cachedDnsServers
-            .ifEmpty { EngineConfig.Singbox.DEFAULT_DNS_SERVERS }
-            .filter { cachedIpv6Enabled || !it.isPlainIpv6Address() }
-
-    private fun String.isPlainIpv6Address(): Boolean =
-        ':' in this && !startsWith("https://") && !startsWith("tls://")
 
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
         val port = activeSocksPort.takeIf { it > 0 }
@@ -853,6 +851,8 @@ class SingboxEngine @Inject constructor(
     }
 
     companion object {
+        private const val TUN_DNS_V4 = "172.19.0.2"
+        private const val TUN_DNS_V6 = "fdfe:dcba:9876::2"
         private const val TAG = "SingboxEngine"
         private const val CONNECT_TIMEOUT_S = 5L
         private const val STATS_POLL_MS = 1_000L

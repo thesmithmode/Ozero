@@ -16,7 +16,6 @@ import io.nekohasekai.libbox.LocalDNSTransport
 import io.nekohasekai.libbox.LogIterator
 import io.nekohasekai.libbox.NetworkInterfaceIterator
 import io.nekohasekai.libbox.Notification
-import io.nekohasekai.libbox.OutboundGroupItemIterator
 import io.nekohasekai.libbox.OutboundGroupIterator
 import io.nekohasekai.libbox.OverrideOptions
 import io.nekohasekai.libbox.PlatformInterface
@@ -26,10 +25,17 @@ import io.nekohasekai.libbox.StringIterator
 import io.nekohasekai.libbox.SystemProxyStatus
 import io.nekohasekai.libbox.TunOptions
 import io.nekohasekai.libbox.WIFIState
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import ru.ozero.enginescore.PersistentLoggers
 import java.security.KeyStore
 import java.util.concurrent.atomic.AtomicBoolean
@@ -40,13 +46,23 @@ internal object SingboxRuntime {
     private const val MAX_NATIVE_LOG_BATCH = 100
     private const val MAX_NATIVE_LOG_CATEGORIES = 16
     private const val STATUS_INTERVAL_NANOS = 1_000_000_000L
+    private const val NATIVE_LOG_CONNECT_TIMEOUT_MS = 2_500L
     private val mutex = Mutex()
+    private val nativeLogScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
     private var commandServer: CommandServer? = null
 
     @Volatile
     private var logClient: CommandClient? = null
+
+    @Volatile
+    private var nativeLogJob: Job? = null
+
+    @Volatile
+    private var nativeLogSessionActive = false
+
+    private val nativeLogReconnectUsed = AtomicBoolean(false)
 
     @Volatile
     private var lastStatus: StatusMessage? = null
@@ -76,6 +92,7 @@ internal object SingboxRuntime {
         tunFd: Int,
         singboxJsonConfig: String,
         protectorBridge: SingboxProtectorBridge,
+        detachedTunFd: DetachedTunFd? = null,
     ) =
         withContext(Dispatchers.Main.immediate) {
             mutex.withLock {
@@ -100,7 +117,12 @@ internal object SingboxRuntime {
                     PersistentLoggers.debug(TAG, "cleaned stale command.sock")
                 }
 
-                val platform = OzeroPlatformInterface(context.applicationContext, tunFd, protectorBridge)
+                val platform = OzeroPlatformInterface(
+                    context.applicationContext,
+                    tunFd,
+                    protectorBridge,
+                    detachedTunFd,
+                )
                 val handler = OzeroCommandServerHandler()
 
                 PersistentLoggers.debug(TAG, "checkpoint: pre-CommandServer")
@@ -113,7 +135,7 @@ internal object SingboxRuntime {
                     server.checkConfig(singboxJsonConfig)
                     PersistentLoggers.debug(TAG, "checkpoint: checkConfig passed")
                 } catch (e: Exception) {
-                    PersistentLoggers.error(TAG, "checkConfig failed: ${e.message}")
+                    PersistentLoggers.error(TAG, "checkConfig failed exceptionClass=${e::class.java.simpleName}")
                     server.close()
                     throw e
                 }
@@ -122,14 +144,17 @@ internal object SingboxRuntime {
                     // Go код дёргает options.AutoRedirect без nil-check → SIGABRT при null
                     server.startOrReloadService(singboxJsonConfig, OverrideOptions())
                     PersistentLoggers.debug(TAG, "checkpoint: post-startOrReloadService (box running)")
-                    startNativeLogSubscription()
                 } catch (e: Exception) {
-                    PersistentLoggers.error(TAG, "startOrReloadService failed: ${e.message}")
+                    PersistentLoggers.error(
+                        TAG,
+                        "startOrReloadService failed exceptionClass=${e::class.java.simpleName}",
+                    )
                     server.close()
                     throw e
                 }
 
                 commandServer = server
+                launchNativeLogSubscription()
                 PersistentLoggers.info(TAG, "runtime started fd=$tunFd")
             }
         }
@@ -139,9 +164,11 @@ internal object SingboxRuntime {
             val server = commandServer ?: return@withLock
             stopNativeLogSubscription()
             runCatching { server.closeService() }
-                .onFailure { PersistentLoggers.warn(TAG, "closeService: ${it.message}") }
+                .onFailure {
+                    PersistentLoggers.warn(TAG, "closeService failed exceptionClass=${it::class.java.simpleName}")
+                }
             runCatching { server.close() }
-                .onFailure { PersistentLoggers.warn(TAG, "close: ${it.message}") }
+                .onFailure { PersistentLoggers.warn(TAG, "close failed exceptionClass=${it::class.java.simpleName}") }
             commandServer = null
             lastStatus = null
             PersistentLoggers.info(TAG, "runtime stopped")
@@ -152,41 +179,77 @@ internal object SingboxRuntime {
 
     fun getLastStatus(): StatusMessage? = lastStatus
 
-    private suspend fun startNativeLogSubscription() {
-        withContext(Dispatchers.IO) {
-            stopNativeLogSubscription()
+    private fun launchNativeLogSubscription(reconnect: Boolean = false) {
+        if (!reconnect) {
+            nativeLogSessionActive = true
+            nativeLogReconnectUsed.set(false)
+        }
+        nativeLogJob = nativeLogScope.launch {
+            connectNativeLogSubscription()
+        }
+    }
+
+    private suspend fun connectNativeLogSubscription() {
+        runCatching {
             val options = CommandClientOptions()
             options.addCommand(Libbox.CommandLog)
             options.addCommand(Libbox.CommandStatus)
             options.statusInterval = STATUS_INTERVAL_NANOS
-            val client = CommandClient(NativeLogHandler(), options)
-            runCatching { client.connect() }
-                .onSuccess {
-                    logClient = client
-                    PersistentLoggers.debug(TAG, "native log subscription connected")
-                }
-                .onFailure {
-                    runCatching { client.disconnect() }
-                    PersistentLoggers.warn(TAG, "native log subscription failed")
-                }
+            val client = CommandClient(NativeLogHandler(::handleNativeLogDisconnected), options)
+            logClient = client
+            withTimeout(NATIVE_LOG_CONNECT_TIMEOUT_MS) {
+                runInterruptible { client.connect() }
+            }
+            PersistentLoggers.debug(TAG, "native log subscription connected")
+        }.onFailure {
+            disconnectNativeLogClient()
+            if (nativeLogSessionActive) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "native diagnostics unavailable exceptionClass=${it::class.java.simpleName}",
+                )
+            }
         }
     }
 
     private suspend fun stopNativeLogSubscription() {
-        withContext(Dispatchers.IO) {
-            val client = logClient ?: return@withContext
-            logClient = null
-            runCatching { client.disconnect() }
-                .onFailure { PersistentLoggers.warn(TAG, "native log subscription stop failed") }
+        nativeLogSessionActive = false
+        nativeLogJob?.cancelAndJoin()
+        nativeLogJob = null
+        withContext(Dispatchers.IO) { disconnectNativeLogClient() }
+        lastStatus = null
+    }
+
+    private fun disconnectNativeLogClient() {
+        val client = logClient ?: return
+        logClient = null
+        runCatching { client.disconnect() }
+            .onFailure {
+                PersistentLoggers.warn(
+                    TAG,
+                    "native diagnostics disconnect failed exceptionClass=${it::class.java.simpleName}",
+                )
+            }
+    }
+
+    private fun handleNativeLogDisconnected() {
+        lastStatus = null
+        logClient = null
+        if (nativeLogSessionActive && nativeLogReconnectUsed.compareAndSet(false, true)) {
+            launchNativeLogSubscription(reconnect = true)
         }
     }
 
-    private class NativeLogHandler : CommandClientHandler {
+    private class NativeLogHandler(
+        private val onDisconnected: () -> Unit,
+    ) : CommandClientHandler {
         private val emittedCategories = mutableSetOf<String>()
 
         override fun connected() {}
 
-        override fun disconnected(message: String?) {}
+        override fun disconnected(message: String?) {
+            onDisconnected()
+        }
 
         override fun setDefaultLogLevel(level: Int) {}
 
@@ -211,8 +274,6 @@ internal object SingboxRuntime {
         }
 
         override fun writeGroups(message: OutboundGroupIterator?) {}
-
-        override fun writeOutbounds(message: OutboundGroupItemIterator?) {}
 
         override fun initializeClashMode(modeList: StringIterator, currentMode: String) {}
 
@@ -253,6 +314,7 @@ internal object SingboxRuntime {
         context: Context,
         private val tunFd: Int,
         private val protector: SingboxProtectorBridge,
+        private val detachedTunFd: DetachedTunFd?,
     ) : PlatformInterface {
         private val connectivity: ConnectivityManager = requireConnectivityManager(context)
         private val defaultInterfaceMonitor = DefaultInterfaceMonitor(connectivity)
@@ -271,7 +333,7 @@ internal object SingboxRuntime {
 
         override fun openTun(options: TunOptions): Int {
             PersistentLoggers.debug(TAG, "openTun mtu=${options.mtu}")
-            return tunFd
+            return detachedTunFd?.claimByLibbox() ?: tunFd
         }
 
         override fun useProcFS(): Boolean = false
@@ -341,14 +403,21 @@ internal fun requireConnectivityManager(context: Context): ConnectivityManager =
 
 internal fun redactSingboxMessage(message: String): String {
     val noJson = message.replace(Regex("\\{.*}"), "<redacted-json>")
-    val noSubscriptionQuery = noJson.replace(Regex("(https?://[^\\s?#]+)\\?[^\\s]+"), "$1?<redacted-query>")
-    return noSubscriptionQuery
-        .replace(Regex("(?i)(password[\\\"'=:\\s]+)([^\\\",&\\s}]+)"), "$1<redacted>")
-        .replace(Regex("(?i)((?:private_key|public_key)[\\\"'=:\\s]+)([^\\\",&\\s}]+)"), "$1<redacted>")
-        .replace(Regex("(?i)((?:serverAddress|server_address|server)[\\\"'=:\\s]+)([^\\\",&\\s}]+)"), "$1<redacted>")
+    val noUrlSecrets = noJson
         .replace(
             Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"),
             "<redacted-uuid>",
+        )
+        .replace(Regex("(?i)(https?://)([^/@\\s]+)@"), "$1<redacted>@")
+        .replace(Regex("(https?://[^\\s?#]+)[?#][^\\s]+"), "$1?<redacted>")
+    return noUrlSecrets
+        .replace(
+            Regex(
+                "(?i)\\b(password|username|token|authorization|cookie|private_key|public_key|" +
+                    "short_id|serverAddress|server_address|server_name|server|host|sni|headers)" +
+                    "([\\\"'=:\\s]+)([^\\\",&\\s}]+)",
+            ),
+            "$1$2<redacted>",
         )
 }
 

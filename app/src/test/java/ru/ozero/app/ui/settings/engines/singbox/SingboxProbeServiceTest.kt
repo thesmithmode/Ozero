@@ -36,10 +36,23 @@ import java.net.ServerSocket
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SingboxProbeServiceTest {
+    @Test
+    fun `profile probe returns typed final failure without diagnostic detail`() {
+        val source = java.io.File(
+            "src/main/java/ru/ozero/app/ui/settings/engines/singbox/SingboxProbeService.kt",
+        ).readText()
+        val failureBranch = source
+            .substringAfter("is ru.ozero.enginesingbox.RoutedProbeResult.Failure ->")
+            .substringBefore("if (attempt < PROBE_ATTEMPTS - 1)")
+
+        assertFalse(failureBranch.contains("result.safeDetail != null"))
+        assertTrue(failureBranch.contains("result.reason.profileProbeStatus()"))
+    }
 
     private val selectedProfileKey = longPreferencesKey("singbox_selected_profile_id")
     private val beanKey = byteArrayPreferencesKey("singbox_vless_bean")

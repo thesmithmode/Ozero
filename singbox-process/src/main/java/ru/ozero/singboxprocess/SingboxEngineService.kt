@@ -29,22 +29,26 @@ class SingboxEngineService : Service() {
             protector: ISingboxProtector,
         ) {
             val rawFd = tunFd.detachFd()
-            PersistentLoggers.debug(
-                TAG,
-                "startWithConfig entry rawFd=$rawFd configLen=${singboxJsonConfig.length} " +
-                    "fingerprint=${singboxJsonConfig.singboxConfigFingerprint()}",
-            )
+            val detachedTunFd = DetachedTunFd(rawFd)
             try {
+                PersistentLoggers.debug(
+                    TAG,
+                    "startWithConfig entry rawFd=$rawFd configLen=${singboxJsonConfig.length} " +
+                        "fingerprint=${singboxJsonConfig.singboxConfigFingerprint()}",
+                )
                 kotlinx.coroutines.runBlocking {
                     SingboxRuntime.start(
                         this@SingboxEngineService,
                         rawFd,
                         singboxJsonConfig,
                         SingboxProtectorBridge(protector),
+                        detachedTunFd,
                     )
                 }
+                check(detachedTunFd.state == TunFdOwnershipState.CLAIMED_BY_LIBBOX)
             } catch (t: Throwable) {
-                PersistentLoggers.error(TAG, "startWithConfig failed: ${t::class.java.simpleName}: ${t.message}", t)
+                detachedTunFd.closeIfDetached()
+                PersistentLoggers.error(TAG, "startWithConfig failed exceptionClass=${t::class.java.simpleName}")
                 throw t
             }
         }
@@ -55,23 +59,27 @@ class SingboxEngineService : Service() {
             protector: ISingboxProtector,
         ) {
             val rawFd = tunFd.detachFd()
-            val json = java.io.File(configFilePath).readText()
-            PersistentLoggers.debug(
-                TAG,
-                "startWithConfigFile entry rawFd=$rawFd configLen=${json.length} " +
-                    "fingerprint=${json.singboxConfigFingerprint()}",
-            )
+            val detachedTunFd = DetachedTunFd(rawFd)
             try {
+                val json = java.io.File(configFilePath).readText()
+                PersistentLoggers.debug(
+                    TAG,
+                    "startWithConfigFile entry rawFd=$rawFd configLen=${json.length} " +
+                        "fingerprint=${json.singboxConfigFingerprint()}",
+                )
                 kotlinx.coroutines.runBlocking {
                     SingboxRuntime.start(
                         this@SingboxEngineService,
                         rawFd,
                         json,
                         SingboxProtectorBridge(protector),
+                        detachedTunFd,
                     )
                 }
+                check(detachedTunFd.state == TunFdOwnershipState.CLAIMED_BY_LIBBOX)
             } catch (t: Throwable) {
-                PersistentLoggers.error(TAG, "startWithConfigFile failed: ${t::class.java.simpleName}: ${t.message}", t)
+                detachedTunFd.closeIfDetached()
+                PersistentLoggers.error(TAG, "startWithConfigFile failed exceptionClass=${t::class.java.simpleName}")
                 throw t
             }
         }

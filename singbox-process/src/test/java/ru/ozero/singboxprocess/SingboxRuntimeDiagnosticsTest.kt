@@ -12,6 +12,10 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SingboxRuntimeDiagnosticsTest {
+    private val runtimeSource by lazy {
+        java.io.File("src/main/java/ru/ozero/singboxprocess/SingboxRuntime.kt").readText()
+    }
+
     @Test
     fun `missing ConnectivityManager fails with process specific error`() {
         val context = mockk<Context>()
@@ -44,6 +48,40 @@ class SingboxRuntimeDiagnosticsTest {
     }
 
     @Test
+    fun `redaction removes every supported secret shape`() {
+        val secrets = listOf(
+            "username=user-value",
+            "token='token-value'",
+            "authorization: bearer-value",
+            "cookie=cookie-value",
+            "short_id=short-value",
+            "server_name=name-value",
+            "host=host-value",
+            "SNI=sni-value",
+            "headers=header-value",
+            "https://url-user:url-password@subscription.example/path?token=url-token#fragment",
+        )
+
+        val redacted = redactSingboxMessage(secrets.joinToString(" "))
+
+        listOf(
+            "user-value",
+            "token-value",
+            "bearer-value",
+            "cookie-value",
+            "short-value",
+            "name-value",
+            "host-value",
+            "sni-value",
+            "header-value",
+            "url-user",
+            "url-password",
+            "url-token",
+            "fragment",
+        ).forEach { secret -> assertFalse(redacted.contains(secret)) }
+    }
+
+    @Test
     fun `libbox diagnostic keywords are promoted`() {
         assertTrue("connection closed".shouldPromoteSingboxMessage())
         assertTrue("TLS handshake failed".shouldPromoteSingboxMessage())
@@ -70,5 +108,45 @@ class SingboxRuntimeDiagnosticsTest {
         assertEquals("dial", nativeLogCategory("dial tcp: timeout"))
         assertEquals("network-unavailable", nativeLogCategory("network unavailable"))
         assertEquals("remote-closed", nativeLogCategory("write: broken pipe"))
+    }
+
+    @Test
+    fun `diagnostics starts only after runtime becomes available`() {
+        val serviceStart = runtimeSource.indexOf("server.startOrReloadService")
+        val serverClaim = runtimeSource.indexOf("commandServer = server", serviceStart)
+        val diagnosticsLaunch = runtimeSource.indexOf("launchNativeLogSubscription()", serverClaim)
+
+        assertTrue(serviceStart in 0..<serverClaim)
+        assertTrue(serverClaim in 0..<diagnosticsLaunch)
+    }
+
+    @Test
+    fun `diagnostic connect is supervised and time bounded`() {
+        assertContains(runtimeSource, "CoroutineScope(SupervisorJob() + Dispatchers.IO)")
+        assertContains(runtimeSource, "withTimeout(NATIVE_LOG_CONNECT_TIMEOUT_MS)")
+        assertContains(runtimeSource, "runInterruptible { client.connect() }")
+        assertContains(runtimeSource, "native diagnostics unavailable exceptionClass=")
+    }
+
+    @Test
+    fun `restart and stop close diagnostics`() {
+        val restart = runtimeSource.substringAfter("if (oldServer != null)").substringBefore("val socketFile")
+        val stop = runtimeSource.substringAfter("suspend fun stop()").substringBefore("fun isRunning()")
+
+        assertContains(restart, "stopNativeLogSubscription()")
+        assertContains(stop, "stopNativeLogSubscription()")
+        assertContains(runtimeSource, "nativeLogJob?.cancelAndJoin()")
+        assertContains(runtimeSource, "client.disconnect()")
+    }
+
+    @Test
+    fun `disconnect clears status and reconnects at most once`() {
+        val disconnected = runtimeSource
+            .substringAfter("private fun handleNativeLogDisconnected()")
+            .substringBefore("private class NativeLogHandler")
+
+        assertContains(disconnected, "lastStatus = null")
+        assertContains(disconnected, "nativeLogReconnectUsed.compareAndSet(false, true)")
+        assertContains(disconnected, "launchNativeLogSubscription(reconnect = true)")
     }
 }

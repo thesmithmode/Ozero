@@ -20,8 +20,8 @@ class SingboxEngineExitIpProbeSentinelTest {
         )
         assertTrue(
             source.hasCallWithArgs(
-                "ConfigBuilder.buildSingboxConfig",
-                "bean",
+                "ConfigBuilder.buildSingboxConfigFromCanonical",
+                "canonicalBean",
                 "probeSocksPort",
                 "config.dnsServers",
                 "config.ipv6Enabled",
@@ -35,7 +35,7 @@ class SingboxEngineExitIpProbeSentinelTest {
                 ) &&
                 source.hasCallWithArgs(
                     "ConfigBuilder.buildProfileChainConfig",
-                    "bean",
+                    "canonicalBean",
                     "wrappers",
                     "probeSocksPort",
                     "config.dnsServers",

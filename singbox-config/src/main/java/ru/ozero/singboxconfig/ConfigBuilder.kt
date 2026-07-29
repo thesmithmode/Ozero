@@ -21,7 +21,7 @@ private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
 private const val REALITY_PUBLIC_KEY_BYTES = 32
 private const val DNS_LOCAL_TAG = "dns-local"
 private val DNS_DOMAIN_RESOLVER_TYPES = setOf("https", "tls")
-private const val AUTO_SELECT_PROBE_URL = "http://www.gstatic.com/generate_204"
+private const val AUTO_SELECT_PROBE_URL = "https://www.gstatic.com/generate_204"
 
 enum class BeanSupportError {
     INVALID_PORT,
@@ -79,6 +79,18 @@ object ConfigBuilder {
         return buildFullConfig(listOf(outbound), probeSocksPort, dnsServers, ipv6Enabled)
     }
 
+    fun canonicalBean(bean: AbstractBean): AbstractBean = bean.canonicalBeanOrThrow()
+
+    fun buildSingboxConfigFromCanonical(
+        bean: AbstractBean,
+        probeSocksPort: Int? = null,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
+    ): String {
+        require(supportDecisionCanonical(bean) is BeanSupportDecision.Supported)
+        return buildFullConfig(listOf(beanOutbound(bean, "proxy")), probeSocksPort, dnsServers, ipv6Enabled)
+    }
+
     fun buildSingboxAutoConfig(
         beans: List<AbstractBean>,
         probeSocksPort: Int? = null,
@@ -113,7 +125,7 @@ object ConfigBuilder {
             is CanonicalizationResult.Rejected -> unsupported(BeanSupportError.UNSUPPORTED_CORE_FEATURE)
         }
 
-    private fun supportDecisionCanonical(bean: AbstractBean): BeanSupportDecision {
+    fun supportDecisionCanonical(bean: AbstractBean): BeanSupportDecision {
         if (bean.serverPort !in MIN_PORT..MAX_PORT) return unsupported(BeanSupportError.INVALID_PORT)
         if (!bean.hasRoutableServerAddress()) return unsupported(BeanSupportError.INVALID_SERVER)
         if (!bean.hasRequiredOutboundCredentials()) return unsupported(BeanSupportError.MISSING_CREDENTIALS)
@@ -406,8 +418,7 @@ object ConfigBuilder {
     }
 
     private fun dnsConfig(dnsServers: List<String>, detour: String?, ipv6Enabled: Boolean): String {
-        val normalized = normalizeDnsServers(dnsServers, ipv6Enabled)
-        val endpoints = normalized.map(DnsEndpoint::from)
+        val endpoints = dnsServers.mapNotNull { DnsEndpoint.parse(it, ipv6Enabled) }
         val finalTag = endpoints.indices.firstOrNull()?.let { "dns-$it" } ?: DNS_LOCAL_TAG
         val servers = buildList {
             add("{\"type\":\"local\",\"tag\":\"$DNS_LOCAL_TAG\"}")
@@ -415,22 +426,6 @@ object ConfigBuilder {
         }.joinToString(",")
         val strategy = if (ipv6Enabled) "" else ",\"strategy\":\"ipv4_only\""
         return "\"dns\":{\"servers\":[$servers],\"final\":${jsonString(finalTag)}$strategy},"
-    }
-
-    private fun normalizeDnsServers(dnsServers: List<String>, ipv6Enabled: Boolean): List<String> =
-        dnsServers
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .filter { it.isValidDnsServer() }
-            .filter { ipv6Enabled || !it.isPlainIpv6Dns() }
-            .ifEmpty { emptyList() }
-
-    private fun String.isPlainIpv6Dns(): Boolean = ':' in this && !startsWith("https://") && !startsWith("tls://")
-
-    private fun String.isValidDnsServer(): Boolean {
-        if (startsWith("https://")) return length > "https://".length && !contains(' ')
-        if (startsWith("tls://")) return length > "tls://".length && !contains(' ')
-        return isValidIpv4Dns() || isValidPlainIpv6Dns()
     }
 
     private fun String.isValidIpv4Dns(): Boolean {
@@ -461,19 +456,34 @@ object ConfigBuilder {
             type in DNS_DOMAIN_RESOLVER_TYPES && server.isDnsHostname()
 
         companion object {
-            fun from(server: String): DnsEndpoint = when {
-                server.startsWith("https://") -> fromUri(server, "https")
-                server.startsWith("tls://") -> fromUri(server, "tls")
-                else -> DnsEndpoint("udp", server, null, null)
+            fun parse(value: String, ipv6Enabled: Boolean): DnsEndpoint? {
+                val input = value.trim()
+                if (input.isEmpty()) return null
+                val endpoint = if ("://" in input) parseUri(input) else parseLiteral(input)
+                return endpoint?.takeIf { ipv6Enabled || !it.server.isValidPlainIpv6Dns() }
             }
 
-            private fun fromUri(server: String, type: String): DnsEndpoint {
-                val uri = URI(server)
-                val address = uri.host ?: server.substringAfter("://").substringBefore('/')
-                val port = uri.port.takeIf { it in MIN_PORT..MAX_PORT }
-                val path = if (type == "https") uri.rawPath.orEmpty().ifEmpty { "/dns-query" } else null
-                return DnsEndpoint(type, address, port, path)
-            }
+            private fun parseLiteral(input: String): DnsEndpoint? =
+                input.takeIf { it.isValidIpv4Dns() || it.isValidPlainIpv6Dns() }
+                    ?.let { DnsEndpoint("udp", it, null, null) }
+
+            private fun parseUri(input: String): DnsEndpoint? = runCatching {
+                val uri = URI(input)
+                val type = uri.scheme?.lowercase()?.takeIf { it in setOf("udp", "tls", "https") }
+                    ?: return@runCatching null
+                if (uri.userInfo != null) return@runCatching null
+                val host = uri.host?.removeSurrounding("[", "]")?.takeIf { it.isNotBlank() }
+                    ?: return@runCatching null
+                val port = uri.port
+                if (port != -1 && port !in MIN_PORT..MAX_PORT) return@runCatching null
+                val path = if (type == "https") {
+                    uri.rawPath.orEmpty().ifEmpty { "/dns-query" }.takeIf { it.startsWith('/') }
+                        ?: return@runCatching null
+                } else {
+                    null
+                }
+                DnsEndpoint(type, host, port.takeIf { it != -1 }, path)
+            }.getOrNull()
         }
     }
 

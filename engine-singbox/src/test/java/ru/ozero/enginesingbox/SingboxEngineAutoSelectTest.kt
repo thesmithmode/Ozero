@@ -209,8 +209,8 @@ class SingboxEngineAutoSelectTest {
         engine.buildManualConfig(SettingsModel(ipv6Enabled = true))
         val enabled = engine.tunSpec()
 
-        assertEquals(listOf("8.8.8.8"), disabled.dnsServers)
-        assertEquals(setOf("8.8.8.8", "2001:4860:4860::8888"), enabled.dnsServers.toSet())
+        assertEquals(listOf("172.19.0.2"), disabled.dnsServers)
+        assertEquals(setOf("172.19.0.2", "fdfe:dcba:9876::2"), enabled.dnsServers.toSet())
     }
 
     @Test
