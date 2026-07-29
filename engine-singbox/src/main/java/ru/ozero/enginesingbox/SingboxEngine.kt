@@ -307,17 +307,19 @@ class SingboxEngine @Inject constructor(
         } else {
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
                 .getOrElse { return StartResult.Failure("chain deserialize: ${it.message}") }
-            val decision = ConfigBuilder.supportDecision(bean)
+            val canonicalBean = runCatching { ConfigBuilder.canonicalBean(bean) }
+                .getOrElse { return StartResult.Failure("chain canonicalization failed") }
+            val decision = ConfigBuilder.supportDecisionCanonical(canonicalBean)
             if (decision is BeanSupportDecision.Unsupported) {
-                logRejectedProfile(null, bean, decision, "chain selected")
+                logRejectedProfile(null, canonicalBean, decision, "chain selected")
                 return StartResult.Failure("chain selected profile rejected: ${decision.error}")
             } else {
-                logCanonicalProfileSummary(cachedSelectedProfileId, bean)
+                logCanonicalProfileSummary(cachedSelectedProfileId, canonicalBean)
                 val wrappers = if (upstream == null) chainWrapperBeans(config) else emptyList()
                 runCatching {
                     if (wrappers.isNotEmpty()) {
                         ConfigBuilder.buildProfileChainProxyConfig(
-                            bean,
+                            canonicalBean,
                             wrappers,
                             port,
                             config.dnsServers,
@@ -325,7 +327,7 @@ class SingboxEngine @Inject constructor(
                         )
                     } else {
                         ConfigBuilder.buildChainConfig(
-                            bean,
+                            canonicalBean,
                             port,
                             upstream,
                             config.dnsServers,

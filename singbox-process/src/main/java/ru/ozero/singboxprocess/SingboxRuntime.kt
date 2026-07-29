@@ -161,14 +161,18 @@ internal object SingboxRuntime {
 
     suspend fun stop() = withContext(Dispatchers.Main.immediate) {
         mutex.withLock {
-            val server = commandServer ?: return@withLock
             stopNativeLogSubscription()
-            runCatching { server.closeService() }
-                .onFailure {
-                    PersistentLoggers.warn(TAG, "closeService failed exceptionClass=${it::class.java.simpleName}")
-                }
-            runCatching { server.close() }
-                .onFailure { PersistentLoggers.warn(TAG, "close failed exceptionClass=${it::class.java.simpleName}") }
+            val server = commandServer
+            if (server != null) {
+                runCatching { server.closeService() }
+                    .onFailure {
+                        PersistentLoggers.warn(TAG, "closeService failed exceptionClass=${it::class.java.simpleName}")
+                    }
+                runCatching { server.close() }
+                    .onFailure {
+                        PersistentLoggers.warn(TAG, "close failed exceptionClass=${it::class.java.simpleName}")
+                    }
+            }
             commandServer = null
             lastStatus = null
             PersistentLoggers.info(TAG, "runtime stopped")
@@ -403,7 +407,12 @@ internal fun requireConnectivityManager(context: Context): ConnectivityManager =
 
 internal fun redactSingboxMessage(message: String): String {
     val noJson = message.replace(Regex("\\{.*}"), "<redacted-json>")
-    val noUrlSecrets = noJson
+    val noHeaders = noJson
+        .replace(Regex("(?i)\\bauthorization\\s*:\\s*[^\\r\\n]+"), "authorization: <redacted>")
+        .replace(Regex("(?i)\\bcookie\\s*:\\s*[^\\r\\n]+"), "cookie: <redacted>")
+        .replace(Regex("(?i)\\bbearer\\s+[A-Za-z0-9._~+/=-]+"), "Bearer <redacted>")
+        .replace(Regex("(?i)\\bbasic\\s+[A-Za-z0-9+/=]+"), "Basic <redacted>")
+    val noUrlSecrets = noHeaders
         .replace(
             Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"),
             "<redacted-uuid>",
@@ -415,7 +424,7 @@ internal fun redactSingboxMessage(message: String): String {
             Regex(
                 "(?i)\\b(password|username|token|authorization|cookie|private_key|public_key|" +
                     "short_id|serverAddress|server_address|server_name|server|host|sni|headers)" +
-                    "([\\\"'=:\\s]+)([^\\\",&\\s}]+)",
+                    "([\\\"'=:\\s]+)(\\\"[^\\\"]*\\\"|'[^']*'|[^\\\",&;\\s}]+)",
             ),
             "$1$2<redacted>",
         )

@@ -103,7 +103,11 @@ class SingboxEngineService : Service() {
                     )
                 }
             } catch (t: Throwable) {
-                PersistentLoggers.error(TAG, "startProxyMode failed: ${t::class.java.simpleName}: ${t.message}", t)
+                PersistentLoggers.error(
+                    TAG,
+                    "startProxyMode failed exceptionClass=${t::class.java.simpleName} stableCategory=runtime-start " +
+                        "sanitizedMessage=${redactSingboxMessage(t.message.orEmpty())}",
+                )
                 throw t
             }
         }
@@ -126,7 +130,11 @@ class SingboxEngineService : Service() {
                     } == true
                 }
             }.onFailure {
-                PersistentLoggers.error(TAG, "stop failed: ${it.message}", it)
+                PersistentLoggers.error(
+                    TAG,
+                    "stop failed exceptionClass=${it::class.java.simpleName} stableCategory=runtime-stop " +
+                        "sanitizedMessage=${redactSingboxMessage(it.message.orEmpty())}",
+                )
             }.getOrDefault(false).also { stopped ->
                 if (!stopped) PersistentLoggers.warn(TAG, "stop timed out after ${boundedTimeoutMs}ms")
             }

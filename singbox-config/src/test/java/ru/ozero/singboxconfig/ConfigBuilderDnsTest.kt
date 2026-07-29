@@ -121,6 +121,27 @@ class ConfigBuilderDnsTest {
     }
 
     @Test
+    fun `UDP hostname uses local bootstrap while UDP literal does not`() {
+        val hostname = ConfigBuilder.buildSingboxConfig(bean(), dnsServers = listOf("udp://dns.example:53"))
+        val literal = ConfigBuilder.buildSingboxConfig(bean(), dnsServers = listOf("udp://9.9.9.9:53"))
+
+        assertContains(hostname, "\"domain_resolver\":\"dns-local\"")
+        assertFalse(literal.contains("\"domain_resolver\":\"dns-local\""))
+    }
+
+    @Test
+    fun `DNS parser rejects malformed IPv6 and accepts compressed IPv6`() {
+        val json = ConfigBuilder.buildSingboxConfig(
+            bean(),
+            dnsServers = listOf("::::", "2001::db8::1", "2001:db8::1"),
+        )
+
+        assertFalse(json.contains("::::"))
+        assertFalse(json.contains("2001::db8::1"))
+        assertContains(json, "\"server\":\"2001:db8::1\"")
+    }
+
+    @Test
     fun `DNS parser rejects userinfo invalid ports and malformed URI`() {
         val json = ConfigBuilder.buildSingboxConfig(
             bean(),

@@ -20,7 +20,6 @@ import ru.ozero.singboxfmt.hasRequiredOutboundCredentials
 private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
 private const val REALITY_PUBLIC_KEY_BYTES = 32
 private const val DNS_LOCAL_TAG = "dns-local"
-private val DNS_DOMAIN_RESOLVER_TYPES = setOf("https", "tls")
 private const val AUTO_SELECT_PROBE_URL = "https://www.gstatic.com/generate_204"
 
 enum class BeanSupportError {
@@ -436,8 +435,39 @@ object ConfigBuilder {
             }
     }
 
-    private fun String.isValidPlainIpv6Dns(): Boolean =
-        ':' in this && all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it == ':' }
+    private fun String.isValidPlainIpv6Dns(): Boolean {
+        if (!hasIpv6LiteralShape() || hasMalformedIpv6Colons()) return false
+        val compressed = "::" in this
+        val sides = split("::", limit = 2)
+        val groups = sides.sumOf(::ipv6GroupCount)
+        val validParts = sides.all { it.hasValidIpv6Parts() }
+        return validParts && if (compressed) groups < 8 else groups == 8
+    }
+
+    private fun String.hasIpv6LiteralShape(): Boolean =
+        isNotEmpty() && '%' !in this && count { it == ':' } >= 2 && all { it.isIpv6LiteralCharacter() }
+
+    private fun String.hasMalformedIpv6Colons(): Boolean =
+        ":::" in this || countSubstring("::") > 1 || hasUnpairedEdgeColon()
+
+    private fun String.hasUnpairedEdgeColon(): Boolean =
+        startsWith(':') && !startsWith("::") || endsWith(':') && !endsWith("::")
+
+    private fun String.hasValidIpv6Parts(): Boolean {
+        if (isEmpty()) return true
+        return split(':').all { part ->
+            if ('.' in part) part.isValidIpv4Dns() else part.length in 1..4 && part.all { it.isIpv6HexDigit() }
+        }
+    }
+
+    private fun ipv6GroupCount(side: String): Int =
+        if (side.isEmpty()) 0 else side.split(':').fold(0) { count, part -> count + if ('.' in part) 2 else 1 }
+
+    private fun String.countSubstring(value: String): Int = windowed(value.length).count { it == value }
+
+    private fun Char.isIpv6HexDigit(): Boolean = isDigit() || this in 'a'..'f' || this in 'A'..'F'
+
+    private fun Char.isIpv6LiteralCharacter(): Boolean = isIpv6HexDigit() || this == ':' || this == '.'
 
     private fun dnsServer(endpoint: DnsEndpoint, tag: String, detour: String?): String = buildString {
         append('{')
@@ -453,7 +483,7 @@ object ConfigBuilder {
 
     private data class DnsEndpoint(val type: String, val server: String, val serverPort: Int?, val path: String?) {
         fun needsDomainResolver(): Boolean =
-            type in DNS_DOMAIN_RESOLVER_TYPES && server.isDnsHostname()
+            server.isDnsHostname()
 
         companion object {
             fun parse(value: String, ipv6Enabled: Boolean): DnsEndpoint? {
