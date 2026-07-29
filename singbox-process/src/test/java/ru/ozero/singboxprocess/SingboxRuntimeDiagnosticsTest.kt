@@ -17,6 +17,42 @@ class SingboxRuntimeDiagnosticsTest {
     }
 
     @Test
+    fun `old diagnostic session cannot mutate replacement client`() {
+        val guard = NativeDiagnosticsSessionGuard()
+        val oldClient = Any()
+        val oldGeneration = guard.begin()
+        val newClient = Any()
+        val newGeneration = guard.begin()
+
+        assertFalse(guard.isCurrent(oldGeneration, oldClient, newClient))
+        assertTrue(guard.isCurrent(newGeneration, newClient, newClient))
+        assertFalse(guard.claimReconnect(oldGeneration))
+    }
+
+    @Test
+    fun `diagnostic reconnect can be claimed only once per generation`() {
+        val guard = NativeDiagnosticsSessionGuard()
+        val generation = guard.begin()
+
+        assertTrue(guard.claimReconnect(generation))
+        assertFalse(guard.claimReconnect(generation))
+        assertFalse(guard.claimReconnect(guard.begin() - 1))
+    }
+
+    @Test
+    fun `invalidating diagnostic session rejects delayed callbacks`() {
+        val guard = NativeDiagnosticsSessionGuard()
+        val client = Any()
+        val generation = guard.begin()
+
+        guard.invalidate()
+
+        assertFalse(guard.isActive(generation))
+        assertFalse(guard.isCurrent(generation, client, client))
+        assertFalse(guard.claimReconnect(generation))
+    }
+
+    @Test
     fun `missing ConnectivityManager fails with process specific error`() {
         val context = mockk<Context>()
         every { context.getSystemService(ConnectivityManager::class.java) } returns null
@@ -137,16 +173,5 @@ class SingboxRuntimeDiagnosticsTest {
         assertContains(stop, "stopNativeLogSubscription()")
         assertContains(runtimeSource, "nativeLogJob?.cancelAndJoin()")
         assertContains(runtimeSource, "client.disconnect()")
-    }
-
-    @Test
-    fun `disconnect clears status and reconnects at most once`() {
-        val disconnected = runtimeSource
-            .substringAfter("private fun handleNativeLogDisconnected()")
-            .substringBefore("private class NativeLogHandler")
-
-        assertContains(disconnected, "lastStatus = null")
-        assertContains(disconnected, "nativeLogReconnectUsed.compareAndSet(false, true)")
-        assertContains(disconnected, "launchNativeLogSubscription(reconnect = true)")
     }
 }

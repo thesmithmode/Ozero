@@ -34,7 +34,7 @@ class SingboxEngineExitIpProbeSentinelTest {
                     "config.ipv6Enabled",
                 ) &&
                 source.hasCallWithArgs(
-                    "ConfigBuilder.buildProfileChainConfig",
+                    "ConfigBuilder.buildProfileChainConfigFromCanonical",
                     "canonicalBean",
                     "wrappers",
                     "probeSocksPort",

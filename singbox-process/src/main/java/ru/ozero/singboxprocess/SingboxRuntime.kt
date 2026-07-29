@@ -62,7 +62,7 @@ internal object SingboxRuntime {
     @Volatile
     private var nativeLogSessionActive = false
 
-    private val nativeLogReconnectUsed = AtomicBoolean(false)
+    private val nativeLogSessions = NativeDiagnosticsSessionGuard()
 
     @Volatile
     private var lastStatus: StatusMessage? = null
@@ -184,30 +184,37 @@ internal object SingboxRuntime {
     fun getLastStatus(): StatusMessage? = lastStatus
 
     private fun launchNativeLogSubscription(reconnect: Boolean = false) {
+        val generation = if (reconnect) nativeLogSessions.activeGeneration() else nativeLogSessions.begin()
         if (!reconnect) {
             nativeLogSessionActive = true
-            nativeLogReconnectUsed.set(false)
         }
         nativeLogJob = nativeLogScope.launch {
-            connectNativeLogSubscription()
+            connectNativeLogSubscription(generation)
         }
     }
 
-    private suspend fun connectNativeLogSubscription() {
+    private suspend fun connectNativeLogSubscription(generation: Long) {
+        var expectedClient: CommandClient? = null
         runCatching {
             val options = CommandClientOptions()
             options.addCommand(Libbox.CommandLog)
             options.addCommand(Libbox.CommandStatus)
             options.statusInterval = STATUS_INTERVAL_NANOS
-            val client = CommandClient(NativeLogHandler(::handleNativeLogDisconnected), options)
+            lateinit var client: CommandClient
+            client = CommandClient(
+                NativeLogHandler { handleNativeLogDisconnected(generation, client) },
+                options,
+            )
+            expectedClient = client
+            if (!nativeLogSessions.isActive(generation)) return
             logClient = client
             withTimeout(NATIVE_LOG_CONNECT_TIMEOUT_MS) {
                 runInterruptible { client.connect() }
             }
             PersistentLoggers.debug(TAG, "native log subscription connected")
         }.onFailure {
-            disconnectNativeLogClient()
-            if (nativeLogSessionActive) {
+            expectedClient?.let(::disconnectNativeLogClient)
+            if (nativeLogSessions.isActive(generation) && nativeLogSessionActive) {
                 PersistentLoggers.warn(
                     TAG,
                     "native diagnostics unavailable exceptionClass=${it::class.java.simpleName}",
@@ -217,15 +224,18 @@ internal object SingboxRuntime {
     }
 
     private suspend fun stopNativeLogSubscription() {
+        nativeLogSessions.invalidate()
         nativeLogSessionActive = false
         nativeLogJob?.cancelAndJoin()
         nativeLogJob = null
-        withContext(Dispatchers.IO) { disconnectNativeLogClient() }
+        val client = logClient
+        if (client != null) withContext(Dispatchers.IO) { disconnectNativeLogClient(client) }
         lastStatus = null
     }
 
-    private fun disconnectNativeLogClient() {
-        val client = logClient ?: return
+    private fun disconnectNativeLogClient(expectedClient: CommandClient) {
+        if (expectedClient !== logClient) return
+        val client = expectedClient
         logClient = null
         runCatching { client.disconnect() }
             .onFailure {
@@ -236,10 +246,11 @@ internal object SingboxRuntime {
             }
     }
 
-    private fun handleNativeLogDisconnected() {
+    private fun handleNativeLogDisconnected(generation: Long, client: CommandClient) {
+        if (!nativeLogSessions.isCurrent(generation, client, logClient)) return
         lastStatus = null
         logClient = null
-        if (nativeLogSessionActive && nativeLogReconnectUsed.compareAndSet(false, true)) {
+        if (nativeLogSessionActive && nativeLogSessions.claimReconnect(generation)) {
             launchNativeLogSubscription(reconnect = true)
         }
     }
@@ -396,6 +407,41 @@ internal object SingboxRuntime {
             override fun len(): Int = values.size
             override fun next(): String = values[index++]
         }
+}
+
+internal class NativeDiagnosticsSessionGuard {
+    private var generation = 0L
+    private var reconnectClaimed = false
+
+    @Synchronized
+    fun begin(): Long {
+        generation += 1
+        reconnectClaimed = false
+        return generation
+    }
+
+    @Synchronized
+    fun invalidate() {
+        generation += 1
+        reconnectClaimed = true
+    }
+
+    @Synchronized
+    fun activeGeneration(): Long = generation
+
+    @Synchronized
+    fun isActive(expectedGeneration: Long): Boolean = expectedGeneration == generation
+
+    @Synchronized
+    fun isCurrent(expectedGeneration: Long, expectedClient: Any, currentClient: Any?): Boolean =
+        expectedGeneration == generation && expectedClient === currentClient
+
+    @Synchronized
+    fun claimReconnect(expectedGeneration: Long): Boolean {
+        if (expectedGeneration != generation || reconnectClaimed) return false
+        reconnectClaimed = true
+        return true
+    }
 }
 
 internal fun requireConnectivityManager(context: Context): ConnectivityManager =

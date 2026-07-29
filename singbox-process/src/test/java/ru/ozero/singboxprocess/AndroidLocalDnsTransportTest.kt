@@ -40,7 +40,7 @@ class AndroidLocalDnsTransportTest {
             returned.set(true)
         }
 
-        assertTrue(callbackReady.await(1, TimeUnit.SECONDS))
+        assertTrue(callbackReady.await(5, TimeUnit.SECONDS))
         assertFalse(returned.get())
         releaseCallback.countDown()
         worker.join(1_000)

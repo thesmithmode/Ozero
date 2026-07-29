@@ -56,6 +56,7 @@ sealed interface BeanSupportDecision {
 
 @Suppress("TooManyFunctions")
 object ConfigBuilder {
+    class CanonicalBean internal constructor(val value: AbstractBean)
 
     private val SUPPORTED_TRANSPORTS = setOf("tcp", "ws", "grpc", "http", "h2", "httpupgrade", "")
     private val SUPPORTED_SECURITY = setOf("", "none", "tls", "reality")
@@ -78,16 +79,16 @@ object ConfigBuilder {
         return buildFullConfig(listOf(outbound), probeSocksPort, dnsServers, ipv6Enabled)
     }
 
-    fun canonicalBean(bean: AbstractBean): AbstractBean = bean.canonicalBeanOrThrow()
+    fun canonicalBean(bean: AbstractBean): CanonicalBean = CanonicalBean(bean.canonicalBeanOrThrow())
 
     fun buildSingboxConfigFromCanonical(
-        bean: AbstractBean,
+        bean: CanonicalBean,
         probeSocksPort: Int? = null,
         dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
         ipv6Enabled: Boolean = true,
     ): String {
         require(supportDecisionCanonical(bean) is BeanSupportDecision.Supported)
-        return buildFullConfig(listOf(beanOutbound(bean, "proxy")), probeSocksPort, dnsServers, ipv6Enabled)
+        return buildFullConfig(listOf(beanOutbound(bean.value, "proxy")), probeSocksPort, dnsServers, ipv6Enabled)
     }
 
     fun buildSingboxAutoConfig(
@@ -120,11 +121,13 @@ object ConfigBuilder {
 
     fun supportDecision(bean: AbstractBean): BeanSupportDecision =
         when (val canonical = BeanCanonicalizer.canonicalizeOrError(bean)) {
-            is CanonicalizationResult.Canonical -> supportDecisionCanonical(canonical.bean)
+            is CanonicalizationResult.Canonical -> supportDecisionCanonicalValue(canonical.bean)
             is CanonicalizationResult.Rejected -> unsupported(BeanSupportError.UNSUPPORTED_CORE_FEATURE)
         }
 
-    fun supportDecisionCanonical(bean: AbstractBean): BeanSupportDecision {
+    fun supportDecisionCanonical(bean: CanonicalBean): BeanSupportDecision = supportDecisionCanonicalValue(bean.value)
+
+    private fun supportDecisionCanonicalValue(bean: AbstractBean): BeanSupportDecision {
         if (bean.serverPort !in MIN_PORT..MAX_PORT) return unsupported(BeanSupportError.INVALID_PORT)
         if (!bean.hasRoutableServerAddress()) return unsupported(BeanSupportError.INVALID_SERVER)
         if (!bean.hasRequiredOutboundCredentials()) return unsupported(BeanSupportError.MISSING_CREDENTIALS)
@@ -188,6 +191,18 @@ object ConfigBuilder {
         val canonical = bean.canonicalBeanOrThrow()
         require(isSupportedBean(canonical)) { "Unsupported transport: ${(canonical as? StandardV2RayBean)?.type}" }
         val outbound = beanOutbound(canonical, "proxy", detour = upstream?.let { "upstream" })
+        return buildChainFullConfig(socksPort, listOf(outbound), upstream, dnsServers, ipv6Enabled)
+    }
+
+    fun buildChainConfigFromCanonical(
+        bean: CanonicalBean,
+        socksPort: Int,
+        upstream: Upstream? = null,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
+    ): String {
+        require(supportDecisionCanonical(bean) is BeanSupportDecision.Supported)
+        val outbound = beanOutbound(bean.value, "proxy", detour = upstream?.let { "upstream" })
         return buildChainFullConfig(socksPort, listOf(outbound), upstream, dnsServers, ipv6Enabled)
     }
 
@@ -285,6 +300,30 @@ object ConfigBuilder {
         )
     }
 
+    fun buildProfileChainConfigFromCanonical(
+        selected: CanonicalBean,
+        wrappers: List<AbstractBean>,
+        probeSocksPort: Int? = null,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
+    ): String = buildFullConfig(
+        profileChainOutboundsCanonical(selected.value, wrappers),
+        probeSocksPort,
+        dnsServers,
+        ipv6Enabled,
+    )
+
+    fun buildProfileChainProxyConfigFromCanonical(
+        selected: CanonicalBean,
+        wrappers: List<AbstractBean>,
+        socksPort: Int,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
+    ): String {
+        val outbounds = profileChainOutboundsCanonical(selected.value, wrappers)
+        return buildChainFullConfig(socksPort, outbounds, null, dnsServers, ipv6Enabled)
+    }
+
     data class Upstream(val host: String, val port: Int)
 
     data class ProbeTarget(val bean: AbstractBean, val socksPort: Int)
@@ -304,6 +343,20 @@ object ConfigBuilder {
         val selectedDetour = supportedWrappers.lastIndex.takeIf { it >= 0 }?.let { "chain-$it" }
         val selectedOutbound = beanOutbound(canonicalSelected, "proxy", selectedDetour)
         return wrapperOutbounds + selectedOutbound
+    }
+
+    private fun profileChainOutboundsCanonical(
+        canonicalSelected: AbstractBean,
+        wrappers: List<AbstractBean>,
+    ): List<String> {
+        val supportedWrappers = wrappers.map(AbstractBean::canonicalBeanOrThrow)
+        require(supportDecisionCanonicalValue(canonicalSelected) is BeanSupportDecision.Supported)
+        require(supportedWrappers.all(::isSupportedBean))
+        val wrapperOutbounds = supportedWrappers.mapIndexed { index, bean ->
+            beanOutbound(bean, "chain-$index", if (index == 0) null else "chain-${index - 1}")
+        }
+        val selectedDetour = supportedWrappers.lastIndex.takeIf { it >= 0 }?.let { "chain-$it" }
+        return wrapperOutbounds + beanOutbound(canonicalSelected, "proxy", selectedDetour)
     }
 
     private fun beanOutbound(bean: AbstractBean, tag: String, detour: String? = null): String = when (bean) {
@@ -437,6 +490,7 @@ object ConfigBuilder {
 
     private fun String.isValidPlainIpv6Dns(): Boolean {
         if (!hasIpv6LiteralShape() || hasMalformedIpv6Colons()) return false
+        if ('.' in this && !substringAfterLast(':').isValidIpv4Dns()) return false
         val compressed = "::" in this
         val sides = split("::", limit = 2)
         val groups = sides.sumOf(::ipv6GroupCount)

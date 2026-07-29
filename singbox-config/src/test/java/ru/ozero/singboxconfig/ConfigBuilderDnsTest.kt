@@ -142,6 +142,29 @@ class ConfigBuilderDnsTest {
     }
 
     @Test
+    fun `DNS parser accepts RFC IPv6 forms and rejects misplaced embedded IPv4`() {
+        val json = ConfigBuilder.buildSingboxConfig(
+            bean(),
+            dnsServers = listOf(
+                "::",
+                "::1",
+                "::ffff:192.0.2.1",
+                "2001:db8::192.0.2.1",
+                "192.0.2.1::",
+                "192.0.2.1::5",
+                "1:2:3:4:5:6:7:8:9",
+            ),
+        )
+
+        listOf("::", "::1", "::ffff:192.0.2.1", "2001:db8::192.0.2.1").forEach {
+            assertContains(json, "\"server\":\"$it\"")
+        }
+        listOf("192.0.2.1::", "192.0.2.1::5", "1:2:3:4:5:6:7:8:9").forEach {
+            assertFalse(json.contains(it))
+        }
+    }
+
+    @Test
     fun `DNS parser rejects userinfo invalid ports and malformed URI`() {
         val json = ConfigBuilder.buildSingboxConfig(
             bean(),

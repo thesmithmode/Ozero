@@ -233,10 +233,10 @@ class SingboxEngine @Inject constructor(
             .getOrNull() ?: return null
         val decision = ConfigBuilder.supportDecisionCanonical(canonicalBean)
         if (decision is BeanSupportDecision.Unsupported) {
-            logRejectedProfile(null, canonicalBean, decision, "selected")
+            logRejectedProfile(null, canonicalBean.value, decision, "selected")
             return null
         }
-        logCanonicalProfileSummary(cachedSelectedProfileId, canonicalBean)
+        logCanonicalProfileSummary(cachedSelectedProfileId, canonicalBean.value)
         return runCatching {
             ConfigBuilder.buildSingboxConfigFromCanonical(
                 canonicalBean,
@@ -247,7 +247,7 @@ class SingboxEngine @Inject constructor(
         }
             .mapCatching {
                 if (wrappers.isNotEmpty()) {
-                    ConfigBuilder.buildProfileChainConfig(
+                    ConfigBuilder.buildProfileChainConfigFromCanonical(
                         canonicalBean,
                         wrappers,
                         probeSocksPort,
@@ -311,14 +311,14 @@ class SingboxEngine @Inject constructor(
                 .getOrElse { return StartResult.Failure("chain canonicalization failed") }
             val decision = ConfigBuilder.supportDecisionCanonical(canonicalBean)
             if (decision is BeanSupportDecision.Unsupported) {
-                logRejectedProfile(null, canonicalBean, decision, "chain selected")
+                logRejectedProfile(null, canonicalBean.value, decision, "chain selected")
                 return StartResult.Failure("chain selected profile rejected: ${decision.error}")
             } else {
-                logCanonicalProfileSummary(cachedSelectedProfileId, canonicalBean)
+                logCanonicalProfileSummary(cachedSelectedProfileId, canonicalBean.value)
                 val wrappers = if (upstream == null) chainWrapperBeans(config) else emptyList()
                 runCatching {
                     if (wrappers.isNotEmpty()) {
-                        ConfigBuilder.buildProfileChainProxyConfig(
+                        ConfigBuilder.buildProfileChainProxyConfigFromCanonical(
                             canonicalBean,
                             wrappers,
                             port,
@@ -326,7 +326,7 @@ class SingboxEngine @Inject constructor(
                             config.ipv6Enabled,
                         )
                     } else {
-                        ConfigBuilder.buildChainConfig(
+                        ConfigBuilder.buildChainConfigFromCanonical(
                             canonicalBean,
                             port,
                             upstream,
@@ -372,8 +372,11 @@ class SingboxEngine @Inject constructor(
             activeSocksPort = 0
             if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)
             if (it is CancellationException) throw it
-            PersistentLoggers.error(TAG, "startProxyMode AIDL call failed: ${it.message}", it)
-            StartResult.Failure("startProxyMode failed: ${it.message}")
+            PersistentLoggers.error(
+                TAG,
+                "startProxyMode failed exceptionClass=${it::class.java.simpleName} stableCategory=aidl",
+            )
+            StartResult.Failure("AIDL failed")
         }
     }
 
@@ -423,8 +426,11 @@ class SingboxEngine @Inject constructor(
             if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)
             clearPendingStart()
             if (it is CancellationException) throw it
-            PersistentLoggers.error(TAG, "startWithConfig AIDL call failed: ${it.message}", it)
-            TunAttachResult.Failure("startWithConfig AIDL call failed: ${it.message}")
+            PersistentLoggers.error(
+                TAG,
+                "startWithConfig failed exceptionClass=${it::class.java.simpleName} stableCategory=aidl",
+            )
+            TunAttachResult.Failure("AIDL failed")
         }
     }
 
