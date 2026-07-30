@@ -202,7 +202,10 @@ internal object SingboxRuntime {
             options.statusInterval = STATUS_INTERVAL_NANOS
             lateinit var client: CommandClient
             client = CommandClient(
-                NativeLogHandler { handleNativeLogDisconnected(generation, client) },
+                NativeLogHandler(
+                    isCurrent = { nativeLogSessions.isCurrent(generation, client, logClient) },
+                    onDisconnected = { handleNativeLogDisconnected(generation, client) },
+                ),
                 options,
             )
             expectedClient = client
@@ -210,6 +213,10 @@ internal object SingboxRuntime {
             logClient = client
             withTimeout(NATIVE_LOG_CONNECT_TIMEOUT_MS) {
                 runInterruptible { client.connect() }
+            }
+            if (!nativeLogSessions.isCurrent(generation, client, logClient)) {
+                disconnectNativeLogClient(client)
+                return
             }
             PersistentLoggers.debug(TAG, "native log subscription connected")
         }.onFailure {
@@ -234,9 +241,8 @@ internal object SingboxRuntime {
     }
 
     private fun disconnectNativeLogClient(expectedClient: CommandClient) {
-        if (expectedClient !== logClient) return
         val client = expectedClient
-        logClient = null
+        if (client === logClient) logClient = null
         runCatching { client.disconnect() }
             .onFailure {
                 PersistentLoggers.warn(
@@ -256,6 +262,7 @@ internal object SingboxRuntime {
     }
 
     private class NativeLogHandler(
+        private val isCurrent: () -> Boolean,
         private val onDisconnected: () -> Unit,
     ) : CommandClientHandler {
         private val emittedCategories = mutableSetOf<String>()
@@ -271,9 +278,10 @@ internal object SingboxRuntime {
         override fun clearLogs() {}
 
         override fun writeLogs(messageList: LogIterator?) {
-            if (messageList == null) return
+            if (messageList == null || !isCurrent()) return
             var inspected = 0
             while (messageList.hasNext() && inspected < MAX_NATIVE_LOG_BATCH) {
+                if (!isCurrent()) return
                 val entry = messageList.next()
                 inspected++
                 val category = nativeLogCategory(entry.message) ?: continue
@@ -285,7 +293,7 @@ internal object SingboxRuntime {
         }
 
         override fun writeStatus(message: StatusMessage) {
-            lastStatus = message
+            if (isCurrent()) lastStatus = message
         }
 
         override fun writeGroups(message: OutboundGroupIterator?) {}
