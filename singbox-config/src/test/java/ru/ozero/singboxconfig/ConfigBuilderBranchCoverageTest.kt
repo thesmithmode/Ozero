@@ -1,5 +1,6 @@
 package ru.ozero.singboxconfig
 
+import org.json.JSONObject
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.WireGuardOutboundConfig
 import ru.ozero.singboxfmt.AbstractBean
@@ -335,6 +336,10 @@ class ConfigBuilderBranchCoverageTest {
         val json = ConfigBuilder.buildSingboxConfig(bean)
 
         assertContains(json, """srv\r\t\b\f.example.com""")
+        assertEquals(
+            bean.serverAddress,
+            JSONObject(json).getJSONArray("outbounds").getJSONObject(0).getString("server"),
+        )
     }
 
     @Test
