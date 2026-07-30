@@ -73,7 +73,7 @@ class SingboxEngineProbeTest {
         )
 
         val failure = assertIs<StartResult.Failure>(result)
-        assertTrue(failure.reason.contains("failed to build"))
+        assertEquals("config failed: SERIALIZATION", failure.reason)
     }
 
     @Test
@@ -90,7 +90,28 @@ class SingboxEngineProbeTest {
         )
 
         val failure = assertIs<StartResult.Failure>(result)
-        assertTrue(failure.reason.contains("failed to build"))
+        assertEquals("config failed: NO_SUPPORTED_AUTO_PROFILE", failure.reason)
+    }
+
+    @Test
+    fun `unsupported selected profile returns exact support error`() = runTest {
+        val engine = buildEngine()
+        val bean = VLESSBean().apply {
+            serverAddress = "invalid.example"
+            serverPort = 0
+            uuid = "00000000-0000-0000-0000-000000000001"
+        }
+
+        val result = engine.start(
+            EngineConfig.Singbox(
+                beanBlob = KryoSerializer.serialize(bean),
+                protocolType = SingboxEngine.PROTOCOL_VLESS,
+            ),
+            Upstream.None,
+        )
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals("profile rejected: INVALID_PORT", failure.reason)
     }
 
     @Test

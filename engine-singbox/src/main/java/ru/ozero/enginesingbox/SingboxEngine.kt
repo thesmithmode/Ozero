@@ -39,6 +39,7 @@ import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.VpnSocketProtectorHolder
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.singboxconfig.BeanSupportDecision
+import ru.ozero.singboxconfig.BeanSupportError
 import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
@@ -56,6 +57,25 @@ import java.net.Socket
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+
+internal enum class BuildConfigFailureCategory {
+    SERIALIZATION,
+    CANONICALIZATION,
+    UNSUPPORTED_PROFILE,
+    NO_SUPPORTED_AUTO_PROFILE,
+    GENERATION,
+}
+
+internal sealed interface BuildConfigResult {
+    data class Success(val json: String) : BuildConfigResult
+
+    data class Failure(
+        val category: BuildConfigFailureCategory,
+        val reason: BeanSupportError? = null,
+    ) : BuildConfigResult {
+        fun stableReason(): String = reason?.let { "profile rejected: $it" } ?: "config failed: $category"
+    }
+}
 
 @Suppress("TooManyFunctions", "LargeClass")
 class SingboxEngine @Inject constructor(
@@ -191,9 +211,17 @@ class SingboxEngine @Inject constructor(
         pendingSocksPort = 0
         pendingConfig = null
         val probePort = allocateChainPort()
-        val json = buildPendingConfig(config, probePort) ?: run {
-            activeAutoSelect = false
-            return StartResult.Failure("failed to build sing-box config")
+        val json = when (val result = buildPendingConfig(config, probePort)) {
+            is BuildConfigResult.Success -> result.json
+            is BuildConfigResult.Failure -> {
+                activeAutoSelect = false
+                PersistentLoggers.warn(
+                    TAG,
+                    "singbox config rejected profileId=${cachedSelectedProfileId ?: "unknown"} " +
+                        "category=${result.category} reason=${result.reason ?: "none"}",
+                )
+                return StartResult.Failure(result.stableReason())
+            }
         }
         PersistentLoggers.debug(
             TAG,
@@ -211,30 +239,31 @@ class SingboxEngine @Inject constructor(
         return StartResult.Success(socksPort = 0)
     }
 
-    private fun buildPendingConfig(config: EngineConfig.Singbox, probeSocksPort: Int): String? {
+    private fun buildPendingConfig(config: EngineConfig.Singbox, probeSocksPort: Int): BuildConfigResult {
         if (config.autoSelectBeanBlobs.isNotEmpty()) {
             val beans = supportedBeans(config.autoSelectBeanBlobs.take(MAX_AUTO_SELECT_OUTBOUNDS))
             if (beans.isEmpty()) {
                 PersistentLoggers.warn(TAG, "auto-select: all ${config.autoSelectBeanBlobs.size} beans failed")
-                return null
+                return BuildConfigResult.Failure(BuildConfigFailureCategory.NO_SUPPORTED_AUTO_PROFILE)
             }
             return runCatching {
                 ConfigBuilder.buildSingboxAutoConfig(beans, probeSocksPort, config.dnsServers, config.ipv6Enabled)
             }
-                .onFailure { PersistentLoggers.warn(TAG, "buildSingboxAutoConfig: ${it.message}") }
-                .getOrNull()
+                .fold(
+                    onSuccess = { BuildConfigResult.Success(it) },
+                    onFailure = { BuildConfigResult.Failure(BuildConfigFailureCategory.GENERATION) },
+                )
         }
         val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
-            .onFailure { PersistentLoggers.warn(TAG, "beanBlob deserialize: ${it.message}") }
-            .getOrNull() ?: return null
+            .getOrElse { return BuildConfigResult.Failure(BuildConfigFailureCategory.SERIALIZATION) }
         val wrappers = chainWrapperBeans(config)
         val canonicalBean = runCatching { ConfigBuilder.canonicalBean(bean) }
             .onFailure { PersistentLoggers.warn(TAG, "canonical profile rejected") }
-            .getOrNull() ?: return null
+            .getOrElse { return BuildConfigResult.Failure(BuildConfigFailureCategory.CANONICALIZATION) }
         val decision = ConfigBuilder.supportDecisionCanonical(canonicalBean)
         if (decision is BeanSupportDecision.Unsupported) {
             logRejectedProfile(null, canonicalBean.value, decision, "selected")
-            return null
+            return BuildConfigResult.Failure(BuildConfigFailureCategory.UNSUPPORTED_PROFILE, decision.error)
         }
         logCanonicalProfileSummary(cachedSelectedProfileId, canonicalBean.value)
         return runCatching {
@@ -258,8 +287,10 @@ class SingboxEngine @Inject constructor(
                     it
                 }
             }
-            .onFailure { PersistentLoggers.warn(TAG, "buildSingboxConfig: ${it.message}") }
-            .getOrNull()
+            .fold(
+                onSuccess = { BuildConfigResult.Success(it) },
+                onFailure = { BuildConfigResult.Failure(BuildConfigFailureCategory.GENERATION) },
+            )
     }
 
     private suspend fun startChainMode(config: EngineConfig.Singbox, upstream: Upstream.Socks5): StartResult {
