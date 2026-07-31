@@ -73,7 +73,7 @@ class SingboxEngineProbeTest {
         )
 
         val failure = assertIs<StartResult.Failure>(result)
-        assertEquals("config failed: SERIALIZATION", failure.reason)
+        assertEquals("config failed: DESERIALIZATION", failure.reason)
     }
 
     @Test
@@ -112,6 +112,23 @@ class SingboxEngineProbeTest {
 
         val failure = assertIs<StartResult.Failure>(result)
         assertEquals("profile rejected: INVALID_PORT", failure.reason)
+    }
+
+    @Test
+    fun `invalid chain wrapper rejects the entire declared chain`() = runTest {
+        val engine = buildEngine()
+
+        val result = engine.start(
+            EngineConfig.Singbox(
+                beanBlob = makeVlessBlob(),
+                protocolType = SingboxEngine.PROTOCOL_VLESS,
+                chainBeanBlobs = listOf(byteArrayOf(1, 2, 3)),
+            ),
+            Upstream.None,
+        )
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals("config failed: UNSUPPORTED_PROFILE", failure.reason)
     }
 
     @Test
