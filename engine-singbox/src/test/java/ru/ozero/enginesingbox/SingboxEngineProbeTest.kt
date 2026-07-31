@@ -155,10 +155,10 @@ class SingboxEngineProbeTest {
 
     @Test
     fun `missing declared chain profile is retained as typed failure`() {
-        val engine = buildEngine()
+        val engine = buildEngine(chainProfileIds = listOf(1L, 99L))
+        Thread.sleep(100)
         engine.setPrivateField("cachedSelectedProfileId", 1L)
         engine.setPrivateField("cachedBlob", makeVlessBlob())
-        engine.setPrivateField("cachedChainProfileIds", listOf(1L, 99L))
 
         val config = assertIs<EngineConfig.Singbox>(engine.buildManualConfig(null))
         val result = assertIs<BuildConfigResult.Failure>(engine.buildPendingConfigForTest(config))
@@ -170,11 +170,11 @@ class SingboxEngineProbeTest {
 
     @Test
     fun `declared chain longer than auto limit is not silently truncated`() {
-        val engine = buildEngine()
         val wrapperIds = (2L..52L).toList()
+        val engine = buildEngine(chainProfileIds = listOf(1L) + wrapperIds)
+        Thread.sleep(100)
         engine.setPrivateField("cachedSelectedProfileId", 1L)
         engine.setPrivateField("cachedBlob", makeVlessBlob())
-        engine.setPrivateField("cachedChainProfileIds", listOf(1L) + wrapperIds)
 
         val config = assertIs<EngineConfig.Singbox>(engine.buildManualConfig(null))
         val result = assertIs<BuildConfigResult.Failure>(engine.buildPendingConfigForTest(config))
@@ -333,7 +333,7 @@ class SingboxEngineProbeTest {
         )
 
         val failure = assertIs<StartResult.Failure>(result)
-        assertTrue(failure.reason.contains("chain deserialize"))
+        assertTrue(failure.reason.contains("chain deserialization"))
     }
 
     @Test
@@ -927,12 +927,12 @@ class SingboxEngineProbeTest {
         return server
     }
 
-    private fun buildEngine(): SingboxEngine =
+    private fun buildEngine(chainProfileIds: List<Long> = emptyList()): SingboxEngine =
         SingboxEngine(
             context = unboundContext(),
             dataStore = fakeDataStore(),
             profileDao = fakeProfileDao(),
-            proxyChainDao = fakeProxyChainDao(),
+            proxyChainDao = fakeProxyChainDao(chainProfileIds),
         )
 
     private fun SingboxEngine.buildPendingConfigForTest(config: EngineConfig.Singbox): BuildConfigResult {
@@ -1016,10 +1016,13 @@ class SingboxEngineProbeTest {
             override suspend fun delete(profile: ProxyProfile) = Unit
         }
 
-    private fun fakeProxyChainDao(): ProxyChainDao =
+    private fun fakeProxyChainDao(profileIds: List<Long> = emptyList()): ProxyChainDao =
         object : ProxyChainDao {
-            override fun getAllFlow(): Flow<List<ProxyChainStep>> = MutableStateFlow(emptyList())
-            override suspend fun getAll(): List<ProxyChainStep> = emptyList()
+            private val steps = profileIds.mapIndexed { index, profileId ->
+                ProxyChainStep(profileId = profileId, userOrder = index)
+            }
+            override fun getAllFlow(): Flow<List<ProxyChainStep>> = MutableStateFlow(steps)
+            override suspend fun getAll(): List<ProxyChainStep> = steps
             override suspend fun clear() = Unit
             override suspend fun insertAll(steps: List<ProxyChainStep>) = Unit
             override suspend fun replace(profileIds: List<Long>) = Unit

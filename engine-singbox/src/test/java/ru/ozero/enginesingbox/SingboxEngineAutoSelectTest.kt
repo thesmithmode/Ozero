@@ -376,7 +376,7 @@ class SingboxEngineAutoSelectTest {
 
         assertNotNull(result)
         assertTrue(result is EngineConfig.Singbox)
-        assertEquals(50, result.autoSelectBeanBlobs.size)
+        assertEquals(80, result.autoSelectBeanBlobs.size)
         assertTrue(result.autoSelectBeanBlobs.first().contentEquals(profiles[69].beanBlob))
         assertTrue(result.autoSelectBeanBlobs.any { it.contentEquals(profiles.first().beanBlob) })
     }
@@ -401,7 +401,7 @@ class SingboxEngineAutoSelectTest {
     }
 
     @Test
-    fun `auto mode skips localhost candidates before building config`() {
+    fun `auto mode preserves localhost candidates for typed diagnostics`() {
         val profiles = listOf(
             makeProfile(1L, 1L, "localhost", 443),
             makeProfile(2L, 1L, "127.0.0.1", 443),
@@ -415,15 +415,15 @@ class SingboxEngineAutoSelectTest {
 
         assertNotNull(result)
         assertTrue(result is EngineConfig.Singbox)
-        assertEquals(1, result.autoSelectBeanBlobs.size)
-        assertTrue(result.autoSelectBeanBlobs.single().contentEquals(profiles[2].beanBlob))
+        assertEquals(3, result.autoSelectBeanBlobs.size)
+        assertEquals(profiles.map { it.id }, result.autoSelectProfileIds)
         val start = kotlinx.coroutines.runBlocking { engine.start(result, ru.ozero.enginescore.Upstream.None) }
         assertTrue(start is ru.ozero.enginescore.StartResult.Failure)
         assertTrue(!start.reason.contains("failed to build sing-box config"))
     }
 
     @Test
-    fun `auto mode skips invalid ports before building config`() {
+    fun `auto mode preserves invalid ports for typed diagnostics`() {
         val profiles = listOf(
             makeProfile(1L, 1L, "bad.example.com", 4_449_499),
             makeProfile(2L, 1L, "remote.example.com", 443),
@@ -436,12 +436,12 @@ class SingboxEngineAutoSelectTest {
 
         assertNotNull(result)
         assertTrue(result is EngineConfig.Singbox)
-        assertEquals(1, result.autoSelectBeanBlobs.size)
-        assertTrue(result.autoSelectBeanBlobs.single().contentEquals(profiles[1].beanBlob))
+        assertEquals(2, result.autoSelectBeanBlobs.size)
+        assertEquals(profiles.map { it.id }, result.autoSelectProfileIds)
     }
 
     @Test
-    fun `auto mode skips oversized blobs before deserialization`() {
+    fun `auto mode preserves oversized blobs for typed diagnostics`() {
         val validProfile = makeProfile(1L, 1L, "remote.example.com", 443)
         val oversizedProfile = validProfile.copy(
             id = 2L,
@@ -456,8 +456,8 @@ class SingboxEngineAutoSelectTest {
 
         assertNotNull(result)
         assertTrue(result is EngineConfig.Singbox)
-        assertEquals(1, result.autoSelectBeanBlobs.size)
-        assertTrue(result.autoSelectBeanBlobs.single().contentEquals(validProfile.beanBlob))
+        assertEquals(2, result.autoSelectBeanBlobs.size)
+        assertEquals(listOf(oversizedProfile.id, validProfile.id), result.autoSelectProfileIds)
     }
 
     @Test
