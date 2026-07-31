@@ -50,7 +50,10 @@ sealed class EngineConfig {
         val beanBlob: ByteArray,
         val protocolType: Int,
         val autoSelectBeanBlobs: List<ByteArray> = emptyList(),
+        val autoSelectProfileIds: List<Long> = emptyList(),
         val chainBeanBlobs: List<ByteArray> = emptyList(),
+        val chainProfileIds: List<Long> = emptyList(),
+        val missingChainProfileIds: Set<Long> = emptySet(),
         val wireGuardConfig: WireGuardOutboundConfig? = null,
         val proxyMode: Boolean = false,
         val dnsServers: List<String> = DEFAULT_DNS_SERVERS,
@@ -69,8 +72,11 @@ sealed class EngineConfig {
                 beanBlob.contentEquals(other.beanBlob) &&
                 autoSelectBeanBlobs.size == other.autoSelectBeanBlobs.size &&
                 autoSelectBeanBlobs.zip(other.autoSelectBeanBlobs).all { (a, b) -> a.contentEquals(b) } &&
+                autoSelectProfileIds == other.autoSelectProfileIds &&
                 chainBeanBlobs.size == other.chainBeanBlobs.size &&
                 chainBeanBlobs.zip(other.chainBeanBlobs).all { (a, b) -> a.contentEquals(b) } &&
+                chainProfileIds == other.chainProfileIds &&
+                missingChainProfileIds == other.missingChainProfileIds &&
                 wireGuardConfig == other.wireGuardConfig &&
                 proxyMode == other.proxyMode &&
                 dnsServers == other.dnsServers &&
@@ -80,7 +86,10 @@ sealed class EngineConfig {
         override fun hashCode(): Int {
             var result = 31 * protocolType + beanBlob.contentHashCode()
             for (blob in autoSelectBeanBlobs) result = 31 * result + blob.contentHashCode()
+            result = 31 * result + autoSelectProfileIds.hashCode()
             for (blob in chainBeanBlobs) result = 31 * result + blob.contentHashCode()
+            result = 31 * result + chainProfileIds.hashCode()
+            result = 31 * result + missingChainProfileIds.hashCode()
             result = 31 * result + (wireGuardConfig?.hashCode() ?: 0)
             result = 31 * result + proxyMode.hashCode()
             result = 31 * result + dnsServers.hashCode()

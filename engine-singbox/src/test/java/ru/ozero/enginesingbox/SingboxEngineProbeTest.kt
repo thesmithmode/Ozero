@@ -27,6 +27,7 @@ import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
+import ru.ozero.singboxconfig.BeanSupportError
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxroom.dao.ProxyChainDao
@@ -91,6 +92,96 @@ class SingboxEngineProbeTest {
 
         val failure = assertIs<StartResult.Failure>(result)
         assertEquals("config failed: NO_SUPPORTED_AUTO_PROFILE", failure.reason)
+    }
+
+    @Test
+    fun `auto select diagnostics preserve profile id and exact rejection`() {
+        val engine = buildEngine()
+        val invalid = VLESSBean().apply {
+            serverAddress = "invalid.example"
+            serverPort = 0
+            uuid = "00000000-0000-0000-0000-000000000001"
+        }
+
+        val result = engine.buildPendingConfigForTest(
+            EngineConfig.Singbox(
+                beanBlob = ByteArray(0),
+                protocolType = SingboxEngine.PROTOCOL_AUTO_SELECT,
+                autoSelectBeanBlobs = listOf(KryoSerializer.serialize(invalid)),
+                autoSelectProfileIds = listOf(42L),
+            ),
+        )
+
+        val failure = assertIs<BuildConfigResult.Failure>(result).inputFailures.single()
+        assertEquals(42L, failure.profileId)
+        assertEquals(ProfileInputStage.VALIDATION, failure.stage)
+        assertEquals(BeanSupportError.INVALID_PORT, failure.reason)
+    }
+
+    @Test
+    fun `valid auto candidate remains while rejected candidate is diagnosed`() {
+        val engine = buildEngine()
+
+        val result = engine.buildPendingConfigForTest(
+            EngineConfig.Singbox(
+                beanBlob = ByteArray(0),
+                protocolType = SingboxEngine.PROTOCOL_AUTO_SELECT,
+                autoSelectBeanBlobs = listOf(byteArrayOf(1), makeVlessBlob()),
+                autoSelectProfileIds = listOf(10L, 11L),
+            ),
+        )
+
+        val success = assertIs<BuildConfigResult.Success>(result)
+        assertTrue(success.json.contains("proxy-0"))
+        assertEquals(10L, success.inputFailures.single().profileId)
+        assertEquals(ProfileInputStage.DESERIALIZATION, success.inputFailures.single().stage)
+    }
+
+    @Test
+    fun `manual auto config preserves unsupported candidates for typed decoding`() {
+        val engine = buildEngine()
+        val profiles = listOf(
+            proxyProfile(20L, byteArrayOf(1)),
+            proxyProfile(21L, makeVlessBlob()),
+        )
+        engine.setPrivateField("cachedSelectedProfileId", SingboxEngine.SELECTED_AUTO)
+        engine.setPrivateField("cachedAutoProfiles", profiles)
+
+        val config = assertIs<EngineConfig.Singbox>(engine.buildManualConfig(null))
+
+        assertEquals(listOf(20L, 21L), config.autoSelectProfileIds)
+        assertEquals(2, config.autoSelectBeanBlobs.size)
+    }
+
+    @Test
+    fun `missing declared chain profile is retained as typed failure`() {
+        val engine = buildEngine()
+        engine.setPrivateField("cachedSelectedProfileId", 1L)
+        engine.setPrivateField("cachedBlob", makeVlessBlob())
+        engine.setPrivateField("cachedChainProfileIds", listOf(1L, 99L))
+
+        val config = assertIs<EngineConfig.Singbox>(engine.buildManualConfig(null))
+        val result = assertIs<BuildConfigResult.Failure>(engine.buildPendingConfigForTest(config))
+
+        assertEquals(listOf(99L), config.chainProfileIds)
+        assertEquals(99L, result.inputFailures.single().profileId)
+        assertEquals(ProfileInputStage.MISSING_PROFILE, result.inputFailures.single().stage)
+    }
+
+    @Test
+    fun `declared chain longer than auto limit is not silently truncated`() {
+        val engine = buildEngine()
+        val wrapperIds = (2L..52L).toList()
+        engine.setPrivateField("cachedSelectedProfileId", 1L)
+        engine.setPrivateField("cachedBlob", makeVlessBlob())
+        engine.setPrivateField("cachedChainProfileIds", listOf(1L) + wrapperIds)
+
+        val config = assertIs<EngineConfig.Singbox>(engine.buildManualConfig(null))
+        val result = assertIs<BuildConfigResult.Failure>(engine.buildPendingConfigForTest(config))
+
+        assertEquals(wrapperIds, config.chainProfileIds)
+        assertEquals(wrapperIds.size, result.inputFailures.size)
+        assertEquals(52L, result.inputFailures.last().profileId)
     }
 
     @Test
@@ -844,6 +935,16 @@ class SingboxEngineProbeTest {
             proxyChainDao = fakeProxyChainDao(),
         )
 
+    private fun SingboxEngine.buildPendingConfigForTest(config: EngineConfig.Singbox): BuildConfigResult {
+        val method = javaClass.getDeclaredMethod(
+            "buildPendingConfig",
+            EngineConfig.Singbox::class.java,
+            Int::class.java,
+        )
+        method.isAccessible = true
+        return method.invoke(this, config, 39000) as BuildConfigResult
+    }
+
     private fun unboundContext(): Context =
         object : ContextWrapper(
             mockk<Context>(relaxed = true) {
@@ -864,6 +965,14 @@ class SingboxEngineProbeTest {
                 security = "none"
             },
         )
+
+    private fun proxyProfile(id: Long, blob: ByteArray): ProxyProfile = ProxyProfile(
+        id = id,
+        groupId = 1L,
+        name = "profile-$id",
+        beanBlob = blob,
+        protocolType = SingboxEngine.PROTOCOL_VLESS,
+    )
 
     private fun fakeDataStore(): DataStore<Preferences> {
         val flow = MutableStateFlow<Preferences>(mutablePreferencesOf())
