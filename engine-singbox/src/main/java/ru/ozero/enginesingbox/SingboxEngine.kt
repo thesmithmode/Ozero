@@ -903,9 +903,12 @@ class SingboxEngine @Inject constructor(
             if (selected.size == MAX_AUTO_SELECT_OUTBOUNDS) break
         }
         if (rejected.isNotEmpty()) {
+            val rejectionSummary = rejected.toSortedMap().entries.joinToString { entry ->
+                "${entry.key}=${entry.value}"
+            }
             PersistentLoggers.warn(
                 TAG,
-                "auto-select skipped profiles=${rejected.toSortedMap().entries.joinToString { "${it.key}=${it.value}" }}",
+                "auto-select skipped profiles=$rejectionSummary",
             )
         }
         return selected
