@@ -33,6 +33,7 @@ import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyChainStep
+import ru.ozero.singboxroom.entity.ProxyProfile
 import java.io.File
 import java.net.ServerSocket
 import kotlin.test.assertEquals
