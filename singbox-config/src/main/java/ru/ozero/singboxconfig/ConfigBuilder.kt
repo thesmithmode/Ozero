@@ -915,7 +915,6 @@ private fun jsonString(s: String): String {
             '\t' -> sb.append("\\t")
             '\b' -> sb.append("\\b")
             '\u000C' -> sb.append("\\f")
-' -> sb.append("\\f")
             else -> if (c.code < 0x20) {
                 sb.append("\\u%04x".format(c.code))
             } else {
