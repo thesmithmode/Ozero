@@ -637,15 +637,16 @@ class SingboxEngine @Inject constructor(
         val process = proxy ?: return EnginePlugin.ReadyResult.Timeout("sing-box process is not connected")
         val runtimeRunning = runCatching { process.runtimeRunning() }.getOrDefault(false)
         if (!runtimeRunning) {
-            clearRuntimeState()
             return EnginePlugin.ReadyResult.Timeout("sing-box runtime is not running")
         }
         val port = activeSocksPort
         if (!awaitLocalSocksReady(port)) {
-            clearRuntimeState()
             return EnginePlugin.ReadyResult.Timeout("sing-box SOCKS5 listener is not ready")
         }
-        return EnginePlugin.ReadyResult.Ready
+        return when (val result = routedProbe.probe(port)) {
+            is RoutedProbeResult.Success -> EnginePlugin.ReadyResult.Ready
+            is RoutedProbeResult.Failure -> EnginePlugin.ReadyResult.Timeout(result.reason.probeFailureMessage())
+        }
     }
 
     private suspend fun awaitLocalSocksReady(port: Int): Boolean {
@@ -889,8 +890,38 @@ class SingboxEngine @Inject constructor(
         )
     }
 
-    private fun autoSelectProfileWindow(profiles: List<ProxyProfile>): List<ProxyProfile> =
-        prioritizeSingboxAutoProfiles(profiles, MAX_AUTO_PROFILE_SCAN)
+    private fun autoSelectProfileWindow(profiles: List<ProxyProfile>): List<ProxyProfile> {
+        val selected = ArrayList<ProxyProfile>(MAX_AUTO_SELECT_OUTBOUNDS)
+        val rejected = mutableMapOf<ProfileInputStage, Int>()
+        for (profile in prioritizeSingboxAutoProfiles(profiles, MAX_AUTO_PROFILE_SCAN)) {
+            val rejectionStage = autoProfileRejectionStage(profile.beanBlob)
+            if (rejectionStage == null) {
+                selected += profile
+            } else {
+                rejected[rejectionStage] = rejected.getOrDefault(rejectionStage, 0) + 1
+            }
+            if (selected.size == MAX_AUTO_SELECT_OUTBOUNDS) break
+        }
+        if (rejected.isNotEmpty()) {
+            PersistentLoggers.warn(
+                TAG,
+                "auto-select skipped profiles=${rejected.toSortedMap().entries.joinToString { "${it.key}=${it.value}" }}",
+            )
+        }
+        return selected
+    }
+
+    private fun autoProfileRejectionStage(blob: ByteArray): ProfileInputStage? {
+        if (blob.size > MAX_AUTO_SELECT_BLOB_BYTES) return ProfileInputStage.SIZE
+        val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
+            .getOrElse { return ProfileInputStage.DESERIALIZATION }
+        val canonical = runCatching { ConfigBuilder.canonicalBean(bean) }
+            .getOrElse { return ProfileInputStage.CANONICALIZATION }
+        return when (ConfigBuilder.supportDecisionCanonical(canonical)) {
+            BeanSupportDecision.Supported -> null
+            is BeanSupportDecision.Unsupported -> ProfileInputStage.VALIDATION
+        }
+    }
 
     private fun resolveProfileByIdBlocking(id: Long): ProxyProfile? =
         runBlocking(Dispatchers.IO) { profileDao.getById(id) }

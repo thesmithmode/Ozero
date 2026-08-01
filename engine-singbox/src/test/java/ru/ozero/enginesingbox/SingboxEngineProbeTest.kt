@@ -33,7 +33,6 @@ import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyChainStep
-import ru.ozero.singboxroom.entity.ProxyProfile
 import java.io.File
 import java.net.ServerSocket
 import kotlin.test.assertEquals
@@ -135,22 +134,6 @@ class SingboxEngineProbeTest {
         assertTrue(success.json.contains("proxy-0"))
         assertEquals(10L, success.inputFailures.single().profileId)
         assertEquals(ProfileInputStage.DESERIALIZATION, success.inputFailures.single().stage)
-    }
-
-    @Test
-    fun `manual auto config preserves unsupported candidates for typed decoding`() {
-        val engine = buildEngine()
-        val profiles = listOf(
-            proxyProfile(20L, byteArrayOf(1)),
-            proxyProfile(21L, makeVlessBlob()),
-        )
-        engine.setPrivateField("cachedSelectedProfileId", SingboxEngine.SELECTED_AUTO)
-        engine.setPrivateField("cachedAutoProfiles", profiles)
-
-        val config = assertIs<EngineConfig.Singbox>(engine.buildManualConfig(null))
-
-        assertEquals(listOf(20L, 21L), config.autoSelectProfileIds)
-        assertEquals(2, config.autoSelectBeanBlobs.size)
     }
 
     @Test
@@ -481,14 +464,14 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `attachTun succeeds without routed probe and awaitReady requires socks5`() = runTest {
+    fun `attachTun succeeds and awaitReady requires routed probe`() = runTest {
         mockkStatic(ParcelFileDescriptor::class)
         try {
             val engine = buildEngine()
             var calls = 0
             engine.routedProbe = SingboxRoutedProbe {
                 calls++
-                if (calls == 1) SingboxHttp204RoutedProbe.LATENCY_FAILED else 12L
+                SingboxHttp204RoutedProbe.LATENCY_FAILED
             }
             val process = mockk<ISingboxEngineProcess>()
             val pfd = mockk<ParcelFileDescriptor>(relaxed = true)
@@ -506,12 +489,12 @@ class SingboxEngineProbeTest {
 
                 val ready = engine.awaitReady()
 
-                assertIs<EnginePlugin.ReadyResult.Ready>(ready)
+                assertIs<EnginePlugin.ReadyResult.Timeout>(ready)
                 assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
             }
 
             assertIs<TunAttachResult.Success>(result)
-            assertEquals(0, calls)
+            assertEquals(1, calls)
             assertEquals(null, engine.privateField("pendingConfig"))
             assertEquals(0, engine.privateIntField("pendingSocksPort"))
             assertEquals(true, engine.privateBooleanField("activeTunAutoSelect"))
@@ -704,47 +687,38 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `awaitReady accepts local socks listener without routed probe`() = runTest {
+    fun `awaitReady is ready only after successful routed probe`() = runTest {
+        val engine = buildEngine()
+        var probedPort = 0
+        engine.routedProbe = SingboxRoutedProbe { socksPort ->
+            probedPort = socksPort
+            24L
+        }
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.runtimeRunning() } returns true
+        engine.setPrivateField("proxy", process)
+        openLocalSocksListener().use { listener ->
+            engine.setPrivateField("activeSocksPort", listener.localPort)
+
+            val result = engine.awaitReady()
+
+            assertIs<EnginePlugin.ReadyResult.Ready>(result)
+            assertEquals(listener.localPort, probedPort)
+            assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
+        }
+    }
+
+    @Test
+    fun `awaitReady returns stable timeout after routed probe failure without clearing runtime state`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = object : SingboxRoutedProbe {
             override suspend fun probeLatencyMs(socksPort: Int): Long = SingboxHttp204RoutedProbe.LATENCY_FAILED
+            override suspend fun probe(socksPort: Int): RoutedProbeResult =
+                RoutedProbeResult.Failure(
+                    RoutedProbeResult.Reason.TLS,
+                    "198.51.100.24 uuid=secret sni=private.example key=private",
+                )
         }
-        val process = mockk<ISingboxEngineProcess>()
-        every { process.runtimeRunning() } returns true
-        engine.setPrivateField("proxy", process)
-        openLocalSocksListener().use { listener ->
-            engine.setPrivateField("activeSocksPort", listener.localPort)
-
-            val result = engine.awaitReady()
-
-            assertIs<EnginePlugin.ReadyResult.Ready>(result)
-            assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
-        }
-    }
-
-    @Test
-    fun `awaitReady accepts warm auto select runtime without routed probe`() = runTest {
-        val engine = buildEngine()
-        engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
-        val process = mockk<ISingboxEngineProcess>()
-        every { process.runtimeRunning() } returns true
-        engine.setPrivateField("proxy", process)
-        openLocalSocksListener().use { listener ->
-            engine.setPrivateField("activeSocksPort", listener.localPort)
-            engine.setPrivateField("activeAutoSelect", true)
-
-            val result = engine.awaitReady()
-
-            assertIs<EnginePlugin.ReadyResult.Ready>(result)
-            assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
-            assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
-        }
-    }
-
-    @Test
-    fun `awaitReady accepts warm tun auto select runtime without routed probe`() = runTest {
-        val engine = buildEngine()
-        engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
         val process = mockk<ISingboxEngineProcess>()
         every { process.runtimeRunning() } returns true
         engine.setPrivateField("proxy", process)
@@ -755,7 +729,11 @@ class SingboxEngineProbeTest {
 
             val result = engine.awaitReady()
 
-            assertIs<EnginePlugin.ReadyResult.Ready>(result)
+            val timeout = assertIs<EnginePlugin.ReadyResult.Timeout>(result)
+            assertEquals("sing-box outbound TLS failed", timeout.reason)
+            assertTrue(!timeout.reason.contains("198.51.100.24"))
+            assertTrue(!timeout.reason.contains("secret"))
+            assertTrue(!timeout.reason.contains("private.example"))
             assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
             assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
             assertEquals(true, engine.privateBooleanField("activeTunAutoSelect"))
@@ -763,40 +741,24 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `awaitReady does not call external routed probe when socks5 is ready`() = runTest {
+    fun `awaitReady does not call routed probe when socks5 handshake fails`() = runTest {
         val engine = buildEngine()
         var calls = 0
         engine.routedProbe = SingboxRoutedProbe {
             calls++
-            if (calls < 3) SingboxHttp204RoutedProbe.LATENCY_FAILED else 24L
+            24L
         }
         val process = mockk<ISingboxEngineProcess>()
         every { process.runtimeRunning() } returns true
         engine.setPrivateField("proxy", process)
-        openLocalSocksListener().use { listener ->
+        openInvalidLocalListener().use { listener ->
             engine.setPrivateField("activeSocksPort", listener.localPort)
 
             val result = engine.awaitReady()
 
-            assertIs<EnginePlugin.ReadyResult.Ready>(result)
+            assertIs<EnginePlugin.ReadyResult.Timeout>(result)
             assertEquals(0, calls)
             assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
-        }
-    }
-
-    @Test
-    fun `awaitReady returns ready after successful probe`() = runTest {
-        val engine = buildEngine()
-        engine.routedProbe = SingboxRoutedProbe { 1L }
-        val process = mockk<ISingboxEngineProcess>()
-        every { process.runtimeRunning() } returns true
-        engine.setPrivateField("proxy", process)
-        openLocalSocksListener().use { listener ->
-            engine.setPrivateField("activeSocksPort", listener.localPort)
-
-            val result = engine.awaitReady()
-
-            assertIs<EnginePlugin.ReadyResult.Ready>(result)
         }
     }
 
@@ -828,7 +790,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `awaitReady rejects invalid local socks response`() = runTest {
+    fun `awaitReady preserves runtime state after invalid local socks response`() = runTest {
         val engine = buildEngine()
         val process = mockk<ISingboxEngineProcess>()
         every { process.runtimeRunning() } returns true
@@ -840,12 +802,12 @@ class SingboxEngineProbeTest {
 
             val failure = assertIs<EnginePlugin.ReadyResult.Timeout>(result)
             assertTrue(failure.reason.contains("SOCKS5 listener"))
-            assertEquals(0, engine.privateIntField("activeSocksPort"))
+            assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
         }
     }
 
     @Test
-    fun `awaitReady clears closed socks port`() = runTest {
+    fun `awaitReady preserves runtime state after closed socks port`() = runTest {
         val engine = buildEngine()
         val process = mockk<ISingboxEngineProcess>()
         every { process.runtimeRunning() } returns true
@@ -856,7 +818,7 @@ class SingboxEngineProbeTest {
         val result = engine.awaitReady()
 
         assertIs<EnginePlugin.ReadyResult.Timeout>(result)
-        assertEquals(0, engine.privateIntField("activeSocksPort"))
+        assertEquals(closedPort, engine.privateIntField("activeSocksPort"))
     }
 
     @Test
@@ -965,14 +927,6 @@ class SingboxEngineProbeTest {
                 security = "none"
             },
         )
-
-    private fun proxyProfile(id: Long, blob: ByteArray): ProxyProfile = ProxyProfile(
-        id = id,
-        groupId = 1L,
-        name = "profile-$id",
-        beanBlob = blob,
-        protocolType = SingboxEngine.PROTOCOL_VLESS,
-    )
 
     private fun fakeDataStore(): DataStore<Preferences> {
         val flow = MutableStateFlow<Preferences>(mutablePreferencesOf())

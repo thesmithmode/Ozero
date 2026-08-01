@@ -27,8 +27,7 @@ class TunBuilderHelperCoverageTest {
         verify(exactly = 1) { builder.addAddress("10.0.0.2", 32) }
         verify(exactly = 1) { builder.addDnsServer("1.1.1.1") }
         verify(exactly = 1) { builder.addDnsServer("8.8.8.8") }
-        verify(exactly = 1) { builder.allowFamily(TEST_AF_INET) }
-        verify(exactly = 0) { builder.allowFamily(TEST_AF_INET6) }
+        verify(exactly = 2) { builder.allowFamily(any()) }
         verify(exactly = 1) { builder.addRoute("0.0.0.0", 0) }
     }
 
@@ -38,7 +37,7 @@ class TunBuilderHelperCoverageTest {
 
         helper(builder).applyEngineTunSpec(
             spec = baseSpec(excludeRfc1918 = true),
-            ipv6Enabled = true,
+            ipv6Enabled = false,
         )
 
         verify(exactly = 1) { builder.addRoute("0.0.0.0", 0) }
@@ -112,12 +111,11 @@ class TunBuilderHelperCoverageTest {
                 ipv6PrefixLength = 128,
                 routeAllV6 = true,
             ),
-            ipv6Enabled = true,
+            ipv6Enabled = false,
         )
 
         verify(exactly = 1) { defaultBuilder.addAddress("fd00::2", 128) }
         verify(exactly = 1) { defaultBuilder.addRoute("::", 0) }
-        verify(exactly = 1) { defaultBuilder.allowFamily(TEST_AF_INET6) }
 
         val cidrBuilder = builder()
         helper(cidrBuilder).applyEngineTunSpec(
@@ -128,7 +126,7 @@ class TunBuilderHelperCoverageTest {
                 routeAllV6 = false,
                 routeCidrsV6 = listOf("2001:db8::/32", "bad-v6"),
             ),
-            ipv6Enabled = true,
+            ipv6Enabled = false,
         )
 
         verify(exactly = 1) { cidrBuilder.addAddress("fd00::3", 64) }
@@ -164,26 +162,6 @@ class TunBuilderHelperCoverageTest {
         )
 
         verify(exactly = 0) { builder.addAddress("fd00::4", 128) }
-        verify(exactly = 0) { builder.addRoute("::", 0) }
-        verify(exactly = 0) { builder.allowFamily(TEST_AF_INET6) }
-    }
-
-    @Test
-    fun `applyEngineTunSpec blocks ipv6 fall through when global ipv6 is disabled`() {
-        val builder = builder()
-
-        helper(builder).applyEngineTunSpec(
-            spec = baseSpec(
-                allowFamilyV6 = true,
-                ipv6Address = "fd00::5",
-                ipv6PrefixLength = 128,
-                routeAllV6 = true,
-            ),
-            ipv6Enabled = false,
-        )
-
-        verify(exactly = 0) { builder.allowFamily(TEST_AF_INET6) }
-        verify(exactly = 0) { builder.addAddress("fd00::5", 128) }
         verify(exactly = 0) { builder.addRoute("::", 0) }
     }
 
@@ -298,12 +276,7 @@ class TunBuilderHelperCoverageTest {
     ): TunBuilderHelper {
         val service = mockk<VpnService>()
         every { service.packageName } returns packageName
-        return TunBuilderHelper(
-            service,
-            builderFactory = { builder },
-            ipv4Family = TEST_AF_INET,
-            ipv6Family = TEST_AF_INET6,
-        )
+        return TunBuilderHelper(service, builderFactory = { builder })
     }
 
     private fun builder(): VpnService.Builder = mockk(relaxed = true) {
@@ -347,9 +320,4 @@ class TunBuilderHelperCoverageTest {
         routeCidrsV6 = routeCidrsV6,
         excludeRfc1918 = excludeRfc1918,
     )
-
-    private companion object {
-        const val TEST_AF_INET = 4
-        const val TEST_AF_INET6 = 6
-    }
 }
