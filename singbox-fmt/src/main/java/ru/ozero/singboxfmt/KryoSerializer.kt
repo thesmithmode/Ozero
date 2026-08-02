@@ -14,6 +14,7 @@ object KryoSerializer {
     private const val MAGIC = 0x4f5a424e
     private const val FORMAT_VERSION = 1
     private const val HEADER_SIZE = 6
+    private const val PROTOCOL_UNKNOWN = 0xff
 
     private val pool = object : Pool<Kryo>(true, false, 4) {
         override fun create(): Kryo = Kryo().apply {
@@ -129,6 +130,6 @@ object KryoSerializer {
         is VMessBean -> 1
         is TrojanBean -> 2
         is ShadowsocksBean -> 3
-        else -> throw KryoException("Unsupported bean type")
+        else -> PROTOCOL_UNKNOWN
     }
 }

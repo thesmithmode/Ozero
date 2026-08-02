@@ -509,7 +509,7 @@ class SingboxEngineAutoSelectTest {
     }
 
     @Test
-    fun `buildManualConfig falls back to VLESS protocol for invalid blob`() {
+    fun `buildManualConfig rejects invalid blob`() {
         val invalid = byteArrayOf(1, 2, 3)
         val prefs = mutablePreferencesOf(beanKey to invalid)
         val engine = buildEngine(prefs = prefs)
@@ -517,9 +517,7 @@ class SingboxEngineAutoSelectTest {
 
         val result = engine.buildManualConfig(null)
 
-        assertNotNull(result)
-        assertTrue(result is EngineConfig.Singbox)
-        assertEquals(SingboxEngine.PROTOCOL_VLESS, result.protocolType)
+        assertNull(result)
     }
 
     @Test

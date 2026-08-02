@@ -6,8 +6,9 @@ import android.system.ErrnoException
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.async
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -139,7 +140,7 @@ class AndroidLocalDnsTransportTest {
         repeat(100) {
             val cancellation = CancellationSignal()
             val started = CountDownLatch(1)
-            val request = async {
+            val request = async(Dispatchers.Default) {
                 assertFailsWith<CancellationException> {
                     awaitDnsCallback<ByteArray>(
                         start = { started.countDown() },
