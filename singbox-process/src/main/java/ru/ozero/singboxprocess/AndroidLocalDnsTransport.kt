@@ -155,7 +155,9 @@ internal suspend fun <T : Any> awaitDnsCallback(
     cancellation?.setOnCancelListener {
         cancelledBySignal.set(true)
         if (completed.compareAndSet(false, true)) {
-            continuation.cancel(CancellationException("DNS query cancelled"))
+            IO_EXECUTOR.execute {
+                continuation.cancel(CancellationException("DNS query cancelled"))
+            }
         }
     }
     continuation.invokeOnCancellation {
