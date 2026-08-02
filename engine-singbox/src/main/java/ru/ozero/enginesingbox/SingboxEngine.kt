@@ -147,11 +147,12 @@ class SingboxEngine @Inject constructor(
             dataStore.data.collect { prefs ->
                 val savedBlob = prefs[BEAN_KEY]
                 val decoded = savedBlob?.let { runCatching { KryoSerializer.deserializeWithMigration(it) }.getOrNull() }
-                cachedBlob = decoded?.migratedBlob ?: savedBlob
-                if (savedBlob != null && decoded?.migratedBlob != null) {
+                val migratedBlob = decoded?.migratedBlob
+                cachedBlob = migratedBlob ?: savedBlob
+                if (savedBlob != null && migratedBlob != null) {
                     dataStore.edit { current ->
                         if (current[BEAN_KEY]?.contentEquals(savedBlob) == true) {
-                            current[BEAN_KEY] = decoded.migratedBlob
+                            current[BEAN_KEY] = migratedBlob
                         }
                     }
                 }
@@ -162,7 +163,9 @@ class SingboxEngine @Inject constructor(
         }
         engineScope.launch {
             profileDao.getAutoCandidatesFlow(MAX_AUTO_PROFILE_SCAN).collect { profiles ->
-                val migratedProfiles = profiles.map(::migrateProfileBlob)
+                val migratedProfiles = buildList {
+                    profiles.forEach { add(migrateProfileBlob(it)) }
+                }
                 cachedProfilesById = migratedProfiles.associateBy { it.id }
                 cachedAutoProfiles = autoSelectProfileWindow(migratedProfiles)
             }
