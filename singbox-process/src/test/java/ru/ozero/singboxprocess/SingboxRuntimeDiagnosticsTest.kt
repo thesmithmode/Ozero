@@ -150,7 +150,7 @@ class SingboxRuntimeDiagnosticsTest {
     fun `diagnostics starts only after runtime becomes available`() {
         val serviceStart = runtimeSource.indexOf("server.startOrReloadService")
         val serverClaim = runtimeSource.indexOf("commandServer = server", serviceStart)
-        val diagnosticsLaunch = runtimeSource.indexOf("launchNativeLogSubscription()", serverClaim)
+        val diagnosticsLaunch = runtimeSource.indexOf("launchNativeLogSubscription(failureDiagnostics)", serverClaim)
 
         assertTrue(serviceStart in 0..<serverClaim)
         assertTrue(serverClaim in 0..<diagnosticsLaunch)
@@ -162,6 +162,52 @@ class SingboxRuntimeDiagnosticsTest {
         assertContains(runtimeSource, "withTimeout(NATIVE_LOG_CONNECT_TIMEOUT_MS)")
         assertContains(runtimeSource, "runInterruptible { client.connect() }")
         assertContains(runtimeSource, "native diagnostics unavailable exceptionClass=")
+    }
+
+    @Test
+    fun `native failure diagnostics preserve protect as the dominant failure`() {
+        val emitted = mutableListOf<String>()
+        val diagnostics = NativeFailureDiagnostics(emitted::add)
+
+        diagnostics.recordNative("connect refused outbound primary server=private.example")
+        diagnostics.recordNative("connect refused outbound primary server=private.example")
+        diagnostics.recordNative("active VPN protect failed")
+        diagnostics.recordNative("dns resolve failed outbound resolver")
+
+        assertEquals(3, emitted.size)
+        assertContains(emitted[0], "outbound=primary category=CONNECT dominant=CONNECT")
+        assertContains(emitted[1], "outbound=unknown category=PROTECT_FAILED dominant=PROTECT_FAILED")
+        assertContains(emitted[2], "outbound=resolver category=DNS dominant=PROTECT_FAILED")
+        assertFalse(emitted[0].contains("private.example"))
+    }
+
+    @Test
+    fun `native failure categories cover each actionable class`() {
+        val cases = listOf(
+            "protect failed" to NativeFailureCategory.PROTECT_FAILED,
+            "default interface unavailable" to NativeFailureCategory.DEFAULT_INTERFACE,
+            "dns resolve failed" to NativeFailureCategory.DNS,
+            "reality handshake failed" to NativeFailureCategory.REALITY_HANDSHAKE,
+            "tls handshake failed" to NativeFailureCategory.TLS,
+            "connect refused" to NativeFailureCategory.CONNECT,
+            "upstream EOF" to NativeFailureCategory.REMOTE_CLOSED,
+            "request timeout" to NativeFailureCategory.TIMEOUT,
+        )
+
+        cases.forEach { (message, category) -> assertEquals(category, nativeFailureCategory(message)) }
+        assertEquals(null, nativeFailureCategory("listener started"))
+    }
+
+    @Test
+    fun `native failure diagnostics stay bounded per session`() {
+        val emitted = mutableListOf<String>()
+        val diagnostics = NativeFailureDiagnostics(emitted::add)
+
+        repeat(17) { index ->
+            diagnostics.record(NativeFailureCategory.CONNECT, "outbound-$index", "connect failed")
+        }
+
+        assertEquals(16, emitted.size)
     }
 
     @Test

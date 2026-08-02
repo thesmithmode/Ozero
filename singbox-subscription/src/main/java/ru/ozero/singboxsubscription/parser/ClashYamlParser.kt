@@ -86,7 +86,8 @@ object ClashYamlParser {
     }
 
     private fun StandardV2RayBean.applyV2Ray(fields: Map<String, Any?>, defaultSecurity: String = "none") {
-        type = normalizeNetwork(fields.string("network", "net"))
+        rawTransportType = fields.string("network", "net")
+        type = normalizeSingboxTransport(rawTransportType)
         val reality = fields.mapValue("reality-opts", "reality_opts")
         val realityPublicKey = fields.string(
             "pbk",
@@ -175,8 +176,6 @@ object ClashYamlParser {
         realityFingerprint = fields.string("fp", "fingerprint", "client-fingerprint", "client_fingerprint")
             .ifBlank { realityFingerprint }
     }
-
-    private fun normalizeNetwork(network: String): String = normalizeSingboxTransport(network)
 
     private fun Map<*, *>.toStringKeyMap(): Map<String, Any?> = entries.associate { (key, value) ->
         key.toString() to value

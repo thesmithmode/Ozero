@@ -4,8 +4,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.Binder
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
+import android.os.Process
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
@@ -208,7 +210,15 @@ class SingboxEngine @Inject constructor(
     private val bindLock = Any()
 
     private val localProtector = object : ISingboxProtector.Stub() {
-        override fun protect(fd: Int): Boolean = VpnSocketProtectorHolder.protect(fd)
+        override fun protect(socket: ParcelFileDescriptor): Boolean = socket.use {
+            val result = VpnSocketProtectorHolder.protect(it.fd)
+            PersistentLoggers.debug(
+                TAG,
+                "protect request sourcePid=${Binder.getCallingPid()} targetPid=${Process.myPid()} " +
+                    "targetReceivedFd=${it.fd} result=$result",
+            )
+            result
+        }
     }
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
@@ -643,10 +653,7 @@ class SingboxEngine @Inject constructor(
         if (!awaitLocalSocksReady(port)) {
             return EnginePlugin.ReadyResult.Timeout("sing-box SOCKS5 listener is not ready")
         }
-        return when (val result = routedProbe.probe(port)) {
-            is RoutedProbeResult.Success -> EnginePlugin.ReadyResult.Ready
-            is RoutedProbeResult.Failure -> EnginePlugin.ReadyResult.Timeout(result.reason.probeFailureMessage())
-        }
+        return EnginePlugin.ReadyResult.Ready
     }
 
     private suspend fun awaitLocalSocksReady(port: Int): Boolean {

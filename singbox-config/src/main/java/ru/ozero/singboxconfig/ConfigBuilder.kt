@@ -29,6 +29,7 @@ enum class BeanSupportError {
     UNSUPPORTED_BEAN_TYPE,
     UNSUPPORTED_SECURITY,
     UNSUPPORTED_TRANSPORT,
+    CORE_UNSUPPORTED_XHTTP,
     UNSUPPORTED_TCP_HEADER,
     UNSUPPORTED_QUIC_SECURITY,
     INVALID_REALITY_PUBLIC_KEY,
@@ -151,7 +152,10 @@ object ConfigBuilder {
             BeanSupportError.UNSUPPORTED_VLESS_ENCRYPTION.takeIf {
                 bean is VLESSBean && bean.encryption.trim().lowercase() !in SUPPORTED_VLESS_ENCRYPTION
             },
-            BeanSupportError.UNSUPPORTED_TRANSPORT.takeIf { bean.type !in SUPPORTED_TRANSPORTS },
+            BeanSupportError.CORE_UNSUPPORTED_XHTTP.takeIf { bean.type == "splithttp" },
+            BeanSupportError.UNSUPPORTED_TRANSPORT.takeIf {
+                bean.type !in SUPPORTED_TRANSPORTS && bean.type != "splithttp"
+            },
             BeanSupportError.UNSUPPORTED_TCP_HEADER.takeIf { bean.hasUnsupportedTcpHeader() },
             BeanSupportError.UNSUPPORTED_GRPC_MULTI_MODE.takeIf { bean.type == "grpc" && bean.grpcMultiMode },
             BeanSupportError.UNSUPPORTED_GRPC_COMPAT_MODE.takeIf {

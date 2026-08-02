@@ -522,6 +522,7 @@ class RawShareLinksParserTest {
         val bean = result.first() as VLESSBean
         assertEquals("No TLS", bean.name)
         assertEquals("splithttp", bean.type)
+        assertEquals("xhttp", bean.rawTransportType)
         assertEquals("none", bean.security)
         assertEquals("", bean.sni)
     }
@@ -659,6 +660,7 @@ class RawShareLinksParserTest {
         assertEquals(1, result.size)
         val bean = result.first() as VLESSBean
         assertEquals("splithttp", bean.type)
+        assertEquals("xhttp", bean.rawTransportType)
         assertEquals("reality", bean.security)
         assertEquals("inline-public-key", bean.realityPublicKey)
         assertEquals("ef01", bean.realityShortId)

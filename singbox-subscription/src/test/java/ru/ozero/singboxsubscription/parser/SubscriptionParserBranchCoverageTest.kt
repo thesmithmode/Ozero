@@ -160,6 +160,7 @@ class SubscriptionParserBranchCoverageTest {
         assertEquals(2, result.size)
         val vless = result[0] as VLESSBean
         assertEquals("splithttp", vless.type)
+        assertEquals("xhttp", vless.rawTransportType)
         assertEquals("/x", vless.path)
         assertEquals("front.example.com", vless.host)
         assertEquals(1024, vless.maxEarlyData)
@@ -223,6 +224,7 @@ class SubscriptionParserBranchCoverageTest {
         assertEquals(2, result.size)
         val vless = result[0] as VLESSBean
         assertEquals("splithttp", vless.type)
+        assertEquals("xhttp", vless.rawTransportType)
         assertEquals("reality", vless.security)
         assertEquals("pk-top", vless.realityPublicKey)
         assertEquals("sid-top", vless.realityShortId)
@@ -583,6 +585,7 @@ class SubscriptionParserBranchCoverageTest {
         assertEquals("", blankHost.realityShortId)
         val realityEnabled = result[1] as VMessBean
         assertEquals("splithttp", realityEnabled.type)
+        assertEquals("xhttp", realityEnabled.rawTransportType)
         assertEquals("reality", realityEnabled.security)
         assertEquals("pk", realityEnabled.realityPublicKey)
         assertEquals("sid", realityEnabled.realityShortId)

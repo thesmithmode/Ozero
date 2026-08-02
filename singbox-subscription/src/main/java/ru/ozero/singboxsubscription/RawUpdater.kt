@@ -25,6 +25,7 @@ import ru.ozero.singboxfmt.StandardV2RayBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxfmt.VLESSBean
+import ru.ozero.singboxfmt.normalizeSingboxTransport
 import ru.ozero.singboxfmt.protocolLabel
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
@@ -61,7 +62,6 @@ class RawUpdater(
                 val beans = Base64BundleParser.parse(body)
                     .ifEmpty { RawShareLinksParser.parse(body) }
                 if (beans.isEmpty()) throw SubscriptionNoProfilesException()
-                logSupportDiagnostics(group.id, beans)
 
                 val profiles = beans.take(MAX_PROFILES_PER_GROUP).mapIndexed { idx, bean ->
                     ProxyProfile(
@@ -104,6 +104,11 @@ class RawUpdater(
                 }
 
                 profileDao.replaceForGroup(group.id, profilesWithStableIds)
+                logSupportDiagnostics(
+                    group.id,
+                    beans.take(MAX_PROFILES_PER_GROUP),
+                    profileDao.getByGroupIdLimited(group.id, MAX_PROFILES_PER_GROUP),
+                )
 
                 val currentGroup = groupDao.getById(group.id) ?: attemptedGroup
                 val usedBytes = subInfo?.let { it.uploadBytes + it.downloadBytes } ?: currentGroup.bytesUsed
@@ -171,11 +176,17 @@ class RawUpdater(
         private const val MAX_PROFILES_PER_GROUP = 2_000
         private const val MAX_SUBSCRIPTION_BYTES = 16L * 1024 * 1024
 
-        private fun logSupportDiagnostics(groupId: Long, beans: List<AbstractBean>) {
-            val decisions = beans.map { bean -> bean to ConfigBuilder.supportDecision(bean) }
-            val supportedCount = decisions.count { it.second is BeanSupportDecision.Supported }
-            val rejected = decisions.mapNotNull { (bean, decision) ->
-                (decision as? BeanSupportDecision.Unsupported)?.let { RejectedBean(bean, it.error) }
+        private fun logSupportDiagnostics(
+            groupId: Long,
+            beans: List<AbstractBean>,
+            profiles: List<ProxyProfile>,
+        ) {
+            val decisions = beans.zip(profiles).map { (bean, profile) ->
+                Triple(bean, profile.id, ConfigBuilder.supportDecision(bean))
+            }
+            val supportedCount = decisions.count { it.third is BeanSupportDecision.Supported }
+            val rejected = decisions.mapNotNull { (bean, profileId, decision) ->
+                (decision as? BeanSupportDecision.Unsupported)?.let { RejectedBean(bean, profileId, it.error) }
             }
             Log.i(
                 TAG,
@@ -185,21 +196,40 @@ class RawUpdater(
             )
         }
 
-        private data class RejectedBean(val bean: AbstractBean, val error: BeanSupportError)
+        private data class RejectedBean(
+            val bean: AbstractBean,
+            val profileId: Long,
+            val error: BeanSupportError,
+        )
 
         private fun List<RejectedBean>.groupByProtocol(): String =
             groupingBy { it.bean.protocolLabel() }.eachCount().stableDiagnosticString()
 
         private fun List<RejectedBean>.groupByTransport(): String =
-            groupingBy { (it.bean as? StandardV2RayBean)?.type.orEmpty().ifBlank { "none" } }
-                .eachCount()
-                .stableDiagnosticString()
+            groupBy {
+                val standardBean = it.bean as? StandardV2RayBean
+                val raw = standardBean
+                    ?.rawTransportType
+                    ?.ifBlank { standardBean.type }
+                    .orEmpty()
+                    .safeTransportLabel()
+                val canonical = normalizeSingboxTransport(raw).safeTransportLabel()
+                "protocol=${it.bean.protocolLabel()} raw=$raw canonical=$canonical reason=${it.error.name}"
+            }
+                .toSortedMap()
+                .entries
+                .joinToString(prefix = "{", postfix = "}") { (key, values) ->
+                    "$key count=${values.size} profileIds=${values.map { it.profileId }.filter { it != 0L }.take(3)}"
+                }
 
         private fun List<RejectedBean>.groupByReason(): String =
             groupingBy { it.error.name }.eachCount().stableDiagnosticString()
 
         private fun Map<String, Int>.stableDiagnosticString(): String =
             entries.sortedBy { it.key }.joinToString(prefix = "{", postfix = "}") { "${it.key}=${it.value}" }
+
+        private fun String.safeTransportLabel(): String =
+            trim().lowercase().filter { it.isLetterOrDigit() || it in "-_." }.take(48).ifBlank { "none" }
 
         private fun normalizeError(e: Throwable): Throwable = when {
             e.isSubscriptionCertificateFailure() ->

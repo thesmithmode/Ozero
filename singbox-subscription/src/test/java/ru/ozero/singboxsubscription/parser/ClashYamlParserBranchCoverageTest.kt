@@ -132,6 +132,7 @@ class ClashYamlParserBranchCoverageTest {
         assertEquals(2, parsed.size)
         val vless = parsed[0] as VLESSBean
         assertEquals("splithttp", vless.type)
+        assertEquals("xhttp", vless.rawTransportType)
         assertEquals("reality", vless.security)
         assertEquals("reality-key", vless.realityPublicKey)
         assertEquals("ab", vless.realityShortId)

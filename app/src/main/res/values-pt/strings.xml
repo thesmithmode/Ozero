@@ -580,6 +580,6 @@
     <string name="singbox_chain_add">Adicionar etapa</string>
     <string name="singbox_chain_remove">Remover</string>
     <string name="singbox_chain_empty">Nenhuma cadeia configurada</string>
-    <string name="singbox_subscription_allow_insecure_tls">Permitir certificado TLS não confiável</string>
-    <string name="singbox_subscription_allow_insecure_tls_warning">Reduz a proteção MITM apenas para esta assinatura</string>
+    <string name="singbox_subscription_allow_insecure_tls">Ignorar certificado ao baixar a assinatura</string>
+    <string name="singbox_subscription_allow_insecure_tls_warning">Afeta apenas o endereço HTTPS da assinatura. Não afeta servidores TLS/Reality.</string>
 </resources>

@@ -138,6 +138,7 @@ class SubscriptionParserYamlEdgeCoverageTest {
         assertEquals("mode=websocket;host=plugin.example.com", ss.pluginOpts)
         val vmessNetAlias = result[4] as VMessBean
         assertEquals("splithttp", vmessNetAlias.type)
+        assertEquals("xhttp", vmessNetAlias.rawTransportType)
         assertEquals("none", vmessNetAlias.security)
         assertTrue(vmessNetAlias.allowInsecure)
     }

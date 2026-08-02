@@ -589,6 +589,6 @@
     <string name="singbox_chain_add">Add step</string>
     <string name="singbox_chain_remove">Remove</string>
     <string name="singbox_chain_empty">No chain configured</string>
-    <string name="singbox_subscription_allow_insecure_tls">Allow an untrusted TLS certificate</string>
-    <string name="singbox_subscription_allow_insecure_tls_warning">Reduces MITM protection for this subscription only</string>
+    <string name="singbox_subscription_allow_insecure_tls">Ignore certificate when downloading subscription</string>
+    <string name="singbox_subscription_allow_insecure_tls_warning">Affects only the subscription HTTPS address. Does not affect TLS/Reality servers.</string>
 </resources>
