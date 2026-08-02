@@ -37,6 +37,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import ru.ozero.enginescore.PersistentLoggers
+import ru.ozero.enginesingbox.SingboxRuntimeCheckpointStore
+import java.io.File
 import java.security.KeyStore
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.ssl.TrustManagerFactory
@@ -130,15 +132,15 @@ internal object SingboxRuntime {
                 )
                 val handler = OzeroCommandServerHandler()
 
-                PersistentLoggers.debug(TAG, "checkpoint: pre-CommandServer")
+                recordCheckpoint("pre-CommandServer")
                 val server = CommandServer(handler, platform)
-                PersistentLoggers.debug(TAG, "checkpoint: post-CommandServer")
+                recordCheckpoint("post-CommandServer")
                 server.start()
-                PersistentLoggers.debug(TAG, "checkpoint: post-start (socket ready)")
+                recordCheckpoint("post-start socket-ready")
 
                 try {
                     server.checkConfig(singboxJsonConfig)
-                    PersistentLoggers.debug(TAG, "checkpoint: checkConfig passed")
+                    recordCheckpoint("checkConfig-passed")
                 } catch (e: Exception) {
                     PersistentLoggers.error(TAG, "checkConfig failed exceptionClass=${e::class.java.simpleName}")
                     server.close()
@@ -148,7 +150,7 @@ internal object SingboxRuntime {
                 try {
                     // Go код дёргает options.AutoRedirect без nil-check → SIGABRT при null
                     server.startOrReloadService(singboxJsonConfig, OverrideOptions())
-                    PersistentLoggers.debug(TAG, "checkpoint: post-startOrReloadService (box running)")
+                    recordCheckpoint("post-startOrReloadService box-running")
                 } catch (e: Exception) {
                     PersistentLoggers.error(
                         TAG,
@@ -160,6 +162,7 @@ internal object SingboxRuntime {
 
                 commandServer = server
                 launchNativeLogSubscription(failureDiagnostics)
+                persistCheckpoint("runtime-started fd=$tunFd")
                 PersistentLoggers.info(TAG, "runtime started fd=$tunFd")
             }
         }
@@ -181,6 +184,7 @@ internal object SingboxRuntime {
             commandServer = null
             lastStatus = null
             nativeFailureDiagnostics = null
+            persistCheckpoint("runtime-stopped")
             PersistentLoggers.info(TAG, "runtime stopped")
         }
     }
@@ -297,6 +301,7 @@ internal object SingboxRuntime {
                 val entry = messageList.next()
                 inspected++
                 failureDiagnostics.recordNative(entry.message)
+                persistCheckpoint("native ${redactSingboxMessage(entry.message)}")
             }
         }
 
@@ -425,6 +430,15 @@ internal object SingboxRuntime {
             override fun len(): Int = values.size
             override fun next(): String = values[index++]
         }
+
+    private fun recordCheckpoint(message: String) {
+        persistCheckpoint(message)
+        PersistentLoggers.debug(TAG, "checkpoint: $message")
+    }
+
+    private fun persistCheckpoint(message: String) {
+        if (basePath.isNotBlank()) SingboxRuntimeCheckpointStore.record(File(basePath), message)
+    }
 }
 
 internal class NativeDiagnosticsSessionGuard {

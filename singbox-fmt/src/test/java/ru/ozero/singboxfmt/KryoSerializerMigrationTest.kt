@@ -2,46 +2,28 @@ package ru.ozero.singboxfmt
 
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.ByteBufferOutput
-import com.esotericsoftware.kryo.serializers.FieldSerializer
 import java.io.ByteArrayOutputStream
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class KryoSerializerMigrationTest {
     @Test
-    fun `migrates legacy VLESS Reality Vision blob`() {
-        val restored = migrate(
-            VLESSBean().apply {
-                uuid = "11111111-1111-1111-1111-111111111111"
-                serverAddress = "198.51.100.10"
-                serverPort = 443
-                type = "tcp"
-                security = "reality"
-                flow = "xtls-rprx-vision"
-                realityPublicKey = "public-key"
-                realityShortId = "a1b2"
-            },
-        )
+    fun `migrates golden VLESS Reality Vision blob from 70899053`() {
+        val restored = assertIs<VLESSBean>(migrateFixture("vless-reality-vision-70899053.bin"))
 
+        assertEquals("198.51.100.10", restored.serverAddress)
         assertEquals("reality", restored.security)
         assertEquals("xtls-rprx-vision", restored.flow)
         assertEquals("", restored.rawTransportType)
     }
 
     @Test
-    fun `migrates legacy VLESS WebSocket TLS blob`() {
-        val restored = migrate(
-            VLESSBean().apply {
-                uuid = "22222222-2222-2222-2222-222222222222"
-                serverAddress = "ws.example"
-                type = "ws"
-                host = "ws.example"
-                path = "/ws"
-                security = "tls"
-            },
-        )
+    fun `migrates golden VLESS WebSocket TLS blob from 70899053`() {
+        val restored = assertIs<VLESSBean>(migrateFixture("vless-ws-tls-70899053.bin"))
 
         assertEquals("ws", restored.type)
         assertEquals("ws.example", restored.host)
@@ -49,67 +31,70 @@ class KryoSerializerMigrationTest {
     }
 
     @Test
-    fun `migrates legacy VMess WebSocket TLS blob`() {
-        val restored = migrate(
-            VMessBean().apply {
-                uuid = "33333333-3333-3333-3333-333333333333"
-                serverAddress = "vmess.example"
-                type = "ws"
-                host = "vmess.example"
-                path = "/v"
-                security = "tls"
-            },
-        )
+    fun `migrates golden VMess WebSocket TLS blob from 70899053`() {
+        val restored = assertIs<VMessBean>(migrateFixture("vmess-ws-tls-70899053.bin"))
 
-        assertEquals("vmess.example", restored.serverAddress)
+        assertEquals("198.51.100.12", restored.serverAddress)
         assertEquals("ws", restored.type)
     }
 
     @Test
-    fun `migrates legacy Trojan TLS blob`() {
-        val restored = migrate(
-            TrojanBean().apply {
-                password = "password"
-                serverAddress = "trojan.example"
-                security = "tls"
-                sni = "trojan.example"
-            },
-        )
+    fun `migrates golden Trojan TLS blob from 70899053`() {
+        val restored = assertIs<TrojanBean>(migrateFixture("trojan-tls-70899053.bin"))
 
-        assertEquals("password", restored.password)
+        assertEquals("fixture-password", restored.password)
         assertEquals("tls", restored.security)
     }
 
     @Test
-    fun `migrates legacy Shadowsocks blob`() {
-        val restored = migrate(
-            ShadowsocksBean().apply {
-                serverAddress = "ss.example"
-                serverPort = 8388
-                method = "aes-128-gcm"
-                password = "password"
-            },
-        )
+    fun `migrates golden Shadowsocks blob from 70899053`() {
+        val restored = assertIs<ShadowsocksBean>(migrateFixture("shadowsocks-70899053.bin"))
 
         assertEquals("aes-128-gcm", restored.method)
         assertEquals(8388, restored.serverPort)
     }
 
-    private inline fun <reified T : AbstractBean> migrate(bean: T): T {
-        val decoded = KryoSerializer.deserializeWithMigration(legacyBlob(bean))
-        assertNotNull(decoded.migratedBlob)
-        assertNull(KryoSerializer.deserializeWithMigration(decoded.migratedBlob).migratedBlob)
-        return decoded.bean as T
+    @Test
+    fun `current raw V2 is decoded before legacy V1 and preserves raw transport`() {
+        val current = VLESSBean().apply {
+            serverAddress = "198.51.100.20"
+            serverPort = 443
+            uuid = "44444444-4444-4444-4444-444444444444"
+            type = "tcp"
+            rawTransportType = "raw"
+            security = "tls"
+        }
+
+        val restored = assertIs<VLESSBean>(KryoSerializer.deserializeWithMigration(currentRawBlob(current)).bean)
+
+        assertEquals("raw", restored.rawTransportType)
     }
 
-    private fun legacyBlob(bean: AbstractBean): ByteArray {
+    @Test
+    fun `trailing payload is rejected before migration rewrite`() {
+        val fixture = fixture("vless-ws-tls-70899053.bin")
+
+        assertFails { KryoSerializer.deserializeWithMigration(fixture + byteArrayOf(1)) }
+    }
+
+    private fun migrateFixture(name: String): AbstractBean {
+        val decoded = KryoSerializer.deserializeWithMigration(fixture(name))
+        val migrated = assertNotNull(decoded.migratedBlob)
+        assertNull(KryoSerializer.deserializeWithMigration(migrated).migratedBlob)
+        return decoded.bean
+    }
+
+    private fun fixture(name: String): ByteArray =
+        assertNotNull(javaClass.getResourceAsStream("/legacy/$name")).use { it.readBytes() }
+
+    private fun currentRawBlob(bean: AbstractBean): ByteArray {
         val kryo = Kryo().apply {
             isRegistrationRequired = false
-            registerLegacyStandard(VLESSBean::class.java)
-            registerLegacyStandard(VMessBean::class.java)
-            registerLegacyStandard(TrojanBean::class.java)
+            register(VLESSBean::class.java)
+            register(VMessBean::class.java)
+            register(TrojanBean::class.java)
             register(ShadowsocksBean::class.java)
-            registerLegacyStandard(StandardV2RayBean::class.java)
+            register(StandardV2RayBean::class.java)
             register(AbstractBean::class.java)
         }
         return ByteArrayOutputStream().use { bytes ->
@@ -119,11 +104,5 @@ class KryoSerializerMigrationTest {
             }
             bytes.toByteArray()
         }
-    }
-
-    private fun <T : StandardV2RayBean> Kryo.registerLegacyStandard(type: Class<T>) {
-        val serializer = FieldSerializer<T>(this, type)
-        serializer.removeField("rawTransportType")
-        register(type, serializer)
     }
 }

@@ -7,18 +7,18 @@ import android.system.ErrnoException
 import io.nekohasekai.libbox.ExchangeContext
 import io.nekohasekai.libbox.Func
 import io.nekohasekai.libbox.LocalDNSTransport
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.suspendCancellableCoroutine
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.UnknownHostException
+import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 
 internal class AndroidLocalDnsTransport(
     private val defaultInterfaceMonitor: DefaultInterfaceMonitor,
@@ -31,7 +31,6 @@ internal class AndroidLocalDnsTransport(
             "Physical network unavailable"
         }
         val cancellation = CancellationSignal()
-        context.onCancel(Func { cancellation.cancel() })
         runBlocking {
             awaitDnsCallback(
                 start = { callback ->
@@ -49,6 +48,7 @@ internal class AndroidLocalDnsTransport(
                 },
                 onErrno = context::errnoCode,
                 cancellation = cancellation,
+                registerCancellation = { cancel -> context.onCancel(Func(cancel)) },
             )
         }
     }
@@ -66,7 +66,6 @@ internal class AndroidLocalDnsTransport(
             return
         }
         val cancellation = CancellationSignal()
-        context.onCancel(Func { cancellation.cancel() })
         runBlocking {
             awaitDnsCallback<Collection<InetAddress>>(
                 start = { callback ->
@@ -109,6 +108,7 @@ internal class AndroidLocalDnsTransport(
                 },
                 onErrno = context::errnoCode,
                 cancellation = cancellation,
+                registerCancellation = { cancel -> context.onCancel(Func(cancel)) },
             )
         }
     }
@@ -137,12 +137,12 @@ internal suspend fun <T : Any> awaitDnsCallback(
     onAnswer: (T, Int) -> Unit,
     onErrno: (Int) -> Unit,
     cancellation: CancellationSignal? = null,
+    registerCancellation: ((() -> Unit) -> Unit)? = null,
     errnoExtractor: (Throwable?) -> Int? = { cause ->
         (cause as? ErrnoException)?.errno
     },
-) = suspendCancellableCoroutine { continuation ->
+) = suspendCoroutine { continuation ->
     val completed = AtomicBoolean(false)
-    val cancelledBySignal = AtomicBoolean(false)
     fun complete(action: () -> Unit) {
         if (!completed.compareAndSet(false, true)) return
         try {
@@ -152,15 +152,14 @@ internal suspend fun <T : Any> awaitDnsCallback(
             continuation.resumeWithException(error)
         }
     }
-    cancellation?.setOnCancelListener {
-        cancelledBySignal.set(true)
+    registerCancellation?.invoke {
         if (completed.compareAndSet(false, true)) {
-            continuation.resumeWithException(CancellationException("DNS query cancelled"))
-        }
-    }
-    continuation.invokeOnCancellation {
-        if (completed.compareAndSet(false, true) && !cancelledBySignal.get()) {
-            cancellation?.cancel()
+            try {
+                cancellation?.cancel()
+                continuation.resumeWithException(CancellationException("DNS query cancelled"))
+            } catch (error: Throwable) {
+                continuation.resumeWithException(error)
+            }
         }
     }
     start(

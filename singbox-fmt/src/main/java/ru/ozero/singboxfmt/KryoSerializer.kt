@@ -4,7 +4,6 @@ import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.KryoException
 import com.esotericsoftware.kryo.io.ByteBufferInput
 import com.esotericsoftware.kryo.io.ByteBufferOutput
-import com.esotericsoftware.kryo.serializers.FieldSerializer
 import com.esotericsoftware.kryo.util.Pool
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -14,7 +13,6 @@ object KryoSerializer {
     private const val MAGIC = 0x4f5a424e
     private const val FORMAT_VERSION = 1
     private const val HEADER_SIZE = 6
-    private const val PROTOCOL_UNKNOWN = 0xff
 
     private val pool = object : Pool<Kryo>(true, false, 4) {
         override fun create(): Kryo = Kryo().apply {
@@ -33,9 +31,13 @@ object KryoSerializer {
         return try {
             val baos = ByteArrayOutputStream(256)
             ByteBufferOutput(baos).use { out ->
-                out.writeInt(MAGIC)
-                out.writeByte(FORMAT_VERSION)
-                out.writeByte(protocolType(bean))
+                val header = ByteBuffer.allocate(HEADER_SIZE)
+                    .order(ByteOrder.LITTLE_ENDIAN)
+                    .putInt(MAGIC)
+                    .put(FORMAT_VERSION.toByte())
+                    .put(protocolType(bean).toByte())
+                    .array()
+                out.writeBytes(header)
                 kryo.writeClassAndObject(out, bean)
                 out.flush()
             }
@@ -69,8 +71,8 @@ object KryoSerializer {
 
     fun deserializeWithMigration(bytes: ByteArray): DecodedBean {
         if (isVersioned(bytes)) return DecodedBean(readVersioned(bytes), migratedBlob = null)
-        val legacyV1 = runCatching { readLegacy(bytes, legacyV1Pool) }
-        val bean = legacyV1.getOrElse { readLegacy(bytes, pool) }
+        val currentV2 = runCatching { readCurrentRaw(bytes) }
+        val bean = currentV2.getOrElse { readLegacyV1(bytes) }
         return DecodedBean(bean, migratedBlob = serialize(bean))
     }
 
@@ -82,19 +84,13 @@ object KryoSerializer {
     private val legacyV1Pool = object : Pool<Kryo>(true, false, 4) {
         override fun create(): Kryo = Kryo().apply {
             isRegistrationRequired = false
-            registerLegacyStandard(VLESSBean::class.java)
-            registerLegacyStandard(VMessBean::class.java)
-            registerLegacyStandard(TrojanBean::class.java)
-            register(ShadowsocksBean::class.java)
-            registerLegacyStandard(StandardV2RayBean::class.java)
-            register(AbstractBean::class.java)
+            register(LegacyV1VLESSBean::class.java)
+            register(LegacyV1VMessBean::class.java)
+            register(LegacyV1TrojanBean::class.java)
+            register(LegacyV1ShadowsocksBean::class.java)
+            register(LegacyV1StandardV2RayBean::class.java)
+            register(LegacyV1AbstractBean::class.java)
         }
-    }
-
-    private fun <T : StandardV2RayBean> Kryo.registerLegacyStandard(type: Class<T>) {
-        val serializer = FieldSerializer<T>(this, type)
-        serializer.removeField("rawTransportType")
-        register(type, serializer)
     }
 
     private fun isVersioned(bytes: ByteArray): Boolean =
@@ -109,19 +105,48 @@ object KryoSerializer {
         check(header.int == MAGIC) { "Bean blob magic mismatch" }
         check(header.get().toInt() == FORMAT_VERSION) { "Unsupported bean blob version" }
         val protocol = header.get().toInt() and 0xff
-        val bean = readLegacy(bytes.copyOfRange(HEADER_SIZE, bytes.size), pool)
+        val bean = readCurrentRaw(bytes.copyOfRange(HEADER_SIZE, bytes.size))
         check(protocolType(bean) == protocol) { "Bean blob protocol mismatch" }
         return bean
     }
 
-    private fun readLegacy(bytes: ByteArray, sourcePool: Pool<Kryo>): AbstractBean {
+    private fun readCurrentRaw(bytes: ByteArray): AbstractBean =
+        (readRaw(bytes, pool) as? AbstractBean)
+            ?.applyCanonicalDefaults()
+            ?.also(::validatePersistedBean)
+            ?: throw KryoException("Unsupported current bean type")
+
+    private fun readLegacyV1(bytes: ByteArray): AbstractBean =
+        (readRaw(bytes, legacyV1Pool) as? LegacyV1AbstractBean)
+            ?.toCurrentBean()
+            ?.also(::validatePersistedBean)
+            ?: throw KryoException("Unsupported legacy bean type")
+
+    private fun readRaw(bytes: ByteArray, sourcePool: Pool<Kryo>): Any {
         val kryo = sourcePool.obtain()
         return try {
             ByteBufferInput(bytes).use { input ->
-                (kryo.readClassAndObject(input) as AbstractBean).applyCanonicalDefaults()
+                val value = kryo.readClassAndObject(input) ?: throw KryoException("Bean blob is null")
+                if (!input.eof()) throw KryoException("Bean blob has trailing payload")
+                value
             }
         } finally {
             sourcePool.free(kryo)
+        }
+    }
+
+    private fun validatePersistedBean(bean: AbstractBean) {
+        require(bean.serverAddress.isNotBlank()) { "Bean server address is blank" }
+        require(bean.serverPort in 1..65535) { "Bean server port is invalid" }
+        when (bean) {
+            is VLESSBean -> require(bean.uuid.isNotBlank()) { "VLESS UUID is blank" }
+            is VMessBean -> require(bean.uuid.isNotBlank()) { "VMess UUID is blank" }
+            is TrojanBean -> require(bean.password.isNotBlank()) { "Trojan password is blank" }
+            is ShadowsocksBean -> {
+                require(bean.method.isNotBlank()) { "Shadowsocks method is blank" }
+                require(bean.password.isNotBlank()) { "Shadowsocks password is blank" }
+            }
+            else -> throw KryoException("Unsupported persisted bean protocol")
         }
     }
 
@@ -130,6 +155,6 @@ object KryoSerializer {
         is VMessBean -> 1
         is TrojanBean -> 2
         is ShadowsocksBean -> 3
-        else -> PROTOCOL_UNKNOWN
+        else -> throw KryoException("Unsupported persisted bean protocol")
     }
 }

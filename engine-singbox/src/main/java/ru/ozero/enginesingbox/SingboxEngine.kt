@@ -987,7 +987,7 @@ class SingboxEngine @Inject constructor(
         is VMessBean -> PROTOCOL_VMESS
         is TrojanBean -> PROTOCOL_TROJAN
         is ShadowsocksBean -> PROTOCOL_SHADOWSOCKS
-        else -> PROTOCOL_VLESS
+        else -> error("Unsupported Sing-box bean type: ${bean::class.java.simpleName}")
     }
 
     private fun bindOrFail(): StartResult.Failure? {
@@ -1000,11 +1000,13 @@ class SingboxEngine @Inject constructor(
                 override fun onServiceConnected(name: ComponentName, binder: IBinder) {
                     proxy = ISingboxEngineProcess.Stub.asInterface(binder)
                     engineBinder = binder
+                    val connectedProcessId = runCatching { proxy?.processId() ?: -1 }.getOrDefault(-1)
+                    engineProcessId = connectedProcessId
                     val recipient = IBinder.DeathRecipient {
                         proxy = null
                         engineBinder = null
                         clearRuntimeState()
-                        logProcessExitInfo(engineProcessId)
+                        logProcessExitInfo(connectedProcessId)
                         engineProcessId = -1
                         val ref = serviceConn
                         serviceConn = null
@@ -1013,8 +1015,11 @@ class SingboxEngine @Inject constructor(
                         runCatching { onProcessDied() }
                     }
                     deathRecipient = recipient
-                    runCatching { binder.linkToDeath(recipient, 0) }
-                    engineProcessId = runCatching { proxy?.processId() ?: -1 }.getOrDefault(-1)
+                    if (runCatching { binder.linkToDeath(recipient, 0) }.isFailure) {
+                        recipient.binderDied()
+                        latch.countDown()
+                        return
+                    }
                     latch.countDown()
                     PersistentLoggers.debug(TAG, "SingboxEngineService connected")
                 }
@@ -1106,19 +1111,34 @@ class SingboxEngine @Inject constructor(
         if (processId <= 0 || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         engineScope.launch {
             val activityManager = context.getSystemService(ActivityManager::class.java) ?: return@launch
-            val exit = runCatching {
-                activityManager.getHistoricalProcessExitReasons(context.packageName, 0, 64)
-                    .firstOrNull { it.pid == processId }
-            }.getOrNull() ?: return@launch
+            var exit: android.app.ApplicationExitInfo? = null
+            for (attempt in 0 until EXIT_INFO_ATTEMPTS) {
+                exit = runCatching {
+                    activityManager.getHistoricalProcessExitReasons(context.packageName, 0, 64)
+                        .firstOrNull { it.pid == processId }
+                }.getOrNull()
+                if (exit != null) break
+                if (attempt < EXIT_INFO_ATTEMPTS - 1) delay(EXIT_INFO_RETRY_MS)
+            }
+            val checkpoints = SingboxRuntimeCheckpointStore.read(java.io.File(context.filesDir, "singbox"), processId)
+            val resolvedExit = exit
+            if (resolvedExit == null) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "engine process exit pid=$processId reason=unavailable checkpoints=${checkpoints.joinToString(" || ")}",
+                )
+                return@launch
+            }
             val trace = runCatching {
-                exit.traceInputStream?.bufferedReader()?.use { it.readText().take(2_000) }.orEmpty()
+                resolvedExit.traceInputStream?.bufferedReader()?.use { it.readText().take(2_000) }.orEmpty()
             }.getOrDefault("")
             PersistentLoggers.warn(
                 TAG,
-                "engine process exit pid=$processId reason=${exit.reason} status=${exit.status} " +
-                    "importance=${exit.importance} pss=${exit.pss} rss=${exit.rss} " +
-                    "description=${sanitizeExitDetail(exit.description.orEmpty())} " +
-                    "trace=${sanitizeExitDetail(trace)}",
+                "engine process exit pid=$processId reason=${resolvedExit.reason} status=${resolvedExit.status} " +
+                    "importance=${resolvedExit.importance} pss=${resolvedExit.pss} rss=${resolvedExit.rss} " +
+                    "timestamp=${resolvedExit.timestamp} " +
+                    "description=${sanitizeExitDetail(resolvedExit.description.orEmpty())} " +
+                    "trace=${sanitizeExitDetail(trace)} checkpoints=${checkpoints.joinToString(" || ")}",
             )
         }
     }
@@ -1142,6 +1162,8 @@ class SingboxEngine @Inject constructor(
         private const val STATS_POLL_MS = 1_000L
         private const val REMOTE_STOP_TIMEOUT_MS = 3_000L
         private const val ENGINE_STOP_TIMEOUT_MS = 4_000L
+        private const val EXIT_INFO_ATTEMPTS = 8
+        private const val EXIT_INFO_RETRY_MS = 250L
         private const val LOCAL_SOCKS_HOST = "127.0.0.1"
         private const val LOCAL_SOCKS_CONNECT_TIMEOUT_MS = 400
         private const val LOCAL_SOCKS_IO_TIMEOUT_MS = 400

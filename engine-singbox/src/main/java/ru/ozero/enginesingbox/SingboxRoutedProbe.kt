@@ -17,7 +17,9 @@ import java.net.URL
 import java.net.UnknownHostException
 import java.nio.charset.StandardCharsets
 import java.security.cert.CertificateException
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.ssl.SSLException
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.HttpsURLConnection
@@ -51,6 +53,37 @@ sealed interface RoutedProbeResult {
         UNEXPECTED_RESPONSE,
         IO,
         SOCKS_NOT_READY,
+    }
+}
+
+class RoutedProbeCancellation {
+    private val cancelled = AtomicBoolean(false)
+    private val sockets = ConcurrentHashMap.newKeySet<Socket>()
+
+    fun cancel() {
+        if (!cancelled.compareAndSet(false, true)) return
+        sockets.forEach { runCatching { it.close() } }
+        sockets.clear()
+    }
+
+    fun isCancelled(): Boolean = cancelled.get()
+
+    internal fun <S : Socket, T> withSocket(socket: S, block: (S) -> T): T {
+        if (cancelled.get()) {
+            socket.close()
+            throw SocketException("Probe cancelled")
+        }
+        sockets += socket
+        if (cancelled.get()) {
+            sockets -= socket
+            socket.close()
+            throw SocketException("Probe cancelled")
+        }
+        return try {
+            socket.use(block)
+        } finally {
+            sockets -= socket
+        }
     }
 }
 
@@ -125,13 +158,18 @@ class SingboxHttp204RoutedProbe(
             is RoutedProbeResult.Failure -> LATENCY_FAILED
         }
 
-    fun probeUntil(socksPort: Int, deadlineNanos: Long): RoutedProbeResult {
+    fun probeUntil(
+        socksPort: Int,
+        deadlineNanos: Long,
+        cancellation: RoutedProbeCancellation = RoutedProbeCancellation(),
+    ): RoutedProbeResult {
+        if (cancellation.isCancelled()) return RoutedProbeResult.Failure(RoutedProbeResult.Reason.IO)
         if (maxProbeUrls <= 0) return RoutedProbeResult.Failure(RoutedProbeResult.Reason.UNEXPECTED_RESPONSE)
         if (socksPort <= 0) {
             PersistentLoggers.warn(TAG, "routed probe failed: invalid socksPort=$socksPort")
             return RoutedProbeResult.Failure(RoutedProbeResult.Reason.SOCKS_NOT_READY)
         }
-        if (!isSocksPortReady(socksPort, deadlineNanos)) {
+        if (!isSocksPortReady(socksPort, deadlineNanos, cancellation)) {
             PersistentLoggers.debug(
                 TAG,
                 "routed probe failed: socks not ready socksPort=$socksPort timeoutMs=$timeoutMs",
@@ -142,10 +180,11 @@ class SingboxHttp204RoutedProbe(
         val endpoints = urls.distinctBy { it.toString() }.take(maxProbeUrls)
         val failures = mutableListOf<ClassifiedFailure>()
         for ((index, url) in endpoints.withIndex()) {
+            if (cancellation.isCancelled()) return RoutedProbeResult.Failure(RoutedProbeResult.Reason.IO)
             val remainingTimeoutMs = remainingTimeoutMs(deadlineNanos) ?: break
             val attemptsLeft = endpoints.size - index
             val attemptTimeoutMs = (remainingTimeoutMs / attemptsLeft).coerceAtLeast(1)
-            val result = probeSingleUrl(url, socksPort, attemptTimeoutMs)
+            val result = probeSingleUrl(url, socksPort, attemptTimeoutMs, cancellation)
             val latency = result.latencyMs
             if (latency >= 0) return RoutedProbeResult.Success(latency)
             failures += result.failure
@@ -158,24 +197,33 @@ class SingboxHttp204RoutedProbe(
         return representative
     }
 
-    private fun isSocksPortReady(socksPort: Int, deadlineNanos: Long): Boolean {
+    private fun isSocksPortReady(
+        socksPort: Int,
+        deadlineNanos: Long,
+        cancellation: RoutedProbeCancellation,
+    ): Boolean {
         val connectTimeoutMs = remainingTimeoutMs(deadlineNanos) ?: return false
         return runCatching {
-            Socket().use { socket ->
+            cancellation.withSocket(Socket()) { socket ->
                 socket.connect(InetSocketAddress(socksHost, socksPort), connectTimeoutMs)
             }
             true
         }.getOrDefault(false)
     }
 
-    private fun probeSingleUrl(url: URL, socksPort: Int, remainingTimeoutMs: Int): ProbeAttempt {
+    private fun probeSingleUrl(
+        url: URL,
+        socksPort: Int,
+        remainingTimeoutMs: Int,
+        cancellation: RoutedProbeCancellation,
+    ): ProbeAttempt {
         val expectation = responseExpectation(url)
             ?: return ProbeAttempt(LATENCY_FAILED, ProbeFailure.UNSUPPORTED_RESPONSE.withDetail(url, null))
         val start = nanoTime()
         return runCatching {
             when (url.protocol.lowercase()) {
-                "https" -> probeHttpsOverSocks(url, socksPort, remainingTimeoutMs, expectation)
-                "http" -> probeHttpOverSocks(url, socksPort, remainingTimeoutMs, expectation)
+                "https" -> probeHttpsOverSocks(url, socksPort, remainingTimeoutMs, expectation, cancellation)
+                "http" -> probeHttpOverSocks(url, socksPort, remainingTimeoutMs, expectation, cancellation)
                 else -> false
             }
         }.fold(
@@ -201,9 +249,10 @@ class SingboxHttp204RoutedProbe(
         socksPort: Int,
         remainingTimeoutMs: Int,
         expectation: ResponseExpectation,
+        cancellation: RoutedProbeCancellation,
     ): Boolean {
         val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress(socksHost, socksPort))
-        return Socket(proxy).use { socket ->
+        return cancellation.withSocket(Socket(proxy)) { socket ->
             val destinationPort = url.port.takeIf { it > 0 } ?: HTTP_PORT
             socket.connect(InetSocketAddress.createUnresolved(url.host, destinationPort), remainingTimeoutMs)
             socket.soTimeout = remainingTimeoutMs
@@ -218,14 +267,15 @@ class SingboxHttp204RoutedProbe(
         socksPort: Int,
         remainingTimeoutMs: Int,
         expectation: ResponseExpectation,
+        cancellation: RoutedProbeCancellation,
     ): Boolean {
         val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress(socksHost, socksPort))
-        Socket(proxy).use { tcpSocket ->
+        cancellation.withSocket(Socket(proxy)) { tcpSocket ->
             val destinationPort = url.port.takeIf { it > 0 } ?: HTTPS_PORT
             tcpSocket.connect(InetSocketAddress.createUnresolved(url.host, destinationPort), remainingTimeoutMs)
             tcpSocket.soTimeout = remainingTimeoutMs
             val sslSocket = sslSocketFactory.createSocket(tcpSocket, url.host, destinationPort, true) as SSLSocket
-            sslSocket.use { socket ->
+            cancellation.withSocket(sslSocket) { socket ->
                 socket.soTimeout = remainingTimeoutMs
                 socket.startHandshake()
                 if (!hostnameVerifier.verify(url.host, socket.session)) {
