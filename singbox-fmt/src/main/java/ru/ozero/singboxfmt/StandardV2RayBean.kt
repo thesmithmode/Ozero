@@ -4,6 +4,7 @@ abstract class StandardV2RayBean : AbstractBean() {
     var uuid: String = ""
     var encryption: String = ""
     var type: String = "tcp"
+    var rawTransportType: String = ""
     var host: String = ""
     var path: String = ""
     var headerType: String = "none"

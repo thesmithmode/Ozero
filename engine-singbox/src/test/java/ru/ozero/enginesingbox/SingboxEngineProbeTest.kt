@@ -465,7 +465,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `attachTun succeeds and awaitReady requires routed probe`() = runTest {
+    fun `attachTun succeeds and awaitReady ignores routed probe failure`() = runTest {
         mockkStatic(ParcelFileDescriptor::class)
         try {
             val engine = buildEngine()
@@ -490,12 +490,12 @@ class SingboxEngineProbeTest {
 
                 val ready = engine.awaitReady()
 
-                assertIs<EnginePlugin.ReadyResult.Timeout>(ready)
+                assertIs<EnginePlugin.ReadyResult.Ready>(ready)
                 assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
             }
 
             assertIs<TunAttachResult.Success>(result)
-            assertEquals(1, calls)
+            assertEquals(0, calls)
             assertEquals(null, engine.privateField("pendingConfig"))
             assertEquals(0, engine.privateIntField("pendingSocksPort"))
             assertEquals(true, engine.privateBooleanField("activeTunAutoSelect"))
@@ -688,7 +688,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `awaitReady is ready only after successful routed probe`() = runTest {
+    fun `awaitReady is ready after local SOCKS handshake without routed probe`() = runTest {
         val engine = buildEngine()
         var probedPort = 0
         engine.routedProbe = SingboxRoutedProbe { socksPort ->
@@ -704,13 +704,13 @@ class SingboxEngineProbeTest {
             val result = engine.awaitReady()
 
             assertIs<EnginePlugin.ReadyResult.Ready>(result)
-            assertEquals(listener.localPort, probedPort)
+            assertEquals(0, probedPort)
             assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
         }
     }
 
     @Test
-    fun `awaitReady returns stable timeout after routed probe failure without clearing runtime state`() = runTest {
+    fun `awaitReady keeps runtime ready when routed probe would fail`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = object : SingboxRoutedProbe {
             override suspend fun probeLatencyMs(socksPort: Int): Long = SingboxHttp204RoutedProbe.LATENCY_FAILED
@@ -730,11 +730,7 @@ class SingboxEngineProbeTest {
 
             val result = engine.awaitReady()
 
-            val timeout = assertIs<EnginePlugin.ReadyResult.Timeout>(result)
-            assertEquals("sing-box outbound TLS failed", timeout.reason)
-            assertTrue(!timeout.reason.contains("198.51.100.24"))
-            assertTrue(!timeout.reason.contains("secret"))
-            assertTrue(!timeout.reason.contains("private.example"))
+            assertIs<EnginePlugin.ReadyResult.Ready>(result)
             assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
             assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
             assertEquals(true, engine.privateBooleanField("activeTunAutoSelect"))

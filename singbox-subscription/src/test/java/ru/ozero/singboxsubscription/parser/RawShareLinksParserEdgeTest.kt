@@ -248,6 +248,7 @@ class RawShareLinksParserEdgeTest {
 
         val vmess = result[1] as VMessBean
         assertEquals("splithttp", vmess.type)
+        assertEquals("xhttp", vmess.rawTransportType)
         assertEquals("/x", vmess.path)
         assertEquals("front.example.com", vmess.host)
         assertEquals(7, vmess.maxEarlyData)

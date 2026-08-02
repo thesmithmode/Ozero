@@ -133,9 +133,13 @@ object RawShareLinksParser {
     }
 
     private fun applyTransport(bean: StandardV2RayBean, outbound: JSONObject) {
-        bean.type = normalizeSingboxTransport(outbound.optString("network", bean.type))
+        val network = outbound.optString("network", bean.type)
+        bean.rawTransportType = network
+        bean.type = normalizeSingboxTransport(network)
         val transport = outbound.optJSONObject("transport") ?: return
-        bean.type = normalizeSingboxTransport(transport.optString("type", bean.type))
+        val transportType = transport.optString("type", bean.type)
+        bean.rawTransportType = transportType
+        bean.type = normalizeSingboxTransport(transportType)
         bean.path = transport.optString("path", bean.path)
         bean.host = transport.hostString(bean.host)
         transport.optJSONObject("headers")

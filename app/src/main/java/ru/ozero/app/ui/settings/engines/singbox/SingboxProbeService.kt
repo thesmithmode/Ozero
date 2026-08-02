@@ -4,6 +4,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.Binder
+import android.os.ParcelFileDescriptor
+import android.os.Process
 import android.os.IBinder
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -488,8 +491,8 @@ internal class ProfileProbeProtector : ISingboxProtector.Stub() {
     private val modeLogged = AtomicBoolean(false)
     private val failureLogged = AtomicBoolean(false)
 
-    override fun protect(fd: Int): Boolean {
-        return when (val result = VpnSocketProtectorHolder.protectIfBound(fd)) {
+    override fun protect(socket: ParcelFileDescriptor): Boolean = socket.use {
+        val result = when (VpnSocketProtectorHolder.protectIfBound(it.fd)) {
             null -> {
                 logModeOnce("no Ozero VPN, protection not required")
                 true
@@ -506,6 +509,12 @@ internal class ProfileProbeProtector : ISingboxProtector.Stub() {
                 false
             }
         }
+        PersistentLoggers.debug(
+            "SingboxProbeService",
+            "protect request sourcePid=${Binder.getCallingPid()} targetPid=${Process.myPid()} " +
+                "targetReceivedFd=${it.fd} result=$result",
+        )
+        result
     }
 
     private fun logModeOnce(mode: String) {

@@ -66,8 +66,12 @@ class SingboxAidlContractTest {
     @Test
     fun `should ISingboxProtector be defined with protect method`() {
         val content = aidlFile("ISingboxProtector.aidl")
-        assertTrue(content.contains("boolean protect"), "ISingboxProtector must have boolean protect(int fd)")
-        assertTrue(content.contains("int"), "protect must accept int fd")
+        assertTrue(
+            content.contains("boolean protect(in ParcelFileDescriptor socket)"),
+            "ISingboxProtector must transfer a ParcelFileDescriptor instead of an int fd",
+        )
+        assertTrue(content.contains("import android.os.ParcelFileDescriptor"))
+        assertTrue(!content.contains("protect(int"), "raw file descriptor numbers cannot cross Binder")
     }
 
     @Test

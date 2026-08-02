@@ -1,11 +1,14 @@
 package ru.ozero.app.ui.settings.engines.singbox
 
+import android.os.ParcelFileDescriptor
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -71,25 +74,36 @@ class SingboxProbeServiceTest {
 
     @Test
     fun `profile protector permits proxy-only probe without active VPN`() {
-        assertTrue(ProfileProbeProtector().protect(7))
+        assertTrue(ProfileProbeProtector().protect(protectorSocket(7)))
     }
 
     @Test
     fun `profile protector delegates success and failure to active VPN`() {
-        val accepting = VpnSocketProtector { true }
+        var acceptedFd = -1
+        val accepting = VpnSocketProtector { fd ->
+            acceptedFd = fd
+            true
+        }
         VpnSocketProtectorHolder.bind(accepting)
         try {
-            assertTrue(ProfileProbeProtector().protect(8))
+            assertTrue(ProfileProbeProtector().protect(protectorSocket(8)))
+            assertEquals(8, acceptedFd)
         } finally {
             VpnSocketProtectorHolder.unbind(accepting)
         }
         val rejecting = VpnSocketProtector { false }
         VpnSocketProtectorHolder.bind(rejecting)
         try {
-            assertEquals(false, ProfileProbeProtector().protect(9))
+            assertEquals(false, ProfileProbeProtector().protect(protectorSocket(9)))
         } finally {
             VpnSocketProtectorHolder.unbind(rejecting)
         }
+    }
+
+    private fun protectorSocket(fd: Int): ParcelFileDescriptor {
+        val socket = mockk<ParcelFileDescriptor>(relaxed = true)
+        every { socket.fd } returns fd
+        return socket
     }
 
     @Test

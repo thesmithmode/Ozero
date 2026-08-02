@@ -24,11 +24,11 @@ class ConfigBuilderSupportDecisionTest {
     }
 
     @Test
-    fun `xhttp and splithttp are unsupported transports`() {
+    fun `xhttp and splithttp are rejected until the core implements them`() {
         listOf("xhttp", "splithttp").forEach { transport ->
             val decision = vless(type = transport).supportDecision()
 
-            assertSupportError(BeanSupportError.UNSUPPORTED_TRANSPORT, decision)
+            assertSupportError(BeanSupportError.CORE_UNSUPPORTED_XHTTP, decision)
         }
     }
 

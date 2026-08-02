@@ -1,5 +1,7 @@
 package ru.ozero.enginesingbox;
 
+import android.os.ParcelFileDescriptor;
+
 interface ISingboxProtector {
-    boolean protect(int fd);
+    boolean protect(in ParcelFileDescriptor socket);
 }

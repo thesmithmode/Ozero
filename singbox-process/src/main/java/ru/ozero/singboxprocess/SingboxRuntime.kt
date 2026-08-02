@@ -44,7 +44,6 @@ import javax.net.ssl.TrustManagerFactory
 internal object SingboxRuntime {
     private const val TAG = "SingboxRuntime"
     private const val MAX_NATIVE_LOG_BATCH = 100
-    private const val MAX_NATIVE_LOG_CATEGORIES = 16
     private const val STATUS_INTERVAL_NANOS = 1_000_000_000L
     private const val NATIVE_LOG_CONNECT_TIMEOUT_MS = 2_500L
     private val mutex = Mutex()
@@ -63,6 +62,9 @@ internal object SingboxRuntime {
     private var nativeLogSessionActive = false
 
     private val nativeLogSessions = NativeDiagnosticsSessionGuard()
+
+    @Volatile
+    private var nativeFailureDiagnostics: NativeFailureDiagnostics? = null
 
     @Volatile
     private var lastStatus: StatusMessage? = null
@@ -117,11 +119,14 @@ internal object SingboxRuntime {
                     PersistentLoggers.debug(TAG, "cleaned stale command.sock")
                 }
 
+                val failureDiagnostics = NativeFailureDiagnostics()
+                nativeFailureDiagnostics = failureDiagnostics
                 val platform = OzeroPlatformInterface(
                     context.applicationContext,
                     tunFd,
                     protectorBridge,
                     detachedTunFd,
+                    failureDiagnostics,
                 )
                 val handler = OzeroCommandServerHandler()
 
@@ -154,7 +159,7 @@ internal object SingboxRuntime {
                 }
 
                 commandServer = server
-                launchNativeLogSubscription()
+                launchNativeLogSubscription(failureDiagnostics)
                 PersistentLoggers.info(TAG, "runtime started fd=$tunFd")
             }
         }
@@ -175,6 +180,7 @@ internal object SingboxRuntime {
             }
             commandServer = null
             lastStatus = null
+            nativeFailureDiagnostics = null
             PersistentLoggers.info(TAG, "runtime stopped")
         }
     }
@@ -183,17 +189,23 @@ internal object SingboxRuntime {
 
     fun getLastStatus(): StatusMessage? = lastStatus
 
-    private fun launchNativeLogSubscription(reconnect: Boolean = false) {
+    private fun launchNativeLogSubscription(
+        failureDiagnostics: NativeFailureDiagnostics = checkNotNull(nativeFailureDiagnostics),
+        reconnect: Boolean = false,
+    ) {
         val generation = if (reconnect) nativeLogSessions.activeGeneration() else nativeLogSessions.begin()
         if (!reconnect) {
             nativeLogSessionActive = true
         }
         nativeLogJob = nativeLogScope.launch {
-            connectNativeLogSubscription(generation)
+            connectNativeLogSubscription(generation, failureDiagnostics)
         }
     }
 
-    private suspend fun connectNativeLogSubscription(generation: Long) {
+    private suspend fun connectNativeLogSubscription(
+        generation: Long,
+        failureDiagnostics: NativeFailureDiagnostics,
+    ) {
         var expectedClient: CommandClient? = null
         runCatching {
             val options = CommandClientOptions()
@@ -203,6 +215,7 @@ internal object SingboxRuntime {
             lateinit var client: CommandClient
             client = CommandClient(
                 NativeLogHandler(
+                    failureDiagnostics = failureDiagnostics,
                     isCurrent = { nativeLogSessions.isCurrent(generation, client, logClient) },
                     onDisconnected = { handleNativeLogDisconnected(generation, client) },
                 ),
@@ -262,11 +275,10 @@ internal object SingboxRuntime {
     }
 
     private class NativeLogHandler(
+        private val failureDiagnostics: NativeFailureDiagnostics,
         private val isCurrent: () -> Boolean,
         private val onDisconnected: () -> Unit,
     ) : CommandClientHandler {
-        private val emittedCategories = mutableSetOf<String>()
-
         override fun connected() {}
 
         override fun disconnected(message: String?) {
@@ -284,11 +296,7 @@ internal object SingboxRuntime {
                 if (!isCurrent()) return
                 val entry = messageList.next()
                 inspected++
-                val category = nativeLogCategory(entry.message) ?: continue
-                val shouldEmit = synchronized(emittedCategories) {
-                    emittedCategories.size < MAX_NATIVE_LOG_CATEGORIES && emittedCategories.add(category)
-                }
-                if (shouldEmit) PersistentLoggers.warn(TAG, "native outbound category=$category")
+                failureDiagnostics.recordNative(entry.message)
             }
         }
 
@@ -338,6 +346,7 @@ internal object SingboxRuntime {
         private val tunFd: Int,
         private val protector: SingboxProtectorBridge,
         private val detachedTunFd: DetachedTunFd?,
+        private val failureDiagnostics: NativeFailureDiagnostics,
     ) : PlatformInterface {
         private val connectivity: ConnectivityManager = requireConnectivityManager(context)
         private val defaultInterfaceMonitor = DefaultInterfaceMonitor(connectivity)
@@ -349,6 +358,7 @@ internal object SingboxRuntime {
         override fun autoDetectInterfaceControl(fd: Int) {
             val protected = protector.protect(fd)
             if (!protected && protectFailureLogged.compareAndSet(false, true)) {
+                failureDiagnostics.record(NativeFailureCategory.PROTECT_FAILED, "platform", "active VPN protect failed")
                 PersistentLoggers.warn(TAG, "active VPN protect failed")
             }
             check(protected) { "active VPN protect failed" }
@@ -495,7 +505,78 @@ internal fun String.shouldPromoteSingboxMessage(): Boolean =
         contains("dial", ignoreCase = true) ||
         contains("connection closed", ignoreCase = true)
 
+internal enum class NativeFailureCategory(val legacyName: String, val priority: Int) {
+    PROTECT_FAILED("protect", 0),
+    DEFAULT_INTERFACE("default-interface", 1),
+    DNS("dns", 2),
+    REALITY_HANDSHAKE("reality-handshake", 3),
+    TLS("tls-handshake", 4),
+    CONNECT("connect", 5),
+    REMOTE_CLOSED("remote-closed", 6),
+    TIMEOUT("timeout", 7),
+}
+
+internal class NativeFailureDiagnostics(
+    private val emit: (String) -> Unit = { message -> PersistentLoggers.warn("SingboxRuntime", message) },
+) {
+    private val sessionId = java.util.UUID.randomUUID().toString().substringBefore('-')
+    private val recorded = mutableSetOf<Pair<NativeFailureCategory, String>>()
+    private var dominant: NativeFailureCategory? = null
+
+    fun recordNative(message: String) {
+        val category = nativeFailureCategory(message) ?: return
+        record(category, nativeOutboundTag(message), redactSingboxMessage(message).take(MAX_NATIVE_MESSAGE_LENGTH))
+    }
+
+    @Synchronized
+    fun record(category: NativeFailureCategory, outboundTag: String, message: String) {
+        if (dominant == null || category.priority < requireNotNull(dominant).priority) {
+            dominant = category
+        }
+        val key = category to outboundTag
+        if (recorded.size >= MAX_RECORDS && key !in recorded) return
+        if (!recorded.add(key)) return
+        emit(
+            "native failure session=$sessionId outbound=$outboundTag category=${category.name} " +
+                "dominant=${requireNotNull(dominant).name} message=${message.take(MAX_NATIVE_MESSAGE_LENGTH)}",
+        )
+    }
+
+    private fun nativeOutboundTag(message: String): String =
+        Regex("(?i)\\boutbound(?:=|\\s+)([a-z0-9_.-]{1,48})")
+            .find(message)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.lowercase()
+            ?: "unknown"
+
+    private companion object {
+        const val MAX_NATIVE_MESSAGE_LENGTH = 320
+        const val MAX_RECORDS = 16
+    }
+}
+
 internal fun nativeLogCategory(message: String): String? {
+    val normalized = message.lowercase()
+    return when {
+        "reality" in normalized &&
+            "handshake" in normalized -> "reality-handshake"
+        "certificate" in normalized ||
+            "tls handshake" in normalized -> "tls-certificate"
+        "eof" in normalized ||
+            "connection closed" in normalized ||
+            "reset" in normalized ||
+            "broken pipe" in normalized -> "remote-closed"
+        "connect" in normalized ||
+            "refused" in normalized -> "connect"
+        "dial" in normalized -> "dial"
+        "route" in normalized -> "route"
+        "network unavailable" in normalized -> "network-unavailable"
+        else -> null
+    }
+}
+
+internal fun nativeFailureCategory(message: String): NativeFailureCategory? {
     val normalized = message.lowercase()
     val failure = listOf(
         "fail",
@@ -513,19 +594,27 @@ internal fun nativeLogCategory(message: String): String? {
     ).any(normalized::contains)
     if (!failure) return null
     return when {
-        "protect" in normalized -> "protect"
-        "certificate" in normalized -> "tls-certificate"
-        "reality" in normalized && "handshake" in normalized -> "reality-handshake"
-        "tls" in normalized && "handshake" in normalized -> "tls-handshake"
-        "default interface" in normalized -> "default-interface"
-        "dns" in normalized || "resolve" in normalized -> "dns"
-        "no route" in normalized || "route" in normalized -> "route"
-        "eof" in normalized || "reset" in normalized || "closed" in normalized || "broken pipe" in normalized ->
-            "remote-closed"
-        "connect" in normalized || "refused" in normalized -> "connect"
-        "dial" in normalized -> "dial"
-        "network" in normalized && ("unavailable" in normalized || "down" in normalized) ->
-            "network-unavailable"
+        "protect" in normalized -> NativeFailureCategory.PROTECT_FAILED
+        "default interface" in normalized -> NativeFailureCategory.DEFAULT_INTERFACE
+        "dns" in normalized ||
+            "resolve" in normalized -> NativeFailureCategory.DNS
+        "reality" in normalized &&
+            "handshake" in normalized -> NativeFailureCategory.REALITY_HANDSHAKE
+        "certificate" in normalized ||
+            "tls" in normalized &&
+            "handshake" in normalized -> NativeFailureCategory.TLS
+        "timeout" in normalized ||
+            "timed out" in normalized -> NativeFailureCategory.TIMEOUT
+        "eof" in normalized ||
+            "reset" in normalized ||
+            "closed" in normalized ||
+            "broken pipe" in normalized ->
+            NativeFailureCategory.REMOTE_CLOSED
+        "connect" in normalized ||
+            "refused" in normalized ||
+            "dial" in normalized ||
+            "no route" in normalized ||
+            "route" in normalized -> NativeFailureCategory.CONNECT
         else -> null
     }
 }
