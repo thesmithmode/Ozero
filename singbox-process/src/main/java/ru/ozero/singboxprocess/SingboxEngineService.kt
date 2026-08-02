@@ -120,6 +120,8 @@ class SingboxEngineService : Service() {
 
         override fun runtimeRunning(): Boolean = SingboxRuntime.isRunning()
 
+        override fun processId(): Int = android.os.Process.myPid()
+
         private fun stopRuntimeAndWait(timeoutMs: Long): Boolean {
             val boundedTimeoutMs = timeoutMs.coerceAtLeast(1L)
             return runCatching {

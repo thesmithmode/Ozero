@@ -7,9 +7,11 @@ import android.system.ErrnoException
 import io.nekohasekai.libbox.ExchangeContext
 import io.nekohasekai.libbox.Func
 import io.nekohasekai.libbox.LocalDNSTransport
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -17,7 +19,6 @@ import java.net.UnknownHostException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
 
 internal class AndroidLocalDnsTransport(
     private val defaultInterfaceMonitor: DefaultInterfaceMonitor,
@@ -47,6 +48,7 @@ internal class AndroidLocalDnsTransport(
                     if (rcode == RCODE_SUCCESS) context.rawSuccess(answer) else context.errorCode(rcode)
                 },
                 onErrno = context::errnoCode,
+                cancellation = cancellation,
             )
         }
     }
@@ -106,6 +108,7 @@ internal class AndroidLocalDnsTransport(
                     }
                 },
                 onErrno = context::errnoCode,
+                cancellation = cancellation,
             )
         }
     }
@@ -133,10 +136,11 @@ internal suspend fun <T : Any> awaitDnsCallback(
     start: (DnsResolver.Callback<T>) -> Unit,
     onAnswer: (T, Int) -> Unit,
     onErrno: (Int) -> Unit,
+    cancellation: CancellationSignal? = null,
     errnoExtractor: (Throwable?) -> Int? = { cause ->
         (cause as? ErrnoException)?.errno
     },
-) = suspendCoroutine { continuation ->
+) = suspendCancellableCoroutine { continuation ->
     val completed = AtomicBoolean(false)
     fun complete(action: () -> Unit) {
         if (!completed.compareAndSet(false, true)) return
@@ -147,6 +151,12 @@ internal suspend fun <T : Any> awaitDnsCallback(
             continuation.resumeWithException(error)
         }
     }
+    cancellation?.setOnCancelListener {
+        if (completed.compareAndSet(false, true)) {
+            continuation.cancel(CancellationException("DNS query cancelled"))
+        }
+    }
+    continuation.invokeOnCancellation { cancellation?.cancel() }
     start(
         object : DnsResolver.Callback<T> {
             override fun onAnswer(answer: T, rcode: Int) {

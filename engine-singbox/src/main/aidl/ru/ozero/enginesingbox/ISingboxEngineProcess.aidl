@@ -11,6 +11,7 @@ interface ISingboxEngineProcess {
     void stop();
     boolean stopAndWait(long timeoutMs);
     boolean runtimeRunning();
+    int processId();
     SingboxStats getStats();
     void registerStatusCallback(ISingboxStatusCallback cb);
     long urlTest(long profileId);

@@ -1,10 +1,13 @@
 package ru.ozero.singboxprocess
 
 import android.net.DnsResolver
+import android.os.CancellationSignal
 import android.system.ErrnoException
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -129,5 +132,26 @@ class AndroidLocalDnsTransportTest {
         )
 
         assertEquals(1, completions.get())
+    }
+
+    @Test
+    fun `cancellation signal releases every pending DNS wait`() = runBlocking {
+        repeat(100) {
+            val cancellation = CancellationSignal()
+            val started = CountDownLatch(1)
+            val request = async {
+                assertFailsWith<CancellationException> {
+                    awaitDnsCallback<ByteArray>(
+                        start = { started.countDown() },
+                        onAnswer = { _, _ -> },
+                        onErrno = {},
+                        cancellation = cancellation,
+                    )
+                }
+            }
+            assertTrue(started.await(1, TimeUnit.SECONDS))
+            cancellation.cancel()
+            request.await()
+        }
     }
 }
