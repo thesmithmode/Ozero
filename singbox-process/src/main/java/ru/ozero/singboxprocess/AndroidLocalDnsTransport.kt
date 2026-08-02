@@ -142,6 +142,7 @@ internal suspend fun <T : Any> awaitDnsCallback(
     },
 ) = suspendCancellableCoroutine { continuation ->
     val completed = AtomicBoolean(false)
+    val cancelledBySignal = AtomicBoolean(false)
     fun complete(action: () -> Unit) {
         if (!completed.compareAndSet(false, true)) return
         try {
@@ -152,11 +153,16 @@ internal suspend fun <T : Any> awaitDnsCallback(
         }
     }
     cancellation?.setOnCancelListener {
+        cancelledBySignal.set(true)
         if (completed.compareAndSet(false, true)) {
             continuation.cancel(CancellationException("DNS query cancelled"))
         }
     }
-    continuation.invokeOnCancellation { cancellation?.cancel() }
+    continuation.invokeOnCancellation {
+        if (completed.compareAndSet(false, true) && !cancelledBySignal.get()) {
+            cancellation?.cancel()
+        }
+    }
     start(
         object : DnsResolver.Callback<T> {
             override fun onAnswer(answer: T, rcode: Int) {
