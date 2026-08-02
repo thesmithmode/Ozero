@@ -32,7 +32,7 @@ import kotlin.test.assertTrue
 class SingboxEngineWarmReadinessTest {
 
     @Test
-    fun `awaitReady fast fails warm auto select when runtime health clears active port`() = runTest {
+    fun `awaitReady fast fails warm auto select without clearing active port`() = runTest {
         val engine = buildEngine()
         engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
         val process = mockk<ISingboxEngineProcess>()
@@ -45,14 +45,14 @@ class SingboxEngineWarmReadinessTest {
 
         val failure = assertIs<EnginePlugin.ReadyResult.Timeout>(result)
         assertTrue(failure.reason.contains("not running"))
-        assertEquals(0, engine.privateIntField("activeSocksPort"))
-        assertEquals(false, engine.privateBooleanField("activeAutoSelect"))
+        assertEquals(49408, engine.privateIntField("activeSocksPort"))
+        assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
     }
 
     @Test
-    fun `proxy mode auto select readiness ignores routed probe when runtime is available`() = runTest {
+    fun `proxy mode auto select readiness requires routed probe when runtime is available`() = runTest {
         val engine = buildEngine()
-        engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
+        engine.routedProbe = SingboxRoutedProbe { 24L }
         val process = mockk<ISingboxEngineProcess>()
         every { process.startProxyMode(any(), any()) } returns Unit
         every { process.runtimeRunning() } returns true

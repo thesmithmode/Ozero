@@ -96,8 +96,8 @@ class SingboxEngineServiceTest {
             "singbox-process/src/main/java/ru/ozero/singboxprocess/SingboxRuntime.kt",
         ).readText()
 
-        assertTrue(runtime.contains("check(protector.protect(fd))"))
-        assertFalse(runtime.contains("protector.protect(fd)" + System.lineSeparator() + "        }"))
+        assertTrue(runtime.contains("val protected = protector.protect(fd)"))
+        assertTrue(runtime.contains("check(protected) { \"active VPN protect failed\" }"))
     }
 
     private class FakeTrustManager(

@@ -20,8 +20,7 @@ import ru.ozero.singboxfmt.hasRequiredOutboundCredentials
 private const val VLESS_FLOW_XTLS_VISION = "xtls-rprx-vision"
 private const val REALITY_PUBLIC_KEY_BYTES = 32
 private const val DNS_LOCAL_TAG = "dns-local"
-private val DNS_DOMAIN_RESOLVER_TYPES = setOf("https", "tls")
-private const val AUTO_SELECT_PROBE_URL = "http://www.gstatic.com/generate_204"
+private const val AUTO_SELECT_PROBE_URL = "https://www.gstatic.com/generate_204"
 
 enum class BeanSupportError {
     INVALID_PORT,
@@ -57,6 +56,7 @@ sealed interface BeanSupportDecision {
 
 @Suppress("TooManyFunctions")
 object ConfigBuilder {
+    class CanonicalBean internal constructor(val value: AbstractBean)
 
     private val SUPPORTED_TRANSPORTS = setOf("tcp", "ws", "grpc", "http", "h2", "httpupgrade", "")
     private val SUPPORTED_SECURITY = setOf("", "none", "tls", "reality")
@@ -77,6 +77,18 @@ object ConfigBuilder {
         require(isSupportedBean(canonical)) { "Unsupported transport: ${(canonical as? StandardV2RayBean)?.type}" }
         val outbound = beanOutbound(canonical, "proxy")
         return buildFullConfig(listOf(outbound), probeSocksPort, dnsServers, ipv6Enabled)
+    }
+
+    fun canonicalBean(bean: AbstractBean): CanonicalBean = CanonicalBean(bean.canonicalBeanOrThrow())
+
+    fun buildSingboxConfigFromCanonical(
+        bean: CanonicalBean,
+        probeSocksPort: Int? = null,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
+    ): String {
+        require(supportDecisionCanonical(bean) is BeanSupportDecision.Supported)
+        return buildFullConfig(listOf(beanOutbound(bean.value, "proxy")), probeSocksPort, dnsServers, ipv6Enabled)
     }
 
     fun buildSingboxAutoConfig(
@@ -109,11 +121,13 @@ object ConfigBuilder {
 
     fun supportDecision(bean: AbstractBean): BeanSupportDecision =
         when (val canonical = BeanCanonicalizer.canonicalizeOrError(bean)) {
-            is CanonicalizationResult.Canonical -> supportDecisionCanonical(canonical.bean)
+            is CanonicalizationResult.Canonical -> supportDecisionCanonicalValue(canonical.bean)
             is CanonicalizationResult.Rejected -> unsupported(BeanSupportError.UNSUPPORTED_CORE_FEATURE)
         }
 
-    private fun supportDecisionCanonical(bean: AbstractBean): BeanSupportDecision {
+    fun supportDecisionCanonical(bean: CanonicalBean): BeanSupportDecision = supportDecisionCanonicalValue(bean.value)
+
+    private fun supportDecisionCanonicalValue(bean: AbstractBean): BeanSupportDecision {
         if (bean.serverPort !in MIN_PORT..MAX_PORT) return unsupported(BeanSupportError.INVALID_PORT)
         if (!bean.hasRoutableServerAddress()) return unsupported(BeanSupportError.INVALID_SERVER)
         if (!bean.hasRequiredOutboundCredentials()) return unsupported(BeanSupportError.MISSING_CREDENTIALS)
@@ -177,6 +191,18 @@ object ConfigBuilder {
         val canonical = bean.canonicalBeanOrThrow()
         require(isSupportedBean(canonical)) { "Unsupported transport: ${(canonical as? StandardV2RayBean)?.type}" }
         val outbound = beanOutbound(canonical, "proxy", detour = upstream?.let { "upstream" })
+        return buildChainFullConfig(socksPort, listOf(outbound), upstream, dnsServers, ipv6Enabled)
+    }
+
+    fun buildChainConfigFromCanonical(
+        bean: CanonicalBean,
+        socksPort: Int,
+        upstream: Upstream? = null,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
+    ): String {
+        require(supportDecisionCanonical(bean) is BeanSupportDecision.Supported)
+        val outbound = beanOutbound(bean.value, "proxy", detour = upstream?.let { "upstream" })
         return buildChainFullConfig(socksPort, listOf(outbound), upstream, dnsServers, ipv6Enabled)
     }
 
@@ -274,6 +300,30 @@ object ConfigBuilder {
         )
     }
 
+    fun buildProfileChainConfigFromCanonical(
+        selected: CanonicalBean,
+        wrappers: List<AbstractBean>,
+        probeSocksPort: Int? = null,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
+    ): String = buildFullConfig(
+        profileChainOutboundsCanonical(selected.value, wrappers),
+        probeSocksPort,
+        dnsServers,
+        ipv6Enabled,
+    )
+
+    fun buildProfileChainProxyConfigFromCanonical(
+        selected: CanonicalBean,
+        wrappers: List<AbstractBean>,
+        socksPort: Int,
+        dnsServers: List<String> = EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+        ipv6Enabled: Boolean = true,
+    ): String {
+        val outbounds = profileChainOutboundsCanonical(selected.value, wrappers)
+        return buildChainFullConfig(socksPort, outbounds, null, dnsServers, ipv6Enabled)
+    }
+
     data class Upstream(val host: String, val port: Int)
 
     data class ProbeTarget(val bean: AbstractBean, val socksPort: Int)
@@ -295,6 +345,20 @@ object ConfigBuilder {
         return wrapperOutbounds + selectedOutbound
     }
 
+    private fun profileChainOutboundsCanonical(
+        canonicalSelected: AbstractBean,
+        wrappers: List<AbstractBean>,
+    ): List<String> {
+        val supportedWrappers = wrappers.map(AbstractBean::canonicalBeanOrThrow)
+        require(supportDecisionCanonicalValue(canonicalSelected) is BeanSupportDecision.Supported)
+        require(supportedWrappers.all(::isSupportedBean))
+        val wrapperOutbounds = supportedWrappers.mapIndexed { index, bean ->
+            beanOutbound(bean, "chain-$index", if (index == 0) null else "chain-${index - 1}")
+        }
+        val selectedDetour = supportedWrappers.lastIndex.takeIf { it >= 0 }?.let { "chain-$it" }
+        return wrapperOutbounds + beanOutbound(canonicalSelected, "proxy", selectedDetour)
+    }
+
     private fun beanOutbound(bean: AbstractBean, tag: String, detour: String? = null): String = when (bean) {
         is VLESSBean -> vlessOutbound(bean, tag, detour)
         is VMessBean -> vmessOutbound(bean, tag, detour)
@@ -313,7 +377,7 @@ object ConfigBuilder {
         sb.append('{')
         sb.append(""""log":{"level":"warn","timestamp":true},""")
         sb.append(""""inbounds":[""")
-        sb.append(tunInbound())
+        sb.append(tunInbound(ipv6Enabled))
         if (probeSocksPort != null && probeSocksPort > 0) {
             sb.append(',')
             sb.append(socksInbound(probeSocksPort))
@@ -328,8 +392,8 @@ object ConfigBuilder {
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
         sb.append(dnsConfig(dnsServers, detour = "proxy", ipv6Enabled = ipv6Enabled))
-        sb.append(""""route":{""")
-        sb.append(""""default_domain_resolver":"$DNS_LOCAL_TAG",""")
+        sb.append("\"route\":{")
+        sb.append(defaultDomainResolver(ipv6Enabled))
         sb.append(""""final":"proxy",""")
         sb.append(""""auto_detect_interface":true,""")
         sb.append(""""rules":[{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}]""")
@@ -364,8 +428,8 @@ object ConfigBuilder {
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
         sb.append(dnsConfig(dnsServers, detour = "proxy", ipv6Enabled = ipv6Enabled))
-        sb.append(""""route":{""")
-        sb.append(""""default_domain_resolver":"$DNS_LOCAL_TAG",""")
+        sb.append("\"route\":{")
+        sb.append(defaultDomainResolver(ipv6Enabled))
         sb.append(""""final":"proxy",""")
         sb.append(""""auto_detect_interface":true,""")
         sb.append(""""rules":[{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}]""")
@@ -383,7 +447,7 @@ object ConfigBuilder {
     ): String {
         val sb = StringBuilder()
         sb.append('{')
-        sb.append(""""log":{"level":"warn","timestamp":true},""")
+        sb.append(""""log":{"level":"debug","timestamp":true},""")
         sb.append(""""inbounds":[""")
         sb.append(inbounds.joinToString(","))
         sb.append("""],""")
@@ -393,7 +457,8 @@ object ConfigBuilder {
         sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
         sb.append(dnsConfig(dnsServers, detour = null, ipv6Enabled = ipv6Enabled))
-        sb.append(""""route":{"default_domain_resolver":"$DNS_LOCAL_TAG",""")
+        sb.append("\"route\":{")
+        sb.append(defaultDomainResolver(ipv6Enabled))
         sb.append(""""final":"block","auto_detect_interface":true,"rules":[""")
         sb.append("""{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}""")
         routeRules.forEach { rule ->
@@ -405,30 +470,14 @@ object ConfigBuilder {
     }
 
     private fun dnsConfig(dnsServers: List<String>, detour: String?, ipv6Enabled: Boolean): String {
-        val normalized = normalizeDnsServers(dnsServers, ipv6Enabled)
-        val endpoints = normalized.map(DnsEndpoint::from)
+        val endpoints = dnsServers.mapNotNull { DnsEndpoint.parse(it, ipv6Enabled) }
         val finalTag = endpoints.indices.firstOrNull()?.let { "dns-$it" } ?: DNS_LOCAL_TAG
         val servers = buildList {
             add("{\"type\":\"local\",\"tag\":\"$DNS_LOCAL_TAG\"}")
             endpoints.mapIndexedTo(this) { index, endpoint -> dnsServer(endpoint, "dns-$index", detour) }
         }.joinToString(",")
-        return "\"dns\":{\"servers\":[$servers],\"final\":${jsonString(finalTag)}},"
-    }
-
-    private fun normalizeDnsServers(dnsServers: List<String>, ipv6Enabled: Boolean): List<String> =
-        dnsServers
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .filter { it.isValidDnsServer() }
-            .filter { ipv6Enabled || !it.isPlainIpv6Dns() }
-            .ifEmpty { emptyList() }
-
-    private fun String.isPlainIpv6Dns(): Boolean = ':' in this && !startsWith("https://") && !startsWith("tls://")
-
-    private fun String.isValidDnsServer(): Boolean {
-        if (startsWith("https://")) return length > "https://".length && !contains(' ')
-        if (startsWith("tls://")) return length > "tls://".length && !contains(' ')
-        return isValidIpv4Dns() || isValidPlainIpv6Dns()
+        val strategy = if (ipv6Enabled) "" else ",\"strategy\":\"ipv4_only\""
+        return "\"dns\":{\"servers\":[$servers],\"final\":${jsonString(finalTag)}$strategy},"
     }
 
     private fun String.isValidIpv4Dns(): Boolean {
@@ -439,8 +488,40 @@ object ConfigBuilder {
             }
     }
 
-    private fun String.isValidPlainIpv6Dns(): Boolean =
-        ':' in this && all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it == ':' }
+    private fun String.isValidPlainIpv6Dns(): Boolean {
+        if (!hasIpv6LiteralShape() || hasMalformedIpv6Colons()) return false
+        if ('.' in this && !substringAfterLast(':').isValidIpv4Dns()) return false
+        val compressed = "::" in this
+        val sides = split("::", limit = 2)
+        val groups = sides.sumOf(::ipv6GroupCount)
+        val validParts = sides.all { it.hasValidIpv6Parts() }
+        return validParts && if (compressed) groups < 8 else groups == 8
+    }
+
+    private fun String.hasIpv6LiteralShape(): Boolean =
+        isNotEmpty() && '%' !in this && count { it == ':' } >= 2 && all { it.isIpv6LiteralCharacter() }
+
+    private fun String.hasMalformedIpv6Colons(): Boolean =
+        ":::" in this || countSubstring("::") > 1 || hasUnpairedEdgeColon()
+
+    private fun String.hasUnpairedEdgeColon(): Boolean =
+        startsWith(':') && !startsWith("::") || endsWith(':') && !endsWith("::")
+
+    private fun String.hasValidIpv6Parts(): Boolean {
+        if (isEmpty()) return true
+        return split(':').all { part ->
+            if ('.' in part) part.isValidIpv4Dns() else part.length in 1..4 && part.all { it.isIpv6HexDigit() }
+        }
+    }
+
+    private fun ipv6GroupCount(side: String): Int =
+        if (side.isEmpty()) 0 else side.split(':').fold(0) { count, part -> count + if ('.' in part) 2 else 1 }
+
+    private fun String.countSubstring(value: String): Int = windowed(value.length).count { it == value }
+
+    private fun Char.isIpv6HexDigit(): Boolean = isDigit() || this in 'a'..'f' || this in 'A'..'F'
+
+    private fun Char.isIpv6LiteralCharacter(): Boolean = isIpv6HexDigit() || this == ':' || this == '.'
 
     private fun dnsServer(endpoint: DnsEndpoint, tag: String, detour: String?): String = buildString {
         append('{')
@@ -456,33 +537,60 @@ object ConfigBuilder {
 
     private data class DnsEndpoint(val type: String, val server: String, val serverPort: Int?, val path: String?) {
         fun needsDomainResolver(): Boolean =
-            type in DNS_DOMAIN_RESOLVER_TYPES && server.isDnsHostname()
+            server.isDnsHostname()
 
         companion object {
-            fun from(server: String): DnsEndpoint = when {
-                server.startsWith("https://") -> fromUri(server, "https")
-                server.startsWith("tls://") -> fromUri(server, "tls")
-                else -> DnsEndpoint("udp", server, null, null)
+            fun parse(value: String, ipv6Enabled: Boolean): DnsEndpoint? {
+                val input = value.trim()
+                if (input.isEmpty()) return null
+                val endpoint = if ("://" in input) parseUri(input) else parseLiteral(input)
+                return endpoint?.takeIf { ipv6Enabled || !it.server.isValidPlainIpv6Dns() }
             }
 
-            private fun fromUri(server: String, type: String): DnsEndpoint {
-                val uri = URI(server)
-                val address = uri.host ?: server.substringAfter("://").substringBefore('/')
-                val port = uri.port.takeIf { it in MIN_PORT..MAX_PORT }
-                val path = if (type == "https") uri.rawPath.orEmpty().ifEmpty { "/dns-query" } else null
-                return DnsEndpoint(type, address, port, path)
-            }
+            private fun parseLiteral(input: String): DnsEndpoint? =
+                input.takeIf { it.isValidIpv4Dns() || it.isValidPlainIpv6Dns() }
+                    ?.let { DnsEndpoint("udp", it, null, null) }
+
+            private fun parseUri(input: String): DnsEndpoint? = runCatching {
+                val uri = URI(input)
+                val type = uri.scheme?.lowercase()?.takeIf { it in setOf("udp", "tls", "https") }
+                    ?: return@runCatching null
+                if (uri.userInfo != null) return@runCatching null
+                val host = uri.host?.removeSurrounding("[", "]")?.takeIf { it.isNotBlank() }
+                    ?: return@runCatching null
+                val port = uri.port
+                if (port != -1 && port !in MIN_PORT..MAX_PORT) return@runCatching null
+                val path = if (type == "https") {
+                    uri.rawPath.orEmpty().ifEmpty { "/dns-query" }.takeIf { it.startsWith('/') }
+                        ?: return@runCatching null
+                } else {
+                    null
+                }
+                DnsEndpoint(type, host, port.takeIf { it != -1 }, path)
+            }.getOrNull()
         }
     }
 
     private fun String.isDnsHostname(): Boolean = !isValidIpv4Dns() && !isValidPlainIpv6Dns()
 
-    private fun tunInbound(): String {
+    private fun defaultDomainResolver(ipv6Enabled: Boolean): String =
+        if (ipv6Enabled) {
+            "\"default_domain_resolver\":\"$DNS_LOCAL_TAG\","
+        } else {
+            "\"default_domain_resolver\":{\"server\":\"$DNS_LOCAL_TAG\",\"strategy\":\"ipv4_only\"},"
+        }
+
+    private fun tunInbound(ipv6Enabled: Boolean): String {
         val sb = StringBuilder()
         sb.append('{')
         sb.append(""""type":"tun",""")
         sb.append(""""tag":"tun-in",""")
-        sb.append(""""address":["172.19.0.1/30","fdfe:dcba:9876::1/126"],""")
+        val addresses = if (ipv6Enabled) {
+            "\"172.19.0.1/30\",\"fdfe:dcba:9876::1/126\""
+        } else {
+            "\"172.19.0.1/30\""
+        }
+        sb.append("\"address\":[$addresses],")
         sb.append(""""mtu":9000,""")
         sb.append(""""auto_route":false,""")
         sb.append(""""strict_route":false""")
@@ -806,7 +914,7 @@ private fun jsonString(s: String): String {
             '\r' -> sb.append("\\r")
             '\t' -> sb.append("\\t")
             '\b' -> sb.append("\\b")
-            '' -> sb.append("\\f")
+            '\u000C' -> sb.append("\\f")
             else -> if (c.code < 0x20) {
                 sb.append("\\u%04x".format(c.code))
             } else {

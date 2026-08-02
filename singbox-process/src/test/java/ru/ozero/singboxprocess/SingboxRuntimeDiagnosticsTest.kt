@@ -6,11 +6,52 @@ import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
 import kotlin.test.assertContains
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SingboxRuntimeDiagnosticsTest {
+    private val runtimeSource by lazy {
+        java.io.File("src/main/java/ru/ozero/singboxprocess/SingboxRuntime.kt").readText()
+    }
+
+    @Test
+    fun `old diagnostic session cannot mutate replacement client`() {
+        val guard = NativeDiagnosticsSessionGuard()
+        val oldClient = Any()
+        val oldGeneration = guard.begin()
+        val newClient = Any()
+        val newGeneration = guard.begin()
+
+        assertFalse(guard.isCurrent(oldGeneration, oldClient, newClient))
+        assertTrue(guard.isCurrent(newGeneration, newClient, newClient))
+        assertFalse(guard.claimReconnect(oldGeneration))
+    }
+
+    @Test
+    fun `diagnostic reconnect can be claimed only once per generation`() {
+        val guard = NativeDiagnosticsSessionGuard()
+        val generation = guard.begin()
+
+        assertTrue(guard.claimReconnect(generation))
+        assertFalse(guard.claimReconnect(generation))
+        assertFalse(guard.claimReconnect(guard.begin() - 1))
+    }
+
+    @Test
+    fun `invalidating diagnostic session rejects delayed callbacks`() {
+        val guard = NativeDiagnosticsSessionGuard()
+        val client = Any()
+        val generation = guard.begin()
+
+        guard.invalidate()
+
+        assertFalse(guard.isActive(generation))
+        assertFalse(guard.isCurrent(generation, client, client))
+        assertFalse(guard.claimReconnect(generation))
+    }
+
     @Test
     fun `missing ConnectivityManager fails with process specific error`() {
         val context = mockk<Context>()
@@ -43,9 +84,94 @@ class SingboxRuntimeDiagnosticsTest {
     }
 
     @Test
+    fun `redaction removes every supported secret shape`() {
+        val secrets = listOf(
+            "username=user-value",
+            "token='token-value'",
+            "authorization: bearer-value",
+            "cookie=cookie-value",
+            "short_id=short-value",
+            "server_name=name-value",
+            "host=host-value",
+            "SNI=sni-value",
+            "headers=header-value",
+            "https://url-user:url-password@subscription.example/path?token=url-token#fragment",
+        )
+
+        val redacted = redactSingboxMessage(secrets.joinToString(" "))
+
+        listOf(
+            "user-value",
+            "token-value",
+            "bearer-value",
+            "cookie-value",
+            "short-value",
+            "name-value",
+            "host-value",
+            "sni-value",
+            "header-value",
+            "url-user",
+            "url-password",
+            "url-token",
+            "fragment",
+        ).forEach { secret -> assertFalse(redacted.contains(secret)) }
+    }
+
+    @Test
     fun `libbox diagnostic keywords are promoted`() {
         assertTrue("connection closed".shouldPromoteSingboxMessage())
         assertTrue("TLS handshake failed".shouldPromoteSingboxMessage())
         assertFalse("started listener".shouldPromoteSingboxMessage())
+    }
+
+    @Test
+    fun `native log categories discard raw endpoint and credentials`() {
+        assertEquals(
+            "reality-handshake",
+            nativeLogCategory(
+                "reality handshake failed server=private.example uuid=12345678-1234-1234-1234-123456789abc",
+            ),
+        )
+        assertEquals("tls-certificate", nativeLogCategory("TLS certificate rejected for private.example"))
+        assertEquals("remote-closed", nativeLogCategory("upstream EOF from private.example"))
+        assertEquals(null, nativeLogCategory("listener started at private.example"))
+    }
+
+    @Test
+    fun `native log classification prioritizes terminal transport state`() {
+        assertEquals("remote-closed", nativeLogCategory("connection closed"))
+        assertEquals("connect", nativeLogCategory("connect: connection refused"))
+        assertEquals("dial", nativeLogCategory("dial tcp: timeout"))
+        assertEquals("network-unavailable", nativeLogCategory("network unavailable"))
+        assertEquals("remote-closed", nativeLogCategory("write: broken pipe"))
+    }
+
+    @Test
+    fun `diagnostics starts only after runtime becomes available`() {
+        val serviceStart = runtimeSource.indexOf("server.startOrReloadService")
+        val serverClaim = runtimeSource.indexOf("commandServer = server", serviceStart)
+        val diagnosticsLaunch = runtimeSource.indexOf("launchNativeLogSubscription()", serverClaim)
+
+        assertTrue(serviceStart in 0..<serverClaim)
+        assertTrue(serverClaim in 0..<diagnosticsLaunch)
+    }
+
+    @Test
+    fun `diagnostic connect is supervised and time bounded`() {
+        assertContains(runtimeSource, "CoroutineScope(SupervisorJob() + Dispatchers.IO)")
+        assertContains(runtimeSource, "withTimeout(NATIVE_LOG_CONNECT_TIMEOUT_MS)")
+        assertContains(runtimeSource, "runInterruptible { client.connect() }")
+        assertContains(runtimeSource, "native diagnostics unavailable exceptionClass=")
+    }
+
+    @Test
+    fun `restart and stop close diagnostics`() {
+        val restart = runtimeSource.substringAfter("if (oldServer != null)").substringBefore("val socketFile")
+        val stop = runtimeSource.substringAfter("suspend fun stop()").substringBefore("fun isRunning()")
+
+        assertContains(restart, "stopNativeLogSubscription()")
+        assertContains(stop, "stopNativeLogSubscription()")
+        assertContains(runtimeSource, "nativeLogJob?.cancelAndJoin()")
+        assertContains(runtimeSource, "client.disconnect()")
     }
 }

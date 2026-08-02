@@ -55,6 +55,7 @@ class ConfigBuilderVLESSTest {
         val json = ConfigBuilder.buildSingboxConfig(makeBean(uuid = uuid))
 
         assertContains(json, uuid)
+        assertContains(json, "\"log\":{\"level\":\"warn\"")
     }
 
     @Test
@@ -71,6 +72,26 @@ class ConfigBuilderVLESSTest {
             BeanSupportDecision.Unsupported(BeanSupportError.UNSUPPORTED_VLESS_FLOW),
             ConfigBuilder.supportDecision(makeBean(flow = "xtls-rprx-vision-udp443")),
         )
+    }
+
+    @Test
+    fun `IPv6 off removes IPv6 tun address and resolves outbound domains over IPv4 only`() {
+        val json = ConfigBuilder.buildSingboxConfig(makeBean(), ipv6Enabled = false)
+
+        assertContains(json, "\"address\":[\"172.19.0.1/30\"]")
+        assertFalse(json.contains("fdfe:dcba:9876::1/126"))
+        assertContains(
+            json,
+            "\"default_domain_resolver\":{\"server\":\"dns-local\",\"strategy\":\"ipv4_only\"}",
+        )
+    }
+
+    @Test
+    fun `IPv6 on keeps dual stack tun address`() {
+        val json = ConfigBuilder.buildSingboxConfig(makeBean(), ipv6Enabled = true)
+
+        assertContains(json, "\"address\":[\"172.19.0.1/30\",\"fdfe:dcba:9876::1/126\"]")
+        assertContains(json, "\"default_domain_resolver\":\"dns-local\"")
     }
 
     @Test
