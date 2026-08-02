@@ -89,8 +89,8 @@ object KryoSerializer {
         }
     }
 
-    private fun Kryo.registerLegacyStandard(type: Class<out StandardV2RayBean>) {
-        val serializer = FieldSerializer(this, type)
+    private fun <T : StandardV2RayBean> Kryo.registerLegacyStandard(type: Class<T>) {
+        val serializer = FieldSerializer<T>(this, type)
         serializer.removeField("rawTransportType")
         register(type, serializer)
     }
