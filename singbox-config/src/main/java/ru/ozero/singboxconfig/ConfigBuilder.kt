@@ -54,38 +54,6 @@ sealed interface BeanSupportDecision {
     data class Unsupported(val error: BeanSupportError) : BeanSupportDecision
 }
 
-enum class BeanSupportError {
-    INVALID_PORT,
-    INVALID_SERVER,
-    MISSING_CREDENTIALS,
-    UNSUPPORTED_BEAN_TYPE,
-    UNSUPPORTED_SECURITY,
-    UNSUPPORTED_TRANSPORT,
-    UNSUPPORTED_TCP_HEADER,
-    UNSUPPORTED_QUIC_SECURITY,
-    INVALID_REALITY_PUBLIC_KEY,
-    INVALID_REALITY_SHORT_ID,
-    UNSUPPORTED_GRPC_MULTI_MODE,
-    UNSUPPORTED_GRPC_COMPAT_MODE,
-    UNSUPPORTED_ECH,
-    UNSUPPORTED_MTLS,
-    UNSUPPORTED_CERTIFICATE_PINNING,
-    MISSING_REALITY_SERVER_NAME,
-    UNSUPPORTED_VLESS_FLOW,
-    UNSUPPORTED_VLESS_ENCRYPTION,
-    UNSUPPORTED_PACKET_ENCODING,
-    UNSUPPORTED_MUX,
-    UNSUPPORTED_BROWSER_FORWARDER,
-    UNSUPPORTED_REALITY_OPTIONS,
-    UNSUPPORTED_SHADOWSOCKS_PLUGIN,
-    UNSUPPORTED_CORE_FEATURE,
-}
-
-sealed interface BeanSupportDecision {
-    data object Supported : BeanSupportDecision
-    data class Unsupported(val error: BeanSupportError) : BeanSupportDecision
-}
-
 @Suppress("TooManyFunctions")
 object ConfigBuilder {
     class CanonicalBean internal constructor(val value: AbstractBean)
