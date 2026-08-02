@@ -8,6 +8,7 @@ import com.esotericsoftware.kryo.serializers.FieldSerializer
 import com.esotericsoftware.kryo.util.Pool
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 object KryoSerializer {
     private const val MAGIC = 0x4f5a424e
@@ -96,11 +97,14 @@ object KryoSerializer {
     }
 
     private fun isVersioned(bytes: ByteArray): Boolean =
-        bytes.size >= HEADER_SIZE && ByteBuffer.wrap(bytes, 0, Int.SIZE_BYTES).int == MAGIC
+        bytes.size >= HEADER_SIZE &&
+            ByteBuffer.wrap(bytes, 0, Int.SIZE_BYTES)
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .int == MAGIC
 
     private fun readVersioned(bytes: ByteArray): AbstractBean {
         if (bytes.size < HEADER_SIZE) throw KryoException("Bean blob header is truncated")
-        val header = ByteBuffer.wrap(bytes, 0, HEADER_SIZE)
+        val header = ByteBuffer.wrap(bytes, 0, HEADER_SIZE).order(ByteOrder.LITTLE_ENDIAN)
         check(header.int == MAGIC) { "Bean blob magic mismatch" }
         check(header.get().toInt() == FORMAT_VERSION) { "Unsupported bean blob version" }
         val protocol = header.get().toInt() and 0xff
