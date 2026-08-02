@@ -12,7 +12,7 @@ import java.nio.ByteBuffer
 object KryoSerializer {
     private const val MAGIC = 0x4f5a424e
     private const val FORMAT_VERSION = 1
-    private const val HEADER_SIZE = 9
+    private const val HEADER_SIZE = 6
 
     private val pool = object : Pool<Kryo>(true, false, 4) {
         override fun create(): Kryo = Kryo().apply {
@@ -33,7 +33,7 @@ object KryoSerializer {
             ByteBufferOutput(baos).use { out ->
                 out.writeInt(MAGIC)
                 out.writeByte(FORMAT_VERSION)
-                out.writeInt(protocolType(bean))
+                out.writeByte(protocolType(bean))
                 kryo.writeClassAndObject(out, bean)
                 out.flush()
             }
@@ -103,7 +103,7 @@ object KryoSerializer {
         val header = ByteBuffer.wrap(bytes, 0, HEADER_SIZE)
         check(header.int == MAGIC) { "Bean blob magic mismatch" }
         check(header.get().toInt() == FORMAT_VERSION) { "Unsupported bean blob version" }
-        val protocol = header.int
+        val protocol = header.get().toInt() and 0xff
         val bean = readLegacy(bytes.copyOfRange(HEADER_SIZE, bytes.size), pool)
         check(protocolType(bean) == protocol) { "Bean blob protocol mismatch" }
         return bean
