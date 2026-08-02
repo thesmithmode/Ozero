@@ -14,8 +14,11 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import ru.ozero.enginesingbox.RoutedProbeResult
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.VpnSocketProtector
+import ru.ozero.enginescore.VpnSocketProtectorHolder
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.ByeDpiUiSettings
 import ru.ozero.enginescore.settings.HostsMode
@@ -33,14 +36,61 @@ import java.net.ServerSocket
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SingboxProbeServiceTest {
+    @Test
+    fun `profile probe returns typed final failure without diagnostic detail`() {
+        val source = java.io.File(
+            "src/main/java/ru/ozero/app/ui/settings/engines/singbox/SingboxProbeService.kt",
+        ).readText()
+        val failureBranch = source
+            .substringAfter("is ru.ozero.enginesingbox.RoutedProbeResult.Failure ->")
+            .substringBefore("if (attempt < PROBE_ATTEMPTS - 1)")
+
+        assertFalse(failureBranch.contains("result.safeDetail != null"))
+        assertTrue(failureBranch.contains("result.reason.profileProbeStatus()"))
+    }
 
     private val selectedProfileKey = longPreferencesKey("singbox_selected_profile_id")
     private val beanKey = byteArrayPreferencesKey("singbox_vless_bean")
     private val dnsServersKey = stringSetPreferencesKey("singbox_dns_servers")
+
+    @Test
+    fun `profile status stores stable category instead of diagnostic detail`() {
+        assertEquals("Remote closed", RoutedProbeResult.Reason.REMOTE_CLOSED.profileProbeStatus())
+        assertEquals("SOCKS rejected", RoutedProbeResult.Reason.SOCKS_REPLY.profileProbeStatus())
+        assertEquals("DNS failed", RoutedProbeResult.Reason.DNS.profileProbeStatus())
+        assertEquals("TLS certificate", RoutedProbeResult.Reason.TLS_CERTIFICATE.profileProbeStatus())
+        assertEquals("TLS handshake", RoutedProbeResult.Reason.TLS_HANDSHAKE.profileProbeStatus())
+        assertEquals("Timeout", RoutedProbeResult.Reason.TIMEOUT.profileProbeStatus())
+        assertEquals("Unexpected response", RoutedProbeResult.Reason.UNEXPECTED_RESPONSE.profileProbeStatus())
+    }
+
+    @Test
+    fun `profile protector permits proxy-only probe without active VPN`() {
+        assertTrue(ProfileProbeProtector().protect(7))
+    }
+
+    @Test
+    fun `profile protector delegates success and failure to active VPN`() {
+        val accepting = VpnSocketProtector { true }
+        VpnSocketProtectorHolder.bind(accepting)
+        try {
+            assertTrue(ProfileProbeProtector().protect(8))
+        } finally {
+            VpnSocketProtectorHolder.unbind(accepting)
+        }
+        val rejecting = VpnSocketProtector { false }
+        VpnSocketProtectorHolder.bind(rejecting)
+        try {
+            assertEquals(false, ProfileProbeProtector().protect(9))
+        } finally {
+            VpnSocketProtectorHolder.unbind(rejecting)
+        }
+    }
 
     @Test
     fun `probeAndAutoSelect preserves auto-select mode while updating latency`() = runTest {

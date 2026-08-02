@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class VpnSocketProtectorHolderTest {
@@ -24,6 +25,8 @@ class VpnSocketProtectorHolderTest {
 
     @Test
     fun `protect returns false when no protector bound`() {
+        assertFalse(VpnSocketProtectorHolder.isBound())
+        assertNull(VpnSocketProtectorHolder.protectIfBound(42))
         assertFalse(VpnSocketProtectorHolder.protect(42))
     }
 
@@ -39,8 +42,10 @@ class VpnSocketProtectorHolderTest {
 
         val result = VpnSocketProtectorHolder.protect(7)
 
+        assertTrue(VpnSocketProtectorHolder.isBound())
+        assertTrue(VpnSocketProtectorHolder.protectIfBound(7) == true)
         assertTrue(result)
-        assertEquals(listOf(7), captured)
+        assertEquals(listOf(7, 7), captured)
     }
 
     @Test

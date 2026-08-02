@@ -110,6 +110,102 @@ class ConfigBuilderDnsTest {
     }
 
     @Test
+    fun `DNS parser supports UDP URI and bracketed IPv6`() {
+        val json = ConfigBuilder.buildSingboxConfig(
+            bean(),
+            dnsServers = listOf("udp://9.9.9.9:53", "tls://[2001:4860:4860::8888]:853"),
+        )
+
+        assertContains(json, "\"type\":\"udp\",\"server\":\"9.9.9.9\",\"server_port\":53")
+        assertContains(json, "\"type\":\"tls\",\"server\":\"2001:4860:4860::8888\",\"server_port\":853")
+    }
+
+    @Test
+    fun `UDP hostname uses local bootstrap while UDP literal does not`() {
+        val hostname = ConfigBuilder.buildSingboxConfig(bean(), dnsServers = listOf("udp://dns.example:53"))
+        val literal = ConfigBuilder.buildSingboxConfig(bean(), dnsServers = listOf("udp://9.9.9.9:53"))
+
+        assertContains(hostname, "\"domain_resolver\":\"dns-local\"")
+        assertFalse(literal.contains("\"domain_resolver\":\"dns-local\""))
+    }
+
+    @Test
+    fun `DNS parser rejects malformed IPv6 and accepts compressed IPv6`() {
+        val json = ConfigBuilder.buildSingboxConfig(
+            bean(),
+            dnsServers = listOf("::::", "2001::db8::1", "2001:db8::1"),
+        )
+
+        assertFalse(json.contains("::::"))
+        assertFalse(json.contains("2001::db8::1"))
+        assertContains(json, "\"server\":\"2001:db8::1\"")
+    }
+
+    @Test
+    fun `DNS parser accepts RFC IPv6 forms and rejects misplaced embedded IPv4`() {
+        val json = ConfigBuilder.buildSingboxConfig(
+            bean(),
+            dnsServers = listOf(
+                "::",
+                "::1",
+                "::ffff:192.0.2.1",
+                "2001:db8::192.0.2.1",
+                "192.0.2.1::",
+                "192.0.2.1::5",
+                "1:2:3:4:5:6:7:8:9",
+            ),
+        )
+
+        listOf("::", "::1", "::ffff:192.0.2.1", "2001:db8::192.0.2.1").forEach {
+            assertContains(json, "\"server\":\"$it\"")
+        }
+        listOf("192.0.2.1::", "192.0.2.1::5", "1:2:3:4:5:6:7:8:9").forEach {
+            assertFalse(json.contains(it))
+        }
+    }
+
+    @Test
+    fun `DNS parser rejects userinfo invalid ports and malformed URI`() {
+        val json = ConfigBuilder.buildSingboxConfig(
+            bean(),
+            dnsServers = listOf(
+                "https://user@dns.example/dns-query",
+                "tls://dns.example:70000",
+                "https://[invalid/dns-query",
+            ),
+        )
+
+        assertContains(json, "\"final\":\"dns-local\"")
+        assertFalse(json.contains("dns.example"))
+        assertFalse(json.contains("user"))
+    }
+
+    @Test
+    fun `DNS parser ignores query and fragment while preserving DoH path`() {
+        val json = ConfigBuilder.buildSingboxConfig(
+            bean(),
+            dnsServers = listOf("https://dns.example/custom?token=secret#fragment"),
+        )
+
+        assertContains(json, "\"server\":\"dns.example\"")
+        assertContains(json, "\"path\":\"/custom\"")
+        assertFalse(json.contains("secret"))
+        assertFalse(json.contains("fragment"))
+    }
+
+    @Test
+    fun `IPv6 off filters secure IPv6 endpoints`() {
+        val json = ConfigBuilder.buildSingboxConfig(
+            bean(),
+            dnsServers = listOf("https://[2001:4860:4860::8888]/dns-query", "tls://[2001:4860:4860::8844]"),
+            ipv6Enabled = false,
+        )
+
+        assertContains(json, "\"final\":\"dns-local\"")
+        assertFalse(json.contains("2001:4860"))
+    }
+
+    @Test
     fun `chain DNS routes plain DNS directly for bootstrap`() {
         val json = ConfigBuilder.buildChainConfig(bean(), socksPort = 2080, dnsServers = listOf("8.8.8.8"))
 
@@ -137,6 +233,8 @@ class ConfigBuilderDnsTest {
 
         assertContains(disabled, "\"server\":\"8.8.8.8\"")
         assertFalse(disabled.contains("2001:4860:4860::8888"))
+        assertContains(disabled, "\"strategy\":\"ipv4_only\"")
         assertContains(enabled, "\"server\":\"2001:4860:4860::8888\"")
+        assertFalse(enabled.contains("\"strategy\":\"ipv4_only\""))
     }
 }

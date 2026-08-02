@@ -36,7 +36,8 @@ class SingboxEngineBuildManualConfigSentinelTest {
                 beanIdx >= 0 &&
                 rowBlobIdx < beanIdx &&
                 block.contains("selectedProfile?.beanBlob") &&
-                block.contains("chainWrapperBlobs(cachedSelectedProfileId)"),
+                block.contains("chainProfileIdsBlocking()") &&
+                block.contains("missingChainProfileIds"),
             "SingboxEngine must use the selected profile row blob first and fall back to the cached DataStore blob only when the row is missing. Block:\n$block",
         )
     }

@@ -49,6 +49,7 @@ import java.net.ServerSocket
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.coroutineContext
@@ -280,10 +281,6 @@ private class SingboxServiceProfileProbe(
 ) : SingboxProfileProbe, SingboxBatchProfileProbe {
     private val mutex = Mutex()
 
-    private val localProtector = object : ISingboxProtector.Stub() {
-        override fun protect(fd: Int): Boolean = VpnSocketProtectorHolder.protect(fd)
-    }
-
     override suspend fun probeLatencyMs(
         bean: AbstractBean,
         settings: SingboxProfileProbeSettings,
@@ -313,6 +310,7 @@ private class SingboxServiceProfileProbe(
         settings: SingboxProfileProbeSettings,
     ): Map<Long, SingboxProbeOutcome> {
         if (targets.isEmpty()) return emptyMap()
+        val localProtector = ProfileProbeProtector()
         val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(settings.timeoutMs.toLong())
         coroutineContext.ensureActive()
         val ports = allocateProbePorts(targets.size)
@@ -377,9 +375,21 @@ private class SingboxServiceProfileProbe(
             if (remainingTimeoutMs(deadlineNanos) == null) {
                 return SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_TIMEOUT)
             }
-            val latency = probe.probeLatencyMsUntil(port, deadlineNanos)
-            if (latency >= 0) {
-                return SingboxProbeOutcome.Success(latency.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+            when (val result = probe.probeUntil(port, deadlineNanos)) {
+                is ru.ozero.enginesingbox.RoutedProbeResult.Success -> {
+                    return SingboxProbeOutcome.Success(
+                        result.latencyMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                    )
+                }
+                is ru.ozero.enginesingbox.RoutedProbeResult.Failure -> {
+                    PersistentLoggers.debug(
+                        "SingboxProbeService",
+                        "profile probe outbound failed ${result.safeDetail ?: "category=${result.reason.name.lowercase()}"}",
+                    )
+                    if (attempt == PROBE_ATTEMPTS - 1) {
+                        return SingboxProbeOutcome.Failure(result.reason.profileProbeStatus())
+                    }
+                }
             }
             if (attempt < PROBE_ATTEMPTS - 1) {
                 delay(minOf(PROBE_RETRY_DELAY_MS, remainingTimeoutMs(deadlineNanos)?.toLong() ?: 0L))
@@ -455,6 +465,53 @@ private class SingboxServiceProfileProbe(
         const val REMOTE_STOP_TIMEOUT_MS = 3_000L
         const val BIND_TIMEOUT_MS = 5_000L
         const val SINGLE_PROFILE_ID = 0L
+    }
+}
+
+internal fun ru.ozero.enginesingbox.RoutedProbeResult.Reason.profileProbeStatus(): String = when (this) {
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.REMOTE_CLOSED -> "Remote closed"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.SOCKS_REPLY -> "SOCKS rejected"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.DNS -> "DNS failed"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.TLS_CERTIFICATE -> "TLS certificate"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.TLS_HANDSHAKE,
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.TLS,
+    -> "TLS handshake"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.TIMEOUT -> "Timeout"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.UNEXPECTED_RESPONSE -> "Unexpected response"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.CONNECT,
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.IO,
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.SOCKS_NOT_READY,
+    -> "Connect failed"
+}
+
+internal class ProfileProbeProtector : ISingboxProtector.Stub() {
+    private val modeLogged = AtomicBoolean(false)
+    private val failureLogged = AtomicBoolean(false)
+
+    override fun protect(fd: Int): Boolean {
+        return when (val result = VpnSocketProtectorHolder.protectIfBound(fd)) {
+            null -> {
+                logModeOnce("no Ozero VPN, protection not required")
+                true
+            }
+            true -> {
+                logModeOnce("active VPN protector")
+                true
+            }
+            false -> {
+                logModeOnce("active VPN protector")
+                if (failureLogged.compareAndSet(false, true)) {
+                    PersistentLoggers.warn("SingboxProbeService", "active VPN protect failed")
+                }
+                false
+            }
+        }
+    }
+
+    private fun logModeOnce(mode: String) {
+        if (modeLogged.compareAndSet(false, true)) {
+            PersistentLoggers.info("SingboxProbeService", "profile probe protector: $mode")
+        }
     }
 }
 private data class RejectedProfile(val protocol: String, val reason: String)

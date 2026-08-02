@@ -39,10 +39,12 @@ import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.VpnSocketProtectorHolder
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.singboxconfig.BeanSupportDecision
+import ru.ozero.singboxconfig.BeanSupportError
 import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
+import ru.ozero.singboxfmt.StandardV2RayBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
@@ -55,6 +57,51 @@ import java.net.Socket
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+
+internal enum class BuildConfigFailureCategory {
+    DESERIALIZATION,
+    CANONICALIZATION,
+    UNSUPPORTED_PROFILE,
+    NO_SUPPORTED_AUTO_PROFILE,
+    GENERATION,
+}
+
+internal sealed interface BuildConfigResult {
+    data class Success(
+        val json: String,
+        val inputFailures: List<ProfileInputFailure> = emptyList(),
+    ) : BuildConfigResult
+
+    data class Failure(
+        val category: BuildConfigFailureCategory,
+        val reason: BeanSupportError? = null,
+        val inputFailures: List<ProfileInputFailure> = emptyList(),
+        val exceptionClass: String? = null,
+    ) : BuildConfigResult {
+        fun stableReason(): String = reason?.let { "profile rejected: $it" } ?: "config failed: $category"
+    }
+}
+
+internal enum class ProfileInputStage {
+    MISSING_PROFILE,
+    SIZE,
+    DESERIALIZATION,
+    CANONICALIZATION,
+    VALIDATION,
+}
+
+internal data class ProfileInputFailure(
+    val index: Int,
+    val stage: ProfileInputStage,
+    val profileId: Long? = null,
+    val reason: BeanSupportError? = null,
+    val exceptionClass: String? = null,
+)
+
+private data class DecodedProfiles(
+    val beans: List<AbstractBean>,
+    val failures: List<ProfileInputFailure>,
+)
 
 @Suppress("TooManyFunctions", "LargeClass")
 class SingboxEngine @Inject constructor(
@@ -76,7 +123,7 @@ class SingboxEngine @Inject constructor(
     private var cachedSelectedProfileId: Long? = null
 
     @Volatile
-    private var cachedAutoBlobs: List<ByteArray> = emptyList()
+    private var cachedAutoProfiles: List<ProxyProfile> = emptyList()
 
     @Volatile
     private var cachedProfilesById: Map<Long, ProxyProfile> = emptyMap()
@@ -102,7 +149,7 @@ class SingboxEngine @Inject constructor(
         engineScope.launch {
             profileDao.getAutoCandidatesFlow(MAX_AUTO_PROFILE_SCAN).collect { profiles ->
                 cachedProfilesById = profiles.associateBy { it.id }
-                cachedAutoBlobs = autoSelectBlobWindow(profiles)
+                cachedAutoProfiles = autoSelectProfileWindow(profiles)
             }
         }
         engineScope.launch {
@@ -190,9 +237,19 @@ class SingboxEngine @Inject constructor(
         pendingSocksPort = 0
         pendingConfig = null
         val probePort = allocateChainPort()
-        val json = buildPendingConfig(config, probePort) ?: run {
-            activeAutoSelect = false
-            return StartResult.Failure("failed to build sing-box config")
+        val json = when (val result = buildPendingConfig(config, probePort)) {
+            is BuildConfigResult.Success -> result.json
+            is BuildConfigResult.Failure -> {
+                activeAutoSelect = false
+                PersistentLoggers.warn(
+                    TAG,
+                    "singbox config rejected profileId=${cachedSelectedProfileId ?: "unknown"} " +
+                        "category=${result.category} reason=${result.reason ?: "none"} " +
+                        "exceptionClass=${result.exceptionClass ?: "none"} " +
+                        "inputs=${result.inputFailures.failureCounts()}",
+                )
+                return StartResult.Failure(result.stableReason())
+            }
         }
         PersistentLoggers.debug(
             TAG,
@@ -210,41 +267,85 @@ class SingboxEngine @Inject constructor(
         return StartResult.Success(socksPort = 0)
     }
 
-    private fun buildPendingConfig(config: EngineConfig.Singbox, probeSocksPort: Int): String? {
+    private fun buildPendingConfig(config: EngineConfig.Singbox, probeSocksPort: Int): BuildConfigResult {
         if (config.autoSelectBeanBlobs.isNotEmpty()) {
-            val beans = supportedBeans(config.autoSelectBeanBlobs.take(MAX_AUTO_SELECT_OUTBOUNDS))
-            if (beans.isEmpty()) {
-                PersistentLoggers.warn(TAG, "auto-select: all ${config.autoSelectBeanBlobs.size} beans failed")
-                return null
+            val decoded = decodeProfiles(
+                config.autoSelectBeanBlobs,
+                config.autoSelectProfileIds,
+                "auto-select",
+                enforceSizeLimit = true,
+            )
+            if (decoded.beans.isEmpty()) {
+                return BuildConfigResult.Failure(
+                    BuildConfigFailureCategory.NO_SUPPORTED_AUTO_PROFILE,
+                    inputFailures = decoded.failures,
+                )
             }
             return runCatching {
-                ConfigBuilder.buildSingboxAutoConfig(beans, probeSocksPort, config.dnsServers, config.ipv6Enabled)
+                ConfigBuilder.buildSingboxAutoConfig(
+                    decoded.beans.take(MAX_AUTO_SELECT_OUTBOUNDS),
+                    probeSocksPort,
+                    config.dnsServers,
+                    config.ipv6Enabled,
+                )
             }
-                .onFailure { PersistentLoggers.warn(TAG, "buildSingboxAutoConfig: ${it.message}") }
-                .getOrNull()
+                .fold(
+                    onSuccess = { BuildConfigResult.Success(it, decoded.failures) },
+                    onFailure = {
+                        BuildConfigResult.Failure(
+                            BuildConfigFailureCategory.GENERATION,
+                            inputFailures = decoded.failures,
+                            exceptionClass = it.safeExceptionClass(),
+                        )
+                    },
+                )
         }
         val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
-            .onFailure { PersistentLoggers.warn(TAG, "beanBlob deserialize: ${it.message}") }
-            .getOrNull() ?: return null
-        val wrappers = chainWrapperBeans(config)
-        val decision = ConfigBuilder.supportDecision(bean)
-        if (decision is BeanSupportDecision.Unsupported) {
-            logRejectedProfile(null, bean, decision, "selected")
-            return null
+            .getOrElse {
+                return BuildConfigResult.Failure(
+                    BuildConfigFailureCategory.DESERIALIZATION,
+                    exceptionClass = it.safeExceptionClass(),
+                )
+            }
+        val wrappers = decodeProfiles(
+            config.chainBeanBlobs,
+            config.chainProfileIds,
+            "chain",
+            enforceSizeLimit = false,
+            missingProfileIds = config.missingChainProfileIds,
+        )
+        if (wrappers.failures.isNotEmpty()) {
+            return BuildConfigResult.Failure(
+                BuildConfigFailureCategory.UNSUPPORTED_PROFILE,
+                inputFailures = wrappers.failures,
+            )
         }
+        val canonicalBean = runCatching { ConfigBuilder.canonicalBean(bean) }
+            .getOrElse {
+                return BuildConfigResult.Failure(
+                    BuildConfigFailureCategory.CANONICALIZATION,
+                    exceptionClass = it.safeExceptionClass(),
+                )
+            }
+        val decision = ConfigBuilder.supportDecisionCanonical(canonicalBean)
+        if (decision is BeanSupportDecision.Unsupported) {
+            logRejectedProfile(null, canonicalBean.value, decision, "selected")
+            return BuildConfigResult.Failure(BuildConfigFailureCategory.UNSUPPORTED_PROFILE, decision.error)
+        }
+        logCanonicalProfileSummary(cachedSelectedProfileId, canonicalBean.value)
         return runCatching {
-            ConfigBuilder.buildSingboxConfig(
-                bean,
+            ConfigBuilder.buildSingboxConfigFromCanonical(
+                canonicalBean,
                 probeSocksPort,
                 config.dnsServers,
                 config.ipv6Enabled
             )
         }
             .mapCatching {
-                if (wrappers.isNotEmpty()) {
-                    ConfigBuilder.buildProfileChainConfig(
-                        bean,
-                        wrappers,
+                if (wrappers.beans.isNotEmpty()) {
+                    ConfigBuilder.buildProfileChainConfigFromCanonical(
+                        canonicalBean,
+                        wrappers.beans,
                         probeSocksPort,
                         config.dnsServers,
                         config.ipv6Enabled
@@ -253,8 +354,15 @@ class SingboxEngine @Inject constructor(
                     it
                 }
             }
-            .onFailure { PersistentLoggers.warn(TAG, "buildSingboxConfig: ${it.message}") }
-            .getOrNull()
+            .fold(
+                onSuccess = { BuildConfigResult.Success(it) },
+                onFailure = {
+                    BuildConfigResult.Failure(
+                        BuildConfigFailureCategory.GENERATION,
+                        exceptionClass = it.safeExceptionClass(),
+                    )
+                },
+            )
     }
 
     private suspend fun startChainMode(config: EngineConfig.Singbox, upstream: Upstream.Socks5): StartResult {
@@ -262,7 +370,7 @@ class SingboxEngine @Inject constructor(
         return startProxyMode(config, configUpstream)
     }
 
-    @Suppress("ReturnCount")
+    @Suppress("ReturnCount", "LongMethod")
     private suspend fun startProxyMode(
         config: EngineConfig.Singbox,
         upstream: ConfigBuilder.Upstream?,
@@ -275,18 +383,26 @@ class SingboxEngine @Inject constructor(
         val port = allocateChainPort()
         val proxyAutoSelect = config.autoSelectBeanBlobs.isNotEmpty()
         val json = if (proxyAutoSelect) {
-            val beans = supportedBeans(config.autoSelectBeanBlobs.take(MAX_AUTO_SELECT_OUTBOUNDS))
-            if (beans.isEmpty()) return StartResult.Failure("chain auto-select: no valid beans")
+            val decoded = decodeProfiles(
+                config.autoSelectBeanBlobs,
+                config.autoSelectProfileIds,
+                "chain auto-select",
+                enforceSizeLimit = true,
+            )
+            if (decoded.beans.isEmpty()) return StartResult.Failure("chain auto-select rejected")
             runCatching {
                 ConfigBuilder.buildAutoChainConfig(
-                    beans,
+                    decoded.beans.take(MAX_AUTO_SELECT_OUTBOUNDS),
                     port,
                     upstream,
                     config.dnsServers,
                     config.ipv6Enabled,
                 )
             }
-                .getOrElse { return StartResult.Failure("chain auto config: ${it.message}") }
+                .getOrElse {
+                    logConfigException("chain auto generation", it)
+                    return StartResult.Failure("chain auto generation failed")
+                }
         } else if (config.wireGuardConfig != null) {
             val wgConfig = requireNotNull(config.wireGuardConfig)
             runCatching {
@@ -298,28 +414,51 @@ class SingboxEngine @Inject constructor(
                     config.ipv6Enabled,
                 )
             }
-                .getOrElse { return StartResult.Failure("chain WG config: ${it.message}") }
+                .getOrElse {
+                    logConfigException("chain wireguard generation", it)
+                    return StartResult.Failure("chain wireguard generation failed")
+                }
         } else {
             val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
-                .getOrElse { return StartResult.Failure("chain deserialize: ${it.message}") }
-            val decision = ConfigBuilder.supportDecision(bean)
+                .getOrElse {
+                    logConfigException("chain deserialization", it)
+                    return StartResult.Failure("chain deserialization failed")
+                }
+            val canonicalBean = runCatching { ConfigBuilder.canonicalBean(bean) }
+                .getOrElse {
+                    logConfigException("chain canonicalization", it)
+                    return StartResult.Failure("chain canonicalization failed")
+                }
+            val decision = ConfigBuilder.supportDecisionCanonical(canonicalBean)
             if (decision is BeanSupportDecision.Unsupported) {
-                logRejectedProfile(null, bean, decision, "chain selected")
+                logRejectedProfile(null, canonicalBean.value, decision, "chain selected")
                 return StartResult.Failure("chain selected profile rejected: ${decision.error}")
             } else {
-                val wrappers = if (upstream == null) chainWrapperBeans(config) else emptyList()
+                logCanonicalProfileSummary(cachedSelectedProfileId, canonicalBean.value)
+                val wrappers = if (upstream == null) {
+                    decodeProfiles(
+                        config.chainBeanBlobs,
+                        config.chainProfileIds,
+                        "chain",
+                        enforceSizeLimit = false,
+                        missingProfileIds = config.missingChainProfileIds,
+                    )
+                } else {
+                    DecodedProfiles(emptyList(), emptyList())
+                }
+                if (wrappers.failures.isNotEmpty()) return StartResult.Failure("chain wrapper rejected")
                 runCatching {
-                    if (wrappers.isNotEmpty()) {
-                        ConfigBuilder.buildProfileChainProxyConfig(
-                            bean,
-                            wrappers,
+                    if (wrappers.beans.isNotEmpty()) {
+                        ConfigBuilder.buildProfileChainProxyConfigFromCanonical(
+                            canonicalBean,
+                            wrappers.beans,
                             port,
                             config.dnsServers,
                             config.ipv6Enabled,
                         )
                     } else {
-                        ConfigBuilder.buildChainConfig(
-                            bean,
+                        ConfigBuilder.buildChainConfigFromCanonical(
+                            canonicalBean,
                             port,
                             upstream,
                             config.dnsServers,
@@ -327,7 +466,10 @@ class SingboxEngine @Inject constructor(
                         )
                     }
                 }
-                    .getOrElse { return StartResult.Failure("chain config: ${it.message}") }
+                    .getOrElse {
+                        logConfigException("chain generation", it)
+                        return StartResult.Failure("chain generation failed")
+                    }
             }
         }
         PersistentLoggers.debug(
@@ -364,8 +506,11 @@ class SingboxEngine @Inject constructor(
             activeSocksPort = 0
             if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)
             if (it is CancellationException) throw it
-            PersistentLoggers.error(TAG, "startProxyMode AIDL call failed: ${it.message}", it)
-            StartResult.Failure("startProxyMode failed: ${it.message}")
+            PersistentLoggers.error(
+                TAG,
+                "startProxyMode failed exceptionClass=${it::class.java.simpleName} stableCategory=aidl",
+            )
+            StartResult.Failure("AIDL failed")
         }
     }
 
@@ -415,8 +560,11 @@ class SingboxEngine @Inject constructor(
             if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)
             clearPendingStart()
             if (it is CancellationException) throw it
-            PersistentLoggers.error(TAG, "startWithConfig AIDL call failed: ${it.message}", it)
-            TunAttachResult.Failure("startWithConfig AIDL call failed: ${it.message}")
+            PersistentLoggers.error(
+                TAG,
+                "startWithConfig failed exceptionClass=${it::class.java.simpleName} stableCategory=aidl",
+            )
+            TunAttachResult.Failure("AIDL failed")
         }
     }
 
@@ -424,7 +572,7 @@ class SingboxEngine @Inject constructor(
         runCatching {
             val stopped = p.stopAndWait(REMOTE_STOP_TIMEOUT_MS)
             if (!stopped) PersistentLoggers.warn(TAG, "stop after routed probe failure timed out")
-        }.onFailure { PersistentLoggers.warn(TAG, "stop after routed probe failure failed: ${it.message}") }
+        }.onFailure { logConfigException("stop after routed probe failure", it) }
     }
 
     override suspend fun stop() {
@@ -440,7 +588,7 @@ class SingboxEngine @Inject constructor(
             runCatching {
                 val stopped = p.stopAndWait(REMOTE_STOP_TIMEOUT_MS)
                 if (!stopped) PersistentLoggers.warn(TAG, "proxy.stopAndWait() timed out")
-            }.onFailure { PersistentLoggers.warn(TAG, "proxy.stopAndWait() failed: ${it.message}") }
+            }.onFailure { logConfigException("proxy stop", it) }
         }
         close()
     }
@@ -458,7 +606,8 @@ class SingboxEngine @Inject constructor(
         PersistentLoggers.debug(TAG, "probe start port=$port chainMode=$chainMode")
         val runtimeRunning = runCatching { p.runtimeRunning() }.getOrElse {
             clearRuntimeState()
-            return ProbeResult.Failure("sing-box runtime health check failed: ${it.message}", it)
+            logConfigException("runtime health check", it)
+            return ProbeResult.Failure("sing-box runtime health check failed")
         }
         if (!runtimeRunning) {
             clearRuntimeState()
@@ -488,15 +637,16 @@ class SingboxEngine @Inject constructor(
         val process = proxy ?: return EnginePlugin.ReadyResult.Timeout("sing-box process is not connected")
         val runtimeRunning = runCatching { process.runtimeRunning() }.getOrDefault(false)
         if (!runtimeRunning) {
-            clearRuntimeState()
             return EnginePlugin.ReadyResult.Timeout("sing-box runtime is not running")
         }
         val port = activeSocksPort
         if (!awaitLocalSocksReady(port)) {
-            clearRuntimeState()
             return EnginePlugin.ReadyResult.Timeout("sing-box SOCKS5 listener is not ready")
         }
-        return EnginePlugin.ReadyResult.Ready
+        return when (val result = routedProbe.probe(port)) {
+            is RoutedProbeResult.Success -> EnginePlugin.ReadyResult.Ready
+            is RoutedProbeResult.Failure -> EnginePlugin.ReadyResult.Timeout(result.reason.probeFailureMessage())
+        }
     }
 
     private suspend fun awaitLocalSocksReady(port: Int): Boolean {
@@ -555,22 +705,17 @@ class SingboxEngine @Inject constructor(
         blocking = false,
         ipv4Address = "172.19.0.1",
         ipv4PrefixLength = 30,
-        dnsServers = effectiveDnsServers(),
+        dnsServers = buildList {
+            add(TUN_DNS_V4)
+            if (cachedIpv6Enabled) add(TUN_DNS_V6)
+        },
         allowFamilyV4 = true,
-        allowFamilyV6 = true,
-        ipv6Address = "fdfe:dcba:9876::1",
+        allowFamilyV6 = cachedIpv6Enabled,
+        ipv6Address = "fdfe:dcba:9876::1".takeIf { cachedIpv6Enabled },
         ipv6PrefixLength = 126,
         routeAllV4 = true,
-        routeAllV6 = true,
+        routeAllV6 = cachedIpv6Enabled,
     )
-
-    private fun effectiveDnsServers(): List<String> =
-        cachedDnsServers
-            .ifEmpty { EngineConfig.Singbox.DEFAULT_DNS_SERVERS }
-            .filter { cachedIpv6Enabled || !it.isPlainIpv6Address() }
-
-    private fun String.isPlainIpv6Address(): Boolean =
-        ':' in this && !startsWith("https://") && !startsWith("tls://")
 
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
         val port = activeSocksPort.takeIf { it > 0 }
@@ -585,17 +730,18 @@ class SingboxEngine @Inject constructor(
         val ipv6Enabled = settings?.ipv6Enabled ?: false
         cachedIpv6Enabled = ipv6Enabled
         if (cachedSelectedProfileId == SELECTED_AUTO) {
-            val blobs = cachedAutoBlobs.ifEmpty {
+            val profiles = cachedAutoProfiles.ifEmpty {
                 runBlocking(Dispatchers.IO) {
                     profileDao.getAutoCandidatesFlow(MAX_AUTO_PROFILE_SCAN).first()
                 }
-                    .let { profiles -> autoSelectBlobWindow(profiles) }
+                    .let(::autoSelectProfileWindow)
             }
-            if (blobs.isEmpty()) return null
+            if (profiles.isEmpty()) return null
             return EngineConfig.Singbox(
                 beanBlob = ByteArray(0),
                 protocolType = PROTOCOL_AUTO_SELECT,
-                autoSelectBeanBlobs = blobs,
+                autoSelectBeanBlobs = profiles.map { it.beanBlob },
+                autoSelectProfileIds = profiles.map { it.id },
                 dnsServers = cachedDnsServers,
                 ipv6Enabled = ipv6Enabled,
             )
@@ -609,10 +755,19 @@ class SingboxEngine @Inject constructor(
         val type = runCatching {
             protocolTypeOf(KryoSerializer.deserialize<AbstractBean>(blob))
         }.getOrDefault(PROTOCOL_VLESS)
+        val chainProfileIds = chainProfileIdsBlocking().filter { it != cachedSelectedProfileId }
+        val chainProfiles = chainProfileIds.map { id ->
+            id to (cachedProfilesById[id] ?: resolveProfileByIdBlocking(id))
+        }
         return EngineConfig.Singbox(
             beanBlob = blob,
             protocolType = type,
-            chainBeanBlobs = chainWrapperBlobs(cachedSelectedProfileId),
+            chainBeanBlobs = chainProfiles.map { (_, profile) -> profile?.beanBlob ?: ByteArray(0) },
+            chainProfileIds = chainProfileIds,
+            missingChainProfileIds = chainProfiles
+                .filter { (_, profile) -> profile == null }
+                .map { it.first }
+                .toSet(),
             dnsServers = cachedDnsServers,
             ipv6Enabled = ipv6Enabled,
         )
@@ -621,53 +776,66 @@ class SingboxEngine @Inject constructor(
     override fun buildProxyConfig(settings: SettingsModel?): EngineConfig? =
         buildManualConfig(settings)?.let { it as? EngineConfig.Singbox }?.copy(proxyMode = true)
 
-    private fun chainWrapperBlobs(selectedProfileId: Long?): List<ByteArray> {
-        val selected = selectedProfileId ?: return emptyList()
-        if (selected == SELECTED_AUTO) return emptyList()
-        return chainProfileIdsBlocking()
-            .filter { it != selected }
-            .mapNotNull { id -> cachedProfilesById[id]?.beanBlob ?: resolveProfileByIdBlocking(id)?.beanBlob }
-    }
-
-    private fun chainWrapperBeans(config: EngineConfig.Singbox): List<AbstractBean> =
-        config.chainBeanBlobs.mapIndexedNotNull { index, blob ->
-            runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
-                .onFailure { PersistentLoggers.warn(TAG, "chain bean deserialize: ${it.message}") }
-                .getOrNull()
-                ?.takeIfSupported(index.toLong(), "chain")
-        }
-
-    private fun supportedBeans(blobs: List<ByteArray>): List<AbstractBean> =
-        blobs.asSequence()
-            .filter { it.size <= MAX_AUTO_SELECT_BLOB_BYTES }
-            .take(MAX_AUTO_SELECT_OUTBOUNDS)
-            .mapIndexedNotNull { index, blob ->
-                runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
-                    .onFailure { e -> PersistentLoggers.warn(TAG, "bean deserialize: ${e.message}") }
-                    .getOrNull()
-                    ?.takeIfSupported(index.toLong(), "auto-select")
-            }
-            .toList()
-
-    private fun isSupportedRoutableBlob(blob: ByteArray): Boolean {
-        if (blob.size > MAX_AUTO_SELECT_BLOB_BYTES) return false
-        return runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
-            .getOrNull()
-            ?.let { ConfigBuilder.supportDecision(it) is BeanSupportDecision.Supported }
-            ?: false
-    }
-
-    private fun AbstractBean.takeIfSupported(
-        profileId: Long?,
+    private fun decodeProfiles(
+        blobs: List<ByteArray>,
+        profileIds: List<Long>,
         source: String,
-    ): AbstractBean? =
-        when (val decision = ConfigBuilder.supportDecision(this)) {
-            BeanSupportDecision.Supported -> this
-            is BeanSupportDecision.Unsupported -> {
-                logRejectedProfile(profileId, this, decision, source)
-                null
+        enforceSizeLimit: Boolean,
+        missingProfileIds: Set<Long> = emptySet(),
+    ): DecodedProfiles {
+        val beans = mutableListOf<AbstractBean>()
+        val failures = mutableListOf<ProfileInputFailure>()
+        blobs.forEachIndexed { index, blob ->
+            val profileId = profileIds.getOrNull(index)
+            if (profileId in missingProfileIds) {
+                failures += ProfileInputFailure(index, ProfileInputStage.MISSING_PROFILE, profileId)
+                return@forEachIndexed
+            }
+            if (enforceSizeLimit && blob.size > MAX_AUTO_SELECT_BLOB_BYTES) {
+                failures += ProfileInputFailure(index, ProfileInputStage.SIZE, profileId)
+                return@forEachIndexed
+            }
+            val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
+                .getOrElse {
+                    failures += ProfileInputFailure(
+                        index,
+                        ProfileInputStage.DESERIALIZATION,
+                        profileId,
+                        exceptionClass = it.safeExceptionClass(),
+                    )
+                    return@forEachIndexed
+                }
+            val canonical = runCatching { ConfigBuilder.canonicalBean(bean) }
+                .getOrElse {
+                    failures += ProfileInputFailure(
+                        index,
+                        ProfileInputStage.CANONICALIZATION,
+                        profileId,
+                        exceptionClass = it.safeExceptionClass(),
+                    )
+                    return@forEachIndexed
+                }
+            when (val decision = ConfigBuilder.supportDecisionCanonical(canonical)) {
+                BeanSupportDecision.Supported -> {
+                    logCanonicalProfileSummary(profileId, canonical.value)
+                    beans += canonical.value
+                }
+                is BeanSupportDecision.Unsupported -> {
+                    logRejectedProfile(profileId, canonical.value, decision, source)
+                    failures += ProfileInputFailure(index, ProfileInputStage.VALIDATION, profileId, decision.error)
+                }
             }
         }
+        failures.forEach {
+            PersistentLoggers.warn(
+                TAG,
+                "singbox input rejected source=$source index=${it.index} " +
+                    "profileId=${it.profileId ?: "unknown"} stage=${it.stage} " +
+                    "reason=${it.reason ?: "none"} exceptionClass=${it.exceptionClass ?: "none"}",
+            )
+        }
+        return DecodedProfiles(beans, failures)
+    }
 
     private fun logRejectedProfile(
         profileId: Long?,
@@ -686,11 +854,77 @@ class SingboxEngine @Inject constructor(
         )
     }
 
-    private fun autoSelectBlobWindow(profiles: List<ProxyProfile>): List<ByteArray> =
-        profiles
-            .filter { isSupportedRoutableBlob(it.beanBlob) }
-            .let { supported -> prioritizeSingboxAutoProfiles(supported, MAX_AUTO_SELECT_OUTBOUNDS) }
-            .map { it.beanBlob }
+    private fun logConfigException(stage: String, throwable: Throwable) {
+        PersistentLoggers.warn(
+            TAG,
+            "singbox config failure stage=$stage exceptionClass=${throwable.safeExceptionClass()}",
+        )
+    }
+
+    private fun logCanonicalProfileSummary(profileId: Long?, bean: AbstractBean) {
+        val standard = bean as? StandardV2RayBean ?: return
+        val publicKeyLength = standard.realityPublicKey.length
+        val shortIdLength = standard.realityShortId.length
+        val publicKeyValid = runCatching {
+            val padded = standard.realityPublicKey + "=".repeat((4 - publicKeyLength % 4) % 4)
+            java.util.Base64.getUrlDecoder().decode(padded).size == 32
+        }.getOrDefault(false)
+        val shortIdValid = shortIdLength <= 16 &&
+            shortIdLength % 2 == 0 &&
+            standard.realityShortId.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
+        val serverIsIp = standard.serverAddress.trim('[', ']').let { address ->
+            ':' in address ||
+                address.split('.').let { parts ->
+                    parts.size == 4 && parts.all { it.toIntOrNull() in 0..255 }
+                }
+        }
+        val flow = (bean as? VLESSBean)?.flow.orEmpty()
+        PersistentLoggers.info(
+            TAG,
+            "singbox profile summary profileId=${profileId ?: "unknown"} protocol=${bean.protocolLabel()} " +
+                "transport=${standard.type} security=${standard.security} flow=$flow serverIsIp=$serverIsIp " +
+                "hasSni=${standard.sni.isNotBlank()} hasHost=${standard.host.isNotBlank()} " +
+                "publicKeyLength=$publicKeyLength publicKeyValid=$publicKeyValid " +
+                "shortIdLength=$shortIdLength shortIdValid=$shortIdValid fingerprint=${standard.realityFingerprint} " +
+                "packetEncoding=${standard.packetEncoding} allowInsecure=${standard.allowInsecure}",
+        )
+    }
+
+    private fun autoSelectProfileWindow(profiles: List<ProxyProfile>): List<ProxyProfile> {
+        val selected = ArrayList<ProxyProfile>(MAX_AUTO_SELECT_OUTBOUNDS)
+        val rejected = mutableMapOf<ProfileInputStage, Int>()
+        for (profile in prioritizeSingboxAutoProfiles(profiles, MAX_AUTO_PROFILE_SCAN)) {
+            val rejectionStage = autoProfileRejectionStage(profile.beanBlob)
+            if (rejectionStage == null) {
+                selected += profile
+            } else {
+                rejected[rejectionStage] = rejected.getOrDefault(rejectionStage, 0) + 1
+            }
+            if (selected.size == MAX_AUTO_SELECT_OUTBOUNDS) break
+        }
+        if (rejected.isNotEmpty()) {
+            val rejectionSummary = rejected.toSortedMap().entries.joinToString { entry ->
+                "${entry.key}=${entry.value}"
+            }
+            PersistentLoggers.warn(
+                TAG,
+                "auto-select skipped profiles=$rejectionSummary",
+            )
+        }
+        return selected
+    }
+
+    private fun autoProfileRejectionStage(blob: ByteArray): ProfileInputStage? {
+        if (blob.size > MAX_AUTO_SELECT_BLOB_BYTES) return ProfileInputStage.SIZE
+        val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
+            .getOrElse { return ProfileInputStage.DESERIALIZATION }
+        val canonical = runCatching { ConfigBuilder.canonicalBean(bean) }
+            .getOrElse { return ProfileInputStage.CANONICALIZATION }
+        return when (ConfigBuilder.supportDecisionCanonical(canonical)) {
+            BeanSupportDecision.Supported -> null
+            is BeanSupportDecision.Unsupported -> ProfileInputStage.VALIDATION
+        }
+    }
 
     private fun resolveProfileByIdBlocking(id: Long): ProxyProfile? =
         runBlocking(Dispatchers.IO) { profileDao.getById(id) }
@@ -821,6 +1055,8 @@ class SingboxEngine @Inject constructor(
     }
 
     companion object {
+        private const val TUN_DNS_V4 = "172.19.0.2"
+        private const val TUN_DNS_V6 = "fdfe:dcba:9876::2"
         private const val TAG = "SingboxEngine"
         private const val CONNECT_TIMEOUT_S = 5L
         private const val STATS_POLL_MS = 1_000L
@@ -851,13 +1087,25 @@ class SingboxEngine @Inject constructor(
     }
 }
 
+private fun Throwable.safeExceptionClass(): String = this::class.simpleName ?: "Throwable"
+
+private fun List<ProfileInputFailure>.failureCounts(): String =
+    groupingBy { failure -> failure.reason?.name ?: failure.stage.name }
+        .eachCount()
+        .toSortedMap()
+        .entries
+        .joinToString(",") { (reason, count) -> "$reason:$count" }
+        .ifEmpty { "none" }
+
 private fun RoutedProbeResult.Reason.probeFailureMessage(): String = when (this) {
     RoutedProbeResult.Reason.DNS -> "sing-box outbound DNS failed"
     RoutedProbeResult.Reason.CONNECT -> "sing-box outbound connect failed"
     RoutedProbeResult.Reason.TLS_CERTIFICATE -> "sing-box TLS certificate verification failed"
     RoutedProbeResult.Reason.TLS_HANDSHAKE -> "sing-box TLS handshake failed"
     RoutedProbeResult.Reason.TLS -> "sing-box outbound TLS failed"
+    RoutedProbeResult.Reason.REMOTE_CLOSED -> "sing-box outbound closed by remote"
     RoutedProbeResult.Reason.TIMEOUT -> "sing-box outbound timed out"
+    RoutedProbeResult.Reason.SOCKS_REPLY -> "sing-box SOCKS proxy rejected outbound"
     RoutedProbeResult.Reason.UNEXPECTED_RESPONSE ->
         "sing-box connectivity endpoint returned unexpected response"
     RoutedProbeResult.Reason.IO -> "sing-box outbound I/O failed"

@@ -91,7 +91,8 @@ class LoggingContractTest {
             "app/src/main/java/ru/ozero/app/ui/settings/engines/singbox/SingboxProbeService.kt",
         ).readText()
 
-        assertEquals(1, Regex("PersistentLoggers\\.warn\\(").findAll(source).count())
+        val rejectedProfilesLogger = source.substringAfter("private fun logRejectedProfiles(")
+        assertEquals(1, Regex("PersistentLoggers\\.warn\\(").findAll(rejectedProfilesLogger).count())
         assertEquals(2, Regex("logRejectedProfiles\\(").findAll(source).count())
         assertTrue(source.contains("singbox profiles rejected count="))
         assertTrue(source.contains("groupingBy { it.reason }.eachCount()"))

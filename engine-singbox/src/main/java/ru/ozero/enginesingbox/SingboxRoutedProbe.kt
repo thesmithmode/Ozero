@@ -5,11 +5,13 @@ import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.PersistentLoggers
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
+import java.io.EOFException
 import java.io.IOException
 import java.net.ConnectException
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.Socket
+import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.UnknownHostException
@@ -43,13 +45,60 @@ sealed interface RoutedProbeResult {
         TLS_CERTIFICATE,
         TLS_HANDSHAKE,
         TLS,
+        REMOTE_CLOSED,
         TIMEOUT,
+        SOCKS_REPLY,
         UNEXPECTED_RESPONSE,
         IO,
         SOCKS_NOT_READY,
     }
 }
 
+internal data class RoutedProbeFailureSample(
+    val reason: RoutedProbeResult.Reason,
+    val label: String,
+    val rootClass: String,
+    val endpoint: String,
+)
+
+internal fun representativeProbeFailure(
+    failures: List<RoutedProbeFailureSample>,
+): RoutedProbeResult.Failure {
+    if (failures.isEmpty()) return RoutedProbeResult.Failure(RoutedProbeResult.Reason.TIMEOUT)
+    val counts = failures.groupingBy(RoutedProbeFailureSample::reason).eachCount()
+    val dominant = counts.entries.maxWithOrNull(
+        compareBy<Map.Entry<RoutedProbeResult.Reason, Int>> { it.value }
+            .thenByDescending { FAILURE_PRIORITY.indexOf(it.key) },
+    )?.key ?: RoutedProbeResult.Reason.TIMEOUT
+    val sample = failures.first { it.reason == dominant }
+    val countDetail = failures
+        .groupingBy(RoutedProbeFailureSample::label)
+        .eachCount()
+        .toSortedMap()
+        .entries
+        .joinToString(",") { (label, count) -> "$label:$count" }
+    return RoutedProbeResult.Failure(
+        reason = dominant,
+        safeDetail = "endpoints=${failures.size} dominant=${sample.label} counts=$countDetail " +
+            "sampleRoot=${sample.rootClass} sampleEndpoint=${sample.endpoint}",
+    )
+}
+
+private val FAILURE_PRIORITY = listOf(
+    RoutedProbeResult.Reason.TLS_CERTIFICATE,
+    RoutedProbeResult.Reason.SOCKS_REPLY,
+    RoutedProbeResult.Reason.DNS,
+    RoutedProbeResult.Reason.CONNECT,
+    RoutedProbeResult.Reason.REMOTE_CLOSED,
+    RoutedProbeResult.Reason.TLS_HANDSHAKE,
+    RoutedProbeResult.Reason.TLS,
+    RoutedProbeResult.Reason.TIMEOUT,
+    RoutedProbeResult.Reason.UNEXPECTED_RESPONSE,
+    RoutedProbeResult.Reason.IO,
+    RoutedProbeResult.Reason.SOCKS_NOT_READY,
+)
+
+@Suppress("TooManyFunctions")
 class SingboxHttp204RoutedProbe(
     private val probeUrl: URL = URL(PROBE_URL),
     private val fallbackProbeUrls: List<URL> = FALLBACK_PROBE_URLS.map(::URL),
@@ -91,7 +140,7 @@ class SingboxHttp204RoutedProbe(
         }
         val urls = listOf(probeUrl) + fallbackProbeUrls
         val endpoints = urls.distinctBy { it.toString() }.take(maxProbeUrls)
-        val failures = mutableListOf<ProbeFailure>()
+        val failures = mutableListOf<ClassifiedFailure>()
         for ((index, url) in endpoints.withIndex()) {
             val remainingTimeoutMs = remainingTimeoutMs(deadlineNanos) ?: break
             val attemptsLeft = endpoints.size - index
@@ -101,23 +150,12 @@ class SingboxHttp204RoutedProbe(
             if (latency >= 0) return RoutedProbeResult.Success(latency)
             failures += result.failure
         }
-        val failureSummary = if (failures.isEmpty()) {
-            "deadline=1"
-        } else {
-            failures
-                .groupingBy(ProbeFailure::label)
-                .eachCount()
-                .toSortedMap()
-                .entries
-                .joinToString(",") { (reason, count) -> "$reason=$count" }
-        }
+        val representative = representativeProbeFailure(failures.map(ClassifiedFailure::sample))
         PersistentLoggers.debug(
             TAG,
-            "routed probe failed: socksPort=$socksPort timeoutMs=$timeoutMs failures=$failureSummary",
+            "routed probe failed: socksPort=$socksPort timeoutMs=$timeoutMs ${representative.safeDetail}",
         )
-        return RoutedProbeResult.Failure(
-            failures.lastOrNull()?.reason ?: RoutedProbeResult.Reason.TIMEOUT,
-        )
+        return representative
     }
 
     private fun isSocksPortReady(socksPort: Int, deadlineNanos: Long): Boolean {
@@ -132,7 +170,7 @@ class SingboxHttp204RoutedProbe(
 
     private fun probeSingleUrl(url: URL, socksPort: Int, remainingTimeoutMs: Int): ProbeAttempt {
         val expectation = responseExpectation(url)
-            ?: return ProbeAttempt(LATENCY_FAILED, ProbeFailure.UNSUPPORTED_RESPONSE)
+            ?: return ProbeAttempt(LATENCY_FAILED, ProbeFailure.UNSUPPORTED_RESPONSE.withDetail(url, null))
         val start = nanoTime()
         return runCatching {
             when (url.protocol.lowercase()) {
@@ -143,12 +181,18 @@ class SingboxHttp204RoutedProbe(
         }.fold(
             onSuccess = { success ->
                 if (success) {
-                    ProbeAttempt(TimeUnit.NANOSECONDS.toMillis(nanoTime() - start).coerceAtLeast(1L), ProbeFailure.NONE)
+                    ProbeAttempt(
+                        TimeUnit.NANOSECONDS.toMillis(nanoTime() - start).coerceAtLeast(1L),
+                        ProbeFailure.NONE.withDetail(url, null),
+                    )
                 } else {
-                    ProbeAttempt(LATENCY_FAILED, ProbeFailure.UNEXPECTED_RESPONSE)
+                    ProbeAttempt(LATENCY_FAILED, ProbeFailure.UNEXPECTED_RESPONSE.withDetail(url, null))
                 }
             },
-            onFailure = { error -> ProbeAttempt(LATENCY_FAILED, classifyFailure(error)) },
+            onFailure = { error ->
+                val failure = classifyFailure(error)
+                ProbeAttempt(LATENCY_FAILED, failure.withDetail(url, error))
+            },
         )
     }
 
@@ -262,8 +306,11 @@ class SingboxHttp204RoutedProbe(
             causes.any {
                 it is CertificateException || it is SSLPeerUnverifiedException
             } -> ProbeFailure.TLS_CERTIFICATE
-            causes.any { it is SSLHandshakeException } -> ProbeFailure.TLS_HANDSHAKE
             causes.any { it is SocketTimeoutException } -> ProbeFailure.TIMEOUT
+            causes.any { it is EOFException || it.message.isRemoteCloseMessage() } ->
+                ProbeFailure.REMOTE_CLOSED
+            causes.any { it is SocketException && it.message.isSocksReplyMessage() } -> ProbeFailure.SOCKS_REPLY
+            causes.any { it is SSLHandshakeException } -> ProbeFailure.TLS_HANDSHAKE
             causes.any { it is ConnectException } -> ProbeFailure.CONNECT
             causes.any { it is SSLException } -> ProbeFailure.TLS
             causes.any { it is IOException } -> ProbeFailure.IO
@@ -289,7 +336,9 @@ class SingboxHttp204RoutedProbe(
         TLS_CERTIFICATE("tls-certificate", RoutedProbeResult.Reason.TLS_CERTIFICATE),
         TLS_HANDSHAKE("tls-handshake", RoutedProbeResult.Reason.TLS_HANDSHAKE),
         TLS("tls", RoutedProbeResult.Reason.TLS),
+        REMOTE_CLOSED("remote-closed", RoutedProbeResult.Reason.REMOTE_CLOSED),
         TIMEOUT("timeout", RoutedProbeResult.Reason.TIMEOUT),
+        SOCKS_REPLY("socks-reply", RoutedProbeResult.Reason.SOCKS_REPLY),
         CONNECT("connect", RoutedProbeResult.Reason.CONNECT),
         IO("io", RoutedProbeResult.Reason.IO),
         UNEXPECTED_RESPONSE("unexpected-response", RoutedProbeResult.Reason.UNEXPECTED_RESPONSE),
@@ -299,7 +348,44 @@ class SingboxHttp204RoutedProbe(
 
     private data class RawHttpResponse(val statusCode: Int, val body: String)
 
-    private data class ProbeAttempt(val latencyMs: Long, val failure: ProbeFailure)
+    private data class ClassifiedFailure(
+        val label: String,
+        val reason: RoutedProbeResult.Reason,
+        val rootClass: String,
+        val endpoint: String,
+    ) {
+        fun sample(): RoutedProbeFailureSample = RoutedProbeFailureSample(reason, label, rootClass, endpoint)
+    }
+
+    private fun ProbeFailure.withDetail(url: URL, error: Throwable?): ClassifiedFailure {
+        val root = generateSequence(error) { it.cause }.take(MAX_CAUSE_DEPTH).lastOrNull()
+        val rootClass = root?.javaClass?.simpleName ?: "none"
+        return ClassifiedFailure(
+            label = label,
+            reason = reason,
+            rootClass = rootClass,
+            endpoint = endpointLabel(url),
+        )
+    }
+
+    private fun endpointLabel(url: URL): String = when {
+        url.host.contains("gstatic", true) -> "gstatic"
+        url.host.contains("cloudflare", true) -> "cloudflare"
+        url.host.contains("msft", true) -> "msft"
+        else -> "custom"
+    }
+
+    private fun String?.isRemoteCloseMessage(): Boolean {
+        val value = this?.lowercase() ?: return false
+        return "eof" in value || "reset" in value || "closed" in value || "broken pipe" in value
+    }
+
+    private fun String?.isSocksReplyMessage(): Boolean {
+        val value = this?.lowercase() ?: return false
+        return "socks" in value || "proxy" in value && "connect" in value
+    }
+
+    private data class ProbeAttempt(val latencyMs: Long, val failure: ClassifiedFailure)
 
     companion object {
         private const val TAG = "SingboxRoutedProbe"

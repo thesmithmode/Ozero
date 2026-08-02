@@ -3,15 +3,21 @@ package ru.ozero.singboxprocess
 import android.content.Context
 import android.net.ConnectivityManager
 import android.util.Base64
+import io.nekohasekai.libbox.CommandClient
+import io.nekohasekai.libbox.CommandClientHandler
+import io.nekohasekai.libbox.CommandClientOptions
 import io.nekohasekai.libbox.CommandServer
 import io.nekohasekai.libbox.CommandServerHandler
+import io.nekohasekai.libbox.ConnectionEvents
 import io.nekohasekai.libbox.ConnectionOwner
 import io.nekohasekai.libbox.InterfaceUpdateListener
-import io.nekohasekai.libbox.OverrideOptions
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.LocalDNSTransport
+import io.nekohasekai.libbox.LogIterator
 import io.nekohasekai.libbox.NetworkInterfaceIterator
 import io.nekohasekai.libbox.Notification
+import io.nekohasekai.libbox.OutboundGroupIterator
+import io.nekohasekai.libbox.OverrideOptions
 import io.nekohasekai.libbox.PlatformInterface
 import io.nekohasekai.libbox.SetupOptions
 import io.nekohasekai.libbox.StatusMessage
@@ -19,20 +25,44 @@ import io.nekohasekai.libbox.StringIterator
 import io.nekohasekai.libbox.SystemProxyStatus
 import io.nekohasekai.libbox.TunOptions
 import io.nekohasekai.libbox.WIFIState
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import ru.ozero.enginescore.PersistentLoggers
 import java.security.KeyStore
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.ssl.TrustManagerFactory
 
 internal object SingboxRuntime {
     private const val TAG = "SingboxRuntime"
+    private const val MAX_NATIVE_LOG_BATCH = 100
+    private const val MAX_NATIVE_LOG_CATEGORIES = 16
+    private const val STATUS_INTERVAL_NANOS = 1_000_000_000L
+    private const val NATIVE_LOG_CONNECT_TIMEOUT_MS = 2_500L
     private val mutex = Mutex()
+    private val nativeLogScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
     private var commandServer: CommandServer? = null
+
+    @Volatile
+    private var logClient: CommandClient? = null
+
+    @Volatile
+    private var nativeLogJob: Job? = null
+
+    @Volatile
+    private var nativeLogSessionActive = false
+
+    private val nativeLogSessions = NativeDiagnosticsSessionGuard()
 
     @Volatile
     private var lastStatus: StatusMessage? = null
@@ -62,12 +92,14 @@ internal object SingboxRuntime {
         tunFd: Int,
         singboxJsonConfig: String,
         protectorBridge: SingboxProtectorBridge,
+        detachedTunFd: DetachedTunFd? = null,
     ) =
         withContext(Dispatchers.Main.immediate) {
             mutex.withLock {
                 val oldServer = commandServer
                 if (oldServer != null) {
                     PersistentLoggers.warn(TAG, "start: already running — graceful restart")
+                    stopNativeLogSubscription()
                     runCatching { oldServer.closeService() }
                     runCatching { oldServer.close() }
                     commandServer = null
@@ -85,7 +117,12 @@ internal object SingboxRuntime {
                     PersistentLoggers.debug(TAG, "cleaned stale command.sock")
                 }
 
-                val platform = OzeroPlatformInterface(context.applicationContext, tunFd, protectorBridge)
+                val platform = OzeroPlatformInterface(
+                    context.applicationContext,
+                    tunFd,
+                    protectorBridge,
+                    detachedTunFd,
+                )
                 val handler = OzeroCommandServerHandler()
 
                 PersistentLoggers.debug(TAG, "checkpoint: pre-CommandServer")
@@ -98,7 +135,7 @@ internal object SingboxRuntime {
                     server.checkConfig(singboxJsonConfig)
                     PersistentLoggers.debug(TAG, "checkpoint: checkConfig passed")
                 } catch (e: Exception) {
-                    PersistentLoggers.error(TAG, "checkConfig failed: ${e.message}")
+                    PersistentLoggers.error(TAG, "checkConfig failed exceptionClass=${e::class.java.simpleName}")
                     server.close()
                     throw e
                 }
@@ -108,23 +145,34 @@ internal object SingboxRuntime {
                     server.startOrReloadService(singboxJsonConfig, OverrideOptions())
                     PersistentLoggers.debug(TAG, "checkpoint: post-startOrReloadService (box running)")
                 } catch (e: Exception) {
-                    PersistentLoggers.error(TAG, "startOrReloadService failed: ${e.message}")
+                    PersistentLoggers.error(
+                        TAG,
+                        "startOrReloadService failed exceptionClass=${e::class.java.simpleName}",
+                    )
                     server.close()
                     throw e
                 }
 
                 commandServer = server
+                launchNativeLogSubscription()
                 PersistentLoggers.info(TAG, "runtime started fd=$tunFd")
             }
         }
 
     suspend fun stop() = withContext(Dispatchers.Main.immediate) {
         mutex.withLock {
-            val server = commandServer ?: return@withLock
-            runCatching { server.closeService() }
-                .onFailure { PersistentLoggers.warn(TAG, "closeService: ${it.message}") }
-            runCatching { server.close() }
-                .onFailure { PersistentLoggers.warn(TAG, "close: ${it.message}") }
+            stopNativeLogSubscription()
+            val server = commandServer
+            if (server != null) {
+                runCatching { server.closeService() }
+                    .onFailure {
+                        PersistentLoggers.warn(TAG, "closeService failed exceptionClass=${it::class.java.simpleName}")
+                    }
+                runCatching { server.close() }
+                    .onFailure {
+                        PersistentLoggers.warn(TAG, "close failed exceptionClass=${it::class.java.simpleName}")
+                    }
+            }
             commandServer = null
             lastStatus = null
             PersistentLoggers.info(TAG, "runtime stopped")
@@ -134,6 +182,128 @@ internal object SingboxRuntime {
     fun isRunning(): Boolean = commandServer != null
 
     fun getLastStatus(): StatusMessage? = lastStatus
+
+    private fun launchNativeLogSubscription(reconnect: Boolean = false) {
+        val generation = if (reconnect) nativeLogSessions.activeGeneration() else nativeLogSessions.begin()
+        if (!reconnect) {
+            nativeLogSessionActive = true
+        }
+        nativeLogJob = nativeLogScope.launch {
+            connectNativeLogSubscription(generation)
+        }
+    }
+
+    private suspend fun connectNativeLogSubscription(generation: Long) {
+        var expectedClient: CommandClient? = null
+        runCatching {
+            val options = CommandClientOptions()
+            options.addCommand(Libbox.CommandLog)
+            options.addCommand(Libbox.CommandStatus)
+            options.statusInterval = STATUS_INTERVAL_NANOS
+            lateinit var client: CommandClient
+            client = CommandClient(
+                NativeLogHandler(
+                    isCurrent = { nativeLogSessions.isCurrent(generation, client, logClient) },
+                    onDisconnected = { handleNativeLogDisconnected(generation, client) },
+                ),
+                options,
+            )
+            expectedClient = client
+            if (!nativeLogSessions.isActive(generation)) return
+            logClient = client
+            withTimeout(NATIVE_LOG_CONNECT_TIMEOUT_MS) {
+                runInterruptible { client.connect() }
+            }
+            if (!nativeLogSessions.isCurrent(generation, client, logClient)) {
+                disconnectNativeLogClient(client)
+                return
+            }
+            PersistentLoggers.debug(TAG, "native log subscription connected")
+        }.onFailure {
+            expectedClient?.let(::disconnectNativeLogClient)
+            if (nativeLogSessions.isActive(generation) && nativeLogSessionActive) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "native diagnostics unavailable exceptionClass=${it::class.java.simpleName}",
+                )
+            }
+        }
+    }
+
+    private suspend fun stopNativeLogSubscription() {
+        nativeLogSessions.invalidate()
+        nativeLogSessionActive = false
+        nativeLogJob?.cancelAndJoin()
+        nativeLogJob = null
+        val client = logClient
+        if (client != null) withContext(Dispatchers.IO) { disconnectNativeLogClient(client) }
+        lastStatus = null
+    }
+
+    private fun disconnectNativeLogClient(expectedClient: CommandClient) {
+        val client = expectedClient
+        if (client === logClient) logClient = null
+        runCatching { client.disconnect() }
+            .onFailure {
+                PersistentLoggers.warn(
+                    TAG,
+                    "native diagnostics disconnect failed exceptionClass=${it::class.java.simpleName}",
+                )
+            }
+    }
+
+    private fun handleNativeLogDisconnected(generation: Long, client: CommandClient) {
+        if (!nativeLogSessions.isCurrent(generation, client, logClient)) return
+        lastStatus = null
+        logClient = null
+        if (nativeLogSessionActive && nativeLogSessions.claimReconnect(generation)) {
+            launchNativeLogSubscription(reconnect = true)
+        }
+    }
+
+    private class NativeLogHandler(
+        private val isCurrent: () -> Boolean,
+        private val onDisconnected: () -> Unit,
+    ) : CommandClientHandler {
+        private val emittedCategories = mutableSetOf<String>()
+
+        override fun connected() {}
+
+        override fun disconnected(message: String?) {
+            onDisconnected()
+        }
+
+        override fun setDefaultLogLevel(level: Int) {}
+
+        override fun clearLogs() {}
+
+        override fun writeLogs(messageList: LogIterator?) {
+            if (messageList == null || !isCurrent()) return
+            var inspected = 0
+            while (messageList.hasNext() && inspected < MAX_NATIVE_LOG_BATCH) {
+                if (!isCurrent()) return
+                val entry = messageList.next()
+                inspected++
+                val category = nativeLogCategory(entry.message) ?: continue
+                val shouldEmit = synchronized(emittedCategories) {
+                    emittedCategories.size < MAX_NATIVE_LOG_CATEGORIES && emittedCategories.add(category)
+                }
+                if (shouldEmit) PersistentLoggers.warn(TAG, "native outbound category=$category")
+            }
+        }
+
+        override fun writeStatus(message: StatusMessage) {
+            if (isCurrent()) lastStatus = message
+        }
+
+        override fun writeGroups(message: OutboundGroupIterator?) {}
+
+        override fun initializeClashMode(modeList: StringIterator, currentMode: String) {}
+
+        override fun updateClashMode(newMode: String) {}
+
+        override fun writeConnectionEvents(events: ConnectionEvents?) {}
+    }
 
     private class OzeroCommandServerHandler : CommandServerHandler {
         override fun serviceStop() {
@@ -167,20 +337,26 @@ internal object SingboxRuntime {
         context: Context,
         private val tunFd: Int,
         private val protector: SingboxProtectorBridge,
+        private val detachedTunFd: DetachedTunFd?,
     ) : PlatformInterface {
         private val connectivity: ConnectivityManager = requireConnectivityManager(context)
         private val defaultInterfaceMonitor = DefaultInterfaceMonitor(connectivity)
         private val localDnsTransport = AndroidLocalDnsTransport(defaultInterfaceMonitor)
+        private val protectFailureLogged = AtomicBoolean(false)
 
         override fun usePlatformAutoDetectInterfaceControl(): Boolean = true
 
         override fun autoDetectInterfaceControl(fd: Int) {
-            check(protector.protect(fd)) { "VpnService.protect($fd) failed" }
+            val protected = protector.protect(fd)
+            if (!protected && protectFailureLogged.compareAndSet(false, true)) {
+                PersistentLoggers.warn(TAG, "active VPN protect failed")
+            }
+            check(protected) { "active VPN protect failed" }
         }
 
         override fun openTun(options: TunOptions): Int {
             PersistentLoggers.debug(TAG, "openTun mtu=${options.mtu}")
-            return tunFd
+            return detachedTunFd?.claimByLibbox() ?: tunFd
         }
 
         override fun useProcFS(): Boolean = false
@@ -241,6 +417,41 @@ internal object SingboxRuntime {
         }
 }
 
+internal class NativeDiagnosticsSessionGuard {
+    private var generation = 0L
+    private var reconnectClaimed = false
+
+    @Synchronized
+    fun begin(): Long {
+        generation += 1
+        reconnectClaimed = false
+        return generation
+    }
+
+    @Synchronized
+    fun invalidate() {
+        generation += 1
+        reconnectClaimed = true
+    }
+
+    @Synchronized
+    fun activeGeneration(): Long = generation
+
+    @Synchronized
+    fun isActive(expectedGeneration: Long): Boolean = expectedGeneration == generation
+
+    @Synchronized
+    fun isCurrent(expectedGeneration: Long, expectedClient: Any, currentClient: Any?): Boolean =
+        expectedGeneration == generation && expectedClient === currentClient
+
+    @Synchronized
+    fun claimReconnect(expectedGeneration: Long): Boolean {
+        if (expectedGeneration != generation || reconnectClaimed) return false
+        reconnectClaimed = true
+        return true
+    }
+}
+
 internal fun requireConnectivityManager(context: Context): ConnectivityManager =
     checkNotNull(
         context.getSystemService(ConnectivityManager::class.java),
@@ -250,14 +461,26 @@ internal fun requireConnectivityManager(context: Context): ConnectivityManager =
 
 internal fun redactSingboxMessage(message: String): String {
     val noJson = message.replace(Regex("\\{.*}"), "<redacted-json>")
-    val noSubscriptionQuery = noJson.replace(Regex("(https?://[^\\s?#]+)\\?[^\\s]+"), "$1?<redacted-query>")
-    return noSubscriptionQuery
-        .replace(Regex("(?i)(password[\\\"'=:\\s]+)([^\\\",&\\s}]+)"), "$1<redacted>")
-        .replace(Regex("(?i)((?:private_key|public_key)[\\\"'=:\\s]+)([^\\\",&\\s}]+)"), "$1<redacted>")
-        .replace(Regex("(?i)((?:serverAddress|server_address|server)[\\\"'=:\\s]+)([^\\\",&\\s}]+)"), "$1<redacted>")
+    val noHeaders = noJson
+        .replace(Regex("(?i)\\bauthorization\\s*:\\s*[^\\r\\n]+"), "authorization: <redacted>")
+        .replace(Regex("(?i)\\bcookie\\s*:\\s*[^\\r\\n]+"), "cookie: <redacted>")
+        .replace(Regex("(?i)\\bbearer\\s+[A-Za-z0-9._~+/=-]+"), "Bearer <redacted>")
+        .replace(Regex("(?i)\\bbasic\\s+[A-Za-z0-9+/=]+"), "Basic <redacted>")
+    val noUrlSecrets = noHeaders
         .replace(
             Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"),
             "<redacted-uuid>",
+        )
+        .replace(Regex("(?i)(https?://)([^/@\\s]+)@"), "$1<redacted>@")
+        .replace(Regex("(https?://[^\\s?#]+)[?#][^\\s]+"), "$1?<redacted>")
+    return noUrlSecrets
+        .replace(
+            Regex(
+                "(?i)\\b(password|username|token|authorization|cookie|private_key|public_key|" +
+                    "short_id|serverAddress|server_address|server_name|server|host|sni|headers)" +
+                    "([\\\"'=:\\s]+)(\\\"[^\\\"]*\\\"|'[^']*'|[^\\\",&;\\s}]+)",
+            ),
+            "$1$2<redacted>",
         )
 }
 
@@ -271,3 +494,38 @@ internal fun String.shouldPromoteSingboxMessage(): Boolean =
         contains("dns", ignoreCase = true) ||
         contains("dial", ignoreCase = true) ||
         contains("connection closed", ignoreCase = true)
+
+internal fun nativeLogCategory(message: String): String? {
+    val normalized = message.lowercase()
+    val failure = listOf(
+        "fail",
+        "error",
+        "refused",
+        "timeout",
+        "timed out",
+        "unavailable",
+        "no route",
+        "eof",
+        "reset",
+        "closed",
+        "broken pipe",
+        "rejected",
+    ).any(normalized::contains)
+    if (!failure) return null
+    return when {
+        "protect" in normalized -> "protect"
+        "certificate" in normalized -> "tls-certificate"
+        "reality" in normalized && "handshake" in normalized -> "reality-handshake"
+        "tls" in normalized && "handshake" in normalized -> "tls-handshake"
+        "default interface" in normalized -> "default-interface"
+        "dns" in normalized || "resolve" in normalized -> "dns"
+        "no route" in normalized || "route" in normalized -> "route"
+        "eof" in normalized || "reset" in normalized || "closed" in normalized || "broken pipe" in normalized ->
+            "remote-closed"
+        "connect" in normalized || "refused" in normalized -> "connect"
+        "dial" in normalized -> "dial"
+        "network" in normalized && ("unavailable" in normalized || "down" in normalized) ->
+            "network-unavailable"
+        else -> null
+    }
+}
