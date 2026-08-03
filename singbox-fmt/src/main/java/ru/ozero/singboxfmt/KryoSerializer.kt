@@ -70,21 +70,48 @@ object KryoSerializer {
     }
 
     fun deserializeWithMigration(bytes: ByteArray): DecodedBean {
-        if (isVersioned(bytes)) return DecodedBean(readVersioned(bytes), migratedBlob = null)
-        val decodedCandidates = listOfNotNull(
-            runCatching { readCurrentRaw(bytes) }.getOrNull(),
-            runCatching { readLegacyV1(bytes) }.getOrNull(),
-        )
-        val candidates = decodedCandidates.fold(emptyList<AbstractBean>()) { distinct, candidate ->
-            val encodedCandidate = serialize(candidate)
-            if (distinct.any { serialize(it).contentEquals(encodedCandidate) }) distinct else distinct + candidate
-        }
+        val candidates = decodeCandidates(bytes)
         val bean = when (candidates.size) {
             0 -> throw KryoException("Unsupported bean blob")
-            1 -> candidates.single()
+            1 -> candidates.single().bean
             else -> throw KryoException("Ambiguous bean blob schema")
         }
-        return DecodedBean(bean, migratedBlob = serialize(bean))
+        return DecodedBean(bean, migratedBlob = if (isVersioned(bytes)) null else serialize(bean))
+    }
+
+    fun decodeCandidates(bytes: ByteArray): List<DecodedCandidate> {
+        if (bytes.isEmpty()) return emptyList()
+        if (isVersioned(bytes)) {
+            return decodeCandidate(BeanBlobSchema.VERSIONED_V1, bytes) { readVersioned(bytes) }
+                ?.let(::listOf)
+                .orEmpty()
+        }
+        return listOfNotNull(
+            decodeCandidate(BeanBlobSchema.CURRENT_RAW_V2, bytes) { readCurrentRaw(bytes) },
+            decodeCandidate(BeanBlobSchema.LEGACY_V1, bytes) { readLegacyV1(bytes) },
+        )
+    }
+
+    private inline fun decodeCandidate(
+        schema: BeanBlobSchema,
+        bytes: ByteArray,
+        decode: () -> AbstractBean,
+    ): DecodedCandidate? = runCatching {
+        val bean = decode()
+        requireValidPersistedBean(bean)
+        DecodedCandidate(schema, bean, bytes.size, bytes.size)
+    }.getOrNull()
+
+    private fun requireValidPersistedBean(bean: AbstractBean) {
+        require(bean.serverAddress.isNotBlank())
+        require(bean.serverPort in 1..65_535)
+        when (bean) {
+            is VLESSBean -> require(bean.uuid.isNotBlank())
+            is VMessBean -> require(bean.uuid.isNotBlank())
+            is TrojanBean -> require(bean.password.isNotBlank())
+            is ShadowsocksBean -> require(bean.method.isNotBlank() && bean.password.isNotBlank())
+            else -> error("Unsupported persisted bean type")
+        }
     }
 
     data class DecodedBean(
@@ -152,3 +179,16 @@ object KryoSerializer {
         else -> throw KryoException("Unsupported persisted bean protocol")
     }
 }
+
+enum class BeanBlobSchema {
+    LEGACY_V1,
+    CURRENT_RAW_V2,
+    VERSIONED_V1,
+}
+
+data class DecodedCandidate(
+    val schema: BeanBlobSchema,
+    val bean: AbstractBean,
+    val bytesConsumed: Int,
+    val blobSize: Int,
+)

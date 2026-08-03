@@ -41,11 +41,10 @@ import ru.ozero.enginesingbox.RoutedProbeCancellation
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.SingboxHttp204RoutedProbe
 import ru.ozero.enginesingbox.SingboxPrefs
-import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.ConfigBuilder
+import ru.ozero.singboxconfig.PersistedProfileRecovery
+import ru.ozero.singboxconfig.RecoveryResult
 import ru.ozero.singboxfmt.AbstractBean
-import ru.ozero.singboxfmt.KryoSerializer
-import ru.ozero.singboxfmt.protocolLabel
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import java.net.InetAddress
@@ -95,20 +94,14 @@ class SingboxProbeService internal constructor(
         )
         val rejectedProfiles = mutableListOf<RejectedProfile>()
         val probeCandidates = profiles.mapNotNull { profile ->
-            val decoded = runCatching { KryoSerializer.deserializeWithMigration(profile.beanBlob) }.getOrNull()
-            val migratedProfile = decoded?.migratedBlob?.let { migratedBlob ->
-                profile.copy(beanBlob = migratedBlob)
-            } ?: profile
-            val bean = decoded?.bean
-            val decision = bean?.let { ConfigBuilder.supportDecision(it) }
-            if (bean == null || decision is BeanSupportDecision.Unsupported) {
-                if (bean != null && decision is BeanSupportDecision.Unsupported) {
-                    rejectedProfiles += RejectedProfile(bean.protocolLabel(), decision.error.name)
-                }
-                profileDao.updateProbeResult(migratedProfile.id, LATENCY_FAILED, PROBE_ERROR_UNSUPPORTED)
+            val recovered = PersistedProfileRecovery.recover(profile.beanBlob, profile.protocolType)
+                as? RecoveryResult.Success
+            val bean = recovered?.bean
+            if (bean == null) {
+                profileDao.updateProbeResult(profile.id, LATENCY_FAILED, PROBE_ERROR_UNSUPPORTED)
                 null
             } else {
-                migratedProfile to bean
+                profile to bean
             }
         }
         logRejectedProfiles(rejectedProfiles)
