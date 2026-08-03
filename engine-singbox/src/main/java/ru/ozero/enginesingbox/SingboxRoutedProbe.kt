@@ -257,8 +257,8 @@ class SingboxHttp204RoutedProbe(
             socket.connect(InetSocketAddress.createUnresolved(url.host, destinationPort), remainingTimeoutMs)
             socket.soTimeout = remainingTimeoutMs
             writeHttpGet(socket, url, destinationPort, HTTP_PORT)
-            val response = readRawHttpResponse(BufferedInputStream(socket.getInputStream())) ?: return@use false
-            expectation.matches(response)
+            val response = readRawHttpResponse(BufferedInputStream(socket.getInputStream()))
+            response != null && expectation.matches(response)
         }
     }
 
@@ -270,7 +270,7 @@ class SingboxHttp204RoutedProbe(
         cancellation: RoutedProbeCancellation,
     ): Boolean {
         val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress(socksHost, socksPort))
-        cancellation.withSocket(Socket(proxy)) { tcpSocket ->
+        return cancellation.withSocket(Socket(proxy)) { tcpSocket ->
             val destinationPort = url.port.takeIf { it > 0 } ?: HTTPS_PORT
             tcpSocket.connect(InetSocketAddress.createUnresolved(url.host, destinationPort), remainingTimeoutMs)
             tcpSocket.soTimeout = remainingTimeoutMs
@@ -282,8 +282,8 @@ class SingboxHttp204RoutedProbe(
                     throw SSLPeerUnverifiedException("Hostname verification failed")
                 }
                 writeHttpGet(socket, url, destinationPort, HTTPS_PORT)
-                val response = readRawHttpResponse(BufferedInputStream(socket.getInputStream())) ?: return false
-                return expectation.matches(response)
+                val response = readRawHttpResponse(BufferedInputStream(socket.getInputStream()))
+                response != null && expectation.matches(response)
             }
         }
     }

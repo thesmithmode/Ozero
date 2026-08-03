@@ -71,8 +71,19 @@ object KryoSerializer {
 
     fun deserializeWithMigration(bytes: ByteArray): DecodedBean {
         if (isVersioned(bytes)) return DecodedBean(readVersioned(bytes), migratedBlob = null)
-        val currentV2 = runCatching { readCurrentRaw(bytes) }
-        val bean = currentV2.getOrElse { readLegacyV1(bytes) }
+        val decodedCandidates = listOfNotNull(
+            runCatching { readCurrentRaw(bytes) }.getOrNull(),
+            runCatching { readLegacyV1(bytes) }.getOrNull(),
+        )
+        val candidates = decodedCandidates.fold(emptyList<AbstractBean>()) { distinct, candidate ->
+            val encodedCandidate = serialize(candidate)
+            if (distinct.any { serialize(it).contentEquals(encodedCandidate) }) distinct else distinct + candidate
+        }
+        val bean = when (candidates.size) {
+            0 -> throw KryoException("Unsupported bean blob")
+            1 -> candidates.single()
+            else -> throw KryoException("Ambiguous bean blob schema")
+        }
         return DecodedBean(bean, migratedBlob = serialize(bean))
     }
 
@@ -113,13 +124,11 @@ object KryoSerializer {
     private fun readCurrentRaw(bytes: ByteArray): AbstractBean =
         (readRaw(bytes, pool) as? AbstractBean)
             ?.applyCanonicalDefaults()
-            ?.also(::validatePersistedBean)
             ?: throw KryoException("Unsupported current bean type")
 
     private fun readLegacyV1(bytes: ByteArray): AbstractBean =
         (readRaw(bytes, legacyV1Pool) as? LegacyV1AbstractBean)
             ?.toCurrentBean()
-            ?.also(::validatePersistedBean)
             ?: throw KryoException("Unsupported legacy bean type")
 
     private fun readRaw(bytes: ByteArray, sourcePool: Pool<Kryo>): Any {
@@ -127,26 +136,11 @@ object KryoSerializer {
         return try {
             ByteBufferInput(bytes).use { input ->
                 val value = kryo.readClassAndObject(input) ?: throw KryoException("Bean blob is null")
-                if (!input.eof()) throw KryoException("Bean blob has trailing payload")
+                if (input.position() != bytes.size) throw KryoException("Bean blob has trailing payload")
                 value
             }
         } finally {
             sourcePool.free(kryo)
-        }
-    }
-
-    private fun validatePersistedBean(bean: AbstractBean) {
-        require(bean.serverAddress.isNotBlank()) { "Bean server address is blank" }
-        require(bean.serverPort in 1..65535) { "Bean server port is invalid" }
-        when (bean) {
-            is VLESSBean -> require(bean.uuid.isNotBlank()) { "VLESS UUID is blank" }
-            is VMessBean -> require(bean.uuid.isNotBlank()) { "VMess UUID is blank" }
-            is TrojanBean -> require(bean.password.isNotBlank()) { "Trojan password is blank" }
-            is ShadowsocksBean -> {
-                require(bean.method.isNotBlank()) { "Shadowsocks method is blank" }
-                require(bean.password.isNotBlank()) { "Shadowsocks password is blank" }
-            }
-            else -> throw KryoException("Unsupported persisted bean protocol")
         }
     }
 

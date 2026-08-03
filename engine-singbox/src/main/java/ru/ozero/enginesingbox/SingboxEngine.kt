@@ -13,7 +13,6 @@ import android.os.Process
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
-import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -149,13 +148,6 @@ class SingboxEngine @Inject constructor(
                 val decoded = savedBlob?.let { runCatching { KryoSerializer.deserializeWithMigration(it) }.getOrNull() }
                 val migratedBlob = decoded?.migratedBlob
                 cachedBlob = migratedBlob ?: savedBlob
-                if (savedBlob != null && migratedBlob != null) {
-                    dataStore.edit { current ->
-                        if (current[BEAN_KEY]?.contentEquals(savedBlob) == true) {
-                            current[BEAN_KEY] = migratedBlob
-                        }
-                    }
-                }
                 cachedSelectedProfileId = prefs[SELECTED_PROFILE_KEY]
                 cachedDnsServers = prefs[SINGBOX_DNS_SERVERS_KEY]?.toList()?.ifEmpty { null }
                     ?: EngineConfig.Singbox.DEFAULT_DNS_SERVERS
@@ -967,9 +959,7 @@ class SingboxEngine @Inject constructor(
         val migrated = runCatching { KryoSerializer.deserializeWithMigration(profile.beanBlob).migratedBlob }
             .getOrNull()
             ?: return profile
-        val updated = profile.copy(beanBlob = migrated)
-        profileDao.update(updated)
-        return updated
+        return profile.copy(beanBlob = migrated)
     }
 
     private fun migrateProfileBlobBlocking(profile: ProxyProfile): ProxyProfile =

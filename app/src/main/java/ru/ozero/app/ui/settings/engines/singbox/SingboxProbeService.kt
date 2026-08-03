@@ -97,7 +97,7 @@ class SingboxProbeService internal constructor(
         val probeCandidates = profiles.mapNotNull { profile ->
             val decoded = runCatching { KryoSerializer.deserializeWithMigration(profile.beanBlob) }.getOrNull()
             val migratedProfile = decoded?.migratedBlob?.let { migratedBlob ->
-                profile.copy(beanBlob = migratedBlob).also { profileDao.update(it) }
+                profile.copy(beanBlob = migratedBlob)
             } ?: profile
             val bean = decoded?.bean
             val decision = bean?.let { ConfigBuilder.supportDecision(it) }
