@@ -9,6 +9,17 @@ import kotlin.test.assertIs
 
 class PersistedProfileRecoveryTest {
     @Test
+    fun `typed protocol recovery does not depend on numeric ranges`() {
+        val bytes = TRANSITIONAL_FIXTURE_HEX.decodeHex()
+
+        val recovered = PersistedProfileRecovery.recover(bytes, PersistedProtocol.VLESS)
+
+        assertIs<RecoveryResult.Success>(recovered)
+        assertEquals(PersistedProtocol.VLESS, PersistedProtocol.fromId(PersistedProtocol.VLESS.id))
+        assertEquals(null, PersistedProtocol.fromId(Int.MAX_VALUE))
+    }
+
+    @Test
     fun `semantically identical candidates collapse to one success`() {
         val bean = validVless("198.51.100.20")
         val candidates = listOf(
@@ -30,7 +41,10 @@ class PersistedProfileRecoveryTest {
 
         val recovered = PersistedProfileRecovery.recoverCandidates(candidates, 0)
 
-        assertEquals(RecoveryResult.MigrationAmbiguous, recovered)
+        assertEquals(
+            RecoveryFailureCategory.MIGRATION_AMBIGUOUS,
+            assertIs<RecoveryResult.Failure>(recovered).category,
+        )
     }
 
     @Test
@@ -59,4 +73,15 @@ class PersistedProfileRecoveryTest {
         realityShortId = "a1b2c3d4"
         flow = "xtls-rprx-vision"
     }
+
+    private companion object {
+        const val TRANSITIONAL_FIXTURE_HEX =
+            "0b0081818181008178746c732d727072782d766973696fee0081006e6f6ee5810081008100816e6f6ee5818181810010" +
+                "6e6f6ee5816e6f6ee581818181816e6f6ee57261f7006368726f6de5ac42424242424242424242424242424242424242" +
+                "42424242424242424242424242424242424242424242424162316332643365b47265616c6974f93139382e35312e3130" +
+                "302e32b0f60600000000000068326d75f87265616c6974792d76322e6578616d706ce581617574ef7463f081a5343434" +
+                "34343434342d343434342d343434342d343434342d34343434343434343434343400"
+    }
 }
+
+private fun String.decodeHex(): ByteArray = chunked(2).map { it.toInt(16).toByte() }.toByteArray()

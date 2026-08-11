@@ -43,6 +43,7 @@ import ru.ozero.enginesingbox.SingboxHttp204RoutedProbe
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxconfig.PersistedProfileRecovery
+import ru.ozero.singboxconfig.PersistedProtocol
 import ru.ozero.singboxconfig.RecoveryResult
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxroom.dao.ProxyProfileDao
@@ -94,14 +95,17 @@ class SingboxProbeService internal constructor(
         )
         val rejectedProfiles = mutableListOf<RejectedProfile>()
         val probeCandidates = profiles.mapNotNull { profile ->
-            val recovered = PersistedProfileRecovery.recover(profile.beanBlob, profile.protocolType)
-                as? RecoveryResult.Success
-            val bean = recovered?.bean
-            if (bean == null) {
-                profileDao.updateProbeResult(profile.id, LATENCY_FAILED, PROBE_ERROR_UNSUPPORTED)
-                null
-            } else {
-                profile to bean
+            when (val recovered = PersistedProfileRecovery.recover(profile.beanBlob, profile.protocolType)) {
+                is RecoveryResult.Failure -> {
+                    rejectedProfiles += RejectedProfile(
+                        protocol = PersistedProtocol.fromId(profile.protocolType)?.label ?: "unknown",
+                        schema = recovered.detectedSchemas.joinToString("+") { it.name }.ifEmpty { "none" },
+                        reason = recovered.category.name,
+                    )
+                    profileDao.updateProbeResult(profile.id, LATENCY_FAILED, PROBE_ERROR_UNSUPPORTED)
+                    null
+                }
+                is RecoveryResult.Success -> profile to recovered.bean
             }
         }
         logRejectedProfiles(rejectedProfiles)
@@ -629,15 +633,17 @@ internal class ProfileProbeProtector : ISingboxProtector.Stub() {
         }
     }
 }
-private data class RejectedProfile(val protocol: String, val reason: String)
+private data class RejectedProfile(val protocol: String, val schema: String, val reason: String)
 
 private fun logRejectedProfiles(rejectedProfiles: List<RejectedProfile>) {
     if (rejectedProfiles.isEmpty()) return
     val protocols = rejectedProfiles.groupingBy { it.protocol }.eachCount().toStableDiagnosticString()
+    val schemas = rejectedProfiles.groupingBy { it.schema }.eachCount().toStableDiagnosticString()
     val reasons = rejectedProfiles.groupingBy { it.reason }.eachCount().toStableDiagnosticString()
     PersistentLoggers.warn(
         "SingboxProbeService",
-        "singbox profiles rejected count=${rejectedProfiles.size} byProtocol=$protocols byReason=$reasons",
+        "singbox profiles rejected count=${rejectedProfiles.size} " +
+            "byProtocol=$protocols bySchema=$schemas byReason=$reasons",
     )
 }
 

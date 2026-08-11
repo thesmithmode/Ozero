@@ -98,21 +98,12 @@ object KryoSerializer {
         decode: () -> AbstractBean,
     ): DecodedCandidate? = runCatching {
         val bean = decode()
-        requireValidPersistedBean(bean)
+        requireAllowedPersistedBean(bean)
         DecodedCandidate(schema, bean, bytes.size, bytes.size)
     }.getOrNull()
 
-    private fun requireValidPersistedBean(bean: AbstractBean) {
-        require(bean.serverAddress.isNotBlank())
-        require(bean.serverPort in 1..65_535)
-        when (bean) {
-            is VLESSBean -> require(bean.uuid.isNotBlank())
-            is VMessBean -> require(bean.uuid.isNotBlank())
-            is TrojanBean -> require(bean.password.isNotBlank())
-            is ShadowsocksBean -> require(bean.method.isNotBlank() && bean.password.isNotBlank())
-            else -> error("Unsupported persisted bean type")
-        }
-    }
+    private fun requireAllowedPersistedBean(bean: AbstractBean) =
+        require(bean is VLESSBean || bean is VMessBean || bean is TrojanBean || bean is ShadowsocksBean)
 
     data class DecodedBean(
         val bean: AbstractBean,

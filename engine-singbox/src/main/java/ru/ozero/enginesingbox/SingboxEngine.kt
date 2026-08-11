@@ -47,6 +47,8 @@ import ru.ozero.singboxconfig.BeanSupportError
 import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxconfig.PersistedProfileRecovery
 import ru.ozero.singboxconfig.RecoveryResult
+import ru.ozero.singboxconfig.RecoveryFailureCategory
+import ru.ozero.singboxconfig.PersistedProtocol
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
@@ -70,6 +72,12 @@ internal enum class BuildConfigFailureCategory {
     UNSUPPORTED_PROFILE,
     NO_SUPPORTED_AUTO_PROFILE,
     GENERATION,
+    DECODE_FAILED,
+    MIGRATION_AMBIGUOUS,
+    PROTOCOL_MISMATCH,
+    INVALID_REQUIRED_FIELDS,
+    CONFIG_GENERATION_FAILED,
+    LIBBOX_CONFIG_REJECTED,
 }
 
 internal sealed interface BuildConfigResult {
@@ -86,6 +94,16 @@ internal sealed interface BuildConfigResult {
     ) : BuildConfigResult {
         fun stableReason(): String = reason?.let { "profile rejected: $it" } ?: "config failed: $category"
     }
+}
+
+private fun RecoveryFailureCategory.toBuildConfigFailureCategory(): BuildConfigFailureCategory = when (this) {
+    RecoveryFailureCategory.DECODE_FAILED -> BuildConfigFailureCategory.DECODE_FAILED
+    RecoveryFailureCategory.MIGRATION_AMBIGUOUS -> BuildConfigFailureCategory.MIGRATION_AMBIGUOUS
+    RecoveryFailureCategory.PROTOCOL_MISMATCH -> BuildConfigFailureCategory.PROTOCOL_MISMATCH
+    RecoveryFailureCategory.INVALID_REQUIRED_FIELDS -> BuildConfigFailureCategory.INVALID_REQUIRED_FIELDS
+    RecoveryFailureCategory.UNSUPPORTED_PROFILE -> BuildConfigFailureCategory.UNSUPPORTED_PROFILE
+    RecoveryFailureCategory.CONFIG_GENERATION_FAILED -> BuildConfigFailureCategory.CONFIG_GENERATION_FAILED
+    RecoveryFailureCategory.LIBBOX_CONFIG_REJECTED -> BuildConfigFailureCategory.LIBBOX_CONFIG_REJECTED
 }
 
 internal enum class ProfileInputStage {
@@ -322,12 +340,14 @@ class SingboxEngine @Inject constructor(
                 )
         }
         val recovery = PersistedProfileRecovery.recover(config.beanBlob, config.protocolType)
-        val bean = (recovery as? RecoveryResult.Success)?.bean
-            ?: run {
+        val bean = when (recovery) {
+            is RecoveryResult.Success -> recovery.bean
+            is RecoveryResult.Failure -> {
                 return BuildConfigResult.Failure(
-                    BuildConfigFailureCategory.DESERIALIZATION,
+                    recovery.category.toBuildConfigFailureCategory(),
                 )
             }
+        }
         val wrappers = decodeProfiles(
             config.chainBeanBlobs,
             config.chainProfileIds,
@@ -982,7 +1002,7 @@ class SingboxEngine @Inject constructor(
     }
 
     private fun recoverPersistedProfileWithoutProtocol(blob: ByteArray): RecoveryResult.Success? =
-        (PROTOCOL_VLESS..PROTOCOL_SHADOWSOCKS)
+        PersistedProtocol.entries
             .mapNotNull { PersistedProfileRecovery.recover(blob, it) as? RecoveryResult.Success }
             .singleOrNull()
 
