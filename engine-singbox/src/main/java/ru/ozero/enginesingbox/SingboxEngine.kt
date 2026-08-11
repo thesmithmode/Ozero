@@ -45,6 +45,8 @@ import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.BeanSupportError
 import ru.ozero.singboxconfig.ConfigBuilder
+import ru.ozero.singboxconfig.PersistedProfileRecovery
+import ru.ozero.singboxconfig.RecoveryResult
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
@@ -145,9 +147,7 @@ class SingboxEngine @Inject constructor(
         engineScope.launch {
             dataStore.data.collect { prefs ->
                 val savedBlob = prefs[BEAN_KEY]
-                val decoded = savedBlob?.let { runCatching { KryoSerializer.deserializeWithMigration(it) }.getOrNull() }
-                val migratedBlob = decoded?.migratedBlob
-                cachedBlob = migratedBlob ?: savedBlob
+                cachedBlob = savedBlob
                 cachedSelectedProfileId = prefs[SELECTED_PROFILE_KEY]
                 cachedDnsServers = prefs[SINGBOX_DNS_SERVERS_KEY]?.toList()?.ifEmpty { null }
                     ?: EngineConfig.Singbox.DEFAULT_DNS_SERVERS
@@ -321,11 +321,11 @@ class SingboxEngine @Inject constructor(
                     },
                 )
         }
-        val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
-            .getOrElse {
+        val recovery = PersistedProfileRecovery.recover(config.beanBlob, config.protocolType)
+        val bean = (recovery as? RecoveryResult.Success)?.bean
+            ?: run {
                 return BuildConfigResult.Failure(
                     BuildConfigFailureCategory.DESERIALIZATION,
-                    exceptionClass = it.safeExceptionClass(),
                 )
             }
         val wrappers = decodeProfiles(
@@ -769,15 +769,16 @@ class SingboxEngine @Inject constructor(
             ?.takeIf { it != SELECTED_AUTO }
             ?.let { cachedProfilesById[it] ?: resolveProfileByIdBlocking(it) }
             ?.let(::migrateProfileBlobBlocking)
-        val blob = selectedProfile?.beanBlob
-            ?: cachedBlob
-            ?: return null
-        val type = runCatching { protocolTypeOf(KryoSerializer.deserialize<AbstractBean>(blob)) }
-            .getOrElse {
+        val selectedBlob = selectedProfile?.beanBlob
+        val savedRecovery = cachedBlob
+            ?.takeIf { selectedBlob == null }
+            ?.let(::recoverPersistedProfileWithoutProtocol)
+        val blob = selectedBlob ?: savedRecovery?.let { KryoSerializer.serialize(it.bean) } ?: return null
+        val type = selectedProfile?.protocolType ?: savedRecovery?.let { protocolTypeOf(it.bean) }
+            ?: run {
                 PersistentLoggers.warn(
                     TAG,
-                    "singbox manual config rejected profileId=${cachedSelectedProfileId ?: "unknown"} " +
-                        "category=DESERIALIZATION exceptionClass=${it.safeExceptionClass()}",
+                    "singbox manual config rejected profileId=${cachedSelectedProfileId ?: "unknown"} category=DESERIALIZATION",
                 )
                 return null
             }
@@ -956,10 +957,10 @@ class SingboxEngine @Inject constructor(
         runBlocking(Dispatchers.IO) { profileDao.getById(id) }
 
     private suspend fun migrateProfileBlob(profile: ProxyProfile): ProxyProfile {
-        val migrated = runCatching { KryoSerializer.deserializeWithMigration(profile.beanBlob).migratedBlob }
-            .getOrNull()
+        val recovered = PersistedProfileRecovery.recover(profile.beanBlob, profile.protocolType)
+            as? RecoveryResult.Success
             ?: return profile
-        return profile.copy(beanBlob = migrated)
+        return profile.copy(beanBlob = KryoSerializer.serialize(recovered.bean))
     }
 
     private fun migrateProfileBlobBlocking(profile: ProxyProfile): ProxyProfile =
@@ -979,6 +980,11 @@ class SingboxEngine @Inject constructor(
         is ShadowsocksBean -> PROTOCOL_SHADOWSOCKS
         else -> error("Unsupported Sing-box bean type: ${bean::class.java.simpleName}")
     }
+
+    private fun recoverPersistedProfileWithoutProtocol(blob: ByteArray): RecoveryResult.Success? =
+        (PROTOCOL_VLESS..PROTOCOL_SHADOWSOCKS)
+            .mapNotNull { PersistedProfileRecovery.recover(blob, it) as? RecoveryResult.Success }
+            .singleOrNull()
 
     private fun bindOrFail(): StartResult.Failure? {
         synchronized(bindLock) {
