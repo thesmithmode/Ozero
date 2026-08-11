@@ -90,6 +90,21 @@ class VLESSBeanKryoRoundtripTest {
     }
 
     @Test
+    fun `should round-trip partial bean without persisted recovery validation`() {
+        val bean = VLESSBean().apply {
+            serverAddress = ""
+            serverPort = 0
+            uuid = ""
+        }
+
+        val restored = KryoSerializer.deserialize<VLESSBean>(KryoSerializer.serialize(bean))
+
+        assertEquals("", restored.serverAddress)
+        assertEquals(0, restored.serverPort)
+        assertEquals("", restored.uuid)
+    }
+
+    @Test
     fun `should handle fields with special characters`() {
         val bean = VLESSBean().apply {
             uuid = "12345678-0000-0000-0000-000000000001"

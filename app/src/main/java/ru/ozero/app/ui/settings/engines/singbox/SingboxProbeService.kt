@@ -41,11 +41,11 @@ import ru.ozero.enginesingbox.RoutedProbeCancellation
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.SingboxHttp204RoutedProbe
 import ru.ozero.enginesingbox.SingboxPrefs
-import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.ConfigBuilder
+import ru.ozero.singboxconfig.PersistedProfileRecovery
+import ru.ozero.singboxconfig.PersistedProtocol
+import ru.ozero.singboxconfig.RecoveryResult
 import ru.ozero.singboxfmt.AbstractBean
-import ru.ozero.singboxfmt.KryoSerializer
-import ru.ozero.singboxfmt.protocolLabel
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import java.net.InetAddress
@@ -95,20 +95,17 @@ class SingboxProbeService internal constructor(
         )
         val rejectedProfiles = mutableListOf<RejectedProfile>()
         val probeCandidates = profiles.mapNotNull { profile ->
-            val decoded = runCatching { KryoSerializer.deserializeWithMigration(profile.beanBlob) }.getOrNull()
-            val migratedProfile = decoded?.migratedBlob?.let { migratedBlob ->
-                profile.copy(beanBlob = migratedBlob)
-            } ?: profile
-            val bean = decoded?.bean
-            val decision = bean?.let { ConfigBuilder.supportDecision(it) }
-            if (bean == null || decision is BeanSupportDecision.Unsupported) {
-                if (bean != null && decision is BeanSupportDecision.Unsupported) {
-                    rejectedProfiles += RejectedProfile(bean.protocolLabel(), decision.error.name)
+            when (val recovered = PersistedProfileRecovery.recover(profile.beanBlob, profile.protocolType)) {
+                is RecoveryResult.Failure -> {
+                    rejectedProfiles += RejectedProfile(
+                        protocol = PersistedProtocol.fromId(profile.protocolType)?.label ?: "unknown",
+                        schema = recovered.detectedSchemas.joinToString("+") { it.name }.ifEmpty { "none" },
+                        reason = recovered.category.name,
+                    )
+                    profileDao.updateProbeResult(profile.id, LATENCY_FAILED, PROBE_ERROR_UNSUPPORTED)
+                    null
                 }
-                profileDao.updateProbeResult(migratedProfile.id, LATENCY_FAILED, PROBE_ERROR_UNSUPPORTED)
-                null
-            } else {
-                migratedProfile to bean
+                is RecoveryResult.Success -> profile to recovered.bean
             }
         }
         logRejectedProfiles(rejectedProfiles)
@@ -636,15 +633,17 @@ internal class ProfileProbeProtector : ISingboxProtector.Stub() {
         }
     }
 }
-private data class RejectedProfile(val protocol: String, val reason: String)
+private data class RejectedProfile(val protocol: String, val schema: String, val reason: String)
 
 private fun logRejectedProfiles(rejectedProfiles: List<RejectedProfile>) {
     if (rejectedProfiles.isEmpty()) return
     val protocols = rejectedProfiles.groupingBy { it.protocol }.eachCount().toStableDiagnosticString()
+    val schemas = rejectedProfiles.groupingBy { it.schema }.eachCount().toStableDiagnosticString()
     val reasons = rejectedProfiles.groupingBy { it.reason }.eachCount().toStableDiagnosticString()
     PersistentLoggers.warn(
         "SingboxProbeService",
-        "singbox profiles rejected count=${rejectedProfiles.size} byProtocol=$protocols byReason=$reasons",
+        "singbox profiles rejected count=${rejectedProfiles.size} " +
+            "byProtocol=$protocols bySchema=$schemas byReason=$reasons",
     )
 }
 

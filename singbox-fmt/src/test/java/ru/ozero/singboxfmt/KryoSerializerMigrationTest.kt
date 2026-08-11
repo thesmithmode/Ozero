@@ -3,12 +3,14 @@ package ru.ozero.singboxfmt
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.ByteBufferOutput
 import java.io.ByteArrayOutputStream
+import java.security.MessageDigest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class KryoSerializerMigrationTest {
     @Test
@@ -16,9 +18,29 @@ class KryoSerializerMigrationTest {
         val restored = assertIs<VLESSBean>(migrateFixture("vless-reality-vision-70899053.bin"))
 
         assertEquals("198.51.100.10", restored.serverAddress)
+        assertEquals(443, restored.serverPort)
+        assertEquals("11111111-1111-1111-1111-111111111111", restored.uuid)
+        assertEquals("tcp", restored.type)
         assertEquals("reality", restored.security)
         assertEquals("xtls-rprx-vision", restored.flow)
         assertEquals("", restored.rawTransportType)
+        assertEquals("reality.example", restored.sni)
+        assertEquals("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", restored.realityPublicKey)
+        assertEquals("a1b2c3d4", restored.realityShortId)
+        assertEquals("chrome", restored.realityFingerprint)
+        assertEquals("none", restored.packetEncoding)
+        assertEquals(false, restored.allowInsecure)
+    }
+
+    @Test
+    fun `legacy Reality fixture has one fully consumed V1 candidate`() {
+        val bytes = fixture("vless-reality-vision-70899053.bin")
+
+        val candidate = KryoSerializer.decodeCandidates(bytes).single()
+
+        assertEquals(BeanBlobSchema.LEGACY_V1, candidate.schema)
+        assertEquals(bytes.size, candidate.bytesConsumed)
+        assertEquals(bytes.size, candidate.blobSize)
     }
 
     @Test
@@ -55,7 +77,19 @@ class KryoSerializerMigrationTest {
     }
 
     @Test
-    fun `current raw V2 is decoded before legacy V1 and preserves raw transport`() {
+    fun `low-level decoder reads golden Shadowsocks blob from 70899053`() {
+        val bytes = fixture("shadowsocks-70899053.bin")
+        val candidate = KryoSerializer.decodeCandidates(bytes).single()
+        val restored = assertIs<ShadowsocksBean>(candidate.bean)
+
+        assertEquals(BeanBlobSchema.LEGACY_V1, candidate.schema)
+        assertEquals(bytes.size, candidate.bytesConsumed)
+        assertEquals("aes-128-gcm", restored.method)
+        assertEquals(8388, restored.serverPort)
+    }
+
+    @Test
+    fun `current raw V2 produces one fully consumed candidate and preserves raw transport`() {
         val current = VLESSBean().apply {
             serverAddress = "198.51.100.20"
             serverPort = 443
@@ -65,9 +99,69 @@ class KryoSerializerMigrationTest {
             security = "tls"
         }
 
-        val restored = assertIs<VLESSBean>(KryoSerializer.deserializeWithMigration(currentRawBlob(current)).bean)
+        val blob = currentRawBlob(current)
+        val candidate = KryoSerializer.decodeCandidates(blob).single()
+        val restored = assertIs<VLESSBean>(candidate.bean)
 
+        assertEquals(BeanBlobSchema.CURRENT_RAW_V2, candidate.schema)
+        assertEquals(blob.size, candidate.bytesConsumed)
         assertEquals("raw", restored.rawTransportType)
+    }
+
+    @Test
+    fun `transitional 0672c82 Reality fixture is only a fully consumed current V2 candidate`() {
+        val bytes = transitionalFixture()
+
+        val candidate = KryoSerializer.decodeCandidates(bytes).single()
+        val restored = assertIs<VLESSBean>(candidate.bean)
+
+        assertEquals(BeanBlobSchema.CURRENT_RAW_V2, candidate.schema)
+        assertEquals(bytes.size, candidate.bytesConsumed)
+        assertEquals(bytes.size, candidate.blobSize)
+        assertEquals("198.51.100.20", restored.serverAddress)
+        assertEquals(443, restored.serverPort)
+        assertEquals("44444444-4444-4444-4444-444444444444", restored.uuid)
+        assertEquals("tcp", restored.type)
+        assertEquals("raw", restored.rawTransportType)
+        assertEquals("reality", restored.security)
+        assertEquals("xtls-rprx-vision", restored.flow)
+        assertEquals("reality-v2.example", restored.sni)
+        assertEquals("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA", restored.realityPublicKey)
+        assertEquals("b1c2d3e4", restored.realityShortId)
+        assertEquals("chrome", restored.realityFingerprint)
+        assertEquals("none", restored.packetEncoding)
+        assertEquals(false, restored.allowInsecure)
+        assertTrue(KryoSerializer.decodeCandidates(bytes.copyOf(bytes.size - 1)).isEmpty())
+        assertTrue(KryoSerializer.decodeCandidates(bytes + byteArrayOf(1)).isEmpty())
+    }
+
+    @Test
+    fun `transitional fixture matches recorded historical checksum`() {
+        val expected = TRANSITIONAL_FIXTURE_SHA256
+        val actual = MessageDigest.getInstance("SHA-256")
+            .digest(transitionalFixture())
+            .joinToString("") { "%02x".format(it) }
+
+        assertEquals(expected, actual)
+    }
+
+    @Test
+    fun `versioned blob produces one versioned candidate`() {
+        val blob = KryoSerializer.serialize(validVless())
+
+        val candidate = KryoSerializer.decodeCandidates(blob).single()
+
+        assertEquals(BeanBlobSchema.VERSIONED_V1, candidate.schema)
+        assertEquals(blob.size, candidate.bytesConsumed)
+    }
+
+    @Test
+    fun `corrupt truncated and trailing blobs produce no candidates`() {
+        val fixture = fixture("vless-reality-vision-70899053.bin")
+
+        assertTrue(KryoSerializer.decodeCandidates(byteArrayOf(1, 2, 3)).isEmpty())
+        assertTrue(KryoSerializer.decodeCandidates(fixture.copyOf(fixture.size - 1)).isEmpty())
+        assertTrue(KryoSerializer.decodeCandidates(fixture + byteArrayOf(1)).isEmpty())
     }
 
     @Test
@@ -87,6 +181,8 @@ class KryoSerializerMigrationTest {
     private fun fixture(name: String): ByteArray =
         assertNotNull(javaClass.getResourceAsStream("/legacy/$name")).use { it.readBytes() }
 
+    private fun transitionalFixture(): ByteArray = TRANSITIONAL_FIXTURE_HEX.decodeHex()
+
     private fun currentRawBlob(bean: AbstractBean): ByteArray {
         val kryo = Kryo().apply {
             isRegistrationRequired = false
@@ -105,4 +201,23 @@ class KryoSerializerMigrationTest {
             bytes.toByteArray()
         }
     }
+
+    private fun validVless() = VLESSBean().apply {
+        serverAddress = "198.51.100.20"
+        serverPort = 443
+        uuid = "44444444-4444-4444-4444-444444444444"
+        security = "tls"
+    }
+
+    private companion object {
+        const val TRANSITIONAL_FIXTURE_HEX =
+            "0b0081818181008178746c732d727072782d766973696fee0081006e6f6ee5810081008100816e6f6ee5818181810010" +
+                "6e6f6ee5816e6f6ee581818181816e6f6ee57261f7006368726f6de5ac42424242424242424242424242424242424242" +
+                "42424242424242424242424242424242424242424242424162316332643365b47265616c6974f93139382e35312e3130" +
+                "302e32b0f60600000000000068326d75f87265616c6974792d76322e6578616d706ce581617574ef7463f081a5343434" +
+                "34343434342d343434342d343434342d343434342d34343434343434343434343400"
+        const val TRANSITIONAL_FIXTURE_SHA256 = "8ce0979851df3888dc4aed491dbf892c6223d854c44291e5789a02125126cdb6"
+    }
 }
+
+private fun String.decodeHex(): ByteArray = chunked(2).map { it.toInt(16).toByte() }.toByteArray()
