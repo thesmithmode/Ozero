@@ -113,7 +113,7 @@ object KryoSerializer {
     private fun semanticKey(bean: AbstractBean): List<Any?> = buildList {
         add(bean.javaClass.name)
         semanticFields.getOrPut(bean.javaClass) {
-            generateSequence(bean.javaClass) { it.superclass }
+            generateSequence<Class<*>>(bean.javaClass) { it.superclass }
                 .takeWhile { AbstractBean::class.java.isAssignableFrom(it) }
                 .flatMap { it.declaredFields.asSequence() }
                 .filterNot { Modifier.isStatic(it.modifiers) }

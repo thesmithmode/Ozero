@@ -357,11 +357,13 @@ class StartSequenceCoordinator(
         settings: SettingsModel,
         trafficMode: TrafficMode,
     ): List<Pair<EngineId, EngineConfig>> {
-        return settings.engineAutoPriority.mapNotNull { id ->
-            if (!engineAllowedForTrafficMode(id, trafficMode)) return@mapNotNull null
-            val cfg = buildEngineConfig(id, settings, trafficMode) ?: return@mapNotNull null
-            id to cfg
+        val candidates = mutableListOf<Pair<EngineId, EngineConfig>>()
+        for (id in settings.engineAutoPriority) {
+            if (!engineAllowedForTrafficMode(id, trafficMode)) continue
+            val config = buildEngineConfig(id, settings, trafficMode) ?: continue
+            candidates += id to config
         }
+        return candidates
     }
 
     private suspend fun autoCandidatesWithPreflight(
