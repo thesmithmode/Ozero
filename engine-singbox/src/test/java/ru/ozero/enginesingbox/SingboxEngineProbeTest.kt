@@ -74,7 +74,7 @@ class SingboxEngineProbeTest {
         )
 
         val failure = assertIs<StartResult.Failure>(result)
-        assertEquals("config failed: DESERIALIZATION", failure.reason)
+        assertEquals("config failed: DECODE_FAILED", failure.reason)
     }
 
     @Test

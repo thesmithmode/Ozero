@@ -9,8 +9,12 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import org.junit.jupiter.api.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicInteger
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.singboxfmt.KryoSerializer
@@ -174,6 +178,38 @@ class SingboxEngineAutoSelectTest {
     )
 
     private fun awaitInit() = Thread.sleep(300)
+
+    @Test
+    fun `first manual config reads selected profile before collector emits`() {
+        val selected = makeProfile(42L, 1L, "cold.example.com", 443)
+        val prefs = mutablePreferencesOf(beanKey to selected.beanBlob, selectedProfileKey to selected.id)
+        val collectorStarted = CountDownLatch(1)
+        val subscriptions = AtomicInteger()
+        val dataStore = object : DataStore<Preferences> {
+            override val data: Flow<Preferences> = flow {
+                if (subscriptions.incrementAndGet() == 1) {
+                    collectorStarted.countDown()
+                    awaitCancellation()
+                }
+                emit(prefs)
+            }
+
+            override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences =
+                transform(prefs)
+        }
+        val engine = SingboxEngine(
+            context = mockk(relaxed = true),
+            dataStore = dataStore,
+            profileDao = fakeProfileDao(mapOf(1L to listOf(selected))),
+            proxyChainDao = fakeProxyChainDao(),
+        )
+        assertTrue(collectorStarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
+
+        val result = assertNotNull(engine.buildManualConfig(null))
+
+        assertTrue(result.beanBlob.contentEquals(selected.beanBlob))
+        assertEquals(selected.protocolType, result.protocolType)
+    }
 
     @Test
     fun `buildManualConfig passes singbox DNS settings`() {

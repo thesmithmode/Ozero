@@ -71,9 +71,10 @@ object KryoSerializer {
 
     fun deserializeWithMigration(bytes: ByteArray): DecodedBean {
         val candidates = decodeCandidates(bytes)
-        val bean = when (candidates.size) {
+        val semanticCandidates = candidates.distinctBy { serialize(it.bean).toList() }
+        val bean = when (semanticCandidates.size) {
             0 -> throw KryoException("Unsupported bean blob")
-            1 -> candidates.single().bean
+            1 -> semanticCandidates.single().bean
             else -> throw KryoException("Ambiguous bean blob schema")
         }
         return DecodedBean(bean, migratedBlob = if (isVersioned(bytes)) null else serialize(bean))

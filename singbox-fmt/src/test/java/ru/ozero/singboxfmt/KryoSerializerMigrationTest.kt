@@ -77,15 +77,21 @@ class KryoSerializerMigrationTest {
     }
 
     @Test
-    fun `low-level decoder reads golden Shadowsocks blob from 70899053`() {
+    fun `low-level decoder reports every fully consumed Shadowsocks schema`() {
         val bytes = fixture("shadowsocks-70899053.bin")
-        val candidate = KryoSerializer.decodeCandidates(bytes).single()
-        val restored = assertIs<ShadowsocksBean>(candidate.bean)
 
-        assertEquals(BeanBlobSchema.LEGACY_V1, candidate.schema)
-        assertEquals(bytes.size, candidate.bytesConsumed)
-        assertEquals("aes-128-gcm", restored.method)
-        assertEquals(8388, restored.serverPort)
+        val candidates = KryoSerializer.decodeCandidates(bytes)
+
+        assertEquals(
+            setOf(BeanBlobSchema.CURRENT_RAW_V2, BeanBlobSchema.LEGACY_V1),
+            candidates.map { it.schema }.toSet(),
+        )
+        candidates.forEach { candidate ->
+            val restored = assertIs<ShadowsocksBean>(candidate.bean)
+            assertEquals(bytes.size, candidate.bytesConsumed)
+            assertEquals("aes-128-gcm", restored.method)
+            assertEquals(8388, restored.serverPort)
+        }
     }
 
     @Test

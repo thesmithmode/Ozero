@@ -161,6 +161,9 @@ class SingboxEngine @Inject constructor(
     @Volatile
     private var cachedIpv6Enabled: Boolean = false
 
+    @Volatile
+    private var preferencesCacheInitialized: Boolean = false
+
     init {
         engineScope.launch {
             dataStore.data.collect { prefs ->
@@ -169,6 +172,7 @@ class SingboxEngine @Inject constructor(
                 cachedSelectedProfileId = prefs[SELECTED_PROFILE_KEY]
                 cachedDnsServers = prefs[SINGBOX_DNS_SERVERS_KEY]?.toList()?.ifEmpty { null }
                     ?: EngineConfig.Singbox.DEFAULT_DNS_SERVERS
+                preferencesCacheInitialized = true
             }
         }
         engineScope.launch {
@@ -345,6 +349,7 @@ class SingboxEngine @Inject constructor(
             is RecoveryResult.Failure -> {
                 return BuildConfigResult.Failure(
                     recovery.category.toBuildConfigFailureCategory(),
+                    recovery.supportError,
                 )
             }
         }
@@ -460,11 +465,16 @@ class SingboxEngine @Inject constructor(
                     return StartResult.Failure("chain wireguard generation failed")
                 }
         } else {
-            val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(config.beanBlob) }
-                .getOrElse {
-                    logConfigException("chain deserialization", it)
-                    return StartResult.Failure("chain deserialization failed")
+            val recovery = PersistedProfileRecovery.recover(config.beanBlob, config.protocolType)
+            val bean = when (recovery) {
+                is RecoveryResult.Success -> recovery.bean
+                is RecoveryResult.Failure -> {
+                    return StartResult.Failure(
+                        recovery.supportError?.let { "chain selected profile rejected: $it" }
+                            ?: "chain recovery failed: ${recovery.category}",
+                    )
                 }
+            }
             val canonicalBean = runCatching { ConfigBuilder.canonicalBean(bean) }
                 .getOrElse {
                     logConfigException("chain canonicalization", it)
@@ -765,6 +775,7 @@ class SingboxEngine @Inject constructor(
     }
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
+        ensurePreferencesCacheInitialized()
         val ipv6Enabled = settings?.ipv6Enabled ?: false
         cachedIpv6Enabled = ipv6Enabled
         if (cachedSelectedProfileId == SELECTED_AUTO) {
@@ -820,6 +831,17 @@ class SingboxEngine @Inject constructor(
         )
     }
 
+    private fun ensurePreferencesCacheInitialized() {
+        if (preferencesCacheInitialized) return
+        val prefs = runBlocking(Dispatchers.IO) { dataStore.data.first() }
+        if (preferencesCacheInitialized) return
+        cachedBlob = prefs[BEAN_KEY]
+        cachedSelectedProfileId = prefs[SELECTED_PROFILE_KEY]
+        cachedDnsServers = prefs[SINGBOX_DNS_SERVERS_KEY]?.toList()?.ifEmpty { null }
+            ?: EngineConfig.Singbox.DEFAULT_DNS_SERVERS
+        preferencesCacheInitialized = true
+    }
+
     override fun buildProxyConfig(settings: SettingsModel?): EngineConfig? =
         buildManualConfig(settings)?.let { it as? EngineConfig.Singbox }?.copy(proxyMode = true)
 
@@ -842,16 +864,32 @@ class SingboxEngine @Inject constructor(
                 failures += ProfileInputFailure(index, ProfileInputStage.SIZE, profileId)
                 return@forEachIndexed
             }
-            val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
-                .getOrElse {
-                    failures += ProfileInputFailure(
-                        index,
-                        ProfileInputStage.DESERIALIZATION,
-                        profileId,
-                        exceptionClass = it.safeExceptionClass(),
-                    )
-                    return@forEachIndexed
+            val knownProfile = profileId?.let { cachedProfilesById[it] ?: resolveProfileByIdBlocking(it) }
+            val bean = if (knownProfile != null) {
+                when (val recovery = PersistedProfileRecovery.recover(blob, knownProfile.protocolType)) {
+                    is RecoveryResult.Success -> recovery.bean
+                    is RecoveryResult.Failure -> {
+                        failures += ProfileInputFailure(
+                            index,
+                            ProfileInputStage.DESERIALIZATION,
+                            profileId,
+                            reason = recovery.supportError,
+                        )
+                        return@forEachIndexed
+                    }
                 }
+            } else {
+                runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
+                    .getOrElse {
+                        failures += ProfileInputFailure(
+                            index,
+                            ProfileInputStage.DESERIALIZATION,
+                            profileId,
+                            exceptionClass = it.safeExceptionClass(),
+                        )
+                        return@forEachIndexed
+                    }
+            }
             val canonical = runCatching { ConfigBuilder.canonicalBean(bean) }
                 .getOrElse {
                     failures += ProfileInputFailure(
@@ -941,7 +979,7 @@ class SingboxEngine @Inject constructor(
         val selected = ArrayList<ProxyProfile>(MAX_AUTO_SELECT_OUTBOUNDS)
         val rejected = mutableMapOf<ProfileInputStage, Int>()
         for (profile in prioritizeSingboxAutoProfiles(profiles, MAX_AUTO_PROFILE_SCAN)) {
-            val rejectionStage = autoProfileRejectionStage(profile.beanBlob)
+            val rejectionStage = autoProfileRejectionStage(profile)
             if (rejectionStage == null) {
                 selected += profile
             } else {
@@ -961,10 +999,10 @@ class SingboxEngine @Inject constructor(
         return selected
     }
 
-    private fun autoProfileRejectionStage(blob: ByteArray): ProfileInputStage? {
-        if (blob.size > MAX_AUTO_SELECT_BLOB_BYTES) return ProfileInputStage.SIZE
-        val bean = runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
-            .getOrElse { return ProfileInputStage.DESERIALIZATION }
+    private fun autoProfileRejectionStage(profile: ProxyProfile): ProfileInputStage? {
+        if (profile.beanBlob.size > MAX_AUTO_SELECT_BLOB_BYTES) return ProfileInputStage.SIZE
+        val bean = (PersistedProfileRecovery.recover(profile.beanBlob, profile.protocolType) as? RecoveryResult.Success)
+            ?.bean ?: return ProfileInputStage.DESERIALIZATION
         val canonical = runCatching { ConfigBuilder.canonicalBean(bean) }
             .getOrElse { return ProfileInputStage.CANONICALIZATION }
         return when (ConfigBuilder.supportDecisionCanonical(canonical)) {
