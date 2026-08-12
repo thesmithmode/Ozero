@@ -225,7 +225,9 @@ internal fun SimpleMainContent(
                 PowerDisc(
                     state = powerState,
                     onClick = onConnectClick,
-                    contentDescription = if (isConnected) "disconnect" else "connect",
+                    contentDescription = stringResource(
+                        if (isConnected) R.string.a11y_disconnect_button else R.string.a11y_connect_button,
+                    ),
                 )
             }
 
@@ -296,7 +298,9 @@ private fun CompactSimpleMainContent(
                 PowerDisc(
                     state = state.powerState,
                     onClick = callbacks.onConnectClick,
-                    contentDescription = if (state.isConnected) "disconnect" else "connect",
+                    contentDescription = stringResource(
+                        if (state.isConnected) R.string.a11y_disconnect_button else R.string.a11y_connect_button,
+                    ),
                     diameterDp = 204,
                 )
             }
@@ -433,7 +437,9 @@ internal fun ExpertMainContent(
                 PowerDisc(
                     state = powerState,
                     onClick = onConnectClick,
-                    contentDescription = if (isConnected) "disconnect" else "connect",
+                    contentDescription = stringResource(
+                        if (isConnected) R.string.a11y_disconnect_button else R.string.a11y_connect_button,
+                    ),
                     diameterDp = 256,
                 )
             }
@@ -540,7 +546,9 @@ private fun CompactExpertMainContent(
                 PowerDisc(
                     state = state.powerState,
                     onClick = callbacks.onConnectClick,
-                    contentDescription = if (state.isConnected) "disconnect" else "connect",
+                    contentDescription = stringResource(
+                        if (state.isConnected) R.string.a11y_disconnect_button else R.string.a11y_connect_button,
+                    ),
                     diameterDp = 204,
                 )
             }

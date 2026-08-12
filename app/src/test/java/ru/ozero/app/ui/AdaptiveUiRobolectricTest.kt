@@ -9,14 +9,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import java.time.LocalDate
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -34,6 +35,7 @@ import ru.ozero.app.logging.LogLevel
 import ru.ozero.app.ui.backup.BackupTestTags
 import ru.ozero.app.ui.backup.CategoryPickerDialog
 import ru.ozero.app.ui.components.BOTTOM_DOCK_TAB_TEST_TAG_PREFIX
+import ru.ozero.app.ui.components.POWER_DISC_TEST_TAG
 import ru.ozero.app.ui.components.PowerDiscState
 import ru.ozero.app.ui.logs.LogsScreenContent
 import ru.ozero.app.ui.logs.LogsScreenTestTags
@@ -111,7 +113,12 @@ class AdaptiveUiRobolectricTest {
         val viewport = composeRule.onNodeWithTag(VIEWPORT_TAG).fetchSemanticsNode().boundsInRoot
         assertTrue(abs(viewport.width - 320f) < 1f)
         assertTrue(abs(viewport.height - 600f) < 1f)
-        composeRule.onNodeWithContentDescription("disconnect").performClick()
+        composeRule.onNodeWithTag(POWER_DISC_TEST_TAG)
+            .assertContentDescriptionEquals(
+                ApplicationProvider.getApplicationContext<Application>()
+                    .getString(R.string.a11y_disconnect_button),
+            )
+            .performClick()
         composeRule.onNodeWithTag(MainScreenTestTags.ENGINE_CHIPS_ROW).performScrollTo()
         composeRule.onNodeWithTag(MainScreenTestTags.ENGINE_CHIP_PREFIX + EngineId.BYEDPI.name)
             .performScrollTo()
@@ -170,7 +177,12 @@ class AdaptiveUiRobolectricTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("connect").performClick()
+        composeRule.onNodeWithTag(POWER_DISC_TEST_TAG)
+            .assertContentDescriptionEquals(
+                ApplicationProvider.getApplicationContext<Application>()
+                    .getString(R.string.a11y_connect_button),
+            )
+            .performClick()
         composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "split_tunnel").performClick()
         composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "settings").performClick()
         assertEquals(1, connectCalls.get())
