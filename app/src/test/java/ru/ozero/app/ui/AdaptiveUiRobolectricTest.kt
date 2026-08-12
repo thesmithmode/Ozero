@@ -1,5 +1,6 @@
 package ru.ozero.app.ui
 
+import android.app.Application
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
@@ -31,7 +32,7 @@ import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.AppMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [34], application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AdaptiveUiRobolectricTest {
     @get:Rule
