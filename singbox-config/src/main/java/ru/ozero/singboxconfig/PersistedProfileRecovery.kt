@@ -9,7 +9,6 @@ import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
-import ru.ozero.singboxfmt.hasRequiredOutboundCredentials
 
 enum class PersistedProtocol(val id: Int, val label: String) {
     VLESS(0, "VLESS"),
@@ -73,15 +72,19 @@ object PersistedProfileRecovery {
     }
 
     private fun recoverMatchingCandidates(candidates: List<DecodedCandidate>): RecoveryResult {
-        val requiredFieldsValid = candidates.filter { hasValidRequiredFields(it.bean) }
-        if (requiredFieldsValid.isEmpty()) return failure(RecoveryFailureCategory.INVALID_REQUIRED_FIELDS, candidates)
-        val canonical = requiredFieldsValid.mapNotNull { candidate ->
+        val canonical = candidates.mapNotNull { candidate ->
             runCatching { candidate to ConfigBuilder.canonicalBean(candidate.bean) }.getOrNull()
         }
-        val supported = canonical.filter {
-            ConfigBuilder.supportDecisionCanonical(it.second) is BeanSupportDecision.Supported
+        val decisions = canonical.map { it to ConfigBuilder.supportDecisionCanonical(it.second) }
+        val supported = decisions.mapNotNull { (candidate, decision) ->
+            candidate.takeIf { decision is BeanSupportDecision.Supported }
         }
-        if (supported.isEmpty()) return failure(RecoveryFailureCategory.UNSUPPORTED_PROFILE, candidates)
+        if (supported.isEmpty()) {
+            val errors = decisions.mapNotNull { (_, decision) ->
+                (decision as? BeanSupportDecision.Unsupported)?.error
+            }.distinct()
+            return failure(RecoveryFailureCategory.UNSUPPORTED_PROFILE, candidates, errors.singleOrNull())
+        }
         val generated = supported.mapNotNull { (candidate, bean) ->
             runCatching {
                 val json = ConfigBuilder.buildSingboxConfigFromCanonical(bean)
@@ -102,15 +105,11 @@ object PersistedProfileRecovery {
         )
     }
 
-    private fun hasValidRequiredFields(bean: AbstractBean): Boolean =
-        bean.serverAddress.isNotBlank() &&
-            bean.serverPort in 1..65_535 &&
-            bean.hasRequiredOutboundCredentials()
-
     private fun failure(
         category: RecoveryFailureCategory,
         candidates: List<DecodedCandidate> = emptyList(),
-    ) = RecoveryResult.Failure(category, candidates.map { it.schema }.distinct())
+        supportError: BeanSupportError? = null,
+    ) = RecoveryResult.Failure(category, candidates.map { it.schema }.distinct(), supportError)
 
     private data class RecoveredCandidate(
         val candidate: DecodedCandidate,
@@ -131,5 +130,6 @@ sealed interface RecoveryResult {
     data class Failure(
         val category: RecoveryFailureCategory,
         val detectedSchemas: List<BeanBlobSchema>,
+        val supportError: BeanSupportError? = null,
     ) : RecoveryResult
 }
