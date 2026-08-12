@@ -30,6 +30,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import ru.ozero.app.R
 import ru.ozero.app.logging.LogEntry
 import ru.ozero.app.logging.LogLevel
 import ru.ozero.app.ui.backup.BackupTestTags

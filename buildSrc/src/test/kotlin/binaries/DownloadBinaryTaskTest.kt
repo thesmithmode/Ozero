@@ -314,7 +314,7 @@ class DownloadBinaryTaskTest {
 
     @Test
     fun `task retries transient server error and wraps final failure`() {
-        repeat(3) {
+        repeat(4) {
             server.enqueue(MockResponse().setResponseCode(500))
         }
         val data = "fake-so".toByteArray()
@@ -326,7 +326,7 @@ class DownloadBinaryTaskTest {
             .hasMessageContaining("Failed to download")
             .hasMessageContaining("HTTP 500")
             .hasCauseInstanceOf(BinaryDownloadException::class.java)
-        assertThat(server.requestCount).isEqualTo(3)
+        assertThat(server.requestCount).isEqualTo(4)
     }
 
     @Test
