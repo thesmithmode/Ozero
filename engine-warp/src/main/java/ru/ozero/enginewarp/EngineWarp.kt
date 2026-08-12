@@ -7,7 +7,6 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -53,17 +52,16 @@ class EngineWarp(
     private val statsPollIntervalMs: Long = STATS_POLL_INTERVAL_MS,
     private val handshakeStaleThresholdSec: Long = HANDSHAKE_STALE_THRESHOLD_SEC,
     private val endpointProber: WarpEndpointProber = WarpEndpointProber(),
-    pluginScope: CoroutineScope? = null,
+    private val runtimeControl: WarpRuntimeControl = WarpRuntimeControl(),
 ) : EnginePlugin, TunFdAcceptor {
 
     private val ownedScope: CoroutineScope =
-        pluginScope ?: CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        runtimeControl.pluginScope ?: CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val runtimeCleanup = WarpRuntimeCleanupCoordinator(sdkBridge, ownedScope, runtimeControl)
     private val statsJobRef = AtomicReference<Job?>(null)
     private val connectedSinceRef = AtomicReference<Long>(0L)
 
     @Volatile private var networkCallback: ConnectivityManager.NetworkCallback? = null
-
-    @Volatile private var savedTunFd: Int = -1
 
     @Volatile private var consecutiveRecoverFails: Int = 0
 
@@ -96,6 +94,9 @@ class EngineWarp(
     override fun buildProxyConfig(settings: SettingsModel?): EngineConfig = EngineConfig.WarpProxy()
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
+        if (!runtimeCleanup.awaitPreviousCleanup()) {
+            return StartResult.Failure("WARP previous runtime cleanup is still active")
+        }
         if (config is EngineConfig.WarpProxy) return startProxy(config, upstream)
         require(config is EngineConfig.Warp) { "EngineWarp requires EngineConfig.Warp" }
         require(upstream is Upstream.None) {
@@ -156,7 +157,7 @@ class EngineWarp(
         statsJobRef.getAndSet(null)?.cancel()
         connectedSinceRef.set(0L)
         _stats.value = EngineStats()
-        savedTunFd = -1
+        runtimeCleanup.closeOwnedTunFd()
         activeSocksPort = WARP_NO_SOCKS_PORT
         consecutiveRecoverFails = 0
         networkCallback?.let { cb ->
@@ -166,10 +167,7 @@ class EngineWarp(
                     ?.unregisterNetworkCallback(cb)
             }.onFailure { PersistentLoggers.warn(TAG, "unregisterNetworkCallback failed: ${it.message}") }
         }
-        withContext(NonCancellable) {
-            sdkBridge.stopProxy()
-            sdkBridge.detachTun()
-        }
+        runtimeCleanup.stopRuntime()
         resolvedConfig = null
         resolvedIni = null
     }
@@ -208,7 +206,7 @@ class EngineWarp(
     }
 
     private suspend fun reattachAfterStale(uapiPath: String, reason: String): EnginePlugin.RecoverResult {
-        val fd = savedTunFd
+        val fd = runtimeCleanup.currentTunFd()
         val ini = resolvedIni
         if (fd < 0 || ini == null) {
             PersistentLoggers.warn(TAG, "recover: reattach impossible - fd=$fd ini=${ini != null}")
@@ -384,11 +382,11 @@ class EngineWarp(
         val ini = resolvedIni ?: return TunAttachResult.Failure(
             reason = "attachTun before start - no ini config",
         )
-        savedTunFd = tunFd
         val uapiPath = uapiPathProvider()
         Log.i(TAG, "attachTun fd=$tunFd uapi=$uapiPath/$TUNNEL_NAME.sock")
         return when (val r = sdkBridge.attachTun(TUNNEL_NAME, tunFd, ini, uapiPath, socketProtector)) {
             WarpSdkBridge.AttachResult.Success -> {
+                runtimeCleanup.ownTunFd(tunFd)
                 startStatsPoll(uapiPath)
                 registerNetworkCallback()
                 TunAttachResult.Success

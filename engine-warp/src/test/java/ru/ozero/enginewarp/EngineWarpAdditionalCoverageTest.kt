@@ -725,7 +725,7 @@ class EngineWarpAdditionalCoverageTest {
         warpReadyPollMs = 5L,
         statsPollIntervalMs = pollMs,
         handshakeStaleThresholdSec = 180L,
-        pluginScope = scope,
+        runtimeControl = WarpRuntimeControl(pluginScope = scope),
     )
 
     private class FakeAuto(private val result: Result<RegisteredWarpConfig>) : WarpAutoConfig {

@@ -14,6 +14,13 @@ class RemoteAwgRuntimeContractTest {
         f.readText()
     }
 
+    private val aidlSource by lazy {
+        val moduleRoot = File(System.getProperty("user.dir") ?: ".")
+        val f = File(moduleRoot, "src/main/aidl/ru/ozero/enginewarp/IWarpEngineProcess.aidl")
+        assertTrue(f.exists(), "IWarpEngineProcess.aidl not found: $f")
+        f.readText()
+    }
+
     @Test
     fun `Binder TUN descriptors duplicate the saved fd before close`() {
         val turnOnBlock = source
@@ -208,6 +215,18 @@ class RemoteAwgRuntimeContractTest {
             "Explicit teardown обязан остановить foreground WARP session, иначе :engine_warp останется жить " +
                 "после выключения VPN.",
         )
+    }
+
+    @Test
+    fun `forceTerminate delegates self termination through one-way Binder identity`() {
+        val forceTerminate = source.substringAfter("override fun forceTerminate()")
+            .substringBefore("override fun turnOn")
+
+        assertTrue(aidlSource.contains("oneway void forceTerminate();"))
+        assertTrue(forceTerminate.contains("remote?.forceTerminate()"))
+        assertTrue(forceTerminate.contains("context.unbindService"))
+        assertFalse(source.contains("processId()"))
+        assertFalse(source.contains("Process.killProcess"))
     }
 
     @Test

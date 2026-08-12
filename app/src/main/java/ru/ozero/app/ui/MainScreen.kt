@@ -50,11 +50,10 @@ import ru.ozero.app.ui.components.chartNiceMax
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import ru.ozero.app.R
@@ -226,9 +225,7 @@ internal fun SimpleMainContent(
                 PowerDisc(
                     state = powerState,
                     onClick = onConnectClick,
-                    modifier = Modifier.semantics {
-                        contentDescription = if (isConnected) "disconnect" else "connect"
-                    },
+                    contentDescription = if (isConnected) "disconnect" else "connect",
                 )
             }
 
@@ -299,9 +296,7 @@ private fun CompactSimpleMainContent(
                 PowerDisc(
                     state = state.powerState,
                     onClick = callbacks.onConnectClick,
-                    modifier = Modifier.semantics {
-                        contentDescription = if (state.isConnected) "disconnect" else "connect"
-                    },
+                    contentDescription = if (state.isConnected) "disconnect" else "connect",
                     diameterDp = 204,
                 )
             }
@@ -438,9 +433,7 @@ internal fun ExpertMainContent(
                 PowerDisc(
                     state = powerState,
                     onClick = onConnectClick,
-                    modifier = Modifier.semantics {
-                        contentDescription = if (isConnected) "disconnect" else "connect"
-                    },
+                    contentDescription = if (isConnected) "disconnect" else "connect",
                     diameterDp = 256,
                 )
             }
@@ -547,9 +540,7 @@ private fun CompactExpertMainContent(
                 PowerDisc(
                     state = state.powerState,
                     onClick = callbacks.onConnectClick,
-                    modifier = Modifier.semantics {
-                        contentDescription = if (state.isConnected) "disconnect" else "connect"
-                    },
+                    contentDescription = if (state.isConnected) "disconnect" else "connect",
                     diameterDp = 204,
                 )
             }
@@ -897,6 +888,7 @@ private fun TrafficStatsCard(
     val rxTotal = BytesFormatter.humanReadable(stats?.rxBytes ?: 0L)
     val txTotal = BytesFormatter.humanReadable(stats?.txBytes ?: 0L)
     val uptime = BytesFormatter.durationHms(sessionMs)
+    val chartHeight = if (LocalDensity.current.fontScale > 1f) 120.dp else 96.dp
 
     var selectedTf by remember { mutableStateOf(TimeframeOption.M1) }
     val displayHistory = remember(speedHistory, selectedTf) {
@@ -930,7 +922,8 @@ private fun TrafficStatsCard(
                 compact = compactVertical,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(96.dp),
+                    .height(chartHeight)
+                    .testTag(MainScreenTestTags.TRAFFIC_CHART),
             )
             TrafficStatsFooter(
                 selectedTf = selectedTf,
@@ -1068,6 +1061,8 @@ private fun LiveTrafficChart(
     val gridColor = OzeroPalette.Text3.copy(alpha = 0.25f)
     val borderColor = OzeroPalette.Text3.copy(alpha = 0.35f)
     val density = LocalDensity.current
+    val largeText = density.fontScale > 1f
+    val axisWidth = if (largeText) 56.dp else 44.dp
 
     val niceMax = remember(history) {
         val raw = if (history.isEmpty()) 0f else history.maxOf { maxOf(it.first, it.second) }
@@ -1077,13 +1072,17 @@ private fun LiveTrafficChart(
     val midLabel = BytesFormatter.humanReadablePerSec((niceMax / 2).toDouble())
     val axisStyle = MaterialTheme.typography.labelSmall.copy(
         color = OzeroPalette.Text3,
-        fontSize = androidx.compose.ui.unit.TextUnit(8f, androidx.compose.ui.unit.TextUnitType.Sp),
+        fontSize = 8.sp,
+        lineHeight = 9.sp,
     )
 
     Column(modifier = modifier) {
         Row(modifier = Modifier.weight(1f)) {
             Column(
-                modifier = Modifier.width(44.dp).fillMaxHeight(),
+                modifier = Modifier
+                    .width(axisWidth)
+                    .fillMaxHeight()
+                    .testTag(MainScreenTestTags.TRAFFIC_CHART_Y_AXIS),
                 verticalArrangement = Arrangement.SpaceBetween,
                 horizontalAlignment = Alignment.End,
             ) {
@@ -1092,7 +1091,12 @@ private fun LiveTrafficChart(
                 Text("0", style = axisStyle)
             }
             Spacer(modifier = Modifier.width(4.dp))
-            Canvas(modifier = Modifier.weight(1f).fillMaxHeight()) {
+            Canvas(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .testTag(MainScreenTestTags.TRAFFIC_CHART_PLOT),
+            ) {
                 val w = size.width
                 val h = size.height
                 val linePx = with(density) { 1.dp.toPx() }
@@ -1119,7 +1123,7 @@ private fun LiveTrafficChart(
                 drawPath(pathTx, colorTx, style = stroke)
             }
         }
-        val timeLabels = if (compact) {
+        val timeLabels = if (compact || largeText) {
             listOf(
                 chartTimeAgo(selectedTf.points),
                 chartTimeAgo(selectedTf.points / 2),
@@ -1135,7 +1139,10 @@ private fun LiveTrafficChart(
             )
         }
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 48.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = axisWidth + 4.dp)
+                .testTag(MainScreenTestTags.TRAFFIC_CHART_X_AXIS),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             timeLabels.forEach { label ->

@@ -51,6 +51,25 @@ object PersistedProfileRecovery {
     fun recover(bytes: ByteArray, expectedProtocol: PersistedProtocol): RecoveryResult =
         recoverCandidates(KryoSerializer.decodeCandidates(bytes), expectedProtocol)
 
+    fun recoverIdentity(bytes: ByteArray, expectedProtocolType: Int): AbstractBean? {
+        return recoverIdentityCandidates(KryoSerializer.decodeCandidates(bytes), expectedProtocolType)
+    }
+
+    internal fun recoverIdentityCandidates(
+        candidates: List<DecodedCandidate>,
+        expectedProtocolType: Int,
+    ): AbstractBean? {
+        val protocol = PersistedProtocol.fromId(expectedProtocolType) ?: return null
+        val canonical = candidates
+            .filter { protocol.matches(it.bean) }
+            .mapNotNull { candidate ->
+                runCatching { ConfigBuilder.canonicalBean(candidate.bean).value }.getOrNull()
+            }
+        return canonical
+            .distinctBy { bean -> KryoSerializer.serialize(bean).toList() }
+            .singleOrNull()
+    }
+
     internal fun recoverCandidates(
         candidates: List<DecodedCandidate>,
         expectedProtocolType: Int,

@@ -55,6 +55,28 @@ fun UrnetworkSharedTrafficScreen(
     val unpaidBytes by viewModel.unpaidBytes.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val dailyBytes by viewModel.dailyBytes.collectAsStateWithLifecycle()
+    UrnetworkSharedTrafficContent(
+        state = UrnetworkSharedTrafficUiState(
+            unpaidBytes = unpaidBytes,
+            isLoading = isLoading,
+            dailyBytes = dailyBytes,
+        ),
+        onBack = onBack,
+    )
+}
+
+internal data class UrnetworkSharedTrafficUiState(
+    val unpaidBytes: Long,
+    val isLoading: Boolean,
+    val dailyBytes: List<DayBytes>,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun UrnetworkSharedTrafficContent(
+    state: UrnetworkSharedTrafficUiState,
+    onBack: () -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -67,28 +89,39 @@ fun UrnetworkSharedTrafficScreen(
             )
         },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            if (isLoading && dailyBytes.all { it.bytes == 0L } && unpaidBytes == 0L) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else {
-                SharedTrafficChartCard(dailyBytes = dailyBytes)
-                SharedTrafficTotalCard(totalBytes = unpaidBytes)
+        if (state.isLoading && state.dailyBytes.all { it.bytes == 0L } && state.unpaidBytes == 0L) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .testTag(UrnetworkSharedTrafficTestTags.LOADING),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.testTag(UrnetworkSharedTrafficTestTags.LOADING_INDICATOR),
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
+                    .testTag(UrnetworkSharedTrafficTestTags.CONTENT),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                SharedTrafficChartCard(dailyBytes = state.dailyBytes)
+                SharedTrafficTotalCard(totalBytes = state.unpaidBytes)
             }
         }
     }
+}
+
+object UrnetworkSharedTrafficTestTags {
+    const val LOADING = "urnetwork_shared_traffic_loading"
+    const val LOADING_INDICATOR = "urnetwork_shared_traffic_loading_indicator"
+    const val CONTENT = "urnetwork_shared_traffic_content"
 }
 
 @Composable

@@ -61,6 +61,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
@@ -85,6 +86,29 @@ private val ENGINE_LINE_PALETTE = listOf(
 )
 private val ALL_LINE_COLOR = OzeroPalette.Text
 
+internal data class TrafficStatsScreenState(
+    val timeframe: TrafficTimeframe,
+    val engineFilter: Set<String>,
+    val availableEngines: List<String>,
+    val summary: TrafficSummary,
+    val engineSummaries: List<EngineSummary>,
+    val chartData: TrafficChartData,
+    val sessions: List<SessionStatsEntity>,
+    val sessionsExpanded: Boolean,
+    val sessionSort: SessionSort,
+)
+
+internal data class TrafficStatsScreenCallbacks(
+    val onBack: () -> Unit,
+    val onTimeframeSelect: (TrafficTimeframe) -> Unit,
+    val onEngineToggle: (String) -> Unit,
+    val onEngineClear: () -> Unit,
+    val onSessionsExpandedChange: (Boolean) -> Unit,
+    val onSessionSortSelect: (SessionSort) -> Unit,
+    val onClearSessions: () -> Unit,
+    val onDeleteSession: (Long) -> Unit,
+)
+
 private fun engineLineColor(engineId: String): Color {
     val idx = EngineId.entries.indexOfFirst {
         it.name.equals(engineId, ignoreCase = true)
@@ -98,7 +122,6 @@ fun TrafficStatsScreen(
     onBack: () -> Unit,
     viewModel: TrafficStatsViewModel = hiltViewModel(),
 ) {
-    BackHandler(onBack = onBack)
     val timeframe by viewModel.timeframe.collectAsStateWithLifecycle()
     val engineFilter by viewModel.engineFilter.collectAsStateWithLifecycle()
     val availableEngines by viewModel.availableEngines.collectAsStateWithLifecycle()
@@ -109,13 +132,47 @@ fun TrafficStatsScreen(
     val sessionsExpanded by viewModel.sessionsExpanded.collectAsStateWithLifecycle()
     val sessionSort by viewModel.sessionSort.collectAsStateWithLifecycle()
 
+    TrafficStatsScreenContent(
+        state = TrafficStatsScreenState(
+            timeframe = timeframe,
+            engineFilter = engineFilter,
+            availableEngines = availableEngines,
+            summary = summary,
+            engineSummaries = engineSummaries,
+            chartData = chartData,
+            sessions = sessions,
+            sessionsExpanded = sessionsExpanded,
+            sessionSort = sessionSort,
+        ),
+        callbacks = TrafficStatsScreenCallbacks(
+            onBack = onBack,
+            onTimeframeSelect = viewModel::setTimeframe,
+            onEngineToggle = viewModel::toggleEngineFilter,
+            onEngineClear = viewModel::clearEngineFilter,
+            onSessionsExpandedChange = viewModel::setSessionsExpanded,
+            onSessionSortSelect = viewModel::setSessionSort,
+            onClearSessions = viewModel::clearSessions,
+            onDeleteSession = viewModel::deleteSession,
+        ),
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun TrafficStatsScreenContent(
+    state: TrafficStatsScreenState,
+    callbacks: TrafficStatsScreenCallbacks,
+) {
+    BackHandler(onBack = callbacks.onBack)
+    val chartHeight = if (LocalDensity.current.fontScale > 1f) 216.dp else 180.dp
+
     Scaffold(
-        modifier = Modifier.testTag("traffic_stats"),
+        modifier = Modifier.testTag(TrafficStatsTestTags.ROOT),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.stats_traffic_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = callbacks.onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
@@ -131,63 +188,63 @@ fun TrafficStatsScreen(
         ) {
             item {
                 TimeframeRow(
-                    current = timeframe,
-                    onSelect = viewModel::setTimeframe,
+                    current = state.timeframe,
+                    onSelect = callbacks.onTimeframeSelect,
                 )
             }
-            if (availableEngines.size > 1) {
+            if (state.availableEngines.size > 1) {
                 item {
                     EngineFilterRow(
-                        engines = availableEngines,
-                        selected = engineFilter,
-                        onToggle = viewModel::toggleEngineFilter,
-                        onClear = viewModel::clearEngineFilter,
+                        engines = state.availableEngines,
+                        selected = state.engineFilter,
+                        onToggle = callbacks.onEngineToggle,
+                        onClear = callbacks.onEngineClear,
                     )
                 }
             }
             item {
-                SummaryRow(summary = summary)
+                SummaryRow(summary = state.summary)
             }
-            if (chartData.buckets.size >= 2) {
+            if (state.chartData.buckets.size >= 2) {
                 item {
                     TrafficLineChart(
-                        data = chartData,
-                        timeframe = timeframe,
+                        data = state.chartData,
+                        timeframe = state.timeframe,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(180.dp)
-                            .testTag("traffic_chart"),
+                            .height(chartHeight)
+                            .testTag(TrafficStatsTestTags.CHART),
                     )
                 }
                 item {
                     ChartLegend(
-                        engineIds = chartData.lines.keys
+                        engineIds = state.chartData.lines.keys
                             .filter { it != ENGINE_ID_ALL }
                             .sorted(),
-                        showAll = chartData.lines.size > 2,
+                        showAll = state.chartData.lines.size > 2,
                     )
                 }
             }
-            if (engineSummaries.size > 1) {
+            if (state.engineSummaries.size > 1) {
                 item {
-                    EngineBreakdown(engineSummaries = engineSummaries)
+                    EngineBreakdown(engineSummaries = state.engineSummaries)
                 }
             }
             item {
                 SessionsDrillDownHeader(
-                    sessions = sessions,
-                    expanded = sessionsExpanded,
-                    sort = sessionSort,
-                    onToggle = { viewModel.setSessionsExpanded(!sessionsExpanded) },
-                    onSortSelect = viewModel::setSessionSort,
-                    onClearSessions = viewModel::clearSessions,
+                    sessions = state.sessions,
+                    expanded = state.sessionsExpanded,
+                    sort = state.sessionSort,
+                    onToggle = { callbacks.onSessionsExpandedChange(!state.sessionsExpanded) },
+                    onSortSelect = callbacks.onSessionSortSelect,
+                    onClearSessions = callbacks.onClearSessions,
                 )
             }
-            if (sessionsExpanded) {
-                items(sessions, key = { it.id }) { session ->
+            if (state.sessionsExpanded) {
+                items(state.sessions, key = { it.id }) { session ->
                     SessionCard(
                         session = session,
-                        onDelete = { viewModel.deleteSession(session.id) },
+                        onDelete = { callbacks.onDeleteSession(session.id) },
                     )
                 }
             }
@@ -304,11 +361,15 @@ private fun TrafficLineChart(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
+    val largeText = density.fontScale > 1f
+    val axisSteps = if (largeText) LARGE_TEXT_CHART_AXIS_STEPS else CHART_AXIS_STEPS
+    val axisWidth = if (largeText) 56.dp else 44.dp
     val gridColor = OzeroPalette.Text3.copy(alpha = 0.2f)
     val borderColor = OzeroPalette.Text3.copy(alpha = 0.3f)
     val axisStyle = MaterialTheme.typography.labelSmall.copy(
         color = OzeroPalette.Text3,
-        fontSize = androidx.compose.ui.unit.TextUnit(8f, androidx.compose.ui.unit.TextUnitType.Sp),
+        fontSize = 8.sp,
+        lineHeight = 9.sp,
     )
 
     val allValues = data.lines.values.flatten()
@@ -316,8 +377,8 @@ private fun TrafficLineChart(
         val raw = if (allValues.isEmpty()) 0f else allValues.maxOf { it }.toFloat()
         chartNiceMax(raw)
     }
-    val axisLabels = remember(niceMax) {
-        chartAxisLabels(niceMax, CHART_AXIS_STEPS).map(BytesFormatter::humanReadable)
+    val axisLabels = remember(niceMax, axisSteps) {
+        chartAxisLabels(niceMax, axisSteps).map(BytesFormatter::humanReadable)
     }
 
     val bucketLabels = remember(data.buckets, timeframe) {
@@ -331,8 +392,9 @@ private fun TrafficLineChart(
             Row(modifier = Modifier.weight(1f)) {
                 Column(
                     modifier = Modifier
-                        .width(44.dp)
-                        .fillMaxHeight(),
+                        .width(axisWidth)
+                        .fillMaxHeight()
+                        .testTag(TrafficStatsTestTags.CHART_Y_AXIS),
                     verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.End,
                 ) {
@@ -341,12 +403,17 @@ private fun TrafficLineChart(
                     }
                 }
                 Spacer(modifier = Modifier.width(4.dp))
-                Canvas(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                Canvas(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .testTag(TrafficStatsTestTags.CHART_PLOT),
+                ) {
                     val w = size.width
                     val h = size.height
                     val linePx = with(density) { 1.dp.toPx() }
-                    for (i in 1 until CHART_AXIS_STEPS) {
-                        val y = h * i / CHART_AXIS_STEPS.toFloat()
+                    for (i in 1 until axisSteps) {
+                        val y = h * i / axisSteps.toFloat()
                         drawLine(gridColor, Offset(0f, y), Offset(w, y), linePx)
                     }
                     drawRect(borderColor, style = Stroke(width = linePx))
@@ -367,15 +434,12 @@ private fun TrafficLineChart(
                 }
             }
             if (bucketLabels.isNotEmpty()) {
-                val displayLabels = if (LocalDensity.current.fontScale > 1f && bucketLabels.size > 3) {
-                    listOf(bucketLabels.first(), bucketLabels[bucketLabels.lastIndex / 2], bucketLabels.last())
-                } else {
-                    bucketLabels
-                }
+                val displayLabels = displayBucketLabels(bucketLabels, largeText)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 48.dp),
+                        .padding(start = axisWidth + 4.dp)
+                        .testTag(TrafficStatsTestTags.CHART_X_AXIS),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     displayLabels.forEach { label ->
@@ -386,6 +450,13 @@ private fun TrafficLineChart(
         }
     }
 }
+
+private fun displayBucketLabels(bucketLabels: List<String>, largeText: Boolean): List<String> =
+    if (largeText && bucketLabels.size > 3) {
+        listOf(bucketLabels.first(), bucketLabels[bucketLabels.lastIndex / 2], bucketLabels.last())
+    } else {
+        bucketLabels
+    }
 
 @Composable
 private fun ChartLegend(engineIds: List<String>, showAll: Boolean) {
@@ -678,3 +749,12 @@ private fun buildBucketLabels(
 }
 
 private const val CHART_AXIS_STEPS = 5
+private const val LARGE_TEXT_CHART_AXIS_STEPS = 3
+
+object TrafficStatsTestTags {
+    const val ROOT = "traffic_stats"
+    const val CHART = "traffic_chart"
+    const val CHART_Y_AXIS = "traffic_chart_y_axis"
+    const val CHART_PLOT = "traffic_chart_plot"
+    const val CHART_X_AXIS = "traffic_chart_x_axis"
+}

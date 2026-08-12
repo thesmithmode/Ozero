@@ -223,7 +223,7 @@ class EngineWarpStartAttachTest {
         warpReadyPollMs = 10L,
         statsPollIntervalMs = 5_000L,
         handshakeStaleThresholdSec = 180L,
-        pluginScope = scope,
+        runtimeControl = WarpRuntimeControl(pluginScope = scope),
     )
 
     private class FakeAuto : WarpAutoConfig {

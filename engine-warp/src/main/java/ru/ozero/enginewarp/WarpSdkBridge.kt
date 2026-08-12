@@ -23,6 +23,8 @@ interface WarpSdkBridge {
 
     suspend fun stopProxy() = Unit
 
+    fun forceTerminate() = Unit
+
     fun isRunning(): Boolean
 
     fun reprotectSockets()

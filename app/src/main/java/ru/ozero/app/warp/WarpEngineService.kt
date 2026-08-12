@@ -5,6 +5,8 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
+import android.os.Process
+import android.os.SystemClock
 import android.util.Log
 import org.amnezia.awg.GoBackend
 import org.amnezia.awg.ProxyGoBackend
@@ -17,14 +19,19 @@ import ru.ozero.enginewarp.WarpTurnOnResult
 class WarpEngineService : Service() {
     private val runtimeLock = Any()
     private val activeTunHandles = WarpNativeHandleRegistry(::turnOffNative)
+    private val shutdownCoordinator = WarpRuntimeShutdownCoordinator(
+        cleanup = ::stopActiveRuntime,
+        terminateProcess = ::terminateCurrentProcess,
+    )
 
     @Volatile private var proxyStarted = false
+    private var lastRuntimeStopElapsedMs = NO_RUNTIME_STOP
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         return when (intent?.action) {
             ACTION_START_SESSION -> startForegroundSession()
             ACTION_STOP_SESSION -> {
-                stopActiveRuntime()
+                shutdownCoordinator.request()
                 leaveForeground()
                 stopSelf(startId)
                 START_NOT_STICKY
@@ -46,6 +53,10 @@ class WarpEngineService : Service() {
         ): Int {
             return synchronized(runtimeLock) {
                 ensureLibraryLoaded()
+                if (!prepareForNewRuntime()) {
+                    runCatching { tunFd.close() }
+                    return@synchronized -1
+                }
                 val rawFd = tunFd.detachFd()
                 Log.i(TAG, "awgTurnOn name=$name fd=$rawFd iniLen=${iniConfig.length}")
                 GoBackend.awgTurnOn(name, rawFd, iniConfig, uapiPath)
@@ -92,6 +103,10 @@ class WarpEngineService : Service() {
         ): WarpTurnOnResult {
             return synchronized(runtimeLock) {
                 ensureLibraryLoaded()
+                if (!prepareForNewRuntime()) {
+                    runCatching { tunFd.close() }
+                    return@synchronized WarpTurnOnResult(-1, null, null)
+                }
                 val rawFd = tunFd.detachFd()
                 Log.i(TAG, "awgTurnOn(combined) name=$name fd=$rawFd iniLen=${iniConfig.length}")
                 val handle = GoBackend.awgTurnOn(name, rawFd, iniConfig, uapiPath)
@@ -121,6 +136,7 @@ class WarpEngineService : Service() {
         ): Int {
             return synchronized(runtimeLock) {
                 ensureLibraryLoaded()
+                if (!prepareForNewRuntime()) return@synchronized -1
                 Log.i(TAG, "awgStartProxy name=$name port=$port iniLen=${iniConfig.length}")
                 ProxyGoBackend.awgSetSocketProtector(SocketProtector { _ -> 1 })
                 ProxyGoBackend.awgStartProxy(name, iniConfig, uapiPath, port).also { handle ->
@@ -135,6 +151,7 @@ class WarpEngineService : Service() {
                 Log.i(TAG, "awgStopProxy")
                 ProxyGoBackend.awgStopProxy()
                 proxyStarted = false
+                markRuntimeStopped()
             }
         }
 
@@ -144,12 +161,21 @@ class WarpEngineService : Service() {
                 ProxyGoBackend.awgResetJNIGlobals()
             }
         }
+
+        override fun forceTerminate() = terminateCurrentProcess()
     }
 
     override fun onBind(intent: Intent): IBinder = binder
 
+    override fun onUnbind(intent: Intent?): Boolean {
+        shutdownCoordinator.request()
+        leaveForeground()
+        stopSelf()
+        return false
+    }
+
     override fun onDestroy() {
-        stopActiveRuntime()
+        shutdownCoordinator.request()
         leaveForeground()
         super.onDestroy()
     }
@@ -171,17 +197,60 @@ class WarpEngineService : Service() {
         }
     }
 
-    private fun stopActiveRuntime() {
-        synchronized(runtimeLock) {
-            activeTunHandles.releaseAll()
-            if (!proxyStarted) return
-            runCatching {
+    private fun stopActiveRuntime(): Boolean = synchronized(runtimeLock) {
+        val tunnelsStopped = releaseActiveTunnels()
+        val proxyStopped = stopActiveProxy()
+        tunnelsStopped && proxyStopped
+    }
+
+    private fun prepareForNewRuntime(): Boolean {
+        val tunnelsStopped = releaseActiveTunnels()
+        val proxyStopped = stopActiveProxy()
+        val stopped = tunnelsStopped && proxyStopped
+        if (stopped) awaitRuntimeRestartCooldown()
+        return stopped
+    }
+
+    private fun releaseActiveTunnels(): Boolean {
+        repeat(CLEANUP_ATTEMPTS) {
+            if (activeTunHandles.releaseAll()) return true
+        }
+        return activeTunHandles.isEmpty()
+    }
+
+    private fun stopActiveProxy(): Boolean {
+        if (!proxyStarted) return true
+        repeat(CLEANUP_ATTEMPTS) {
+            val reset = runCatching {
                 ensureLibraryLoaded()
+                ProxyGoBackend.awgResetJNIGlobals()
+            }.onFailure { Log.e(TAG, "awgResetJNIGlobals cleanup failed: ${it.message}") }
+            val stopped = runCatching {
                 ProxyGoBackend.awgStopProxy()
             }.onSuccess {
                 proxyStarted = false
+                markRuntimeStopped()
             }.onFailure { Log.e(TAG, "awgStopProxy cleanup failed: ${it.message}") }
+            if (reset.isSuccess && stopped.isSuccess) return true
+            if (stopped.isSuccess) return false
         }
+        return !proxyStarted
+    }
+
+    private fun markRuntimeStopped() {
+        lastRuntimeStopElapsedMs = SystemClock.elapsedRealtime()
+    }
+
+    private fun awaitRuntimeRestartCooldown() {
+        if (lastRuntimeStopElapsedMs == NO_RUNTIME_STOP) return
+        val elapsed = SystemClock.elapsedRealtime() - lastRuntimeStopElapsedMs
+        val remaining = RUNTIME_RESTART_COOLDOWN_MS - elapsed
+        if (remaining > 0L) SystemClock.sleep(remaining)
+    }
+
+    private fun terminateCurrentProcess() {
+        Log.e(TAG, "native cleanup was not confirmed; terminating isolated WARP process")
+        Process.killProcess(Process.myPid())
     }
 
     private fun turnOffNative(handle: Int) {
@@ -189,6 +258,7 @@ class WarpEngineService : Service() {
             ensureLibraryLoaded()
             Log.i(TAG, "awgTurnOff handle=$handle")
             GoBackend.awgTurnOff(handle)
+            markRuntimeStopped()
         } catch (t: Throwable) {
             Log.e(TAG, "awgTurnOff cleanup failed: ${t.message}")
             throw t
@@ -208,5 +278,8 @@ class WarpEngineService : Service() {
         const val TAG = "WarpEngineService"
         const val ACTION_START_SESSION = WarpEngineServiceActions.START_SESSION
         const val ACTION_STOP_SESSION = WarpEngineServiceActions.STOP_SESSION
+        const val CLEANUP_ATTEMPTS = 2
+        const val RUNTIME_RESTART_COOLDOWN_MS = 300L
+        const val NO_RUNTIME_STOP = -1L
     }
 }

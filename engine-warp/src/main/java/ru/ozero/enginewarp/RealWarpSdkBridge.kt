@@ -339,6 +339,13 @@ class RealWarpSdkBridge(
         }
     }
 
+    override fun forceTerminate() {
+        tunnelHandle.set(INVALID_HANDLE)
+        proxyHandle.set(INVALID_HANDLE)
+        savedProtector = null
+        awgRuntime.forceTerminate()
+    }
+
     private fun closeRuntimeIfIdle() {
         if (tunnelHandle.get() != INVALID_HANDLE || proxyHandle.get() != INVALID_HANDLE) return
         awgRuntime.close()
@@ -429,6 +436,8 @@ interface AwgRuntime {
     fun resetProxyGlobals() = Unit
 
     fun close() = Unit
+
+    fun forceTerminate() = close()
 
     fun version(): String = "unknown"
 

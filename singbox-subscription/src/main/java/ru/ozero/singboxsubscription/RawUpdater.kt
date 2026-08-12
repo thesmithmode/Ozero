@@ -19,7 +19,6 @@ import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.BeanSupportError
 import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxconfig.PersistedProfileRecovery
-import ru.ozero.singboxconfig.RecoveryResult
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
@@ -378,7 +377,7 @@ private fun AbstractBean.stableCredentialKey(): String = when (this) {
 }
 
 private fun ProxyProfile.recoveredIdentityBean(): AbstractBean? =
-    (PersistedProfileRecovery.recover(beanBlob, protocolType) as? RecoveryResult.Success)?.bean
+    PersistedProfileRecovery.recoverIdentity(beanBlob, protocolType)
 
 private fun AbstractBean.stableRuntimeKey(): String = when (this) {
     is VLESSBean -> listOf(

@@ -16,12 +16,16 @@ internal class WarpNativeHandleRegistry(
         remove(handle)
     }
 
-    fun releaseAll() {
+    fun releaseAll(): Boolean {
         snapshot().forEach { handle ->
             runCatching { turnOff(handle) }
                 .onSuccess { remove(handle) }
         }
+        return isEmpty()
     }
+
+    @Synchronized
+    fun isEmpty(): Boolean = handles.isEmpty()
 
     @Synchronized
     private fun contains(handle: Int): Boolean = handle in handles

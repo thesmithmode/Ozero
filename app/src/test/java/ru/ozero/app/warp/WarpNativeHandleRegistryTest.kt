@@ -1,6 +1,8 @@
 package ru.ozero.app.warp
 
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 
 class WarpNativeHandleRegistryTest {
@@ -76,9 +78,9 @@ class WarpNativeHandleRegistryTest {
         }
         registry.register(0)
 
-        registry.releaseAll()
+        assertFalse(registry.releaseAll())
         shouldFail = false
-        registry.releaseAll()
+        assertTrue(registry.releaseAll())
 
         assertEquals(listOf(0), released)
     }

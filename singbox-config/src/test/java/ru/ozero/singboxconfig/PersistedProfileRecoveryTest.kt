@@ -3,9 +3,13 @@ package ru.ozero.singboxconfig
 import org.junit.jupiter.api.Test
 import ru.ozero.singboxfmt.BeanBlobSchema
 import ru.ozero.singboxfmt.DecodedCandidate
+import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.VLESSBean
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PersistedProfileRecoveryTest {
     @Test
@@ -13,8 +17,11 @@ class PersistedProfileRecoveryTest {
         val bytes = TRANSITIONAL_FIXTURE_HEX.decodeHex()
 
         val recovered = PersistedProfileRecovery.recover(bytes, PersistedProtocol.VLESS)
+        val identity = PersistedProfileRecovery.recoverIdentity(bytes, PersistedProtocol.VLESS.id)
 
         assertIs<RecoveryResult.Success>(recovered)
+        assertNotNull(identity)
+        assertTrue(KryoSerializer.decodeCandidates(bytes).any { it.schema == BeanBlobSchema.LEGACY_V1 })
         assertEquals(PersistedProtocol.VLESS, PersistedProtocol.fromId(PersistedProtocol.VLESS.id))
         assertEquals(null, PersistedProtocol.fromId(Int.MAX_VALUE))
     }
@@ -58,6 +65,34 @@ class PersistedProfileRecoveryTest {
         val recovered = PersistedProfileRecovery.recoverCandidates(candidates, 0)
 
         assertIs<RecoveryResult.Success>(recovered)
+    }
+
+    @Test
+    fun `identity recovery accepts canonical unsupported profile without runtime validation`() {
+        val unsupported = validVless("198.51.100.22").apply { type = "splithttp" }
+        val bytes = KryoSerializer.serialize(unsupported)
+
+        val runtimeRecovery = PersistedProfileRecovery.recover(bytes, PersistedProtocol.VLESS)
+        val identity = PersistedProfileRecovery.recoverIdentity(bytes, PersistedProtocol.VLESS.id)
+
+        assertEquals(
+            RecoveryFailureCategory.UNSUPPORTED_PROFILE,
+            assertIs<RecoveryResult.Failure>(runtimeRecovery).category,
+        )
+        assertEquals(unsupported.serverAddress, assertNotNull(identity).serverAddress)
+    }
+
+    @Test
+    fun `identity recovery rejects ambiguous fully consumed candidates`() {
+        val identity = PersistedProfileRecovery.recoverIdentityCandidates(
+            candidates = listOf(
+                candidate(BeanBlobSchema.LEGACY_V1, validVless("198.51.100.20")),
+                candidate(BeanBlobSchema.CURRENT_RAW_V2, validVless("198.51.100.21")),
+            ),
+            expectedProtocolType = PersistedProtocol.VLESS.id,
+        )
+
+        assertNull(identity)
     }
 
     private fun candidate(schema: BeanBlobSchema, bean: VLESSBean) =
