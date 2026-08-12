@@ -69,4 +69,15 @@ class WarpEngineServiceLoadOnceSentinelTest {
             "Если startForeground rejected, service обязан self-stop, иначе Android O+ убьёт его по FGS timeout.",
         )
     }
+
+    @Test
+    fun `WARP service releases active runtime for explicit and process teardown`() {
+        val stopSession = source.substringAfter("ACTION_STOP_SESSION ->").substringBefore("else ->")
+        val onDestroy = source.substringAfter("override fun onDestroy()")
+            .substringBefore("private fun startForegroundSession")
+
+        assertTrue(stopSession.contains("stopActiveRuntime()"))
+        assertTrue(onDestroy.contains("stopActiveRuntime()"))
+        assertTrue(source.contains("activeTunHandles.releaseAll()"))
+    }
 }

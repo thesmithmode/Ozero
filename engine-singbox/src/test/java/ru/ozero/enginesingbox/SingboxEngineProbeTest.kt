@@ -317,7 +317,7 @@ class SingboxEngineProbeTest {
         )
 
         val failure = assertIs<StartResult.Failure>(result)
-        assertTrue(failure.reason.contains("chain deserialization"))
+        assertEquals("chain recovery failed: DECODE_FAILED", failure.reason)
     }
 
     @Test

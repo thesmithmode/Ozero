@@ -2,8 +2,14 @@ package ru.ozero.commonvpn
 
 import android.os.ParcelFileDescriptor
 import io.mockk.mockk
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.ChainOrchestrator
 import ru.ozero.enginescore.EngineCapabilities
@@ -67,7 +73,7 @@ class StartSequenceCoordinatorDecisionCoverageTest {
     }
 
     @Test
-    fun `auto candidates skip disallowed missing config and include valid proxy configs`() {
+    fun `auto candidates skip disallowed missing config and include valid proxy configs`() = runTest {
         val valid = DecisionPlugin(
             EngineId.WARP,
             manualConfig = EngineConfig.WarpProxy(2080),
@@ -100,7 +106,7 @@ class StartSequenceCoordinatorDecisionCoverageTest {
     }
 
     @Test
-    fun `auto candidates use effective settings default priority`() {
+    fun `auto candidates use effective settings default priority`() = runTest {
         val byedpi = DecisionPlugin(
             EngineId.BYEDPI,
             manualConfig = EngineConfig.ByeDpi(socksPort = 2081),
@@ -147,7 +153,7 @@ class StartSequenceCoordinatorDecisionCoverageTest {
         }
 
     @Test
-    fun `build config returns null for missing plugin and selects proxy config only in proxy mode`() {
+    fun `build config returns null for missing plugin and selects proxy config only in proxy mode`() = runTest {
         val plugin = DecisionPlugin(
             EngineId.WARP,
             manualConfig = EngineConfig.WarpProxy(2080),
@@ -238,15 +244,15 @@ class StartSequenceCoordinatorDecisionCoverageTest {
     private fun StartSequenceCoordinator.engineAllowed(engineId: EngineId, trafficMode: TrafficMode): Boolean =
         callPrivate("engineAllowedForTrafficMode", engineId, trafficMode)
 
-    private fun StartSequenceCoordinator.autoCandidates(
+    private suspend fun StartSequenceCoordinator.autoCandidates(
         settings: SettingsModel,
         trafficMode: TrafficMode,
-    ): List<Pair<EngineId, EngineConfig>> = callPrivate("autoCandidates", settings, trafficMode)
+    ): List<Pair<EngineId, EngineConfig>> = callSuspendingPrivate("autoCandidates", settings, trafficMode)
 
-    private fun StartSequenceCoordinator.buildConfig(
+    private suspend fun StartSequenceCoordinator.buildConfig(
         engineId: EngineId,
         trafficMode: TrafficMode,
-    ): EngineConfig? = callPrivate("buildEngineConfig", engineId, SettingsModel(), trafficMode)
+    ): EngineConfig? = callSuspendingPrivate("buildEngineConfig", engineId, SettingsModel(), trafficMode)
 
     private fun StartSequenceCoordinator.reportEngineFailure(
         engineId: EngineId,
@@ -263,6 +269,25 @@ class StartSequenceCoordinatorDecisionCoverageTest {
         }
         method.isAccessible = true
         return method.invoke(this, *args) as T
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun <T> StartSequenceCoordinator.callSuspendingPrivate(
+        name: String,
+        vararg args: Any?,
+    ): T = suspendCoroutine { continuation ->
+        val method = StartSequenceCoordinator::class.java.declaredMethods.first { method ->
+            method.name == name &&
+                method.parameterTypes.size == args.size + 1 &&
+                Continuation::class.java.isAssignableFrom(method.parameterTypes.last())
+        }
+        method.isAccessible = true
+        val result = runCatching { method.invoke(this, *args, continuation) }
+            .getOrElse { throwable ->
+                continuation.resumeWithException(throwable.cause ?: throwable)
+                return@suspendCoroutine
+            }
+        if (result !== COROUTINE_SUSPENDED) continuation.resume(result as T)
     }
 
     private class DecisionPlugin(

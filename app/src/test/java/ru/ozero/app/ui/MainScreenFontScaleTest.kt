@@ -1,31 +1,34 @@
 package ru.ozero.app.ui
 
+import androidx.compose.ui.unit.dp
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
-import kotlin.test.assertEquals
 
 class MainScreenFontScaleTest {
+
     @Test
-    fun `обычный масштаб остается без изменений`() {
-        assertEquals(1f, boundedMainScreenFontScale(1f))
+    fun `обычный масштаб сохраняет исходную компоновку`() {
+        assertFalse(isCompactMainLayout(width = 412.dp, height = 840.dp, fontScale = 1f))
     }
 
     @Test
-    fun `уменьшенный пользователем масштаб остается без изменений`() {
-        assertEquals(0.85f, boundedMainScreenFontScale(0.85f))
+    fun `уменьшенный масштаб сохраняет исходную компоновку`() {
+        assertFalse(isCompactMainLayout(width = 412.dp, height = 840.dp, fontScale = 0.85f))
     }
 
     @Test
-    fun `доступный увеличенный масштаб сохраняется`() {
-        assertEquals(1.2f, boundedMainScreenFontScale(1.2f))
+    fun `увеличенный масштаб включает компактную компоновку`() {
+        assertTrue(isCompactMainLayout(width = 412.dp, height = 840.dp, fontScale = 1.2f))
     }
 
     @Test
-    fun `максимальный поддерживаемый масштаб сохраняется`() {
-        assertEquals(1.3f, boundedMainScreenFontScale(1.3f))
+    fun `маленькая высота включает компактную компоновку`() {
+        assertTrue(isCompactMainLayout(width = 412.dp, height = 700.dp, fontScale = 1f))
     }
 
     @Test
-    fun `системный сверхкрупный масштаб ограничивается`() {
-        assertEquals(1.3f, boundedMainScreenFontScale(2f))
+    fun `узкая ширина включает компактную компоновку`() {
+        assertTrue(isCompactMainLayout(width = 320.dp, height = 840.dp, fontScale = 1f))
     }
 }

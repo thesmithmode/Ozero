@@ -4,6 +4,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -239,6 +241,18 @@ class EngineWarpContractTest {
         val (e, _, _) = engine(activeConfig = sampleConfig, bridge = bridge)
         e.start(EngineConfig.Warp, Upstream.None)
         e.stop()
+        assertEquals(1, bridge.detachCalls)
+    }
+
+    @Test
+    fun `stop finishes native cleanup after caller timeout`() = runTest {
+        val bridge = FakeWarpSdkBridge(stopProxyDelayMs = 10)
+        val (e, _, _) = engine(activeConfig = sampleConfig, bridge = bridge)
+        e.start(EngineConfig.Warp, Upstream.None)
+
+        withTimeoutOrNull(1) { e.stop() }
+
+        assertEquals(1, bridge.stopProxyCalls)
         assertEquals(1, bridge.detachCalls)
     }
 
@@ -755,10 +769,12 @@ class EngineWarpContractTest {
     private class FakeWarpSdkBridge(
         private val attachResult: WarpSdkBridge.AttachResult = WarpSdkBridge.AttachResult.Success,
         private val proxyResult: WarpSdkBridge.ProxyResult = WarpSdkBridge.ProxyResult.Failed("proxy disabled"),
+        private val stopProxyDelayMs: Long = 0L,
     ) : WarpSdkBridge {
         var attachCalls: Int = 0
         var startProxyCalls: Int = 0
         var detachCalls: Int = 0
+        var stopProxyCalls: Int = 0
         var lastFd: Int = -1
         var lastIni: String? = null
         var lastUapi: String? = null
@@ -796,6 +812,11 @@ class EngineWarpContractTest {
         override suspend fun detachTun() {
             detachCalls++
             running = false
+        }
+
+        override suspend fun stopProxy() {
+            stopProxyCalls++
+            if (stopProxyDelayMs > 0) delay(stopProxyDelayMs)
         }
 
         override fun isRunning(): Boolean = running

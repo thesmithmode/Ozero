@@ -15,10 +15,14 @@ import ru.ozero.enginewarp.WarpEngineServiceActions
 import ru.ozero.enginewarp.WarpTurnOnResult
 
 class WarpEngineService : Service() {
+    private val activeTunHandles = WarpNativeHandleRegistry(::turnOffNative)
+    @Volatile private var proxyStarted = false
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         return when (intent?.action) {
             ACTION_START_SESSION -> startForegroundSession()
             ACTION_STOP_SESSION -> {
+                stopActiveRuntime()
                 leaveForeground()
                 stopSelf(startId)
                 START_NOT_STICKY
@@ -42,12 +46,11 @@ class WarpEngineService : Service() {
             val rawFd = tunFd.detachFd()
             Log.i(TAG, "awgTurnOn name=$name fd=$rawFd iniLen=${iniConfig.length}")
             return GoBackend.awgTurnOn(name, rawFd, iniConfig, uapiPath)
+                .also(activeTunHandles::register)
         }
 
         override fun turnOff(handle: Int) {
-            ensureLibraryLoaded()
-            Log.i(TAG, "awgTurnOff handle=$handle")
-            GoBackend.awgTurnOff(handle)
+            activeTunHandles.release(handle)
         }
 
         override fun socketV4Fd(handle: Int): ParcelFileDescriptor? {
@@ -84,6 +87,7 @@ class WarpEngineService : Service() {
                 Log.w(TAG, "awgTurnOn returned handle=$handle (<0 = SDK error) — skip socket fetch")
                 return WarpTurnOnResult(handle, null, null)
             }
+            activeTunHandles.register(handle)
             val v4Pfd = runCatching {
                 val v4Fd = GoBackend.awgGetSocketV4(handle)
                 if (v4Fd > 0) ParcelFileDescriptor.fromFd(v4Fd) else null
@@ -104,13 +108,19 @@ class WarpEngineService : Service() {
             ensureLibraryLoaded()
             Log.i(TAG, "awgStartProxy name=$name port=$port iniLen=${iniConfig.length}")
             ProxyGoBackend.awgSetSocketProtector(SocketProtector { _ -> 1 })
-            return ProxyGoBackend.awgStartProxy(name, iniConfig, uapiPath, port)
+            return ProxyGoBackend.awgStartProxy(name, iniConfig, uapiPath, port).also { handle ->
+                proxyStarted = handle >= 0
+            }
         }
 
         override fun stopProxy() {
             ensureLibraryLoaded()
             Log.i(TAG, "awgStopProxy")
-            ProxyGoBackend.awgStopProxy()
+            try {
+                ProxyGoBackend.awgStopProxy()
+            } finally {
+                proxyStarted = false
+            }
         }
 
         override fun resetProxyGlobals() {
@@ -122,6 +132,7 @@ class WarpEngineService : Service() {
     override fun onBind(intent: Intent): IBinder = binder
 
     override fun onDestroy() {
+        stopActiveRuntime()
         leaveForeground()
         super.onDestroy()
     }
@@ -141,6 +152,24 @@ class WarpEngineService : Service() {
                 stopForeground(false)
             }
         }
+    }
+
+    private fun stopActiveRuntime() {
+        activeTunHandles.releaseAll()
+        if (!proxyStarted) return
+        proxyStarted = false
+        runCatching {
+            ensureLibraryLoaded()
+            ProxyGoBackend.awgStopProxy()
+        }.onFailure { Log.e(TAG, "awgStopProxy cleanup failed: ${it.message}") }
+    }
+
+    private fun turnOffNative(handle: Int) {
+        runCatching {
+            ensureLibraryLoaded()
+            Log.i(TAG, "awgTurnOff handle=$handle")
+            GoBackend.awgTurnOff(handle)
+        }.onFailure { Log.e(TAG, "awgTurnOff cleanup failed: ${it.message}") }
     }
 
     private fun ensureLibraryLoaded() {

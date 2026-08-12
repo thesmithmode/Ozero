@@ -7,6 +7,7 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -165,8 +166,10 @@ class EngineWarp(
                     ?.unregisterNetworkCallback(cb)
             }.onFailure { PersistentLoggers.warn(TAG, "unregisterNetworkCallback failed: ${it.message}") }
         }
-        sdkBridge.stopProxy()
-        sdkBridge.detachTun()
+        withContext(NonCancellable) {
+            sdkBridge.stopProxy()
+            sdkBridge.detachTun()
+        }
         resolvedConfig = null
         resolvedIni = null
     }
