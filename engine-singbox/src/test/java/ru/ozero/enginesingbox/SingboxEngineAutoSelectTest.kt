@@ -180,7 +180,7 @@ class SingboxEngineAutoSelectTest {
     private fun awaitInit() = Thread.sleep(300)
 
     @Test
-    fun `first manual config reads selected profile before collector emits`() {
+    fun `first manual config reads selected profile before collector emits`() = kotlinx.coroutines.test.runTest {
         val selected = makeProfile(42L, 1L, "cold.example.com", 443)
         val prefs = mutablePreferencesOf(beanKey to selected.beanBlob, selectedProfileKey to selected.id)
         val collectorStarted = CountDownLatch(1)
@@ -205,7 +205,7 @@ class SingboxEngineAutoSelectTest {
         )
         assertTrue(collectorStarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
 
-        val result = assertNotNull(engine.buildManualConfig(null))
+        val result = assertIs<EngineConfig.Singbox>(engine.buildManualConfigAwaitingStorage(null))
 
         assertTrue(result.beanBlob.contentEquals(selected.beanBlob))
         assertEquals(selected.protocolType, result.protocolType)

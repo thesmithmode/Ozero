@@ -326,16 +326,16 @@ class StartSequenceCoordinator(
         }
     }
 
-    private fun buildEngineConfig(
+    private suspend fun buildEngineConfig(
         engineId: EngineId,
         settings: SettingsModel,
         trafficMode: TrafficMode = TrafficMode.TUN,
     ): EngineConfig? {
         val plugin = deps.enginePlugins.firstOrNull { it.id == engineId } ?: return null
         return if (trafficMode == TrafficMode.PROXY) {
-            plugin.buildProxyConfig(settings)
+            plugin.buildProxyConfigAwaitingStorage(settings)
         } else {
-            plugin.buildManualConfig(settings)
+            plugin.buildManualConfigAwaitingStorage(settings)
         }
     }
 
@@ -353,7 +353,10 @@ class StartSequenceCoordinator(
         killswitch: Boolean,
     ): Boolean = manualEngine == null && !isLast && trafficMode == TrafficMode.TUN && killswitch
 
-    private fun autoCandidates(settings: SettingsModel, trafficMode: TrafficMode): List<Pair<EngineId, EngineConfig>> {
+    private suspend fun autoCandidates(
+        settings: SettingsModel,
+        trafficMode: TrafficMode,
+    ): List<Pair<EngineId, EngineConfig>> {
         return settings.engineAutoPriority.mapNotNull { id ->
             if (!engineAllowedForTrafficMode(id, trafficMode)) return@mapNotNull null
             val cfg = buildEngineConfig(id, settings, trafficMode) ?: return@mapNotNull null

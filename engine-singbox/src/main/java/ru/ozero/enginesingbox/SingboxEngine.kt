@@ -694,7 +694,13 @@ class SingboxEngine @Inject constructor(
         if (!awaitLocalSocksReady(port)) {
             return EnginePlugin.ReadyResult.Timeout("sing-box SOCKS5 listener is not ready")
         }
-        return EnginePlugin.ReadyResult.Ready
+        return when (val result = routedProbe.probe(port)) {
+            is RoutedProbeResult.Success -> EnginePlugin.ReadyResult.Ready
+            is RoutedProbeResult.Failure -> {
+                PersistentLoggers.warn(TAG, "startup routed probe failed reason=${result.reason}")
+                EnginePlugin.ReadyResult.Timeout(result.reason.probeFailureMessage())
+            }
+        }
     }
 
     private suspend fun awaitLocalSocksReady(port: Int): Boolean {
@@ -775,7 +781,6 @@ class SingboxEngine @Inject constructor(
     }
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
-        ensurePreferencesCacheInitialized()
         val ipv6Enabled = settings?.ipv6Enabled ?: false
         cachedIpv6Enabled = ipv6Enabled
         if (cachedSelectedProfileId == SELECTED_AUTO) {
@@ -831,9 +836,12 @@ class SingboxEngine @Inject constructor(
         )
     }
 
-    private fun ensurePreferencesCacheInitialized() {
-        if (preferencesCacheInitialized) return
-        val prefs = runBlocking(Dispatchers.IO) { dataStore.data.first() }
+    override suspend fun buildManualConfigAwaitingStorage(settings: SettingsModel?): EngineConfig? {
+        if (!preferencesCacheInitialized) ensurePreferencesCacheInitialized(dataStore.data.first())
+        return buildManualConfig(settings)
+    }
+
+    private fun ensurePreferencesCacheInitialized(prefs: Preferences) {
         if (preferencesCacheInitialized) return
         cachedBlob = prefs[BEAN_KEY]
         cachedSelectedProfileId = prefs[SELECTED_PROFILE_KEY]
@@ -844,6 +852,9 @@ class SingboxEngine @Inject constructor(
 
     override fun buildProxyConfig(settings: SettingsModel?): EngineConfig? =
         buildManualConfig(settings)?.let { it as? EngineConfig.Singbox }?.copy(proxyMode = true)
+
+    override suspend fun buildProxyConfigAwaitingStorage(settings: SettingsModel?): EngineConfig? =
+        buildManualConfigAwaitingStorage(settings)?.let { it as? EngineConfig.Singbox }?.copy(proxyMode = true)
 
     private fun decodeProfiles(
         blobs: List<ByteArray>,

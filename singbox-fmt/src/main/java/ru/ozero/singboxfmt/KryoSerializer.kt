@@ -8,6 +8,8 @@ import com.esotericsoftware.kryo.util.Pool
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.lang.reflect.Modifier
+import java.util.concurrent.ConcurrentHashMap
 
 object KryoSerializer {
     private const val MAGIC = 0x4f5a424e
@@ -71,7 +73,7 @@ object KryoSerializer {
 
     fun deserializeWithMigration(bytes: ByteArray): DecodedBean {
         val candidates = decodeCandidates(bytes)
-        val semanticCandidates = candidates.distinctBy { serialize(it.bean).toList() }
+        val semanticCandidates = candidates.distinctBy { semanticKey(it.bean) }
         val bean = when (semanticCandidates.size) {
             0 -> throw KryoException("Unsupported bean blob")
             1 -> semanticCandidates.single().bean
@@ -105,6 +107,21 @@ object KryoSerializer {
 
     private fun requireAllowedPersistedBean(bean: AbstractBean) =
         require(bean is VLESSBean || bean is VMessBean || bean is TrojanBean || bean is ShadowsocksBean)
+
+    private val semanticFields = ConcurrentHashMap<Class<*>, List<java.lang.reflect.Field>>()
+
+    private fun semanticKey(bean: AbstractBean): List<Any?> = buildList {
+        add(bean.javaClass.name)
+        semanticFields.getOrPut(bean.javaClass) {
+            generateSequence(bean.javaClass) { it.superclass }
+                .takeWhile { AbstractBean::class.java.isAssignableFrom(it) }
+                .flatMap { it.declaredFields.asSequence() }
+                .filterNot { Modifier.isStatic(it.modifiers) }
+                .sortedBy { "${it.declaringClass.name}:${it.name}" }
+                .onEach { it.isAccessible = true }
+                .toList()
+        }.forEach { add(it.get(bean)) }
+    }
 
     data class DecodedBean(
         val bean: AbstractBean,
