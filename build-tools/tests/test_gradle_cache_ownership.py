@@ -21,3 +21,10 @@ class GradleCacheOwnershipTest(unittest.TestCase):
             conflicting_workflows,
             "setup-java cache prevents setup-gradle from restoring and saving wrapper distributions",
         )
+
+    def test_style_gate_primes_shared_native_binary_cache_before_fanout(self):
+        source = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
+        style_job = source.split("  kotlin-style:", 1)[1].split("\n  test-singbox:", 1)[0]
+
+        self.assertIn(":engine-byedpi:downloadBinaries", style_job)
+        self.assertIn(":engine-masterdns:downloadBinaries", style_job)

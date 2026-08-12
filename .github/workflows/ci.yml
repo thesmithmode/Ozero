@@ -91,8 +91,13 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
-      - name: ktlint + detekt
-        run: ./gradlew ktlintCheck detekt --stacktrace --continue
+      - name: Prime native cache + ktlint + detekt
+        run: |
+          ./gradlew \
+            :engine-byedpi:downloadBinaries \
+            :engine-masterdns:downloadBinaries \
+            ktlintCheck detekt \
+            --stacktrace --continue
 
 
   test-singbox:

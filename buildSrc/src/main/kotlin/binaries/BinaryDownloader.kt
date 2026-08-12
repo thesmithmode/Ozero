@@ -46,7 +46,7 @@ class BinaryDownloader(
         val tmp = parent.resolve("${cached.fileName}.tmp.${ProcessHandle.current().pid()}")
 
         var lastError: Exception? = null
-        val attempts = retryDelaysMs.size
+        val attempts = retryDelaysMs.size + 1
         for (attempt in 1..attempts) {
             try {
                 val request =

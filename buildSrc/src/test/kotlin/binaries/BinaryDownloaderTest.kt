@@ -99,6 +99,21 @@ class BinaryDownloaderTest {
     }
 
     @Test
+    fun `three retry delays allow success on fourth attempt`() {
+        val data = "masterdns-binary".toByteArray()
+        repeat(3) { server.enqueue(MockResponse().setResponseCode(503)) }
+        server.enqueue(bodyResponse(data))
+        val cache = tmp.resolve("cache")
+        val dst = tmp.resolve("out/libmdnsvpn.so")
+        val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = listOf(0, 0, 0))
+
+        downloader.download(server.url("/x.so").toString(), sha256(data), dst)
+
+        assertThat(Files.readAllBytes(dst)).isEqualTo(data)
+        assertThat(server.requestCount).isEqualTo(4)
+    }
+
+    @Test
     fun `404 fails immediately with canonical message — no retry`() {
         server.enqueue(MockResponse().setResponseCode(404))
         val cache = tmp.resolve("cache")
@@ -138,12 +153,12 @@ class BinaryDownloaderTest {
         }
             .isInstanceOf(BinaryDownloadException::class.java)
             .hasMessageContaining("500")
-        assertThat(server.requestCount).isEqualTo(3)
+        assertThat(server.requestCount).isEqualTo(4)
     }
 
     @Test
     fun `599 is treated as retryable server error`() {
-        repeat(2) { server.enqueue(MockResponse().setResponseCode(599)) }
+        repeat(3) { server.enqueue(MockResponse().setResponseCode(599)) }
         val cache = tmp.resolve("cache")
         val dst = tmp.resolve("out/libbyedpi.so")
         val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = listOf(0, 0))
@@ -154,12 +169,12 @@ class BinaryDownloaderTest {
             .isInstanceOf(BinaryDownloadException::class.java)
             .hasMessageContaining("599")
 
-        assertThat(server.requestCount).isEqualTo(2)
+        assertThat(server.requestCount).isEqualTo(3)
     }
 
     @Test
-    fun `single retry slot still reports final failure without sleeping`() {
-        server.enqueue(MockResponse().setResponseCode(500))
+    fun `single retry delay allows one retry before final failure`() {
+        repeat(2) { server.enqueue(MockResponse().setResponseCode(500)) }
         val cache = tmp.resolve("cache")
         val dst = tmp.resolve("out/libbyedpi.so")
         val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = listOf(0))
@@ -168,10 +183,10 @@ class BinaryDownloaderTest {
             downloader.download(server.url("/x.so").toString(), "0".repeat(64), dst)
         }
             .isInstanceOf(BinaryDownloadException::class.java)
-            .hasMessageContaining("after 1 attempts")
+            .hasMessageContaining("after 2 attempts")
             .hasMessageContaining("HTTP 500")
 
-        assertThat(server.requestCount).isEqualTo(1)
+        assertThat(server.requestCount).isEqualTo(2)
     }
 
     @Test
@@ -201,12 +216,13 @@ class BinaryDownloaderTest {
             downloader.download(url, "0".repeat(64), dst)
         }
             .isInstanceOf(BinaryDownloadException::class.java)
-            .hasMessageContaining("after 3 attempts")
+            .hasMessageContaining("after 4 attempts")
             .hasCauseInstanceOf(java.io.IOException::class.java)
     }
 
     @Test
-    fun `empty retry schedule fails without issuing HTTP request`() {
+    fun `empty retry schedule performs one initial request without retry`() {
+        server.enqueue(MockResponse().setResponseCode(500))
         val cache = tmp.resolve("cache")
         val dst = tmp.resolve("out/libbyedpi.so")
         val downloader = BinaryDownloader(cacheDir = cache, retryDelaysMs = emptyList())
@@ -215,9 +231,9 @@ class BinaryDownloaderTest {
             downloader.download(server.url("/x.so").toString(), "0".repeat(64), dst)
         }
             .isInstanceOf(BinaryDownloadException::class.java)
-            .hasMessageContaining("after 0 attempts")
+            .hasMessageContaining("after 1 attempts")
 
-        assertThat(server.requestCount).isEqualTo(0)
+        assertThat(server.requestCount).isEqualTo(1)
         assertThat(Files.exists(dst)).isFalse()
     }
 
@@ -233,7 +249,7 @@ class BinaryDownloaderTest {
             downloader.download(url, "0".repeat(64), dst)
         }
             .isInstanceOf(BinaryDownloadException::class.java)
-            .hasMessageContaining("after 1 attempts")
+            .hasMessageContaining("after 2 attempts")
             .hasCauseInstanceOf(java.io.IOException::class.java)
     }
 }
