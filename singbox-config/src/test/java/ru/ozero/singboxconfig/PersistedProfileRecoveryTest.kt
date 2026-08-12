@@ -9,7 +9,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class PersistedProfileRecoveryTest {
     @Test
@@ -21,9 +20,20 @@ class PersistedProfileRecoveryTest {
 
         assertIs<RecoveryResult.Success>(recovered)
         assertNotNull(identity)
-        assertTrue(KryoSerializer.decodeCandidates(bytes).any { it.schema == BeanBlobSchema.LEGACY_V1 })
         assertEquals(PersistedProtocol.VLESS, PersistedProtocol.fromId(PersistedProtocol.VLESS.id))
         assertEquals(null, PersistedProtocol.fromId(Int.MAX_VALUE))
+    }
+
+    @Test
+    fun `identity recovery accepts fully consumed legacy profile`() {
+        val bytes = assertNotNull(javaClass.getResourceAsStream("/legacy/vless-reality-vision-70899053.bin"))
+            .use { it.readBytes() }
+
+        val identity = PersistedProfileRecovery.recoverIdentity(bytes, PersistedProtocol.VLESS.id)
+        val candidate = KryoSerializer.decodeCandidates(bytes).single()
+
+        assertEquals(BeanBlobSchema.LEGACY_V1, candidate.schema)
+        assertEquals("198.51.100.10", assertNotNull(identity).serverAddress)
     }
 
     @Test
