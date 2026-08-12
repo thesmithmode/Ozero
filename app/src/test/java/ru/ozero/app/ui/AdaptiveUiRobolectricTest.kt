@@ -71,7 +71,12 @@ class AdaptiveUiRobolectricTest {
             }
         }
 
-        composeRule.onNodeWithTag(MainScreenTestTags.TRAFFIC_STATS).assertIsDisplayed()
+        composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "home").assertIsDisplayed()
+        composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "servers").assertIsDisplayed()
+        composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "split_tunnel").assertIsDisplayed()
+        composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "settings").assertIsDisplayed()
+        composeRule.onNodeWithTag(MainScreenTestTags.TRAFFIC_STATS).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "home").assertIsDisplayed()
         composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "servers").assertIsDisplayed()
         composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "split_tunnel").assertIsDisplayed()
         composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "settings").assertIsDisplayed()
