@@ -47,6 +47,7 @@ fun BottomDock(
     activeTabId: String,
     onTabSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
+    adaptiveLabels: Boolean = false,
 ) {
     Row(
         modifier = modifier
@@ -74,6 +75,7 @@ fun BottomDock(
                 tab = tab,
                 isActive = tab.id == activeTabId,
                 onClick = { onTabSelected(tab.id) },
+                adaptiveLabel = adaptiveLabels,
                 modifier = Modifier
                     .weight(1f)
                     .testTag("$BOTTOM_DOCK_TAB_TEST_TAG_PREFIX${tab.id}"),
@@ -87,12 +89,13 @@ private fun DockButton(
     tab: DockTab,
     isActive: Boolean,
     onClick: () -> Unit,
+    adaptiveLabel: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val tint = if (isActive) MaterialTheme.colorScheme.onSurface else OzeroPalette.Text2
     val background = if (isActive) Color.White.copy(alpha = 0.10f) else Color.Transparent
     val density = LocalDensity.current
-    val verticalScale = min(1f, 1.3f / density.fontScale)
+    val verticalScale = if (adaptiveLabel) 1f else min(1f, 1.3f / density.fontScale)
     val iconSize = (DOCK_ICON_SIZE_DP * verticalScale).dp
     val verticalPadding = (DOCK_BUTTON_VERTICAL_PADDING_DP * verticalScale).dp
     val labelSize = (DOCK_LABEL_SIZE_SP * verticalScale).sp
@@ -127,7 +130,7 @@ private fun DockButton(
                     lineHeight = labelLineHeight,
                 ),
                 color = tint,
-                maxLines = 1,
+                maxLines = if (adaptiveLabel) 2 else 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }

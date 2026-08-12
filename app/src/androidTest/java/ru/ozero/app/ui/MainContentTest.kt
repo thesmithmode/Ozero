@@ -135,6 +135,9 @@ class MainContentTest {
         )
 
         composeRule.onNodeWithTag(BOTTOM_DOCK_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "servers").assertIsDisplayed()
+        composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "split_tunnel").assertIsDisplayed()
+        composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "settings").assertIsDisplayed()
         composeRule.onNodeWithTag(MainScreenTestTags.ENGINE_CHIPS_ROW).assertExists()
     }
 

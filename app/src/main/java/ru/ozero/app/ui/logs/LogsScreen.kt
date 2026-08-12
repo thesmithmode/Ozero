@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -365,6 +366,32 @@ private fun LogEntryRow(entry: LogEntry) {
     val timeStr = formatLogTime(entry.timestampMs)
     val lvlColor = levelColor(entry.level)
 
+    if (LocalDensity.current.fontScale > 1f) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(LogsScreenTestTags.logRow(entry)),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                LogMetadata(text = timeStr, color = OzeroPalette.Text3)
+                LogMetadata(text = entry.tag.take(12), color = OzeroPalette.Violet)
+                LogMetadata(text = entry.level.name.take(5), color = lvlColor)
+            }
+            Text(
+                text = entry.message,
+                fontFamily = FontFamily.Monospace,
+                style = MaterialTheme.typography.labelSmall,
+                color = OzeroPalette.Text,
+                maxLines = 4,
+            )
+        }
+        return
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -405,6 +432,17 @@ private fun LogEntryRow(entry: LogEntry) {
             maxLines = 2,
         )
     }
+}
+
+@Composable
+private fun LogMetadata(text: String, color: Color) {
+    Text(
+        text = text,
+        fontFamily = FontFamily.Monospace,
+        style = MaterialTheme.typography.labelSmall,
+        color = color,
+        maxLines = 1,
+    )
 }
 
 private fun formatLogTime(timestampMs: Long): String {

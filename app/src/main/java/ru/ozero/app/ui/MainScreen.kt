@@ -328,6 +328,7 @@ private fun CompactSimpleMainContent(
                     DOCK_TAB_SETTINGS -> callbacks.onOpenSettings()
                 }
             },
+            adaptiveLabels = true,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 4.dp),
@@ -595,6 +596,7 @@ private fun CompactExpertMainContent(
                     DOCK_TAB_SETTINGS -> callbacks.onOpenSettings()
                 }
             },
+            adaptiveLabels = true,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 4.dp),
@@ -925,9 +927,10 @@ private fun TrafficStatsCard(
             LiveTrafficChart(
                 history = displayHistory,
                 selectedTf = selectedTf,
+                compact = compactVertical,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (compactVertical) 64.dp else 96.dp),
+                    .height(96.dp),
             )
             TrafficStatsFooter(
                 selectedTf = selectedTf,
@@ -1057,6 +1060,7 @@ private fun TotalsRow(rxTotal: String, txTotal: String) {
 private fun LiveTrafficChart(
     history: List<Pair<Float, Float>>,
     selectedTf: TimeframeOption,
+    compact: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val colorRx = OzeroPalette.Aqua
@@ -1115,15 +1119,28 @@ private fun LiveTrafficChart(
                 drawPath(pathTx, colorTx, style = stroke)
             }
         }
+        val timeLabels = if (compact) {
+            listOf(
+                chartTimeAgo(selectedTf.points),
+                chartTimeAgo(selectedTf.points / 2),
+                "now",
+            )
+        } else {
+            listOf(
+                chartTimeAgo(selectedTf.points),
+                chartTimeAgo(selectedTf.points * 3 / 4),
+                chartTimeAgo(selectedTf.points / 2),
+                chartTimeAgo(selectedTf.points / 4),
+                "now",
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 48.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(chartTimeAgo(selectedTf.points), style = axisStyle)
-            Text(chartTimeAgo(selectedTf.points * 3 / 4), style = axisStyle)
-            Text(chartTimeAgo(selectedTf.points / 2), style = axisStyle)
-            Text(chartTimeAgo(selectedTf.points / 4), style = axisStyle)
-            Text("now", style = axisStyle)
+            timeLabels.forEach { label ->
+                Text(label, style = axisStyle)
+            }
         }
     }
 }

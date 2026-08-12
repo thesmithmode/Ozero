@@ -262,11 +262,7 @@ private fun EngineFilterRow(
 
 @Composable
 private fun SummaryRow(summary: TrafficSummary) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    val content: @Composable () -> Unit = {
         Text(
             text = "↓ ${BytesFormatter.humanReadable(summary.totalRx)}",
             style = MaterialTheme.typography.bodyMedium,
@@ -282,6 +278,22 @@ private fun SummaryRow(summary: TrafficSummary) {
             style = MaterialTheme.typography.bodySmall,
             color = OzeroPalette.Text3,
         )
+    }
+    if (LocalDensity.current.fontScale > 1f) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            content()
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            content()
+        }
     }
 }
 
@@ -355,13 +367,18 @@ private fun TrafficLineChart(
                 }
             }
             if (bucketLabels.isNotEmpty()) {
+                val displayLabels = if (LocalDensity.current.fontScale > 1f && bucketLabels.size > 3) {
+                    listOf(bucketLabels.first(), bucketLabels[bucketLabels.lastIndex / 2], bucketLabels.last())
+                } else {
+                    bucketLabels
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = 48.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    bucketLabels.forEach { label ->
+                    displayLabels.forEach { label ->
                         Text(label, style = axisStyle)
                     }
                 }
@@ -421,11 +438,7 @@ private fun EngineBreakdown(engineSummaries: List<EngineSummary>) {
                         color = OzeroPalette.Line,
                     )
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                val engineLabel: @Composable () -> Unit = {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -441,6 +454,8 @@ private fun EngineBreakdown(engineSummaries: List<EngineSummary>) {
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
+                }
+                val trafficValues: @Composable () -> Unit = {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
                             text = "↓ ${BytesFormatter.humanReadable(es.rx)}",
@@ -452,6 +467,24 @@ private fun EngineBreakdown(engineSummaries: List<EngineSummary>) {
                             style = MaterialTheme.typography.bodySmall,
                             color = OzeroPalette.Amber,
                         )
+                    }
+                }
+                if (LocalDensity.current.fontScale > 1f) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        engineLabel()
+                        trafficValues()
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        engineLabel()
+                        trafficValues()
                     }
                 }
             }
@@ -469,11 +502,7 @@ private fun SessionsDrillDownHeader(
     onClearSessions: () -> Unit,
 ) {
     var showClearConfirm by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    val title: @Composable () -> Unit = {
         TextButton(onClick = onToggle) {
             Icon(
                 imageVector = if (expanded) {
@@ -491,6 +520,8 @@ private fun SessionsDrillDownHeader(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
+    }
+    val actions: @Composable () -> Unit = {
         if (expanded) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (sessions.isNotEmpty()) {
@@ -506,6 +537,21 @@ private fun SessionsDrillDownHeader(
                 }
                 SessionSortMenu(current = sort, onSelect = onSortSelect)
             }
+        }
+    }
+    if (LocalDensity.current.fontScale > 1f) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            title()
+            actions()
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            title()
+            actions()
         }
     }
     if (showClearConfirm) {

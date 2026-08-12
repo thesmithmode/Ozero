@@ -2,6 +2,7 @@ package ru.ozero.app.ui.onboarding
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -42,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -124,30 +126,68 @@ fun OnboardingContent(
                     )
                 }
             }
+            OnboardingNavigation(
+                pageIndex = pageIndex,
+                totalPages = totalPages,
+                onSkip = onSkip,
+                onNext = {
+                    onNext()
+                    scope.launch { pagerState.animateScrollToPage(pageIndex + 1) }
+                },
+                onFinish = onFinish,
+            )
+        }
+    }
+}
+
+@Composable
+private fun OnboardingNavigation(
+    pageIndex: Int,
+    totalPages: Int,
+    onSkip: () -> Unit,
+    onNext: () -> Unit,
+    onFinish: () -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 360.dp || LocalDensity.current.fontScale > 1f
+        val skipButton: @Composable (Modifier) -> Unit = { buttonModifier ->
+            OutlinedButton(
+                onClick = onSkip,
+                modifier = buttonModifier.testTag("onboarding_skip"),
+            ) {
+                Text(stringResource(R.string.onboarding_skip))
+            }
+        }
+        val actionButton: @Composable (Modifier) -> Unit = { buttonModifier ->
+            if (pageIndex < totalPages - 1) {
+                Button(
+                    onClick = onNext,
+                    modifier = buttonModifier.testTag("onboarding_next"),
+                ) {
+                    Text(stringResource(R.string.onboarding_next))
+                }
+            } else {
+                Button(
+                    onClick = onFinish,
+                    modifier = buttonModifier.testTag("onboarding_finish"),
+                ) {
+                    Text(stringResource(R.string.onboarding_finish))
+                }
+            }
+        }
+        if (compact) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                skipButton(Modifier.fillMaxWidth())
+                actionButton(Modifier.fillMaxWidth())
+            }
+        } else {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedButton(
-                    onClick = onSkip,
-                    modifier = Modifier.testTag("onboarding_skip"),
-                ) { Text(stringResource(R.string.onboarding_skip)) }
-
-                if (pageIndex < totalPages - 1) {
-                    Button(
-                        onClick = {
-                            onNext()
-                            scope.launch { pagerState.animateScrollToPage(pageIndex + 1) }
-                        },
-                        modifier = Modifier.testTag("onboarding_next"),
-                    ) { Text(stringResource(R.string.onboarding_next)) }
-                } else {
-                    Button(
-                        onClick = onFinish,
-                        modifier = Modifier.testTag("onboarding_finish"),
-                    ) { Text(stringResource(R.string.onboarding_finish)) }
-                }
+                skipButton(Modifier)
+                actionButton(Modifier)
             }
         }
     }
@@ -169,6 +209,7 @@ private fun BackupImportStep() {
             importOnly = true,
             showTopBar = false,
             showWarning = false,
+            modifier = Modifier.weight(1f),
         )
     }
 }
@@ -425,20 +466,39 @@ private fun LanguageStep(
 
 @Composable
 private fun StaticPage(titleRes: Int, bodyRes: Int) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = stringResource(titleRes),
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            Text(
-                text = stringResource(bodyRes),
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(top = 16.dp),
-            )
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        if (LocalDensity.current.fontScale <= 1f && maxHeight >= 520.dp && maxWidth >= 360.dp) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                StaticPageContent(titleRes = titleRes, bodyRes = bodyRes)
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                StaticPageContent(titleRes = titleRes, bodyRes = bodyRes)
+            }
         }
+    }
+}
+
+@Composable
+private fun StaticPageContent(titleRes: Int, bodyRes: Int) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = stringResource(titleRes),
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        Text(
+            text = stringResource(bodyRes),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(top = 16.dp),
+        )
     }
 }

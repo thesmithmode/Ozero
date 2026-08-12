@@ -1,9 +1,12 @@
 package ru.ozero.app.ui.onboarding
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -55,6 +58,14 @@ class OnboardingContentTest {
         assertEquals(listOf("mode:EXPERT", "finish"), events)
     }
 
+    @Test
+    fun navigationRemainsReachableAtLargeFontScale() {
+        render(pageIndex = 4, fontScale = 2f)
+
+        composeRule.onNodeWithTag("onboarding_skip").assertIsDisplayed()
+        composeRule.onNodeWithTag("onboarding_finish").assertIsDisplayed()
+    }
+
     private fun render(
         pageIndex: Int,
         currentLocaleTag: String? = null,
@@ -64,19 +75,22 @@ class OnboardingContentTest {
         onNext: () -> Unit = {},
         onSkip: () -> Unit = {},
         onFinish: () -> Unit = {},
+        fontScale: Float = 1f,
     ) {
         composeRule.setContent {
-            OzeroTheme {
-                OnboardingContent(
-                    pageIndex = pageIndex,
-                    currentLocaleTag = currentLocaleTag,
-                    currentAppMode = currentAppMode,
-                    onLocaleSelect = onLocaleSelect,
-                    onAppModeSelect = onAppModeSelect,
-                    onNext = onNext,
-                    onSkip = onSkip,
-                    onFinish = onFinish,
-                )
+            CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
+                OzeroTheme {
+                    OnboardingContent(
+                        pageIndex = pageIndex,
+                        currentLocaleTag = currentLocaleTag,
+                        currentAppMode = currentAppMode,
+                        onLocaleSelect = onLocaleSelect,
+                        onAppModeSelect = onAppModeSelect,
+                        onNext = onNext,
+                        onSkip = onSkip,
+                        onFinish = onFinish,
+                    )
+                }
             }
         }
     }
