@@ -65,4 +65,21 @@ class WarpNativeHandleRegistryTest {
         assertEquals(setOf(3, 8), released.toSet())
         assertEquals(2, released.size)
     }
+
+    @Test
+    fun `failed emergency cleanup keeps handle for retry`() {
+        val released = mutableListOf<Int>()
+        var shouldFail = true
+        val registry = WarpNativeHandleRegistry { handle ->
+            if (shouldFail) error("native stop failed")
+            released += handle
+        }
+        registry.register(0)
+
+        registry.releaseAll()
+        shouldFail = false
+        registry.releaseAll()
+
+        assertEquals(listOf(0), released)
+    }
 }

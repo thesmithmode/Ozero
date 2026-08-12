@@ -79,5 +79,7 @@ class WarpEngineServiceLoadOnceSentinelTest {
         assertTrue(stopSession.contains("stopActiveRuntime()"))
         assertTrue(onDestroy.contains("stopActiveRuntime()"))
         assertTrue(source.contains("activeTunHandles.releaseAll()"))
+        assertTrue(source.contains("synchronized(runtimeLock)"))
+        assertTrue(source.contains(".onSuccess {") && source.contains("proxyStarted = false"))
     }
 }

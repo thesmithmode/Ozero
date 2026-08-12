@@ -11,17 +11,24 @@ internal class WarpNativeHandleRegistry(
     }
 
     fun release(handle: Int) {
-        if (remove(handle)) turnOff(handle)
+        if (!contains(handle)) return
+        turnOff(handle)
+        remove(handle)
     }
 
     fun releaseAll() {
-        val activeHandles = drain()
-        activeHandles.forEach(turnOff)
+        snapshot().forEach { handle ->
+            runCatching { turnOff(handle) }
+                .onSuccess { remove(handle) }
+        }
     }
+
+    @Synchronized
+    private fun contains(handle: Int): Boolean = handle in handles
 
     @Synchronized
     private fun remove(handle: Int): Boolean = handles.remove(handle)
 
     @Synchronized
-    private fun drain(): List<Int> = handles.toList().also(handles::clear)
+    private fun snapshot(): List<Int> = handles.toList()
 }
