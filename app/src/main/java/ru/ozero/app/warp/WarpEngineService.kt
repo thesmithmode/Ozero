@@ -16,6 +16,7 @@ import ru.ozero.enginewarp.WarpTurnOnResult
 
 class WarpEngineService : Service() {
     private val activeTunHandles = WarpNativeHandleRegistry(::turnOffNative)
+
     @Volatile private var proxyStarted = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

@@ -152,10 +152,10 @@ fun MainScreen(
                         onOpenSettings = onOpenSettings,
                     ),
                 )
-                }
             }
         }
     }
+}
 
 internal fun isCompactMainLayout(
     width: Dp,
@@ -233,7 +233,10 @@ internal fun SimpleMainContent(
             }
 
             val visualConnected = isConnected || switching != null
-            if (visualConnected && resolveUiSelectedEngine(tunnelState, switching, manualEngine) == EngineId.URNETWORK) {
+            if (
+                visualConnected &&
+                resolveUiSelectedEngine(tunnelState, switching, manualEngine) == EngineId.URNETWORK
+            ) {
                 UrnetworkPeerBadge(
                     count = urnetworkPeerCount,
                     searchSeconds = urnetworkPeerSearchSeconds,
