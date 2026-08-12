@@ -574,7 +574,7 @@ class SingboxEngine @Inject constructor(
         }
         var runtimeStarted = false
         return runCatching {
-            val pfd = ParcelFileDescriptor.fromFd(tunFd)
+            val pfd = ParcelFileDescriptor.adoptFd(tunFd)
             try {
                 PersistentLoggers.debug(
                     TAG,

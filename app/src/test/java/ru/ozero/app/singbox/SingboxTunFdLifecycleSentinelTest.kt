@@ -39,12 +39,19 @@ class SingboxTunFdLifecycleSentinelTest {
         assertTrue(engine.isFile, "SingboxEngine.kt must exist")
         val content = engine.readText()
 
+        val attachTunBlock = content.substringAfter("override suspend fun attachTun")
+            .substringBefore("private fun stopRuntimeAfterFailedReadiness")
+
         assertTrue(
-            content.contains("attachTun"),
-            "SingboxEngine must implement attachTun",
+            attachTunBlock.contains("ParcelFileDescriptor.adoptFd(tunFd)"),
+            "SingboxEngine must adopt the transferred raw TUN fd so its finally block closes the original descriptor",
+        )
+        assertFalse(
+            attachTunBlock.contains("ParcelFileDescriptor.fromFd(tunFd)"),
+            "fromFd duplicates the transferred raw TUN fd and leaks the original descriptor on every successful attach",
         )
         assertTrue(
-            content.contains("startWithConfig"),
+            attachTunBlock.contains("startWithConfig"),
             "SingboxEngine.attachTun must call proxy.startWithConfig over AIDL",
         )
     }
