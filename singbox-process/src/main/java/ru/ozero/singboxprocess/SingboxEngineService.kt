@@ -10,6 +10,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicBoolean
 import ru.ozero.enginesingbox.ISingboxEngineProcess
 import ru.ozero.enginesingbox.ISingboxProtector
 import ru.ozero.enginesingbox.ISingboxStatusCallback
@@ -112,6 +113,17 @@ class SingboxEngineService : Service() {
             }
         }
 
+        override fun startProxyModeIfIdle(
+            singboxJsonConfig: String,
+            protector: ISingboxProtector,
+        ): Boolean = runBlocking {
+            SingboxRuntime.startIfIdle(
+                this@SingboxEngineService,
+                singboxJsonConfig,
+                SingboxProtectorBridge(protector),
+            )
+        }
+
         override fun stop() {
             stopAndWait(DEFAULT_STOP_TIMEOUT_MS)
         }
@@ -124,7 +136,18 @@ class SingboxEngineService : Service() {
 
         private fun stopRuntimeAndWait(timeoutMs: Long): Boolean {
             val boundedTimeoutMs = timeoutMs.coerceAtLeast(1L)
-            return runCatching {
+            val finished = AtomicBoolean(false)
+            Thread({
+                android.os.SystemClock.sleep(boundedTimeoutMs)
+                if (finished.compareAndSet(false, true)) {
+                    PersistentLoggers.error(TAG, "native stop watchdog expired; terminating isolated runtime")
+                    android.os.Process.killProcess(android.os.Process.myPid())
+                }
+            }, STOP_WATCHDOG_THREAD_NAME).apply {
+                isDaemon = true
+                start()
+            }
+            val stopped = runCatching {
                 runBlocking {
                     withTimeoutOrNull(boundedTimeoutMs) {
                         SingboxRuntime.stop()
@@ -137,9 +160,14 @@ class SingboxEngineService : Service() {
                     "stop failed exceptionClass=${it::class.java.simpleName} stableCategory=runtime-stop " +
                         "sanitizedMessage=${redactSingboxMessage(it.message.orEmpty())}",
                 )
-            }.getOrDefault(false).also { stopped ->
-                if (!stopped) PersistentLoggers.warn(TAG, "stop timed out after ${boundedTimeoutMs}ms")
+            }.getOrDefault(false)
+            if (stopped) {
+                finished.set(true)
+            } else if (finished.compareAndSet(false, true)) {
+                PersistentLoggers.error(TAG, "native stop failed; terminating isolated runtime")
+                android.os.Process.killProcess(android.os.Process.myPid())
             }
+            return stopped
         }
 
         override fun getStats(): SingboxStats {
@@ -192,5 +220,6 @@ class SingboxEngineService : Service() {
         private const val TAG = "SingboxEngineService"
         private const val DEFAULT_STOP_TIMEOUT_MS = 3_000L
         private const val NO_TUN_FD = -1
+        private const val STOP_WATCHDOG_THREAD_NAME = "singbox-runtime-watchdog"
     }
 }

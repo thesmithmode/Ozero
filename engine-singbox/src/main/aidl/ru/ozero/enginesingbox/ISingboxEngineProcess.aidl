@@ -8,6 +8,7 @@ interface ISingboxEngineProcess {
     void startWithConfig(in ParcelFileDescriptor tunFd, String singboxJsonConfig, ISingboxProtector protector);
     void startWithConfigFile(in ParcelFileDescriptor tunFd, String configFilePath, ISingboxProtector protector);
     void startProxyMode(String singboxJsonConfig, ISingboxProtector protector);
+    boolean startProxyModeIfIdle(String singboxJsonConfig, ISingboxProtector protector);
     void stop();
     boolean stopAndWait(long timeoutMs);
     boolean runtimeRunning();

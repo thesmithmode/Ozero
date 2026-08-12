@@ -347,19 +347,15 @@ private class SingboxServiceProfileProbe(
             if (binding.processDied.get()) {
                 return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
             }
-            val alreadyRunning = runCatching { process.runtimeRunning() }.getOrDefault(false)
-            if (binding.processDied.get()) {
-                return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
-            }
-            if (alreadyRunning) return outcomes(targets, SingboxProbeOutcome.SkippedActiveRuntime)
             coroutineContext.ensureActive()
-            shouldStop = true
-            runCatching { process.startProxyMode(config, localProtector) }.getOrElse {
+            val started = runCatching { process.startProxyModeIfIdle(config, localProtector) }.getOrElse {
                 if (binding.processDied.get()) {
                     return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
                 }
                 return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_FAILED))
             }
+            if (!started) return outcomes(targets, SingboxProbeOutcome.SkippedActiveRuntime)
+            shouldStop = true
             coroutineContext.ensureActive()
             if (!waitWhileProcessAlive(
                     binding,

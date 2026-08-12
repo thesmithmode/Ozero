@@ -31,6 +31,8 @@ class SingboxEngineServiceTest {
         assertTrue(stopAndWaitBlock.contains("withTimeoutOrNull"))
         assertTrue(stopAndWaitBlock.contains("SingboxRuntime.stop()"))
         assertTrue(stopAndWaitBlock.contains("getOrDefault(false)"))
+        assertTrue(stopAndWaitBlock.contains("Process.killProcess"))
+        assertTrue(stopAndWaitBlock.contains("AtomicBoolean"))
     }
 
     @Test
@@ -98,6 +100,20 @@ class SingboxEngineServiceTest {
 
         assertTrue(runtime.contains("val protected = protector.protect(fd)"))
         assertTrue(runtime.contains("check(protected) { \"active VPN protect failed\" }"))
+    }
+
+    @Test
+    fun `profile probe start checks idle state under runtime mutex`() {
+        val runtime = File(
+            locateRepoRoot(),
+            "singbox-process/src/main/java/ru/ozero/singboxprocess/SingboxRuntime.kt",
+        ).readText()
+        val guardedStart = runtime.substringAfter("suspend fun startIfIdle")
+            .substringBefore("private fun startLocked")
+
+        assertTrue(guardedStart.contains("mutex.withLock"))
+        assertTrue(guardedStart.contains("if (commandServer != null) return@withLock false"))
+        assertTrue(guardedStart.contains("startLocked"))
     }
 
     private class FakeTrustManager(
