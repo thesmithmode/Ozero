@@ -12,6 +12,7 @@ import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.VpnSocketProtector
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 class RealWarpSdkBridge(
     private val awgRuntime: AwgRuntime,
@@ -21,6 +22,7 @@ class RealWarpSdkBridge(
     private val proxyHandle = AtomicInteger(INVALID_HANDLE)
     private val lifecycleLock = Mutex()
     private val nativeHandleLock = Any()
+    private val terminationGeneration = AtomicLong(0L)
 
     @Volatile private var savedProtector: VpnSocketProtector? = null
 
@@ -38,10 +40,9 @@ class RealWarpSdkBridge(
             closeStaleHandle()
             cleanupStaleSockets(uapiPath, tunnelName)
             logIniDigest(tunnelName, iniConfig)
-            val result = invokeAwgTurnOnAndProtect(tunnelName, tunFd, iniConfig, uapiPath, protector)
-            if (result is WarpSdkBridge.AttachResult.Success) {
-                savedProtector = protector
-            } else {
+            val generation = terminationGeneration.get()
+            val result = invokeAwgTurnOnAndProtect(tunnelName, tunFd, iniConfig, uapiPath, protector, generation)
+            if (result !is WarpSdkBridge.AttachResult.Success) {
                 cleanupFailedAttachStart()
             }
             result
@@ -74,6 +75,7 @@ class RealWarpSdkBridge(
             closeStaleProxy()
             cleanupStaleSockets(uapiPath, tunnelName)
             logIniDigest(tunnelName, iniConfig)
+            val generation = terminationGeneration.get()
             val started = System.currentTimeMillis()
             val threadName = Thread.currentThread().name
             PersistentLoggers.debug(
@@ -98,8 +100,9 @@ class RealWarpSdkBridge(
                 cleanupFailedProxyStart()
                 return@withLock WarpSdkBridge.ProxyResult.Failed("awgStartProxy handle=$handle")
             }
-            proxyHandle.set(handle)
-            savedProtector = protector
+            if (!publishHandle(proxyHandle, handle, protector, generation)) {
+                return@withLock WarpSdkBridge.ProxyResult.Failed("WARP runtime terminated during proxy start")
+            }
             WarpSdkBridge.ProxyResult.Success
         }
     }
@@ -187,6 +190,7 @@ class RealWarpSdkBridge(
         iniConfig: String,
         uapiPath: String,
         protector: VpnSocketProtector,
+        generation: Long,
     ): WarpSdkBridge.AttachResult {
         val started = System.currentTimeMillis()
         val threadName = Thread.currentThread().name
@@ -215,7 +219,11 @@ class RealWarpSdkBridge(
                 "awgTurnOn handle=$handle (<0 = AWG SDK ошибка; 0 = валидный первый tunnel slot)",
             )
         }
-        tunnelHandle.set(handle)
+        if (terminationGeneration.get() != generation) {
+            closeRawFd(combined.socketV4Fd, "stale-v4")
+            closeRawFd(combined.socketV6Fd, "stale-v6")
+            return WarpSdkBridge.AttachResult.Failed("WARP runtime terminated during tunnel start")
+        }
         val protectOk = try {
             protectSockets(combined.socketV4Fd, combined.socketV6Fd, protector)
         } catch (ce: CancellationException) {
@@ -225,19 +233,35 @@ class RealWarpSdkBridge(
                 TAG,
                 "protect threw: ${t.message} (${t.javaClass.name}) — rollback awgTurnOff",
             )
-            if (tunnelHandle.compareAndSet(handle, INVALID_HANDLE)) {
-                runCatching { awgRuntime.turnOff(handle) }
-            }
+            if (terminationGeneration.get() == generation) runCatching { awgRuntime.turnOff(handle) }
             return WarpSdkBridge.AttachResult.Failed("protect threw: ${t.message ?: t.javaClass.simpleName}")
         }
         if (!protectOk) {
             PersistentLoggers.error(TAG, "protect failed — rolling back to avoid routing loop")
-            if (tunnelHandle.compareAndSet(handle, INVALID_HANDLE)) {
-                runCatching { awgRuntime.turnOff(handle) }
-            }
+            if (terminationGeneration.get() == generation) runCatching { awgRuntime.turnOff(handle) }
             return WarpSdkBridge.AttachResult.Failed("protect underlying sockets failed")
         }
+        if (!publishHandle(tunnelHandle, handle, protector, generation)) {
+            return WarpSdkBridge.AttachResult.Failed("WARP runtime terminated during tunnel start")
+        }
         return WarpSdkBridge.AttachResult.Success
+    }
+
+    private fun publishHandle(
+        target: AtomicInteger,
+        handle: Int,
+        protector: VpnSocketProtector,
+        generation: Long,
+    ): Boolean {
+        synchronized(nativeHandleLock) {
+            if (terminationGeneration.get() != generation) return false
+            target.set(handle)
+            savedProtector = protector
+        }
+        if (terminationGeneration.get() == generation) return true
+        target.compareAndSet(handle, INVALID_HANDLE)
+        savedProtector = null
+        return false
     }
 
     private fun logAwgFailure(startedMs: Long, threadName: String, t: Throwable): WarpSdkBridge.AttachResult {
@@ -349,12 +373,11 @@ class RealWarpSdkBridge(
     }
 
     override fun forceTerminate() {
-        synchronized(nativeHandleLock) {
-            tunnelHandle.set(INVALID_HANDLE)
-            proxyHandle.set(INVALID_HANDLE)
-            savedProtector = null
-            awgRuntime.forceTerminate()
-        }
+        terminationGeneration.incrementAndGet()
+        tunnelHandle.set(INVALID_HANDLE)
+        proxyHandle.set(INVALID_HANDLE)
+        savedProtector = null
+        awgRuntime.forceTerminate()
     }
 
     private fun closeRuntimeIfIdle() {

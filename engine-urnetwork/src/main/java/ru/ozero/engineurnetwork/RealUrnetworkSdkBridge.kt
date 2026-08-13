@@ -280,12 +280,13 @@ class RealUrnetworkSdkBridge(
             contractStatusListener.detach()
             detachConnectionStatusListener()
             detachSelectedLocationListener()
-            detachJwtRefreshListener()
+            val jwtRefreshSub = invalidateJwtRefreshListener()
             tunnelStartedRef.set(false)
             connectIssuedRef.set(false)
             sharingTrafficLogged.set(false)
             val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
                 withContext(Dispatchers.Main.immediate) {
+                    closeJwtRefreshListener(jwtRefreshSub)
                     walletVcRef.getAndSet(null)?.also { vc ->
                         runCatching { vc.close() }
                             .onFailure { PersistentLoggers.warn(TAG, "walletVc.close threw: ${it.message}") }
@@ -738,8 +739,8 @@ class RealUrnetworkSdkBridge(
         localState: LocalState,
         source: String,
     ) {
-        detachJwtRefreshListener()
         val generation = jwtRefreshGeneration.incrementAndGet()
+        closeJwtRefreshListener(jwtRefreshSubRef.getAndSet(null))
         val sub = runCatching {
             device.addJwtRefreshListener { newJwt ->
                 bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable) {
@@ -762,10 +763,14 @@ class RealUrnetworkSdkBridge(
         jwtRefreshSubRef.getAndSet(sub)?.also { previous -> runCatching { previous.close() } }
     }
 
-    private fun detachJwtRefreshListener() {
+    private fun invalidateJwtRefreshListener(): Sub? {
         jwtRefreshGeneration.incrementAndGet()
-        jwtRefreshSubRef.getAndSet(null)?.also { sub ->
-            runCatching { sub.close() }
+        return jwtRefreshSubRef.getAndSet(null)
+    }
+
+    private fun closeJwtRefreshListener(sub: Sub?) {
+        sub?.also { owned ->
+            runCatching { owned.close() }
                 .onFailure { PersistentLoggers.warn(TAG, "credential refresh listener close threw: ${it.message}") }
         }
     }
@@ -946,12 +951,15 @@ class RealUrnetworkSdkBridge(
         }
     }
 
-    private fun cleanupOnFailure() {
+    private suspend fun cleanupOnFailure() {
         if (running.get()) return
         tunnelStartedRef.set(false)
         connectIssuedRef.set(false)
-        detachJwtRefreshListener()
-        deviceRef.getAndSet(null)?.also { runCatching { it.close() } }
+        val jwtRefreshSub = invalidateJwtRefreshListener()
+        withContext(Dispatchers.Main.immediate) {
+            closeJwtRefreshListener(jwtRefreshSub)
+            deviceRef.getAndSet(null)?.also { runCatching { it.close() } }
+        }
     }
 
     private companion object {

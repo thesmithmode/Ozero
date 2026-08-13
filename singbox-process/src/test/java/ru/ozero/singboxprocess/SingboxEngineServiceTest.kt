@@ -138,7 +138,8 @@ class SingboxEngineServiceTest {
         val createBlock = runtimeSource.substringAfter("private fun createCommandServer")
             .substringBefore("private fun launchNativeLogSubscription")
 
-        assertTrue(startBlock.split("releaseServerCallbacks()").size >= 5)
+        assertTrue(startBlock.contains("cleanupFailedServerStart(server, e)"))
+        assertTrue(startBlock.contains("closeCommandServer(oldServer, closeService = true)"))
         assertTrue(createBlock.contains("releaseServerCallbacks()"))
         assertTrue(releaseBlock.contains("platformInterface = null"))
         assertTrue(releaseBlock.contains("commandServerHandler = null"))
@@ -161,9 +162,12 @@ class SingboxEngineServiceTest {
         val disconnectBlock = runtimeSource.substringAfter("private fun disconnectNativeLogClient")
             .substringBefore("private fun handleNativeLogDisconnected")
 
-        assertTrue(runtimeSource.contains("private var logClientHandler: NativeLogHandler? = null"))
-        assertTrue(connectBlock.contains("logClientHandler = handler"))
-        assertTrue(disconnectBlock.contains("logClientHandler = null"))
+        assertTrue(runtimeSource.contains("private var nativeLogConnection: NativeLogConnection? = null"))
+        assertTrue(connectBlock.contains("NativeLogConnection(client, handler)"))
+        assertTrue(connectBlock.contains("nativeLogConnection = connection"))
+        assertTrue(disconnectBlock.contains("connection.client.disconnect()"))
+        assertTrue(disconnectBlock.contains("Reference.reachabilityFence(connection.handler)"))
+        assertTrue(disconnectBlock.contains("retainedFailedLogConnections.add(connection)"))
     }
 
     private class FakeTrustManager(
