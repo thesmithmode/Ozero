@@ -821,7 +821,7 @@ class RealUrnetworkSdkBridgeContractTest {
         val startBlock = source.substringAfter("private suspend fun runStartOnMain")
             .substringBefore("override suspend fun stop")
         assertTrue(
-            startBlock.contains("attachJwtRefreshListener(d, localState, \"node\")"),
+            startBlock.contains("attachJwtRefreshListener(d, byClientJwt, \"node\")"),
             "runStartOnMain must use the lifecycle-owned JWT subscription.",
         )
     }
@@ -831,7 +831,7 @@ class RealUrnetworkSdkBridgeContractTest {
         val ensureBlock = source.substringAfter("private suspend fun ensureDeviceOnMain")
             .substringBefore("private fun applyDeviceFields")
         assertTrue(
-            ensureBlock.contains("attachJwtRefreshListener(device, localState, \"ensureDevice\")"),
+            ensureBlock.contains("attachJwtRefreshListener(device, byClientJwt, \"ensureDevice\")"),
             "Location bootstrap must replace rather than accumulate the JWT subscription.",
         )
     }
@@ -845,8 +845,11 @@ class RealUrnetworkSdkBridgeContractTest {
 
         assertTrue(source.contains("private val jwtRefreshSubRef = AtomicReference<Sub?>(null)"))
         assertTrue(source.contains("private val jwtRefreshGeneration = AtomicLong(0L)"))
+        assertTrue(source.contains("private val jwtRefreshValueRef = AtomicReference<String?>(null)"))
+        assertTrue(source.contains("private val jwtRefreshPersistMutex = Mutex()"))
         assertTrue(listenerBlock.contains("jwtRefreshGeneration.get() != generation"))
-        assertTrue(listenerBlock.contains("localState.byClientJwt == newJwt"))
+        assertTrue(listenerBlock.contains("configStore?.setByClientJwt(newJwt)"))
+        assertTrue(!listenerBlock.contains("localState.byClientJwt = newJwt"))
         assertTrue(listenerBlock.contains("jwtRefreshSubRef.getAndSet(sub)"))
         assertTrue(stopBlock.contains("val jwtRefreshSub = invalidateJwtRefreshListener()"))
         val mainBlock = stopBlock.substringAfter("withContext(Dispatchers.Main.immediate)")

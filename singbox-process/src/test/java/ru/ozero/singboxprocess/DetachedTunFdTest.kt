@@ -19,26 +19,39 @@ class DetachedTunFdTest {
     }
 
     @Test
-    fun `successful claim transfers ownership to libbox`() {
+    fun `host close also handles fd before it is provided`() {
         val closed = mutableListOf<Int>()
-        val ownership = DetachedTunFd(42, closed::add)
+        val ownership = DetachedTunFd(40, closed::add)
 
-        assertEquals(42, ownership.claimByLibbox())
+        assertTrue(ownership.closeOwnedByHost())
         assertFalse(ownership.closeIfDetached())
-        assertEquals(emptyList(), closed)
-        assertEquals(TunFdOwnershipState.CLAIMED_BY_LIBBOX, ownership.state)
+        assertEquals(listOf(40), closed)
     }
 
     @Test
-    fun `repeated claim is rejected without closing claimed fd`() {
+    fun `providing fd to libbox retains host close responsibility`() {
+        val closed = mutableListOf<Int>()
+        val ownership = DetachedTunFd(42, closed::add)
+
+        assertEquals(42, ownership.provideToLibbox())
+        assertFalse(ownership.closeIfDetached())
+        assertTrue(ownership.closeOwnedByHost())
+        assertFalse(ownership.closeOwnedByHost())
+        assertEquals(listOf(42), closed)
+        assertEquals(TunFdOwnershipState.CLOSED, ownership.state)
+    }
+
+    @Test
+    fun `repeated provide is rejected before host closes fd`() {
         val closed = mutableListOf<Int>()
         val ownership = DetachedTunFd(43, closed::add)
 
-        ownership.claimByLibbox()
+        ownership.provideToLibbox()
 
-        assertFailsWith<IllegalStateException> { ownership.claimByLibbox() }
+        assertFailsWith<IllegalStateException> { ownership.provideToLibbox() }
         assertFalse(ownership.closeIfDetached())
-        assertEquals(emptyList(), closed)
+        assertTrue(ownership.closeOwnedByHost())
+        assertEquals(listOf(43), closed)
     }
 
     @Test

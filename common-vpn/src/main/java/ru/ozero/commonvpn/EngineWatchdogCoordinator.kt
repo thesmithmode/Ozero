@@ -13,6 +13,7 @@ import ru.ozero.enginescore.ChainOrchestrator
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.PersistentLoggers
+import ru.ozero.enginescore.ProbeResult
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -35,6 +36,7 @@ class EngineWatchdogCoordinator(
 
     private val healthWatchJobRef = AtomicReference<Job?>(null)
     private val peerWatchJobRef = AtomicReference<Job?>(null)
+    private val routedProbeWatchJobRef = AtomicReference<Job?>(null)
     private val stagnationWatchJobRef = AtomicReference<Job?>(null)
 
     fun startHealthKillswitchWatcher(engineId: EngineId) {
@@ -132,6 +134,41 @@ class EngineWatchdogCoordinator(
         peerWatchJobRef.set(job)
     }
 
+    fun startRoutedProbeWatchdog(engineId: EngineId) {
+        routedProbeWatchJobRef.getAndSet(null)?.cancel()
+        val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return
+        val job = scope.launch {
+            try {
+                var consecutiveFailures = 0
+                while (isActive) {
+                    delay(ROUTED_PROBE_WATCHDOG_POLL_MS)
+                    when (val result = runCatching { plugin.probe() }.getOrElse { t ->
+                        ProbeResult.Failure("probe threw: ${t.message}")
+                    }) {
+                        is ProbeResult.Success -> consecutiveFailures = 0
+                        is ProbeResult.Failure -> {
+                            consecutiveFailures += 1
+                            PersistentLoggers.warn(
+                                TAG,
+                                "routed probe failed engine=$engineId " +
+                                    "($consecutiveFailures/$ROUTED_PROBE_WATCHDOG_MAX_FAILURES): ${result.reason}",
+                            )
+                            if (consecutiveFailures >= ROUTED_PROBE_WATCHDOG_MAX_FAILURES) {
+                                handleEngineFailure(engineId, "routed probe failed: ${result.reason}")
+                                return@launch
+                            }
+                        }
+                    }
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (t: Throwable) {
+                PersistentLoggers.warn(TAG, "routed probe watchdog threw: ${t.message}")
+            }
+        }
+        routedProbeWatchJobRef.set(job)
+    }
+
     fun startStagnationWatchdog(engineId: EngineId) {
         stagnationWatchJobRef.getAndSet(null)?.cancel()
         val plugin = enginePlugins.firstOrNull { it.id == engineId } ?: return
@@ -176,6 +213,7 @@ class EngineWatchdogCoordinator(
     fun cancelWatchers() {
         healthWatchJobRef.getAndSet(null)?.cancel()
         peerWatchJobRef.getAndSet(null)?.cancel()
+        routedProbeWatchJobRef.getAndSet(null)?.cancel()
         stagnationWatchJobRef.getAndSet(null)?.cancel()
     }
 
@@ -214,6 +252,7 @@ class EngineWatchdogCoordinator(
         statsJobRef.getAndSet(null)?.cancel()
         healthWatchJobRef.getAndSet(null)?.cancel()
         peerWatchJobRef.getAndSet(null)?.cancel()
+        routedProbeWatchJobRef.getAndSet(null)?.cancel()
         stagnationWatchJobRef.getAndSet(null)?.cancel()
         scope.launch {
             runCatching { chainOrchestrator.stop() }
@@ -241,6 +280,8 @@ class EngineWatchdogCoordinator(
         const val PEER_WATCHDOG_TIMEOUT_MS = 30_000L
         const val PEER_WATCHDOG_RECOVER_GRACE_MS = 30_000L
         const val PEER_WATCHDOG_MAX_FAILED_RECOVERS = 3
+        const val ROUTED_PROBE_WATCHDOG_POLL_MS = 30_000L
+        const val ROUTED_PROBE_WATCHDOG_MAX_FAILURES = 3
         const val STAGNATION_POLL_MS = 10_000L
         const val STAGNATION_RECOVER_THRESHOLD_MS = 60_000L
         const val STAGNATION_RECOVER_GRACE_MS = 30_000L

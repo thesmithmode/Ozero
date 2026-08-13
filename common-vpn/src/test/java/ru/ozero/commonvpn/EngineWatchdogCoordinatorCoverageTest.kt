@@ -116,6 +116,7 @@ class EngineWatchdogCoordinatorCoverageTest {
         try {
             watchdog.startHealthKillswitchWatcher(plugin.id)
             watchdog.startPeerWatchdog(plugin.id)
+            watchdog.startRoutedProbeWatchdog(plugin.id)
             watchdog.startStagnationWatchdog(plugin.id)
             watchdog.cancelWatchers()
             health.start(1080)
@@ -125,10 +126,118 @@ class EngineWatchdogCoordinatorCoverageTest {
             runCurrent()
 
             assertEquals(0, plugin.recoverCalls)
+            assertEquals(0, plugin.probeCalls)
         } finally {
             watchdog.cancelWatchers()
             health.shutdown()
         }
+    }
+
+    @Test
+    fun `routed probe watchdog enters killswitch after consecutive failures`() = runTest {
+        val plugin = FakeWatchdogPlugin(
+            id = EngineId.SINGBOX,
+            probeResults = List(3) { ProbeResult.Failure("offline") },
+        )
+        val controller = connectedController(plugin.id)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            plugins = setOf(plugin),
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+        )
+
+        try {
+            watchdog.startRoutedProbeWatchdog(plugin.id)
+            repeat(3) {
+                advanceTimeBy(EngineWatchdogCoordinator.ROUTED_PROBE_WATCHDOG_POLL_MS)
+                runCurrent()
+            }
+
+            assertEquals(3, plugin.probeCalls)
+            assertTrue(controller.killswitchActive.value)
+        } finally {
+            watchdog.cancelWatchers()
+        }
+    }
+
+    @Test
+    fun `routed probe watchdog resets failure count after success`() = runTest {
+        val plugin = FakeWatchdogPlugin(
+            id = EngineId.SINGBOX,
+            probeResults = listOf(
+                ProbeResult.Failure("first"),
+                ProbeResult.Success(1),
+                ProbeResult.Failure("second"),
+                ProbeResult.Failure("third"),
+            ),
+        )
+        val controller = connectedController(plugin.id)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            plugins = setOf(plugin),
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+        )
+
+        try {
+            watchdog.startRoutedProbeWatchdog(plugin.id)
+            repeat(4) {
+                advanceTimeBy(EngineWatchdogCoordinator.ROUTED_PROBE_WATCHDOG_POLL_MS)
+                runCurrent()
+            }
+
+            assertEquals(4, plugin.probeCalls)
+            assertFalse(controller.killswitchActive.value)
+        } finally {
+            watchdog.cancelWatchers()
+        }
+    }
+
+    @Test
+    fun `routed probe watchdog treats thrown probes as failures`() = runTest {
+        val plugin = FakeWatchdogPlugin(id = EngineId.SINGBOX, probeThrows = true)
+        val stopCount = AtomicReference(0)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            plugins = setOf(plugin),
+            controller = connectedController(plugin.id),
+            tunFd = mockk(relaxed = true),
+            killswitch = false,
+            stopCount = stopCount,
+        )
+
+        try {
+            watchdog.startRoutedProbeWatchdog(plugin.id)
+            repeat(3) {
+                advanceTimeBy(EngineWatchdogCoordinator.ROUTED_PROBE_WATCHDOG_POLL_MS)
+                runCurrent()
+            }
+
+            assertEquals(3, plugin.probeCalls)
+            assertEquals(1, stopCount.get())
+        } finally {
+            watchdog.cancelWatchers()
+        }
+    }
+
+    @Test
+    fun `routed probe watchdog with missing plugin is no-op`() = runTest {
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            plugins = emptySet(),
+            controller = connectedController(EngineId.SINGBOX),
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+        )
+
+        watchdog.startRoutedProbeWatchdog(EngineId.SINGBOX)
+        advanceTimeBy(EngineWatchdogCoordinator.ROUTED_PROBE_WATCHDOG_POLL_MS)
+        runCurrent()
+
+        watchdog.cancelWatchers()
     }
 
     @Test
@@ -1118,6 +1227,8 @@ class EngineWatchdogCoordinatorCoverageTest {
         private val policy: EnginePlugin.PeerWatchdogPolicy = EnginePlugin.PeerWatchdogPolicy(),
         private val recoverThrows: Boolean = false,
         private val statsThrows: Boolean = false,
+        private val probeResults: List<ProbeResult> = listOf(ProbeResult.Success(1)),
+        private val probeThrows: Boolean = false,
     ) : EnginePlugin {
         override val capabilities = EngineCapabilities(
             supportsTcp = true,
@@ -1129,13 +1240,21 @@ class EngineWatchdogCoordinatorCoverageTest {
         )
         var recoverCalls = 0
             private set
+        var probeCalls = 0
+            private set
         private var statsCalls = 0
 
         override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult =
             StartResult.Success(1080)
 
         override suspend fun stop() = Unit
-        override suspend fun probe(): ProbeResult = ProbeResult.Success(1)
+        override suspend fun probe(): ProbeResult {
+            probeCalls++
+            if (probeThrows) error("probe down")
+            val index = (probeCalls - 1).coerceAtMost(probeResults.lastIndex)
+            return probeResults[index]
+        }
+
         override fun peerWatchdogPolicy(): EnginePlugin.PeerWatchdogPolicy = policy
 
         override fun stats(): Flow<EngineStats> {

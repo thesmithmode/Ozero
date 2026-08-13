@@ -572,51 +572,56 @@ class SingboxEngine @Inject constructor(
             clearPendingStart()
             return TunAttachResult.Failure("SingboxEngineService not connected")
         }
+        val transportPfd = ParcelFileDescriptor.fromFd(tunFd)
         var runtimeStarted = false
-        return runCatching {
-            val pfd = ParcelFileDescriptor.adoptFd(tunFd)
-            try {
+        val result = try {
+            runCatching {
                 PersistentLoggers.debug(
                     TAG,
                     "attachTun start rawFd=$tunFd pendingPort=$pendingSocksPort " +
                         "fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
                 )
-                p.startWithConfig(pfd, json, localProtector)
+                p.startWithConfig(transportPfd, json, localProtector)
                 runtimeStarted = true
-            } finally {
-                runCatching { pfd.close() }
-            }
-            delay(150)
-            val runtimeRunning = runCatching { p.runtimeRunning() }.getOrDefault(false)
-            PersistentLoggers.debug(
-                TAG,
-                "attachTun AIDL returned rawFd=$tunFd pendingPort=$pendingSocksPort runtimeRunning=$runtimeRunning",
-            )
-            if (!runtimeRunning) {
-                stopRuntimeAfterFailedReadiness(p)
+                delay(150)
+                val runtimeRunning = runCatching { p.runtimeRunning() }.getOrDefault(false)
+                PersistentLoggers.debug(
+                    TAG,
+                    "attachTun AIDL returned rawFd=$tunFd pendingPort=$pendingSocksPort runtimeRunning=$runtimeRunning",
+                )
+                if (!runtimeRunning) {
+                    stopRuntimeAfterFailedReadiness(p)
+                    clearPendingStart()
+                    return@runCatching TunAttachResult.Failure("sing-box runtime failed to start")
+                }
+                activeSocksPort = pendingSocksPort
+                activeTunAutoSelect = pendingTunAutoSelect
+                pendingTunAutoSelect = false
+                pendingSocksPort = 0
+                pendingConfig = null
+                PersistentLoggers.debug(
+                    TAG,
+                    "startWithConfig sent over AIDL activePort=$activeSocksPort autoSelect=$activeTunAutoSelect",
+                )
+                TunAttachResult.Success
+            }.getOrElse {
+                if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)
                 clearPendingStart()
-                return TunAttachResult.Failure("sing-box runtime failed to start")
+                if (it is CancellationException) throw it
+                PersistentLoggers.error(
+                    TAG,
+                    "startWithConfig failed exceptionClass=${it::class.java.simpleName} stableCategory=aidl",
+                )
+                TunAttachResult.Failure("AIDL failed")
             }
-            activeSocksPort = pendingSocksPort
-            activeTunAutoSelect = pendingTunAutoSelect
-            pendingTunAutoSelect = false
-            pendingSocksPort = 0
-            pendingConfig = null
-            PersistentLoggers.debug(
-                TAG,
-                "startWithConfig sent over AIDL activePort=$activeSocksPort autoSelect=$activeTunAutoSelect",
-            )
-            TunAttachResult.Success
-        }.getOrElse {
-            if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)
-            clearPendingStart()
-            if (it is CancellationException) throw it
-            PersistentLoggers.error(
-                TAG,
-                "startWithConfig failed exceptionClass=${it::class.java.simpleName} stableCategory=aidl",
-            )
-            TunAttachResult.Failure("AIDL failed")
+        } finally {
+            runCatching { transportPfd.close() }
         }
+        if (result == TunAttachResult.Success) {
+            runCatching { ParcelFileDescriptor.adoptFd(tunFd).close() }
+                .onFailure { PersistentLoggers.warn(TAG, "attachTun raw fd close failed: ${it.message}") }
+        }
+        return result
     }
 
     private fun stopRuntimeAfterFailedReadiness(p: ISingboxEngineProcess) {
@@ -694,7 +699,11 @@ class SingboxEngine @Inject constructor(
         if (!awaitLocalSocksReady(port)) {
             return EnginePlugin.ReadyResult.Timeout("sing-box SOCKS5 listener is not ready")
         }
-        return EnginePlugin.ReadyResult.Ready
+        return when (val result = routedProbe.probe(port)) {
+            is RoutedProbeResult.Success -> EnginePlugin.ReadyResult.Ready
+            is RoutedProbeResult.Failure ->
+                EnginePlugin.ReadyResult.Timeout(result.reason.probeFailureMessage())
+        }
     }
 
     private suspend fun awaitLocalSocksReady(port: Int): Boolean {

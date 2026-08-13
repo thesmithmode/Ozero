@@ -147,13 +147,13 @@ class SingboxRuntimeDiagnosticsTest {
     }
 
     @Test
-    fun `diagnostics starts only after runtime becomes available`() {
+    fun `native command client diagnostics are not started with runtime`() {
         val serviceStart = runtimeSource.indexOf("server.startOrReloadService")
         val serverClaim = runtimeSource.indexOf("commandServer = server", serviceStart)
         val diagnosticsLaunch = runtimeSource.indexOf("launchNativeLogSubscription(failureDiagnostics)", serverClaim)
 
         assertTrue(serviceStart in 0..<serverClaim)
-        assertTrue(serverClaim in 0..<diagnosticsLaunch)
+        assertEquals(-1, diagnosticsLaunch)
     }
 
     @Test

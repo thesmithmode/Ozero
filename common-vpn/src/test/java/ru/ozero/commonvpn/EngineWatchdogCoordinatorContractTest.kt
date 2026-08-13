@@ -57,6 +57,7 @@ class EngineWatchdogCoordinatorContractTest {
         listOf(
             "fun startHealthKillswitchWatcher(",
             "fun startPeerWatchdog(",
+            "fun startRoutedProbeWatchdog(",
             "fun startStagnationWatchdog(",
             "fun handleEngineFailure(",
             "fun cancelWatchers(",
@@ -88,6 +89,7 @@ class EngineWatchdogCoordinatorContractTest {
         assertTrue(
             body.contains("healthWatchJobRef.getAndSet(null)") &&
                 body.contains("peerWatchJobRef.getAndSet(null)") &&
+                body.contains("routedProbeWatchJobRef.getAndSet(null)") &&
                 body.contains("stagnationWatchJobRef.getAndSet(null)"),
             "cancelWatchers РѕР±СЏР·Р°РЅ РѕС‚РјРµРЅРёС‚СЊ РІСЃРµ jobs вЂ” РёРЅР°С‡Рµ СѓС‚РµС‡РєР° watchers РїСЂРё stop. Body:\n$body",
         )

@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 internal enum class TunFdOwnershipState {
     DETACHED,
-    CLAIMED_BY_LIBBOX,
+    PROVIDED_TO_LIBBOX,
     CLOSED,
 }
 
@@ -18,13 +18,20 @@ internal class DetachedTunFd(
     val state: TunFdOwnershipState
         get() = ownership.get()
 
-    fun claimByLibbox(): Int {
-        check(ownership.compareAndSet(TunFdOwnershipState.DETACHED, TunFdOwnershipState.CLAIMED_BY_LIBBOX))
+    fun provideToLibbox(): Int {
+        check(ownership.compareAndSet(TunFdOwnershipState.DETACHED, TunFdOwnershipState.PROVIDED_TO_LIBBOX))
         return fd
     }
 
     fun closeIfDetached(): Boolean {
         if (!ownership.compareAndSet(TunFdOwnershipState.DETACHED, TunFdOwnershipState.CLOSED)) return false
+        closeFd(fd)
+        return true
+    }
+
+    fun closeOwnedByHost(): Boolean {
+        val previous = ownership.getAndSet(TunFdOwnershipState.CLOSED)
+        if (previous == TunFdOwnershipState.CLOSED) return false
         closeFd(fd)
         return true
     }

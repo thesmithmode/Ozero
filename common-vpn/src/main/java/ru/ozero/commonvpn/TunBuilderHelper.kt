@@ -27,21 +27,19 @@ class TunBuilderHelper(
     private val builderFactory: () -> VpnService.Builder = { service.Builder() },
 ) {
 
-    @Suppress("UnusedParameter")
     fun applyEngineTunSpec(spec: TunSpec, ipv6Enabled: Boolean): VpnService.Builder {
+        val ipv6Address = spec.ipv6Address?.takeIf { ipv6Enabled && spec.allowFamilyV6 }
+        val useIpv6 = ipv6Address != null
         val builder = builderFactory()
             .setSession(spec.sessionName)
             .setMtu(spec.mtu)
             .setBlocking(spec.blocking)
             .addAddress(spec.ipv4Address, spec.ipv4PrefixLength)
         applyLockdown(builder, "applyEngineTunSpec", applyUnderlying = true)
-        spec.dnsServers.forEach { dns ->
+        spec.dnsServers.filter { dns -> useIpv6 || ':' !in dns }.forEach { dns ->
             runCatching { builder.addDnsServer(dns) }
                 .onFailure { PersistentLoggers.warn(TAG, "spec addDnsServer rejected '$dns': ${it.message}") }
         }
-        // Calling only one allowFamily makes Android drop the other family in split-tunnel blocklist mode.
-        builder.allowFamily(android.system.OsConstants.AF_INET)
-        builder.allowFamily(android.system.OsConstants.AF_INET6)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching { builder.setMetered(false) }
         }
@@ -65,9 +63,8 @@ class TunBuilderHelper(
         } else {
             addCidrRoutes(builder, spec.routeCidrsV4, "v4")
         }
-        val v6 = spec.ipv6Address
-        if (spec.allowFamilyV6 && v6 != null) {
-            builder.addAddress(v6, spec.ipv6PrefixLength)
+        if (ipv6Address != null) {
+            builder.addAddress(ipv6Address, spec.ipv6PrefixLength)
             if (spec.routeAllV6) {
                 builder.addRoute("::", 0)
             } else {

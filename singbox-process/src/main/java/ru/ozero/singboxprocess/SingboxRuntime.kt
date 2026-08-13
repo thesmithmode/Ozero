@@ -202,7 +202,6 @@ internal object SingboxRuntime {
         }
 
         commandServer = server
-        launchNativeLogSubscription(failureDiagnostics)
         persistCheckpoint("runtime-started fd=$tunFd")
         PersistentLoggers.info(TAG, "runtime started fd=$tunFd")
     }
@@ -231,6 +230,7 @@ internal object SingboxRuntime {
     fun getLastStatus(): StatusMessage? = lastStatus
 
     private fun releaseServerCallbacks() {
+        platformInterface?.closeTunFd()
         platformInterface = null
         commandServerHandler = null
     }
@@ -273,6 +273,7 @@ internal object SingboxRuntime {
         throw e
     }
 
+    // Keep detached from runtime startup: gomobile CommandClient callbacks can abort the isolated process.
     private fun launchNativeLogSubscription(
         failureDiagnostics: NativeFailureDiagnostics = checkNotNull(nativeFailureDiagnostics),
         reconnect: Boolean = false,
@@ -468,7 +469,11 @@ internal object SingboxRuntime {
 
         override fun openTun(options: TunOptions): Int {
             PersistentLoggers.debug(TAG, "openTun mtu=${options.mtu}")
-            return detachedTunFd?.claimByLibbox() ?: tunFd
+            return detachedTunFd?.provideToLibbox() ?: tunFd
+        }
+
+        fun closeTunFd() {
+            detachedTunFd?.closeOwnedByHost()
         }
 
         override fun useProcFS(): Boolean = false

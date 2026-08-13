@@ -46,7 +46,7 @@ class SingboxEngineService : Service() {
                         detachedTunFd,
                     )
                 }
-                check(detachedTunFd.state == TunFdOwnershipState.CLAIMED_BY_LIBBOX)
+                check(detachedTunFd.state == TunFdOwnershipState.PROVIDED_TO_LIBBOX)
             } catch (t: Throwable) {
                 detachedTunFd.closeIfDetached()
                 PersistentLoggers.error(TAG, "startWithConfig failed exceptionClass=${t::class.java.simpleName}")
@@ -77,7 +77,7 @@ class SingboxEngineService : Service() {
                         detachedTunFd,
                     )
                 }
-                check(detachedTunFd.state == TunFdOwnershipState.CLAIMED_BY_LIBBOX)
+                check(detachedTunFd.state == TunFdOwnershipState.PROVIDED_TO_LIBBOX)
             } catch (t: Throwable) {
                 detachedTunFd.closeIfDetached()
                 PersistentLoggers.error(TAG, "startWithConfigFile failed exceptionClass=${t::class.java.simpleName}")

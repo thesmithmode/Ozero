@@ -55,6 +55,7 @@ class RealUrnetworkSdkBridge(
     private val app: Application,
     private val appVersion: String = DEFAULT_APP_VERSION,
     private val onIoLoopDied: (String) -> Unit = {},
+    private val configStore: UrnetworkConfigStore? = null,
 ) : UrnetworkSdkBridge {
 
     private val deviceRef = AtomicReference<DeviceLocal?>(null)
@@ -64,6 +65,8 @@ class RealUrnetworkSdkBridge(
     private val selectedLocationSubRef = AtomicReference<Sub?>(null)
     private val jwtRefreshSubRef = AtomicReference<Sub?>(null)
     private val jwtRefreshGeneration = AtomicLong(0L)
+    private val jwtRefreshValueRef = AtomicReference<String?>(null)
+    private val jwtRefreshPersistMutex = Mutex()
     private val connectionStatusRef = AtomicReference<String?>(null)
     private val tunnelStartedRef = AtomicBoolean(false)
     private val connectIssuedRef = AtomicBoolean(false)
@@ -188,7 +191,7 @@ class RealUrnetworkSdkBridge(
             }.onFailure {
                 PersistentLoggers.warn(TAG, "node start: session keys init threw: ${it.message}")
             }
-            attachJwtRefreshListener(d, localState, "node")
+            attachJwtRefreshListener(d, byClientJwt, "node")
             applyDeviceFields(d, localState, DeviceInitMode.FULL_START)
             PersistentLoggers.debug(TAG, "node start: instance created - fields applied")
             deviceRef.set(d)
@@ -505,7 +508,7 @@ class RealUrnetworkSdkBridge(
                 Log.i(TAG, "ensureDevice: provideSecretKeys not found - generating new keys")
             }
         }
-        attachJwtRefreshListener(device, localState, "ensureDevice")
+        attachJwtRefreshListener(device, byClientJwt, "ensureDevice")
         applyDeviceFields(device, localState, DeviceInitMode.LOCATION_BROWSE)
         deviceRef.set(device)
         Log.i(TAG, "initDeviceForLocations: device ready for location browse - applyDeviceFields done")
@@ -736,24 +739,29 @@ class RealUrnetworkSdkBridge(
 
     private fun attachJwtRefreshListener(
         device: DeviceLocal,
-        localState: LocalState,
+        currentJwt: String,
         source: String,
     ) {
         val generation = jwtRefreshGeneration.incrementAndGet()
+        jwtRefreshValueRef.set(currentJwt)
         closeJwtRefreshListener(jwtRefreshSubRef.getAndSet(null))
         val sub = runCatching {
             device.addJwtRefreshListener { newJwt ->
-                bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable) {
-                    if (jwtRefreshGeneration.get() != generation) return@launch
-                    val unchanged = runCatching { localState.byClientJwt == newJwt }.getOrDefault(false)
-                    if (unchanged) return@launch
-                    runCatching { localState.byClientJwt = newJwt }
-                        .onSuccess {
-                            PersistentLoggers.debug(TAG, "$source: credential refreshed - state updated")
+                if (jwtRefreshGeneration.get() != generation) return@addJwtRefreshListener
+                if (newJwt.isBlank()) return@addJwtRefreshListener
+                val previous = jwtRefreshValueRef.getAndSet(newJwt)
+                if (previous == newJwt) return@addJwtRefreshListener
+                bridgeScope.launch(NonCancellable) {
+                    jwtRefreshPersistMutex.withLock {
+                        if (jwtRefreshGeneration.get() != generation || jwtRefreshValueRef.get() != newJwt) {
+                            return@withLock
                         }
-                        .onFailure {
-                            PersistentLoggers.warn(TAG, "$source: credential refresh persist threw: ${it.message}")
-                        }
+                        runCatching { configStore?.setByClientJwt(newJwt) }
+                            .onFailure {
+                                jwtRefreshValueRef.compareAndSet(newJwt, previous)
+                                PersistentLoggers.warn(TAG, "$source: credential refresh persist threw: ${it.message}")
+                            }
+                    }
                 }
             }
         }.getOrElse {

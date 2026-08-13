@@ -56,5 +56,7 @@ object LanRoutes {
         Cidr("208.0.0.0", 4),
     )
 
+    val BYPASS_LAN_IPV6: List<Cidr> = listOf(Cidr("2000::", 3))
+
     data class Cidr(val address: String, val prefix: Int)
 }
