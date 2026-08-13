@@ -50,7 +50,7 @@ class SingboxEngineWarmReadinessTest {
     }
 
     @Test
-    fun `proxy mode auto select readiness requires routed traffic when runtime is available`() = runTest {
+    fun `proxy mode auto select readiness uses local SOCKS when runtime is available`() = runTest {
         val engine = buildEngine()
         var routedProbeCalls = 0
         engine.routedProbe = SingboxRoutedProbe {
@@ -82,7 +82,7 @@ class SingboxEngineWarmReadinessTest {
             val ready = engine.awaitReady()
 
             assertIs<EnginePlugin.ReadyResult.Ready>(ready)
-            assertEquals(1, routedProbeCalls)
+            assertEquals(0, routedProbeCalls)
             assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
             assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
         }

@@ -839,7 +839,7 @@ class RealUrnetworkSdkBridgeContractTest {
     @Test
     fun `JWT refresh listener is deduplicated and closed on teardown`() {
         val listenerBlock = source.substringAfter("private fun attachJwtRefreshListener")
-            .substringBefore("private fun detachJwtRefreshListener")
+            .substringBefore("private fun invalidateJwtRefreshListener")
         val stopBlock = source.substringAfter("private suspend fun stopUnderLock")
             .substringBefore("private fun closeDevice")
 
@@ -848,7 +848,12 @@ class RealUrnetworkSdkBridgeContractTest {
         assertTrue(listenerBlock.contains("jwtRefreshGeneration.get() != generation"))
         assertTrue(listenerBlock.contains("localState.byClientJwt == newJwt"))
         assertTrue(listenerBlock.contains("jwtRefreshSubRef.getAndSet(sub)"))
-        assertTrue(stopBlock.contains("detachJwtRefreshListener()"))
+        assertTrue(stopBlock.contains("val jwtRefreshSub = invalidateJwtRefreshListener()"))
+        val mainBlock = stopBlock.substringAfter("withContext(Dispatchers.Main.immediate)")
+        assertTrue(mainBlock.contains("contractStatusListener.detach()"))
+        assertTrue(mainBlock.contains("detachConnectionStatusListener()"))
+        assertTrue(mainBlock.contains("detachSelectedLocationListener()"))
+        assertTrue(mainBlock.contains("closeJwtRefreshListener(jwtRefreshSub)"))
     }
 
     @Test

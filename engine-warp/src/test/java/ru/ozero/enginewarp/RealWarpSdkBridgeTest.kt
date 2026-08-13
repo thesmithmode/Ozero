@@ -1,10 +1,15 @@
 package ru.ozero.enginewarp
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.enginescore.VpnSocketProtector
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -617,7 +622,64 @@ class RealWarpSdkBridgeTest {
         assertTrue(reprotect.contains("synchronized(nativeHandleLock)"))
         assertTrue(detach.contains("synchronized(nativeHandleLock) { awgRuntime.turnOff(h) }"))
         assertTrue(detach.contains("savedProtector = null"))
-        assertTrue(forceTerminate.contains("synchronized(nativeHandleLock)"))
+        assertFalse(forceTerminate.contains("synchronized(nativeHandleLock)"))
+        assertTrue(forceTerminate.contains("terminationGeneration.incrementAndGet()"))
+    }
+
+    @Test
+    fun `forceTerminate remains available while native turnOff is blocked`() = runTest {
+        val turnOffEntered = CountDownLatch(1)
+        val releaseTurnOff = CountDownLatch(1)
+        val forceTerminated = CountDownLatch(1)
+        val runtime = object : AwgRuntime {
+            override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int = 7
+            override fun turnOff(handle: Int) {
+                turnOffEntered.countDown()
+                releaseTurnOff.await()
+            }
+            override fun getSocketV4(handle: Int): Int = 100
+            override fun getSocketV6(handle: Int): Int = -1
+            override fun forceTerminate() {
+                forceTerminated.countDown()
+            }
+        }
+        val bridge = RealWarpSdkBridge(runtime)
+        assertIs<WarpSdkBridge.AttachResult.Success>(bridge.attachTun("wg-test", 7, validIni, "/tmp", noopProtector))
+        val detach = async(Dispatchers.IO) { bridge.detachTun() }
+        assertTrue(turnOffEntered.await(1, TimeUnit.SECONDS))
+
+        val terminator = thread { bridge.forceTerminate() }
+
+        assertTrue(forceTerminated.await(1, TimeUnit.SECONDS))
+        releaseTurnOff.countDown()
+        terminator.join(1_000L)
+        detach.await()
+        assertFalse(bridge.isRunning())
+    }
+
+    @Test
+    fun `late native start cannot publish handle after forceTerminate`() = runTest {
+        val startEntered = CountDownLatch(1)
+        val releaseStart = CountDownLatch(1)
+        val runtime = object : AwgRuntime {
+            override fun turnOn(name: String, tunFd: Int, ini: String, uapiPath: String): Int {
+                startEntered.countDown()
+                releaseStart.await()
+                return 7
+            }
+            override fun turnOff(handle: Int) = Unit
+            override fun getSocketV4(handle: Int): Int = 100
+            override fun getSocketV6(handle: Int): Int = -1
+        }
+        val bridge = RealWarpSdkBridge(runtime)
+        val attach = async(Dispatchers.IO) { bridge.attachTun("wg-test", 7, validIni, "/tmp", noopProtector) }
+        assertTrue(startEntered.await(1, TimeUnit.SECONDS))
+
+        bridge.forceTerminate()
+        releaseStart.countDown()
+
+        assertIs<WarpSdkBridge.AttachResult.Failed>(attach.await())
+        assertFalse(bridge.isRunning())
     }
 
     @Test

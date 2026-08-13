@@ -51,7 +51,7 @@ class SingboxRuntimeReleaseSentinelTest {
             "SingboxRuntime.stop must null out lastStatus — stale status after stop is misleading",
         )
         assertTrue(
-            stopBlock.contains("closeService()") || stopBlock.contains(".close()"),
+            stopBlock.contains("closeCommandServer(it, closeService = true)"),
             "SingboxRuntime.stop must call closeService/close before clearing",
         )
     }
@@ -66,9 +66,15 @@ class SingboxRuntimeReleaseSentinelTest {
 
         val stopBlock = content.substringAfter("fun stop()")
             .substringBefore("fun ")
+        val closeBlock = content.substringAfter("private fun closeCommandServer")
+            .substringBefore("private fun createCommandServer")
 
-        val closeServicePos = stopBlock.indexOf("closeService()")
-        val closePos = stopBlock.indexOf("server.close()")
+        assertTrue(
+            stopBlock.contains("closeCommandServer(it, closeService = true)"),
+            "stop must request service shutdown from the shared teardown path",
+        )
+        val closeServicePos = closeBlock.indexOf("server.closeService()")
+        val closePos = closeBlock.indexOf("server.close()")
         assertTrue(
             closeServicePos >= 0 && closePos >= 0 && closeServicePos < closePos,
             "closeService must be called before close — stop TUN traffic before shutting down core",

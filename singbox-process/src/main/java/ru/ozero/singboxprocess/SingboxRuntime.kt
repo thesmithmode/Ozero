@@ -40,6 +40,7 @@ import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginesingbox.SingboxRuntimeCheckpointStore
 import java.io.File
 import java.security.KeyStore
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.ssl.TrustManagerFactory
 
@@ -62,10 +63,9 @@ internal object SingboxRuntime {
     private var commandServerHandler: OzeroCommandServerHandler? = null
 
     @Volatile
-    private var logClient: CommandClient? = null
+    private var nativeLogConnection: NativeLogConnection? = null
 
-    @Volatile
-    private var logClientHandler: NativeLogHandler? = null
+    private val retainedFailedLogConnections = ConcurrentHashMap.newKeySet<NativeLogConnection>()
 
     @Volatile
     private var nativeLogJob: Job? = null
@@ -113,11 +113,14 @@ internal object SingboxRuntime {
                 val oldServer = commandServer
                 if (oldServer != null) {
                     PersistentLoggers.warn(TAG, "start: already running — graceful restart")
-                    stopNativeLogSubscription()
-                    runCatching { oldServer.closeService() }
-                    runCatching { oldServer.close() }
+                    val diagnosticsStopped = stopNativeLogSubscription()
+                    val closeFailure = closeCommandServer(oldServer, closeService = true)
+                    if (!diagnosticsStopped || closeFailure != null) {
+                        throw IllegalStateException("previous sing-box runtime teardown failed", closeFailure)
+                    }
                     commandServer = null
                     releaseServerCallbacks()
+                    retainedFailedLogConnections.clear()
                     lastStatus = null
                 }
                 startLocked(context, tunFd, singboxJsonConfig, protectorBridge, detachedTunFd)
@@ -171,8 +174,7 @@ internal object SingboxRuntime {
             server.start()
         } catch (e: Exception) {
             PersistentLoggers.error(TAG, "command server start failed exceptionClass=${e::class.java.simpleName}")
-            runCatching { server.close() }
-            releaseServerCallbacks()
+            cleanupFailedServerStart(server, e)
             throw e
         }
         recordCheckpoint("post-start socket-ready")
@@ -182,8 +184,7 @@ internal object SingboxRuntime {
             recordCheckpoint("checkConfig-passed")
         } catch (e: Exception) {
             PersistentLoggers.error(TAG, "checkConfig failed exceptionClass=${e::class.java.simpleName}")
-            runCatching { server.close() }
-            releaseServerCallbacks()
+            cleanupFailedServerStart(server, e)
             throw e
         }
 
@@ -196,8 +197,7 @@ internal object SingboxRuntime {
                 TAG,
                 "startOrReloadService failed exceptionClass=${e::class.java.simpleName}",
             )
-            runCatching { server.close() }
-            releaseServerCallbacks()
+            cleanupFailedServerStart(server, e)
             throw e
         }
 
@@ -209,20 +209,15 @@ internal object SingboxRuntime {
 
     suspend fun stop() = withContext(Dispatchers.Main.immediate) {
         mutex.withLock {
-            stopNativeLogSubscription()
+            val diagnosticsStopped = stopNativeLogSubscription()
             val server = commandServer
-            if (server != null) {
-                runCatching { server.closeService() }
-                    .onFailure {
-                        PersistentLoggers.warn(TAG, "closeService failed exceptionClass=${it::class.java.simpleName}")
-                    }
-                runCatching { server.close() }
-                    .onFailure {
-                        PersistentLoggers.warn(TAG, "close failed exceptionClass=${it::class.java.simpleName}")
-                    }
+            val closeFailure = server?.let { closeCommandServer(it, closeService = true) }
+            if (!diagnosticsStopped || closeFailure != null) {
+                throw IllegalStateException("sing-box native teardown failed", closeFailure)
             }
             commandServer = null
             releaseServerCallbacks()
+            retainedFailedLogConnections.clear()
             lastStatus = null
             nativeFailureDiagnostics = null
             persistCheckpoint("runtime-stopped")
@@ -238,6 +233,33 @@ internal object SingboxRuntime {
     private fun releaseServerCallbacks() {
         platformInterface = null
         commandServerHandler = null
+    }
+
+    private fun cleanupFailedServerStart(server: CommandServer, startFailure: Exception) {
+        val closeFailure = closeCommandServer(server, closeService = false)
+        if (closeFailure == null) {
+            releaseServerCallbacks()
+        } else {
+            commandServer = server
+            startFailure.addSuppressed(closeFailure)
+        }
+    }
+
+    private fun closeCommandServer(server: CommandServer, closeService: Boolean): Throwable? {
+        var failure: Throwable? = null
+        if (closeService) {
+            runCatching { server.closeService() }
+                .onFailure {
+                    failure = it
+                    PersistentLoggers.warn(TAG, "closeService failed exceptionClass=${it::class.java.simpleName}")
+                }
+        }
+        runCatching { server.close() }
+            .onFailure {
+                if (failure == null) failure = it else failure?.addSuppressed(it)
+                PersistentLoggers.warn(TAG, "close failed exceptionClass=${it::class.java.simpleName}")
+            }
+        return failure
     }
 
     private fun createCommandServer(
@@ -268,7 +290,7 @@ internal object SingboxRuntime {
         generation: Long,
         failureDiagnostics: NativeFailureDiagnostics,
     ) {
-        var expectedClient: CommandClient? = null
+        var expectedConnection: NativeLogConnection? = null
         runCatching {
             val options = CommandClientOptions()
             options.addCommand(Libbox.CommandLog)
@@ -277,30 +299,30 @@ internal object SingboxRuntime {
             lateinit var client: CommandClient
             val handler = NativeLogHandler(
                 failureDiagnostics = failureDiagnostics,
-                isCurrent = { nativeLogSessions.isCurrent(generation, client, logClient) },
+                isCurrent = { nativeLogSessions.isCurrent(generation, client, nativeLogConnection?.client) },
                 onDisconnected = { handleNativeLogDisconnected(generation, client) },
             )
             client = CommandClient(
                 handler,
                 options,
             )
-            expectedClient = client
+            val connection = NativeLogConnection(client, handler)
+            expectedConnection = connection
             if (!nativeLogSessions.isActive(generation)) {
-                disconnectNativeLogClient(client)
+                disconnectNativeLogClient(connection)
                 return@runCatching
             }
-            logClient = client
-            logClientHandler = handler
+            nativeLogConnection = connection
             withTimeout(NATIVE_LOG_CONNECT_TIMEOUT_MS) {
                 runInterruptible { client.connect() }
             }
-            if (!nativeLogSessions.isCurrent(generation, client, logClient)) {
-                disconnectNativeLogClient(client)
+            if (!nativeLogSessions.isCurrent(generation, client, nativeLogConnection?.client)) {
+                disconnectNativeLogClient(connection)
                 return
             }
             PersistentLoggers.debug(TAG, "native log subscription connected")
         }.onFailure {
-            expectedClient?.let(::disconnectNativeLogClient)
+            expectedConnection?.let(::disconnectNativeLogClient)
             if (nativeLogSessions.isActive(generation) && nativeLogSessionActive) {
                 PersistentLoggers.warn(
                     TAG,
@@ -310,41 +332,48 @@ internal object SingboxRuntime {
         }
     }
 
-    private suspend fun stopNativeLogSubscription() {
+    private suspend fun stopNativeLogSubscription(): Boolean {
         nativeLogSessions.invalidate()
         nativeLogSessionActive = false
         nativeLogJob?.cancelAndJoin()
         nativeLogJob = null
-        val client = logClient
-        if (client != null) withContext(Dispatchers.IO) { disconnectNativeLogClient(client) }
-        logClientHandler = null
+        val connection = nativeLogConnection
+        val disconnected = connection == null || withContext(Dispatchers.IO) { disconnectNativeLogClient(connection) }
         lastStatus = null
+        return disconnected && retainedFailedLogConnections.isEmpty()
     }
 
-    private fun disconnectNativeLogClient(expectedClient: CommandClient) {
-        val client = expectedClient
-        if (client === logClient) {
-            logClient = null
-            logClientHandler = null
-        }
-        runCatching { client.disconnect() }
-            .onFailure {
+    private fun disconnectNativeLogClient(connection: NativeLogConnection): Boolean {
+        val disconnected = runCatching { connection.client.disconnect() }
+            .onFailure { failure ->
+                retainedFailedLogConnections.add(connection)
                 PersistentLoggers.warn(
                     TAG,
-                    "native diagnostics disconnect failed exceptionClass=${it::class.java.simpleName}",
+                    "native diagnostics disconnect failed exceptionClass=${failure::class.java.simpleName}",
                 )
             }
+            .isSuccess
+        synchronized(connection.handler) { Unit }
+        if (disconnected) {
+            if (nativeLogConnection === connection) nativeLogConnection = null
+            retainedFailedLogConnections.remove(connection)
+        }
+        return disconnected
     }
 
     private fun handleNativeLogDisconnected(generation: Long, client: CommandClient) {
-        if (!nativeLogSessions.isCurrent(generation, client, logClient)) return
+        if (!nativeLogSessions.isCurrent(generation, client, nativeLogConnection?.client)) return
         lastStatus = null
-        logClient = null
-        logClientHandler = null
+        nativeLogConnection = null
         if (nativeLogSessionActive && nativeLogSessions.claimReconnect(generation)) {
             launchNativeLogSubscription(reconnect = true)
         }
     }
+
+    private class NativeLogConnection(
+        val client: CommandClient,
+        val handler: NativeLogHandler,
+    )
 
     private class NativeLogHandler(
         private val failureDiagnostics: NativeFailureDiagnostics,

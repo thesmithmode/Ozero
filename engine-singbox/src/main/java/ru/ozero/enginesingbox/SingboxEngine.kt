@@ -694,12 +694,7 @@ class SingboxEngine @Inject constructor(
         if (!awaitLocalSocksReady(port)) {
             return EnginePlugin.ReadyResult.Timeout("sing-box SOCKS5 listener is not ready")
         }
-        return when (val result = routedProbe.probe(port)) {
-            is RoutedProbeResult.Success -> EnginePlugin.ReadyResult.Ready
-            is RoutedProbeResult.Failure -> EnginePlugin.ReadyResult.Timeout(
-                "sing-box routed traffic is not ready: ${result.reason.probeFailureMessage()}",
-            )
-        }
+        return EnginePlugin.ReadyResult.Ready
     }
 
     private suspend fun awaitLocalSocksReady(port: Int): Boolean {
