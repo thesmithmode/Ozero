@@ -164,25 +164,34 @@ class RawUpdater(
             if (failure is CancellationException) throw failure
         }
         result.exceptionOrNull()?.let { failure ->
-            val errorCode = refreshErrorCode(failure)
-            runCatching {
-                val currentGroup = groupDao.getById(group.id) ?: attemptedGroup
-                groupDao.update(
-                    currentGroup.copy(
-                        lastAttemptAt = lastAttemptAt,
-                        lastRefreshErrorCode = errorCode,
-                    ),
-                )
-            }.onFailure { statusFailure ->
-                if (statusFailure !== failure) failure.addSuppressed(statusFailure)
-            }
-            Log.w(
-                TAG,
-                "refresh failed groupId=${group.id} code=$errorCode " +
-                    "causes=${failure.safeCauseDiagnostics()}",
-            )
+            recordRefreshFailure(group, attemptedGroup, lastAttemptAt, failure)
         }
         result
+    }
+
+    private suspend fun recordRefreshFailure(
+        group: SubscriptionGroup,
+        attemptedGroup: SubscriptionGroup,
+        lastAttemptAt: Long,
+        failure: Throwable,
+    ) {
+        val errorCode = refreshErrorCode(failure)
+        runCatching {
+            val currentGroup = groupDao.getById(group.id) ?: attemptedGroup
+            groupDao.update(
+                currentGroup.copy(
+                    lastAttemptAt = lastAttemptAt,
+                    lastRefreshErrorCode = errorCode,
+                ),
+            )
+        }.onFailure { statusFailure ->
+            if (statusFailure !== failure) failure.addSuppressed(statusFailure)
+        }
+        Log.w(
+            TAG,
+            "refresh failed groupId=${group.id} code=$errorCode " +
+                "causes=${failure.safeCauseDiagnostics()}",
+        )
     }
 
     private fun httpClientFor(group: SubscriptionGroup): OkHttpClient = when {
