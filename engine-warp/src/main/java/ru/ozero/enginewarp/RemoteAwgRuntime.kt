@@ -27,6 +27,7 @@ class RemoteAwgRuntime(
     @Volatile private var deathRecipient: IBinder.DeathRecipient? = null
 
     @Volatile private var engineBinder: IBinder? = null
+
     private val bindLock = Any()
 
     private fun ensureConnected(): IWarpEngineProcess {
@@ -146,6 +147,23 @@ class RemoteAwgRuntime(
                 context.stopService(Intent().setComponent(serviceComponent).setAction(ACTION_STOP_SESSION))
             }.onFailure {
                 PersistentLoggers.warn(TAG, "stop WARP foreground service failed: ${it.message}")
+            }
+        }
+    }
+
+    override fun forceTerminate() {
+        synchronized(bindLock) {
+            val remote = engine
+            unlinkDeathRecipient()
+            runCatching { remote?.forceTerminate() }
+                .onFailure { PersistentLoggers.warn(TAG, "force termination request failed: ${it.message}") }
+            engine = null
+            serviceConnection?.let { conn ->
+                runCatching { context.unbindService(conn) }
+                serviceConnection = null
+            }
+            runCatching {
+                context.stopService(Intent().setComponent(serviceComponent).setAction(ACTION_STOP_SESSION))
             }
         }
     }

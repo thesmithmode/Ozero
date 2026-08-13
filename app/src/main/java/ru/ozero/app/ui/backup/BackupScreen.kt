@@ -56,6 +56,7 @@ fun BackupScreen(
     importOnly: Boolean = false,
     showTopBar: Boolean = true,
     showWarning: Boolean = true,
+    modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -93,6 +94,7 @@ fun BackupScreen(
     )
 
     Scaffold(
+        modifier = modifier,
         topBar = {
             if (showTopBar) {
                 TopAppBar(

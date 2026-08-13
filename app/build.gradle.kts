@@ -180,7 +180,10 @@ dependencies {
 
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
     testRuntimeOnly(libs.junit.vintage.engine)
+    debugImplementation(libs.compose.ui.test.manifest)
     robolectricRuntimeDeps24("org.robolectric:android-all-instrumented:7.0.0_r1-robolectric-r1-i6")
     robolectricRuntimeDeps28("org.robolectric:android-all-instrumented:9-robolectric-4913185-2-i6")
     robolectricRuntimeDeps29("org.robolectric:android-all-instrumented:10-robolectric-5803371-i6")

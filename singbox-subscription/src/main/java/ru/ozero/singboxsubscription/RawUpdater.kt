@@ -18,6 +18,7 @@ import javax.net.ssl.SSLPeerUnverifiedException
 import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.BeanSupportError
 import ru.ozero.singboxconfig.ConfigBuilder
+import ru.ozero.singboxconfig.PersistedProfileRecovery
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
@@ -353,8 +354,7 @@ private fun ProxyProfile.stableBaseIdentityKey(): String =
     listOf(
         groupId.toString(),
         protocolType.toString(),
-        runCatching { KryoSerializer.deserialize<AbstractBean>(beanBlob) }
-            .getOrNull()
+        recoveredIdentityBean()
             ?.let { "${it.serverAddress}|${it.serverPort}|${it.stableCredentialKey()}" }
             ?: beanBlob.contentHashCode().toString(),
     ).joinToString("|")
@@ -362,8 +362,7 @@ private fun ProxyProfile.stableBaseIdentityKey(): String =
 private fun ProxyProfile.stableFullIdentityKey(): String =
     listOf(
         stableBaseIdentityKey(),
-        runCatching { KryoSerializer.deserialize<AbstractBean>(beanBlob) }
-            .getOrNull()
+        recoveredIdentityBean()
             ?.stableRuntimeKey()
             ?: "",
     ).joinToString("|")
@@ -374,8 +373,11 @@ private fun AbstractBean.stableCredentialKey(): String = when (this) {
     is TrojanBean -> "password=${password.trim()}"
     is ShadowsocksBean -> "method=${method.trim()}|password=${password.trim()}"
     is StandardV2RayBean -> "uuid=${uuid.trim()}"
-    else -> "blob=${KryoSerializer.serialize(this).contentHashCode()}"
+    else -> "blob=${listOf(serverAddress.trim(), serverPort, name.trim()).hashCode()}"
 }
+
+private fun ProxyProfile.recoveredIdentityBean(): AbstractBean? =
+    PersistedProfileRecovery.recoverIdentity(beanBlob, protocolType)
 
 private fun AbstractBean.stableRuntimeKey(): String = when (this) {
     is VLESSBean -> listOf(

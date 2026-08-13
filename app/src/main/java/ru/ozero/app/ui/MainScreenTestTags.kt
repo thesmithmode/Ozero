@@ -3,6 +3,10 @@ package ru.ozero.app.ui
 object MainScreenTestTags {
     const val OPEN_SETTINGS = "main_open_settings"
     const val TRAFFIC_STATS = "main_traffic_stats"
+    const val TRAFFIC_CHART = "main_traffic_chart"
+    const val TRAFFIC_CHART_Y_AXIS = "main_traffic_chart_y_axis"
+    const val TRAFFIC_CHART_PLOT = "main_traffic_chart_plot"
+    const val TRAFFIC_CHART_X_AXIS = "main_traffic_chart_x_axis"
     const val STAGNATION_BADGE = "main_stagnation_badge"
     const val HEALTH_DEGRADED_BADGE = "main_health_degraded_badge"
     const val ENGINE_CHIPS_ROW = "main_engine_chips_row"

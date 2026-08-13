@@ -1,5 +1,7 @@
 package ru.ozero.app.ui.servers
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -7,6 +9,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -50,6 +54,21 @@ class ServersScreenTest {
         composeRule.onNodeWithTag(ServersTestTags.ENTRY_DROPDOWN).assertIsDisplayed()
         composeRule.onNodeWithTag(ServersTestTags.EXIT_DROPDOWN).assertIsDisplayed()
         composeRule.onNodeWithTag(ServersTestTags.PREVIEW).assertIsDisplayed()
+    }
+
+    @Test
+    fun actionsRemainReachableAtLargeFontScale() {
+        render(
+            state = ServersUiState.Content(
+                servers = sample,
+                entryId = "a",
+                exitId = "b",
+            ),
+            fontScale = 2f,
+        )
+
+        composeRule.onNodeWithTag(ServersTestTags.SAVE).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(ServersTestTags.CLEAR).performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -196,17 +215,19 @@ class ServersScreenTest {
             port = 443,
         )
 
-    private fun render(state: ServersUiState) {
+    private fun render(state: ServersUiState, fontScale: Float = 1f) {
         composeRule.setContent {
-            OzeroTheme {
-                ServersScreenContent(
-                    state = state,
-                    onBack = {},
-                    onEntrySelect = {},
-                    onExitSelect = {},
-                    onSavePair = {},
-                    onClearPair = {},
-                )
+            CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
+                OzeroTheme {
+                    ServersScreenContent(
+                        state = state,
+                        onBack = {},
+                        onEntrySelect = {},
+                        onExitSelect = {},
+                        onSavePair = {},
+                        onClearPair = {},
+                    )
+                }
             }
         }
     }

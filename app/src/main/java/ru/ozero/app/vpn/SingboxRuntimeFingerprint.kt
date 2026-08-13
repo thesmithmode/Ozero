@@ -7,8 +7,8 @@ import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.prioritizeSingboxAutoProfiles
 import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.ConfigBuilder
-import ru.ozero.singboxfmt.AbstractBean
-import ru.ozero.singboxfmt.KryoSerializer
+import ru.ozero.singboxconfig.PersistedProfileRecovery
+import ru.ozero.singboxconfig.RecoveryResult
 import ru.ozero.singboxroom.entity.ProxyChainStep
 import ru.ozero.singboxroom.entity.ProxyProfile
 
@@ -23,7 +23,7 @@ internal fun singboxRuntimeFingerprint(
         val supportedProfiles = profiles
             .asSequence()
             .take(MAX_AUTO_SELECT_FINGERPRINT_SCAN)
-            .filter { isSupportedRoutableBlob(it.beanBlob) }
+            .filter(::isSupportedRoutableProfile)
             .toList()
         val profileBlobHashes = prioritizeSingboxAutoProfiles(
             supportedProfiles,
@@ -52,9 +52,9 @@ private val SINGBOX_DNS_SERVERS_KEY = stringSetPreferencesKey("singbox_dns_serve
 private const val MAX_AUTO_SELECT_FINGERPRINT_SCAN = 2_000
 private const val MAX_AUTO_SELECT_FINGERPRINT_PROFILES = 50
 
-private fun isSupportedRoutableBlob(blob: ByteArray): Boolean =
-    runCatching { KryoSerializer.deserialize<AbstractBean>(blob) }
-        .getOrNull()
+private fun isSupportedRoutableProfile(profile: ProxyProfile): Boolean =
+    (PersistedProfileRecovery.recover(profile.beanBlob, profile.protocolType) as? RecoveryResult.Success)
+        ?.bean
         ?.let { ConfigBuilder.supportDecision(it) is BeanSupportDecision.Supported }
         ?: false
 

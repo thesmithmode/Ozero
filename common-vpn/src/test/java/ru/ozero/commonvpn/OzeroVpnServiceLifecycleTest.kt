@@ -428,7 +428,7 @@ class OzeroVpnServiceLifecycleTest {
     @Test
     fun `awaitEngineReady обрабатывает ReadyResult Timeout логом — не маскирует как Ready`() {
         val body = startSequenceSource.substringAfter("private suspend fun awaitEngineReady(")
-            .substringBefore("private fun buildEngineConfig(")
+            .substringBefore("private suspend fun buildEngineConfig(")
         assertTrue(
             body.contains("awaitReady()"),
             "awaitEngineReady обязан звать plugin.awaitReady() — readiness signal",
@@ -460,7 +460,7 @@ class OzeroVpnServiceLifecycleTest {
 
     @Test
     fun `autoCandidates итерирует engineAutoPriority при manualEngine null`() {
-        val body = startSequenceSource.substringAfter("private fun autoCandidates(")
+        val body = startSequenceSource.substringAfter("private suspend fun autoCandidates(")
             .substringBefore("private suspend fun autoCandidatesWithPreflight")
         assertTrue(
             body.contains("engineAutoPriority"),
@@ -517,7 +517,7 @@ class OzeroVpnServiceLifecycleTest {
             "suspend fun engineNeedsCustomTun",
             "private suspend fun awaitEngineReady(",
             "private suspend fun autoCandidatesWithPreflight",
-            "private fun autoCandidates",
+            "private suspend fun autoCandidates",
             "private fun resolveTargetForUi(",
             "private fun establishTun(",
             "private suspend fun establishTunForEngine(",

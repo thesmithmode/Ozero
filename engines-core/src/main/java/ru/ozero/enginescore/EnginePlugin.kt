@@ -47,7 +47,11 @@ interface EnginePlugin {
 
     fun buildManualConfig(settings: SettingsModel?): EngineConfig? = null
 
+    suspend fun buildManualConfigAwaitingStorage(settings: SettingsModel?): EngineConfig? = buildManualConfig(settings)
+
     fun buildProxyConfig(settings: SettingsModel?): EngineConfig? = buildManualConfig(settings)
+
+    suspend fun buildProxyConfigAwaitingStorage(settings: SettingsModel?): EngineConfig? = buildProxyConfig(settings)
 
     fun statsLabel(stats: EngineStats): String? {
         val peers = stats.activeConnections

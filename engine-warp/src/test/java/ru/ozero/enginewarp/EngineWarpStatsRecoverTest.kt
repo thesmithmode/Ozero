@@ -458,7 +458,7 @@ class EngineWarpStatsRecoverTest {
         warpReadyPollMs = 10L,
         statsPollIntervalMs = pollMs,
         handshakeStaleThresholdSec = 180L,
-        pluginScope = scope,
+        runtimeControl = WarpRuntimeControl(pluginScope = scope),
     )
 
     private class FakeAuto : WarpAutoConfig {

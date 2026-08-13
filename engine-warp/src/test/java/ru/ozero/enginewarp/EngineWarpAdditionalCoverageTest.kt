@@ -687,14 +687,16 @@ class EngineWarpAdditionalCoverageTest {
 
     @Test
     fun `recover second stale reports reattach failure`() = runTest {
-        val bridge = FakeBridge(attachResult = WarpSdkBridge.AttachResult.Failed("wg down"))
+        val bridge = FakeBridge(
+            reattachResult = WarpSdkBridge.AttachResult.Failed("wg down"),
+        )
         val engine = newEngine(
             bridge = bridge,
             reader = { _, _ -> WarpUapiState(999, 1L, 2L, 1) },
         )
 
         engine.start(EngineConfig.Warp, Upstream.None)
-        assertIs<TunAttachResult.Failure>(engine.attachTun(48))
+        assertIs<TunAttachResult.Success>(engine.attachTun(48))
         assertIs<EnginePlugin.RecoverResult.Failed>(engine.recover())
         val second = assertIs<EnginePlugin.RecoverResult.Failed>(engine.recover())
 
@@ -725,7 +727,7 @@ class EngineWarpAdditionalCoverageTest {
         warpReadyPollMs = 5L,
         statsPollIntervalMs = pollMs,
         handshakeStaleThresholdSec = 180L,
-        pluginScope = scope,
+        runtimeControl = WarpRuntimeControl(pluginScope = scope),
     )
 
     private class FakeAuto(private val result: Result<RegisteredWarpConfig>) : WarpAutoConfig {
@@ -783,6 +785,7 @@ class EngineWarpAdditionalCoverageTest {
 
     private class FakeBridge(
         private val attachResult: WarpSdkBridge.AttachResult = WarpSdkBridge.AttachResult.Success,
+        private val reattachResult: WarpSdkBridge.AttachResult = attachResult,
         private val proxyResult: WarpSdkBridge.ProxyResult = WarpSdkBridge.ProxyResult.Failed("proxy off"),
     ) : WarpSdkBridge {
         var stopProxyCalls = 0
@@ -799,7 +802,7 @@ class EngineWarpAdditionalCoverageTest {
         ): WarpSdkBridge.AttachResult {
             attachCalls++
             lastIni = iniConfig
-            return attachResult
+            return if (attachCalls == 1) attachResult else reattachResult
         }
         override suspend fun detachTun() {
             detachCalls++

@@ -69,4 +69,57 @@ class WarpEngineServiceLoadOnceSentinelTest {
             "Если startForeground rejected, service обязан self-stop, иначе Android O+ убьёт его по FGS timeout.",
         )
     }
+
+    @Test
+    fun `WARP service releases active runtime for explicit and process teardown`() {
+        val stopSession = source.substringAfter("ACTION_STOP_SESSION ->").substringBefore("else ->")
+        val onDestroy = source.substringAfter("override fun onDestroy()")
+            .substringBefore("private fun startForegroundSession")
+
+        assertTrue(stopSession.contains("shutdownCoordinator.request()"))
+        assertTrue(onDestroy.contains("shutdownCoordinator.request()"))
+        assertTrue(source.contains("cleanup = ::stopActiveRuntime"))
+        assertTrue(source.contains("activeTunHandles.releaseAll()"))
+        assertTrue(source.contains("synchronized(runtimeLock)"))
+        assertTrue(source.contains(".onSuccess {") && source.contains("proxyStarted = false"))
+    }
+
+    @Test
+    fun `service owns one runtime lease and cleans both native modes before replacement`() {
+        val prepare = source.substringAfter("private fun prepareForNewRuntime()")
+            .substringBefore("private fun releaseActiveTunnels")
+
+        assertTrue(prepare.contains("releaseActiveTunnels()"))
+        assertTrue(prepare.contains("stopActiveProxy()"))
+        assertFalse(prepare.contains("releaseActiveTunnels() && stopActiveProxy()"))
+        assertTrue(prepare.contains("awaitRuntimeRestartCooldown()"))
+        assertTrue(source.split("prepareForNewRuntime()").size >= 4)
+    }
+
+    @Test
+    fun `runtime cooldown survives explicit turnOff before replacement`() {
+        val turnOff = source.substringAfter("private fun turnOffNative")
+            .substringBefore("private fun ensureLibraryLoaded")
+        val cooldown = source.substringAfter("private fun awaitRuntimeRestartCooldown()")
+            .substringBefore("private fun terminateCurrentProcess")
+
+        assertTrue(turnOff.contains("markRuntimeStopped()"))
+        assertTrue(cooldown.contains("lastRuntimeStopElapsedMs"))
+        assertTrue(cooldown.contains("RUNTIME_RESTART_COOLDOWN_MS"))
+        assertTrue(cooldown.contains("SystemClock.sleep(remaining)"))
+    }
+
+    @Test
+    fun `client loss schedules bounded cleanup and binder force kill stays process local`() {
+        val onUnbind = source.substringAfter("override fun onUnbind")
+            .substringBefore("override fun onDestroy")
+        val terminate = source.substringAfter("private fun terminateCurrentProcess()")
+            .substringBefore("private fun turnOffNative")
+
+        assertTrue(onUnbind.contains("shutdownCoordinator.request()"))
+        assertTrue(onUnbind.contains("stopSelf()"))
+        assertFalse(onUnbind.contains("stopActiveRuntime()"))
+        assertTrue(source.contains("override fun forceTerminate() = terminateCurrentProcess()"))
+        assertTrue(terminate.contains("Process.killProcess(Process.myPid())"))
+    }
 }

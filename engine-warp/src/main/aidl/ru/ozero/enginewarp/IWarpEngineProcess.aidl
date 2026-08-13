@@ -12,4 +12,5 @@ interface IWarpEngineProcess {
     int startProxy(String name, String iniConfig, String uapiPath, int port);
     void stopProxy();
     void resetProxyGlobals();
+    oneway void forceTerminate();
 }

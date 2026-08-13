@@ -15,6 +15,9 @@ import okhttp3.mockwebserver.MockWebServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import ru.ozero.singboxconfig.BeanSupportDecision
+import ru.ozero.singboxconfig.ConfigBuilder
+import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
@@ -652,6 +655,43 @@ class RawUpdaterTest {
         assertEquals(first.id, refreshed.id)
         assertEquals(123, refreshed.latencyMs)
         assertTrue(!first.beanBlob.contentEquals(refreshed.beanBlob))
+    }
+
+    @Test
+    fun `unsupported profile becoming supported preserves id and diagnostics`() = runBlocking {
+        val unsupported =
+            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443" +
+                "?type=xhttp&security=none#Unsupported"
+        val supported =
+            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443" +
+                "?type=ws&security=none&path=/ws#Supported"
+        server.enqueue(MockResponse().setBody(unsupported))
+        val g = group()
+
+        rawUpdater.refresh(g)
+        val first = profileDao.profiles.single()
+        assertTrue(
+            ConfigBuilder.supportDecision(KryoSerializer.deserialize<VLESSBean>(first.beanBlob))
+                is BeanSupportDecision.Unsupported,
+        )
+        profileDao.profiles[0] = first.copy(
+            latencyMs = 321,
+            probeError = "unsupported transport",
+            lastProbeAt = 123_456L,
+        )
+
+        server.enqueue(MockResponse().setBody(supported))
+        rawUpdater.refresh(g)
+
+        val refreshed = profileDao.profiles.single()
+        assertEquals(first.id, refreshed.id)
+        assertEquals(321, refreshed.latencyMs)
+        assertEquals("unsupported transport", refreshed.probeError)
+        assertEquals(123_456L, refreshed.lastProbeAt)
+        assertTrue(
+            ConfigBuilder.supportDecision(KryoSerializer.deserialize<VLESSBean>(refreshed.beanBlob))
+                is BeanSupportDecision.Supported,
+        )
     }
 
     @Test

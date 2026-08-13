@@ -4,6 +4,7 @@ plugins {
 
 android {
     namespace = "ru.ozero.singboxconfig"
+    sourceSets.getByName("test").resources.srcDir(project(":singbox-fmt").file("src/test/resources"))
 }
 
 dependencies {

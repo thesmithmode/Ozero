@@ -37,10 +37,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import ru.ozero.enginescore.PersistentLoggers
+import ru.ozero.enginesingbox.SingboxRuntimeCheckpointStore
+import java.io.File
 import java.security.KeyStore
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.ssl.TrustManagerFactory
 
+@Suppress("TooManyFunctions")
 internal object SingboxRuntime {
     private const val TAG = "SingboxRuntime"
     private const val MAX_NATIVE_LOG_BATCH = 100
@@ -107,62 +110,81 @@ internal object SingboxRuntime {
                     commandServer = null
                     lastStatus = null
                 }
-
-                PersistentLoggers.debug(
-                    TAG,
-                    "start configLen=${singboxJsonConfig.length} fd=$tunFd",
-                )
-
-                val socketFile = java.io.File(basePath, "command.sock")
-                if (socketFile.exists()) {
-                    socketFile.delete()
-                    PersistentLoggers.debug(TAG, "cleaned stale command.sock")
-                }
-
-                val failureDiagnostics = NativeFailureDiagnostics()
-                nativeFailureDiagnostics = failureDiagnostics
-                val platform = OzeroPlatformInterface(
-                    context.applicationContext,
-                    tunFd,
-                    protectorBridge,
-                    detachedTunFd,
-                    failureDiagnostics,
-                )
-                val handler = OzeroCommandServerHandler()
-
-                PersistentLoggers.debug(TAG, "checkpoint: pre-CommandServer")
-                val server = CommandServer(handler, platform)
-                PersistentLoggers.debug(TAG, "checkpoint: post-CommandServer")
-                server.start()
-                PersistentLoggers.debug(TAG, "checkpoint: post-start (socket ready)")
-
-                try {
-                    server.checkConfig(singboxJsonConfig)
-                    PersistentLoggers.debug(TAG, "checkpoint: checkConfig passed")
-                } catch (e: Exception) {
-                    PersistentLoggers.error(TAG, "checkConfig failed exceptionClass=${e::class.java.simpleName}")
-                    server.close()
-                    throw e
-                }
-
-                try {
-                    // Go код дёргает options.AutoRedirect без nil-check → SIGABRT при null
-                    server.startOrReloadService(singboxJsonConfig, OverrideOptions())
-                    PersistentLoggers.debug(TAG, "checkpoint: post-startOrReloadService (box running)")
-                } catch (e: Exception) {
-                    PersistentLoggers.error(
-                        TAG,
-                        "startOrReloadService failed exceptionClass=${e::class.java.simpleName}",
-                    )
-                    server.close()
-                    throw e
-                }
-
-                commandServer = server
-                launchNativeLogSubscription(failureDiagnostics)
-                PersistentLoggers.info(TAG, "runtime started fd=$tunFd")
+                startLocked(context, tunFd, singboxJsonConfig, protectorBridge, detachedTunFd)
             }
         }
+
+    suspend fun startIfIdle(
+        context: Context,
+        singboxJsonConfig: String,
+        protectorBridge: SingboxProtectorBridge,
+    ): Boolean = withContext(Dispatchers.Main.immediate) {
+        mutex.withLock {
+            if (commandServer != null) return@withLock false
+            startLocked(context, NO_TUN_FD, singboxJsonConfig, protectorBridge, null)
+            true
+        }
+    }
+
+    private fun startLocked(
+        context: Context,
+        tunFd: Int,
+        singboxJsonConfig: String,
+        protectorBridge: SingboxProtectorBridge,
+        detachedTunFd: DetachedTunFd?,
+    ) {
+        PersistentLoggers.debug(TAG, "start configLen=${singboxJsonConfig.length} fd=$tunFd")
+
+        val socketFile = File(basePath, "command.sock")
+        if (socketFile.exists()) {
+            socketFile.delete()
+            PersistentLoggers.debug(TAG, "cleaned stale command.sock")
+        }
+
+        val failureDiagnostics = NativeFailureDiagnostics()
+        nativeFailureDiagnostics = failureDiagnostics
+        val platform = OzeroPlatformInterface(
+            context.applicationContext,
+            tunFd,
+            protectorBridge,
+            detachedTunFd,
+            failureDiagnostics,
+        )
+        val handler = OzeroCommandServerHandler()
+
+        recordCheckpoint("pre-CommandServer")
+        val server = CommandServer(handler, platform)
+        recordCheckpoint("post-CommandServer")
+        server.start()
+        recordCheckpoint("post-start socket-ready")
+
+        try {
+            server.checkConfig(singboxJsonConfig)
+            recordCheckpoint("checkConfig-passed")
+        } catch (e: Exception) {
+            PersistentLoggers.error(TAG, "checkConfig failed exceptionClass=${e::class.java.simpleName}")
+            server.close()
+            throw e
+        }
+
+        try {
+            // Go код дёргает options.AutoRedirect без nil-check → SIGABRT при null
+            server.startOrReloadService(singboxJsonConfig, OverrideOptions())
+            recordCheckpoint("post-startOrReloadService box-running")
+        } catch (e: Exception) {
+            PersistentLoggers.error(
+                TAG,
+                "startOrReloadService failed exceptionClass=${e::class.java.simpleName}",
+            )
+            server.close()
+            throw e
+        }
+
+        commandServer = server
+        launchNativeLogSubscription(failureDiagnostics)
+        persistCheckpoint("runtime-started fd=$tunFd")
+        PersistentLoggers.info(TAG, "runtime started fd=$tunFd")
+    }
 
     suspend fun stop() = withContext(Dispatchers.Main.immediate) {
         mutex.withLock {
@@ -181,6 +203,7 @@ internal object SingboxRuntime {
             commandServer = null
             lastStatus = null
             nativeFailureDiagnostics = null
+            persistCheckpoint("runtime-stopped")
             PersistentLoggers.info(TAG, "runtime stopped")
         }
     }
@@ -297,6 +320,7 @@ internal object SingboxRuntime {
                 val entry = messageList.next()
                 inspected++
                 failureDiagnostics.recordNative(entry.message)
+                persistCheckpoint("native ${redactSingboxMessage(entry.message)}")
             }
         }
 
@@ -425,6 +449,17 @@ internal object SingboxRuntime {
             override fun len(): Int = values.size
             override fun next(): String = values[index++]
         }
+
+    private fun recordCheckpoint(message: String) {
+        persistCheckpoint(message)
+        PersistentLoggers.debug(TAG, "checkpoint: $message")
+    }
+
+    private fun persistCheckpoint(message: String) {
+        if (basePath.isNotBlank()) SingboxRuntimeCheckpointStore.record(File(basePath), message)
+    }
+
+    private const val NO_TUN_FD = -1
 }
 
 internal class NativeDiagnosticsSessionGuard {

@@ -43,6 +43,10 @@ class SingboxAidlContractTest {
             content.contains("boolean runtimeRunning()"),
             "ISingboxEngineProcess must expose runtimeRunning() for startup health without faking stats",
         )
+        assertTrue(
+            content.contains("boolean startProxyModeIfIdle"),
+            "Profile probes must atomically refuse to replace an active runtime",
+        )
     }
 
     @Test

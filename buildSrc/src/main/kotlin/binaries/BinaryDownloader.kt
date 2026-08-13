@@ -45,9 +45,8 @@ class BinaryDownloader(
         Files.createDirectories(parent)
         val tmp = parent.resolve("${cached.fileName}.tmp.${ProcessHandle.current().pid()}")
 
-        var lastError: Exception? = null
-        val attempts = retryDelaysMs.size
-        for (attempt in 1..attempts) {
+        var attemptIndex = 0
+        while (true) {
             try {
                 val request =
                     HttpRequest.newBuilder()
@@ -71,8 +70,11 @@ class BinaryDownloader(
                     }
                     in 500..599 -> {
                         Files.deleteIfExists(tmp)
-                        lastError = BinaryDownloadException("HTTP $status for $url")
-                        if (attempt < attempts) Thread.sleep(retryDelaysMs[attempt - 1])
+                        attemptIndex = nextAttemptOrThrow(
+                            url,
+                            attemptIndex,
+                            BinaryDownloadException("HTTP $status for $url"),
+                        )
                     }
                     else -> {
                         Files.deleteIfExists(tmp)
@@ -81,13 +83,20 @@ class BinaryDownloader(
                 }
             } catch (e: java.io.IOException) {
                 Files.deleteIfExists(tmp)
-                lastError = e
-                if (attempt < attempts) Thread.sleep(retryDelaysMs[attempt - 1])
+                attemptIndex = nextAttemptOrThrow(url, attemptIndex, e)
             }
         }
-        throw BinaryDownloadException(
-            "Failed to download $url after $attempts attempts: ${lastError?.message}",
-            lastError,
-        )
+    }
+
+    private fun nextAttemptOrThrow(url: String, attemptIndex: Int, failure: Exception): Int {
+        if (attemptIndex >= retryDelaysMs.size) {
+            val attempts = retryDelaysMs.size + 1
+            throw BinaryDownloadException(
+                "Failed to download $url after $attempts attempts: ${failure.message}",
+                failure,
+            )
+        }
+        Thread.sleep(retryDelaysMs[attemptIndex])
+        return attemptIndex + 1
     }
 }

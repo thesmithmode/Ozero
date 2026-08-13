@@ -1,8 +1,11 @@
 package ru.ozero.app.ui.settings.engines
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +32,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -51,6 +55,28 @@ fun UrnetworkSharedTrafficScreen(
     val unpaidBytes by viewModel.unpaidBytes.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val dailyBytes by viewModel.dailyBytes.collectAsStateWithLifecycle()
+    UrnetworkSharedTrafficContent(
+        state = UrnetworkSharedTrafficUiState(
+            unpaidBytes = unpaidBytes,
+            isLoading = isLoading,
+            dailyBytes = dailyBytes,
+        ),
+        onBack = onBack,
+    )
+}
+
+internal data class UrnetworkSharedTrafficUiState(
+    val unpaidBytes: Long,
+    val isLoading: Boolean,
+    val dailyBytes: List<DayBytes>,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun UrnetworkSharedTrafficContent(
+    state: UrnetworkSharedTrafficUiState,
+    onBack: () -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -63,27 +89,39 @@ fun UrnetworkSharedTrafficScreen(
             )
         },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            if (isLoading && dailyBytes.all { it.bytes == 0L } && unpaidBytes == 0L) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else {
-                SharedTrafficChartCard(dailyBytes = dailyBytes)
-                SharedTrafficTotalCard(totalBytes = unpaidBytes)
+        if (state.isLoading && state.dailyBytes.all { it.bytes == 0L } && state.unpaidBytes == 0L) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .testTag(UrnetworkSharedTrafficTestTags.LOADING),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.testTag(UrnetworkSharedTrafficTestTags.LOADING_INDICATOR),
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
+                    .testTag(UrnetworkSharedTrafficTestTags.CONTENT),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                SharedTrafficChartCard(dailyBytes = state.dailyBytes)
+                SharedTrafficTotalCard(totalBytes = state.unpaidBytes)
             }
         }
     }
+}
+
+object UrnetworkSharedTrafficTestTags {
+    const val LOADING = "urnetwork_shared_traffic_loading"
+    const val LOADING_INDICATOR = "urnetwork_shared_traffic_loading_indicator"
+    const val CONTENT = "urnetwork_shared_traffic_content"
 }
 
 @Composable
@@ -195,26 +233,38 @@ private fun SharedTrafficTotalCard(totalBytes: Long) {
             .testTag("urnetwork_shared_traffic_total"),
         colors = CardDefaults.cardColors(containerColor = OzeroPalette.Bg1),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.urnetwork_shared_traffic_provided),
-                style = MaterialTheme.typography.bodyMedium,
-                color = OzeroPalette.Text2,
-                modifier = Modifier.padding(end = 8.dp),
-            )
-            Text(
-                text = formatBytes(totalBytes),
-                style = MaterialTheme.typography.titleMedium,
-                color = OzeroPalette.Text,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.End,
-            )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            val compact = maxWidth < 360.dp || LocalDensity.current.fontScale > 1f
+            if (compact) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    SharedTrafficTotal(labelPadding = Modifier, totalBytes = totalBytes)
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SharedTrafficTotal(labelPadding = Modifier.padding(end = 8.dp), totalBytes = totalBytes)
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun SharedTrafficTotal(labelPadding: Modifier, totalBytes: Long) {
+    Text(
+        text = stringResource(R.string.urnetwork_shared_traffic_provided),
+        style = MaterialTheme.typography.bodyMedium,
+        color = OzeroPalette.Text2,
+        modifier = labelPadding,
+    )
+    Text(
+        text = formatBytes(totalBytes),
+        style = MaterialTheme.typography.titleMedium,
+        color = OzeroPalette.Text,
+        fontWeight = FontWeight.SemiBold,
+        textAlign = TextAlign.End,
+    )
 }

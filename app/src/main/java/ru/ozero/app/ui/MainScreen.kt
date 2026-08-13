@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -30,7 +32,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -49,11 +50,10 @@ import ru.ozero.app.ui.components.chartNiceMax
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import ru.ozero.app.R
@@ -100,75 +100,68 @@ fun MainScreen(
     val powerState by viewModel.powerDiscState.collectAsStateWithLifecycle()
     val backgroundState = powerState.toBackgroundState()
     val isConnected = state is TunnelState.Connected
-    val systemDensity = LocalDensity.current
-    val mainScreenDensity = Density(
-        density = systemDensity.density,
-        fontScale = boundedMainScreenFontScale(systemDensity.fontScale),
-    )
-
     OzeroBackground(state = backgroundState) {
-        CompositionLocalProvider(LocalDensity provides mainScreenDensity) {
-            AnimatedContent(
-                targetState = appMode,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "mode_switch",
-            ) { mode ->
-                when (mode) {
-                    AppMode.SIMPLE -> SimpleMainContent(
-                        state = SimpleMainState(
-                            tunnelState = state,
-                            switching = switching,
-                            powerState = powerState,
-                            isConnected = isConnected,
-                            manualEngine = manualEngine,
-                            urnetworkPeerCount = urnetworkPeerCount,
-                            urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
-                            isReconnecting = isReconnecting,
-                        ),
-                        callbacks = SimpleMainCallbacks(
-                            onConnectClick = onConnectClick,
-                            onOpenSplitTunnel = onOpenSplitTunnel,
-                            onOpenSettings = onOpenSettings,
-                        ),
-                    )
-                    AppMode.EXPERT -> ExpertMainContent(
-                        state = ExpertMainState(
-                            tunnelState = state,
-                            switching = switching,
-                            stats = stats,
-                            speedHistory = speedHistory,
-                            stagnant = stagnant,
-                            healthStatus = healthStatus,
-                            powerState = powerState,
-                            isConnected = isConnected,
-                            manualEngine = manualEngine,
-                            engineAutoPriority = engineAutoPriority,
-                            urnetworkPeerCount = urnetworkPeerCount,
-                            urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
-                            ipInfo = ipInfo,
-                            killswitchActive = killswitchActive,
-                            isReconnecting = isReconnecting,
-                        ),
-                        callbacks = ExpertMainCallbacks(
-                            onConnectClick = onConnectClick,
-                            onManualEngineSelect = viewModel::onManualEngineSelect,
-                            onRefreshIpInfo = viewModel::refreshIpInfo,
-                            onOpenEngineParams = onOpenEngineParams,
-                            onOpenSplitTunnel = onOpenSplitTunnel,
-                            onOpenSettings = onOpenSettings,
-                        ),
-                    )
-                }
+        AnimatedContent(
+            targetState = appMode,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "mode_switch",
+        ) { mode ->
+            when (mode) {
+                AppMode.SIMPLE -> SimpleMainContent(
+                    state = SimpleMainState(
+                        tunnelState = state,
+                        switching = switching,
+                        powerState = powerState,
+                        isConnected = isConnected,
+                        manualEngine = manualEngine,
+                        urnetworkPeerCount = urnetworkPeerCount,
+                        urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                        isReconnecting = isReconnecting,
+                    ),
+                    callbacks = SimpleMainCallbacks(
+                        onConnectClick = onConnectClick,
+                        onOpenSplitTunnel = onOpenSplitTunnel,
+                        onOpenSettings = onOpenSettings,
+                    ),
+                )
+                AppMode.EXPERT -> ExpertMainContent(
+                    state = ExpertMainState(
+                        tunnelState = state,
+                        switching = switching,
+                        stats = stats,
+                        speedHistory = speedHistory,
+                        stagnant = stagnant,
+                        healthStatus = healthStatus,
+                        powerState = powerState,
+                        isConnected = isConnected,
+                        manualEngine = manualEngine,
+                        engineAutoPriority = engineAutoPriority,
+                        urnetworkPeerCount = urnetworkPeerCount,
+                        urnetworkPeerSearchSeconds = urnetworkPeerSearchSeconds,
+                        ipInfo = ipInfo,
+                        killswitchActive = killswitchActive,
+                        isReconnecting = isReconnecting,
+                    ),
+                    callbacks = ExpertMainCallbacks(
+                        onConnectClick = onConnectClick,
+                        onManualEngineSelect = viewModel::onManualEngineSelect,
+                        onRefreshIpInfo = viewModel::refreshIpInfo,
+                        onOpenEngineParams = onOpenEngineParams,
+                        onOpenSplitTunnel = onOpenSplitTunnel,
+                        onOpenSettings = onOpenSettings,
+                    ),
+                )
             }
         }
     }
 }
 
-internal fun boundedMainScreenFontScale(fontScale: Float): Float =
-    fontScale.coerceAtMost(MAX_FIXED_DASHBOARD_FONT_SCALE)
-
-// Highest scale that keeps every fixed dashboard section visible on a compact 720dp viewport.
-private const val MAX_FIXED_DASHBOARD_FONT_SCALE = 1.3f
+internal fun isCompactMainLayout(
+    width: Dp,
+    height: Dp,
+    fontScale: Float,
+): Boolean =
+    width < 360.dp || height < 720.dp || fontScale > 1f
 
 data class SimpleMainState(
     val tunnelState: TunnelState,
@@ -203,61 +196,142 @@ internal fun SimpleMainContent(
     val onConnectClick = callbacks.onConnectClick
     val onOpenSplitTunnel = callbacks.onOpenSplitTunnel
     val onOpenSettings = callbacks.onOpenSettings
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Spacer(modifier = Modifier.height(20.dp))
-
-        AnimatedContent(
-            targetState = switching to tunnelState,
-            transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
-            label = "status",
-        ) { (sw, s) ->
-            StatusLabel(s, sw, urnetworkPeerCount, isReconnecting)
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        if (isCompactMainLayout(maxWidth, maxHeight, LocalDensity.current.fontScale)) {
+            CompactSimpleMainContent(state = state, callbacks = callbacks)
+            return@BoxWithConstraints
         }
-
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center,
-        ) {
-            PowerDisc(
-                state = powerState,
-                onClick = onConnectClick,
-                modifier = Modifier.semantics {
-                    contentDescription = if (isConnected) "disconnect" else "connect"
-                },
-            )
-        }
-
-        val visualConnected = isConnected || switching != null
-        if (visualConnected && resolveUiSelectedEngine(tunnelState, switching, manualEngine) == EngineId.URNETWORK) {
-            UrnetworkPeerBadge(
-                count = urnetworkPeerCount,
-                searchSeconds = urnetworkPeerSearchSeconds,
-            )
-        }
-
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            BottomDock(
-                tabs = simpleDockTabs(),
-                activeTabId = DOCK_TAB_HOME,
-                onTabSelected = { id ->
-                    when (id) {
-                        DOCK_TAB_SPLIT_TUNNEL -> onOpenSplitTunnel()
-                        DOCK_TAB_SETTINGS -> onOpenSettings()
-                    }
-                },
+            Spacer(modifier = Modifier.height(20.dp))
+
+            AnimatedContent(
+                targetState = switching to tunnelState,
+                transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
+                label = "status",
+            ) { (sw, s) ->
+                StatusLabel(s, sw, urnetworkPeerCount, isReconnecting)
+            }
+
+            Box(
                 modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+                contentAlignment = Alignment.Center,
+            ) {
+                PowerDisc(
+                    state = powerState,
+                    onClick = onConnectClick,
+                    contentDescription = stringResource(
+                        if (isConnected) R.string.a11y_disconnect_button else R.string.a11y_connect_button,
+                    ),
+                )
+            }
+
+            val visualConnected = isConnected || switching != null
+            if (
+                visualConnected &&
+                resolveUiSelectedEngine(tunnelState, switching, manualEngine) == EngineId.URNETWORK
+            ) {
+                UrnetworkPeerBadge(
+                    count = urnetworkPeerCount,
+                    searchSeconds = urnetworkPeerSearchSeconds,
+                )
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                BottomDock(
+                    tabs = simpleDockTabs(),
+                    activeTabId = DOCK_TAB_HOME,
+                    onTabSelected = { id ->
+                        when (id) {
+                            DOCK_TAB_SPLIT_TUNNEL -> onOpenSplitTunnel()
+                            DOCK_TAB_SETTINGS -> onOpenSettings()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
         }
+    }
+}
+
+@Composable
+private fun CompactSimpleMainContent(
+    state: SimpleMainState,
+    callbacks: SimpleMainCallbacks,
+) {
+    val scrollState = rememberScrollState()
+    Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(scrollState)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AnimatedContent(
+                targetState = state.switching to state.tunnelState,
+                transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
+                label = "compact_status",
+            ) { (switching, tunnelState) ->
+                StatusLabel(
+                    state = tunnelState,
+                    switching = switching,
+                    urnetworkPeerCount = state.urnetworkPeerCount,
+                    isReconnecting = state.isReconnecting,
+                )
+            }
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                PowerDisc(
+                    state = state.powerState,
+                    onClick = callbacks.onConnectClick,
+                    contentDescription = stringResource(
+                        if (state.isConnected) R.string.a11y_disconnect_button else R.string.a11y_connect_button,
+                    ),
+                    diameterDp = 204,
+                )
+            }
+            if (
+                (state.isConnected || state.switching != null) &&
+                resolveUiSelectedEngine(
+                    state.tunnelState,
+                    state.switching,
+                    state.manualEngine,
+                ) == EngineId.URNETWORK
+            ) {
+                UrnetworkPeerBadge(
+                    count = state.urnetworkPeerCount,
+                    searchSeconds = state.urnetworkPeerSearchSeconds,
+                )
+            }
+        }
+        BottomDock(
+            tabs = simpleDockTabs(),
+            activeTabId = DOCK_TAB_HOME,
+            onTabSelected = { id ->
+                when (id) {
+                    DOCK_TAB_SPLIT_TUNNEL -> callbacks.onOpenSplitTunnel()
+                    DOCK_TAB_SETTINGS -> callbacks.onOpenSettings()
+                }
+            },
+            adaptiveLabels = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+        )
     }
 }
 
@@ -336,18 +410,17 @@ internal fun ExpertMainContent(
     val onOpenSettings = callbacks.onOpenSettings
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val fontScale = LocalDensity.current.fontScale
-        val compactVertical = maxHeight < 720.dp || fontScale >= 1.3f
-        val topSpacer = if (compactVertical) 8.dp else 16.dp
-        val bottomSpacer = if (compactVertical) 4.dp else 8.dp
-        val sectionGap = if (compactVertical) 4.dp else 8.dp
-        val discDiameter = if (compactVertical) 204 else 256
+        if (isCompactMainLayout(maxWidth, maxHeight, fontScale)) {
+            CompactExpertMainContent(state = state, callbacks = callbacks)
+            return@BoxWithConstraints
+        }
 
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Spacer(modifier = Modifier.height(topSpacer))
+            Spacer(modifier = Modifier.height(16.dp))
 
             AnimatedContent(
                 targetState = switching to tunnelState,
@@ -364,17 +437,17 @@ internal fun ExpertMainContent(
                 PowerDisc(
                     state = powerState,
                     onClick = onConnectClick,
-                    modifier = Modifier.semantics {
-                        contentDescription = if (isConnected) "disconnect" else "connect"
-                    },
-                    diameterDp = discDiameter,
+                    contentDescription = stringResource(
+                        if (isConnected) R.string.a11y_disconnect_button else R.string.a11y_connect_button,
+                    ),
+                    diameterDp = 256,
                 )
             }
 
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(sectionGap),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val visualConnected = isConnected ||
                     switching != null ||
@@ -393,7 +466,7 @@ internal fun ExpertMainContent(
                     speedHistory = speedHistory,
                     stagnant = stagnant,
                     healthStatus = healthStatus,
-                    compactVertical = compactVertical,
+                    compactVertical = false,
                     onRefreshIpInfo = onRefreshIpInfo,
                 )
 
@@ -428,9 +501,105 @@ internal fun ExpertMainContent(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
                 )
-                Spacer(modifier = Modifier.height(bottomSpacer))
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun CompactExpertMainContent(
+    state: ExpertMainState,
+    callbacks: ExpertMainCallbacks,
+) {
+    val visualConnected = state.isConnected ||
+        state.switching != null ||
+        state.tunnelState is TunnelState.Probing ||
+        state.tunnelState is TunnelState.Connecting
+    val scrollState = rememberScrollState()
+    Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(scrollState)
+                .padding(top = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AnimatedContent(
+                targetState = state.switching to state.tunnelState,
+                transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
+                label = "compact_status",
+            ) { (switching, tunnelState) ->
+                StatusLabel(
+                    tunnelState,
+                    switching,
+                    state.urnetworkPeerCount,
+                    state.isReconnecting,
+                )
+            }
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                PowerDisc(
+                    state = state.powerState,
+                    onClick = callbacks.onConnectClick,
+                    contentDescription = stringResource(
+                        if (state.isConnected) R.string.a11y_disconnect_button else R.string.a11y_connect_button,
+                    ),
+                    diameterDp = 204,
+                )
+            }
+            ExpertStatusBadges(
+                visualConnected = visualConnected,
+                killswitchActive = state.killswitchActive,
+                manualEngine = state.manualEngine,
+                tunnelState = state.tunnelState,
+                switching = state.switching,
+                urnetworkPeerCount = state.urnetworkPeerCount,
+                urnetworkPeerSearchSeconds = state.urnetworkPeerSearchSeconds,
+                ipInfo = state.ipInfo,
+                stats = state.stats,
+                speedHistory = state.speedHistory,
+                stagnant = state.stagnant,
+                healthStatus = state.healthStatus,
+                compactVertical = true,
+                onRefreshIpInfo = callbacks.onRefreshIpInfo,
+            )
+            EngineChipsRow(
+                selectedEngine = resolveUiSelectedEngine(
+                    tunnelState = state.tunnelState,
+                    switching = state.switching,
+                    manualEngine = state.manualEngine,
+                ),
+                engineOrder = state.engineAutoPriority,
+                onSelect = callbacks.onManualEngineSelect,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        BottomDock(
+            tabs = expertDockTabs(),
+            activeTabId = DOCK_TAB_HOME,
+            onTabSelected = { id ->
+                when (id) {
+                    DOCK_TAB_SERVERS -> callbacks.onOpenEngineParams(
+                        resolveUiSelectedEngine(
+                            tunnelState = state.tunnelState,
+                            switching = state.switching,
+                            manualEngine = state.manualEngine,
+                        ),
+                    )
+                    DOCK_TAB_SPLIT_TUNNEL -> callbacks.onOpenSplitTunnel()
+                    DOCK_TAB_SETTINGS -> callbacks.onOpenSettings()
+                }
+            },
+            adaptiveLabels = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+        )
     }
 }
 
@@ -727,6 +896,7 @@ private fun TrafficStatsCard(
     val rxTotal = BytesFormatter.humanReadable(stats?.rxBytes ?: 0L)
     val txTotal = BytesFormatter.humanReadable(stats?.txBytes ?: 0L)
     val uptime = BytesFormatter.durationHms(sessionMs)
+    val chartHeight = if (LocalDensity.current.fontScale > 1f) 120.dp else 96.dp
 
     var selectedTf by remember { mutableStateOf(TimeframeOption.M1) }
     val displayHistory = remember(speedHistory, selectedTf) {
@@ -748,54 +918,142 @@ private fun TrafficStatsCard(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "↓ $rxSpeed  ↑ $txSpeed",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = OzeroPalette.Text,
-                )
-                Text(
-                    text = stringResource(R.string.stats_uptime, uptime),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OzeroPalette.Text3,
-                )
-            }
+            TrafficStatsHeader(
+                rxSpeed = rxSpeed,
+                txSpeed = txSpeed,
+                uptime = uptime,
+                compact = compactVertical,
+            )
             LiveTrafficChart(
                 history = displayHistory,
                 selectedTf = selectedTf,
+                compact = compactVertical,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (compactVertical) 64.dp else 96.dp),
+                    .height(chartHeight)
+                    .testTag(MainScreenTestTags.TRAFFIC_CHART),
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TimeframeOption.entries.forEach { tf ->
-                    FilterChip(
-                        selected = selectedTf == tf,
-                        onClick = { selectedTf = tf },
-                        label = { Text(stringResource(tf.labelRes), style = MaterialTheme.typography.labelSmall) },
-                    )
+            TrafficStatsFooter(
+                selectedTf = selectedTf,
+                onTimeframeSelected = { selectedTf = it },
+                rxTotal = rxTotal,
+                txTotal = txTotal,
+                compact = compactVertical,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrafficStatsHeader(
+    rxSpeed: String,
+    txSpeed: String,
+    uptime: String,
+    compact: Boolean,
+) {
+    val speed = "↓ $rxSpeed  ↑ $txSpeed"
+    if (compact) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = speed,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = OzeroPalette.Text,
+            )
+            Text(
+                text = stringResource(R.string.stats_uptime, uptime),
+                style = MaterialTheme.typography.bodySmall,
+                color = OzeroPalette.Text3,
+                modifier = Modifier.align(Alignment.End),
+            )
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = speed,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = OzeroPalette.Text,
+            )
+            Text(
+                text = stringResource(R.string.stats_uptime, uptime),
+                style = MaterialTheme.typography.bodySmall,
+                color = OzeroPalette.Text3,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrafficStatsFooter(
+    selectedTf: TimeframeOption,
+    onTimeframeSelected: (TimeframeOption) -> Unit,
+    rxTotal: String,
+    txTotal: String,
+    compact: Boolean,
+) {
+    if (compact) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            TimeframeOption.entries.chunked(2).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    row.forEach { timeframe ->
+                        TimeframeChip(
+                            timeframe = timeframe,
+                            selected = selectedTf == timeframe,
+                            onClick = { onTimeframeSelected(timeframe) },
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = "↓ $rxTotal",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OzeroPalette.Aqua,
-                )
-                Text(
-                    text = "↑ $txTotal",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OzeroPalette.Amber,
+            }
+            TotalsRow(rxTotal = rxTotal, txTotal = txTotal)
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TimeframeOption.entries.forEach { timeframe ->
+                TimeframeChip(
+                    timeframe = timeframe,
+                    selected = selectedTf == timeframe,
+                    onClick = { onTimeframeSelected(timeframe) },
                 )
             }
+            Spacer(modifier = Modifier.weight(1f))
+            TotalsRow(rxTotal = rxTotal, txTotal = txTotal)
         }
+    }
+}
+
+@Composable
+private fun TimeframeChip(
+    timeframe: TimeframeOption,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(stringResource(timeframe.labelRes), style = MaterialTheme.typography.labelSmall) },
+    )
+}
+
+@Composable
+private fun TotalsRow(rxTotal: String, txTotal: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "↓ $rxTotal",
+            style = MaterialTheme.typography.bodySmall,
+            color = OzeroPalette.Aqua,
+        )
+        Text(
+            text = "↑ $txTotal",
+            style = MaterialTheme.typography.bodySmall,
+            color = OzeroPalette.Amber,
+        )
     }
 }
 
@@ -803,6 +1061,7 @@ private fun TrafficStatsCard(
 private fun LiveTrafficChart(
     history: List<Pair<Float, Float>>,
     selectedTf: TimeframeOption,
+    compact: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val colorRx = OzeroPalette.Aqua
@@ -810,6 +1069,8 @@ private fun LiveTrafficChart(
     val gridColor = OzeroPalette.Text3.copy(alpha = 0.25f)
     val borderColor = OzeroPalette.Text3.copy(alpha = 0.35f)
     val density = LocalDensity.current
+    val largeText = density.fontScale > 1f
+    val axisWidth = if (largeText) 56.dp else 44.dp
 
     val niceMax = remember(history) {
         val raw = if (history.isEmpty()) 0f else history.maxOf { maxOf(it.first, it.second) }
@@ -819,13 +1080,17 @@ private fun LiveTrafficChart(
     val midLabel = BytesFormatter.humanReadablePerSec((niceMax / 2).toDouble())
     val axisStyle = MaterialTheme.typography.labelSmall.copy(
         color = OzeroPalette.Text3,
-        fontSize = androidx.compose.ui.unit.TextUnit(8f, androidx.compose.ui.unit.TextUnitType.Sp),
+        fontSize = 8.sp,
+        lineHeight = 9.sp,
     )
 
     Column(modifier = modifier) {
         Row(modifier = Modifier.weight(1f)) {
             Column(
-                modifier = Modifier.width(44.dp).fillMaxHeight(),
+                modifier = Modifier
+                    .width(axisWidth)
+                    .fillMaxHeight()
+                    .testTag(MainScreenTestTags.TRAFFIC_CHART_Y_AXIS),
                 verticalArrangement = Arrangement.SpaceBetween,
                 horizontalAlignment = Alignment.End,
             ) {
@@ -834,7 +1099,12 @@ private fun LiveTrafficChart(
                 Text("0", style = axisStyle)
             }
             Spacer(modifier = Modifier.width(4.dp))
-            Canvas(modifier = Modifier.weight(1f).fillMaxHeight()) {
+            Canvas(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .testTag(MainScreenTestTags.TRAFFIC_CHART_PLOT),
+            ) {
                 val w = size.width
                 val h = size.height
                 val linePx = with(density) { 1.dp.toPx() }
@@ -861,15 +1131,31 @@ private fun LiveTrafficChart(
                 drawPath(pathTx, colorTx, style = stroke)
             }
         }
+        val timeLabels = if (compact || largeText) {
+            listOf(
+                chartTimeAgo(selectedTf.points),
+                chartTimeAgo(selectedTf.points / 2),
+                "now",
+            )
+        } else {
+            listOf(
+                chartTimeAgo(selectedTf.points),
+                chartTimeAgo(selectedTf.points * 3 / 4),
+                chartTimeAgo(selectedTf.points / 2),
+                chartTimeAgo(selectedTf.points / 4),
+                "now",
+            )
+        }
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 48.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = axisWidth + 4.dp)
+                .testTag(MainScreenTestTags.TRAFFIC_CHART_X_AXIS),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(chartTimeAgo(selectedTf.points), style = axisStyle)
-            Text(chartTimeAgo(selectedTf.points * 3 / 4), style = axisStyle)
-            Text(chartTimeAgo(selectedTf.points / 2), style = axisStyle)
-            Text(chartTimeAgo(selectedTf.points / 4), style = axisStyle)
-            Text("now", style = axisStyle)
+            timeLabels.forEach { label ->
+                Text(label, style = axisStyle)
+            }
         }
     }
 }

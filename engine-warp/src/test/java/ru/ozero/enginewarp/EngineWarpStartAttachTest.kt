@@ -48,7 +48,9 @@ class EngineWarpStartAttachTest {
 
     @Test
     fun `second stale recover reports failed when reattach fails`() = runTest {
-        val bridge = FakeBridge(attachResult = WarpSdkBridge.AttachResult.Failed("attach down"))
+        val bridge = FakeBridge(
+            reattachResult = WarpSdkBridge.AttachResult.Failed("attach down"),
+        )
         val reader = FixedReader(
             WarpUapiState(handshakeAgeSeconds = 999L, rxBytes = 0L, txBytes = 0L, peersSeen = 1),
         )
@@ -223,7 +225,7 @@ class EngineWarpStartAttachTest {
         warpReadyPollMs = 10L,
         statsPollIntervalMs = 5_000L,
         handshakeStaleThresholdSec = 180L,
-        pluginScope = scope,
+        runtimeControl = WarpRuntimeControl(pluginScope = scope),
     )
 
     private class FakeAuto : WarpAutoConfig {
@@ -269,6 +271,7 @@ class EngineWarpStartAttachTest {
 
     private class FakeBridge(
         private val attachResult: WarpSdkBridge.AttachResult = WarpSdkBridge.AttachResult.Success,
+        private val reattachResult: WarpSdkBridge.AttachResult = attachResult,
         private val proxyResult: WarpSdkBridge.ProxyResult = WarpSdkBridge.ProxyResult.Failed("not supported"),
     ) : WarpSdkBridge {
         var attachCalls = 0
@@ -287,8 +290,9 @@ class EngineWarpStartAttachTest {
         ): WarpSdkBridge.AttachResult {
             attachCalls++
             lastIni = iniConfig
-            running = attachResult is WarpSdkBridge.AttachResult.Success
-            return attachResult
+            val result = if (attachCalls == 1) attachResult else reattachResult
+            running = result is WarpSdkBridge.AttachResult.Success
+            return result
         }
 
         override suspend fun detachTun() {

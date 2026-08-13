@@ -1,15 +1,20 @@
 package ru.ozero.app.ui
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import ru.ozero.app.ui.components.BOTTOM_DOCK_TEST_TAG
 import ru.ozero.app.ui.components.BOTTOM_DOCK_TAB_TEST_TAG_PREFIX
 import ru.ozero.app.ui.components.POWER_DISC_TEST_TAG
 import ru.ozero.app.ui.components.PowerDiscState
@@ -99,6 +104,43 @@ class MainContentTest {
         )
     }
 
+    @Test
+    fun expertContentKeepsDockReachableAtLargeFontScale() {
+        renderExpert(
+            state = ExpertMainState(
+                tunnelState = TunnelState.Connected(EngineId.WARP, socksPort = 0),
+                switching = null,
+                stats = null,
+                speedHistory = emptyList(),
+                stagnant = false,
+                healthStatus = HealthMonitor.Status.HEALTHY,
+                powerState = PowerDiscState.Connected,
+                isConnected = true,
+                manualEngine = EngineId.WARP,
+                engineAutoPriority = listOf(EngineId.WARP, EngineId.BYEDPI),
+                urnetworkPeerCount = 0,
+                urnetworkPeerSearchSeconds = 0,
+                ipInfo = IpInfoState.Idle,
+                killswitchActive = false,
+            ),
+            callbacks = ExpertMainCallbacks(
+                onConnectClick = {},
+                onManualEngineSelect = {},
+                onRefreshIpInfo = {},
+                onOpenEngineParams = {},
+                onOpenSplitTunnel = {},
+                onOpenSettings = {},
+            ),
+            fontScale = 2f,
+        )
+
+        composeRule.onNodeWithTag(BOTTOM_DOCK_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "servers").assertIsDisplayed()
+        composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "split_tunnel").assertIsDisplayed()
+        composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "settings").assertIsDisplayed()
+        composeRule.onNodeWithTag(MainScreenTestTags.ENGINE_CHIPS_ROW).assertExists()
+    }
+
     private fun renderSimple(
         state: SimpleMainState,
         callbacks: SimpleMainCallbacks,
@@ -113,10 +155,13 @@ class MainContentTest {
     private fun renderExpert(
         state: ExpertMainState,
         callbacks: ExpertMainCallbacks,
+        fontScale: Float = 1f,
     ) {
         composeRule.setContent {
-            OzeroTheme {
-                ExpertMainContent(state = state, callbacks = callbacks)
+            CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
+                OzeroTheme {
+                    ExpertMainContent(state = state, callbacks = callbacks)
+                }
             }
         }
     }

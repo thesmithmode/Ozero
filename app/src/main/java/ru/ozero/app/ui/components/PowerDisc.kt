@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import ru.ozero.app.R
 import ru.ozero.app.ui.theme.OzeroPalette
@@ -37,6 +39,7 @@ enum class PowerDiscState { Off, Connecting, Switching, Connected }
 fun PowerDisc(
     state: PowerDiscState,
     onClick: () -> Unit,
+    contentDescription: String,
     modifier: Modifier = Modifier,
     diameterDp: Int = POWER_DISC_DIAMETER_DP,
 ) {
@@ -118,6 +121,7 @@ fun PowerDisc(
                     ),
                 )
                 .clickable(onClick = onClick)
+                .semantics { this.contentDescription = contentDescription }
                 .testTag(POWER_DISC_TEST_TAG),
             contentAlignment = Alignment.Center,
         ) {
