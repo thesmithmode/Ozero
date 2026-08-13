@@ -411,7 +411,7 @@ class SingboxEngineProbeTest {
             }
             val process = mockk<ISingboxEngineProcess>()
             val pfd = mockk<ParcelFileDescriptor>(relaxed = true)
-            every { ParcelFileDescriptor.fromFd(42) } returns pfd
+            every { ParcelFileDescriptor.adoptFd(42) } returns pfd
             every { process.startWithConfig(pfd, any(), any()) } returns Unit
             every { process.runtimeRunning() } returns true
             every { process.stopAndWait(3_000L) } returns true
@@ -442,7 +442,7 @@ class SingboxEngineProbeTest {
             engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
             val process = mockk<ISingboxEngineProcess>()
             val pfd = mockk<ParcelFileDescriptor>(relaxed = true)
-            every { ParcelFileDescriptor.fromFd(42) } returns pfd
+            every { ParcelFileDescriptor.adoptFd(42) } returns pfd
             every { process.startWithConfig(pfd, any(), any()) } returns Unit
             every { process.runtimeRunning() } returns true
             every { process.stopAndWait(3_000L) } returns true
@@ -476,7 +476,7 @@ class SingboxEngineProbeTest {
             }
             val process = mockk<ISingboxEngineProcess>()
             val pfd = mockk<ParcelFileDescriptor>(relaxed = true)
-            every { ParcelFileDescriptor.fromFd(42) } returns pfd
+            every { ParcelFileDescriptor.adoptFd(42) } returns pfd
             every { process.startWithConfig(pfd, any(), any()) } returns Unit
             every { process.runtimeRunning() } returns true
             engine.setPrivateField("proxy", process)
