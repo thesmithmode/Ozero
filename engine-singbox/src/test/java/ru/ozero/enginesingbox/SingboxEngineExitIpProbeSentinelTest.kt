@@ -66,7 +66,9 @@ class SingboxEngineExitIpProbeSentinelTest {
         )
         assertTrue(
             attachBlock.contains("clearPendingStart()") &&
-                attachBlock.contains("return@runCatching TunAttachResult.Failure(\"sing-box runtime failed to start\")"),
+                attachBlock.contains(
+                    "return@runCatching TunAttachResult.Failure(\"sing-box runtime failed to start\")",
+                ),
             "failed runtime health must clear pending/active SOCKS state before exitNodeStrategy can observe it",
         )
     }
