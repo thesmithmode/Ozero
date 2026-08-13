@@ -279,7 +279,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             _uiState.update { it.copy(isAutoSelecting = true) }
             val allProfiles = prioritizeSingboxAutoProfiles(
                 groupDao.getAll().flatMap { profileDao.getAutoCandidatesByGroupId(it.id, MAX_PROFILE_SCAN) },
-                MAX_PROBE_PROFILES,
+                MAX_PROFILE_SCAN,
             )
             if (allProfiles.isNotEmpty()) {
                 probeService.probeAndAutoSelect(
