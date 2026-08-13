@@ -142,9 +142,10 @@ class EngineWatchdogCoordinator(
                 var consecutiveFailures = 0
                 while (isActive) {
                     delay(ROUTED_PROBE_WATCHDOG_POLL_MS)
-                    when (val result = runCatching { plugin.probe() }.getOrElse { t ->
+                    val result = runCatching { plugin.probe() }.getOrElse { t ->
                         ProbeResult.Failure("probe threw: ${t.message}")
-                    }) {
+                    }
+                    when (result) {
                         is ProbeResult.Success -> consecutiveFailures = 0
                         is ProbeResult.Failure -> {
                             consecutiveFailures += 1
