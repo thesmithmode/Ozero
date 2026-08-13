@@ -7,6 +7,8 @@
     <string name="singbox_add_group_button">Agregar suscripción</string>
     <string name="singbox_group_refresh">Actualizar</string>
     <string name="singbox_group_delete">Eliminar</string>
+    <string name="singbox_group_delete_confirm_title">¿Eliminar suscripción?</string>
+    <string name="singbox_group_delete_confirm_message">Se eliminarán el grupo «%1$s», sus servidores y cadenas.</string>
     <string name="singbox_no_profiles_hint">Sin servidores — actualice la suscripción</string>
     <string name="singbox_add_group_title">Nueva suscripción</string>
     <string name="singbox_group_name_hint">Nombre</string>

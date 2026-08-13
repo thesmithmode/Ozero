@@ -14,6 +14,8 @@
     <string name="singbox_manual_links_error_parse">Не найдено валидных ссылок</string>
     <string name="singbox_group_refresh">Обновить</string>
     <string name="singbox_group_delete">Удалить</string>
+    <string name="singbox_group_delete_confirm_title">Удалить подписку?</string>
+    <string name="singbox_group_delete_confirm_message">Группа «%1$s», её серверы и цепочки будут удалены.</string>
     <string name="singbox_no_profiles_hint">Нет серверов — обновите подписку</string>
     <string name="singbox_add_group_title">Новая подписка</string>
     <string name="singbox_group_name_hint">Название</string>

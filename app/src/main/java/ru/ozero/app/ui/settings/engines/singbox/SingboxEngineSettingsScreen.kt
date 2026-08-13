@@ -144,6 +144,29 @@ private fun SingboxSettingsContent(
     viewModel: SingboxEngineSettingsViewModel,
     modifier: Modifier = Modifier,
 ) {
+    var pendingDeleteGroup by remember { mutableStateOf<SubscriptionGroup?>(null) }
+    pendingDeleteGroup?.let { group ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteGroup = null },
+            title = { Text(stringResource(R.string.singbox_group_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.singbox_group_delete_confirm_message, group.name)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDeleteGroup = null
+                        viewModel.onDeleteGroup(group)
+                    },
+                ) {
+                    Text(stringResource(R.string.singbox_group_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteGroup = null }) {
+                    Text(stringResource(R.string.singbox_cancel))
+                }
+            },
+        )
+    }
     Column(
         modifier = modifier
             .padding(horizontal = 16.dp)
@@ -202,7 +225,7 @@ private fun SingboxSettingsContent(
                 onPing = { viewModel.onPing(group.id) },
                 onCancelRefresh = { viewModel.onCancel(refresh = true) },
                 onCancelPing = { viewModel.onCancel(ping = true) },
-                onDelete = { viewModel.onDeleteGroup(group) },
+                onDelete = { pendingDeleteGroup = group },
                 onProfileSelect = { viewModel.onProfileSelect(it) },
                 onAllowInsecureTls = { viewModel.onAllowInsecureSubscriptionTls(group, it) },
             )
