@@ -277,15 +277,15 @@ class RealUrnetworkSdkBridge(
     private suspend fun stopUnderLock() {
         try {
             runCatching { bridgeScope.coroutineContext.cancelChildren() }
-            contractStatusListener.detach()
-            detachConnectionStatusListener()
-            detachSelectedLocationListener()
             val jwtRefreshSub = invalidateJwtRefreshListener()
             tunnelStartedRef.set(false)
             connectIssuedRef.set(false)
             sharingTrafficLogged.set(false)
             val completed = withTimeoutOrNull(STOP_TIMEOUT_MS) {
                 withContext(Dispatchers.Main.immediate) {
+                    contractStatusListener.detach()
+                    detachConnectionStatusListener()
+                    detachSelectedLocationListener()
                     closeJwtRefreshListener(jwtRefreshSub)
                     walletVcRef.getAndSet(null)?.also { vc ->
                         runCatching { vc.close() }

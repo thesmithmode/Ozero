@@ -850,6 +850,9 @@ class RealUrnetworkSdkBridgeContractTest {
         assertTrue(listenerBlock.contains("jwtRefreshSubRef.getAndSet(sub)"))
         assertTrue(stopBlock.contains("val jwtRefreshSub = invalidateJwtRefreshListener()"))
         val mainBlock = stopBlock.substringAfter("withContext(Dispatchers.Main.immediate)")
+        assertTrue(mainBlock.contains("contractStatusListener.detach()"))
+        assertTrue(mainBlock.contains("detachConnectionStatusListener()"))
+        assertTrue(mainBlock.contains("detachSelectedLocationListener()"))
         assertTrue(mainBlock.contains("closeJwtRefreshListener(jwtRefreshSub)"))
     }
 
