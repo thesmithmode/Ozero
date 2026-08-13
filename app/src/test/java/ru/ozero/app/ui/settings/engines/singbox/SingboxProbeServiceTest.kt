@@ -570,6 +570,7 @@ class SingboxProbeServiceTest {
         override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
             profiles.map { it.id.takeIf { id -> id != 0L } ?: 1L }
         override suspend fun getById(id: Long): ProxyProfile? = null
+        override fun getByIdFlow(id: Long): Flow<ProxyProfile?> = MutableStateFlow(null)
         override fun getAllFlow(): Flow<List<ProxyProfile>> = MutableStateFlow(emptyList())
         override fun getAllLimitedFlow(limit: Int): Flow<List<ProxyProfile>> = MutableStateFlow(emptyList())
         override fun getAutoCandidatesFlow(limit: Int): Flow<List<ProxyProfile>> = MutableStateFlow(emptyList())

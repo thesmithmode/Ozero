@@ -1041,6 +1041,7 @@ class EngineRuntimeConfigRestartObserverTest {
             override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
                 profiles.map { it.id.takeIf { id -> id != 0L } ?: 1L }
             override suspend fun getById(id: Long): ProxyProfile? = lookupById(id)
+            override fun getByIdFlow(id: Long): Flow<ProxyProfile?> = flow.map { lookupById(id) }
             override fun getAllFlow() = flow
             override fun getAllLimitedFlow(limit: Int) = flow.map { it.take(limit) }
             override fun getAutoCandidatesFlow(limit: Int) = flow.map { it.sortedByAutoPriority().take(limit) }

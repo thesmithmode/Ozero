@@ -114,6 +114,8 @@ class SingboxEngineAutoSelectTest {
             override suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile> =
                 profilesByGroup[groupId]?.sortedByAutoPriority()?.take(limit) ?: emptyList()
             override suspend fun getById(id: Long): ProxyProfile? = allProfiles.find { it.id == id }
+            override fun getByIdFlow(id: Long): Flow<ProxyProfile?> =
+                MutableStateFlow(allProfiles.find { it.id == id })
             override suspend fun insert(profile: ProxyProfile): Long = profile.id
             override suspend fun insertAll(profiles: List<ProxyProfile>) {}
             override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
@@ -364,6 +366,18 @@ class SingboxEngineAutoSelectTest {
         assertTrue(result is EngineConfig.Singbox)
         assertTrue(result.beanBlob.contentEquals(selected.beanBlob))
         assertTrue(!result.beanBlob.contentEquals(stale))
+    }
+
+    @Test
+    fun `manual profile config rejects stale datastore blob when selected row was removed`() {
+        val stale = makeVlessBlob("removed.example.com", 8443)
+        val prefs = mutablePreferencesOf(beanKey to stale, selectedProfileKey to 42L)
+        val engine = buildEngine(prefs = prefs)
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNull(result)
     }
 
     @Test

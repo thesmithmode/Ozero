@@ -6,6 +6,15 @@ import kotlin.test.assertTrue
 
 class V2RayFmtParseVLESSTest {
 
+    @Test
+    fun `IPv6 authority is stored without URI brackets`() {
+        val bean = V2RayFmt.parseVLESS(
+            "vless://00000000-0000-0000-0000-000000000001@[2001:db8::1]:443?security=none&type=tcp",
+        )
+
+        assertEquals("2001:db8::1", bean.serverAddress)
+    }
+
     private val fmtSource: String by lazy {
         val root = locateRepoRoot()
         val main = File(root, "singbox-fmt/src/main/java/ru/ozero/singboxfmt/V2RayFmt.kt")

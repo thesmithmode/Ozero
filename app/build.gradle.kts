@@ -190,8 +190,10 @@ dependencies {
     robolectricRuntimeDeps33(libs.robolectric.android.all.instrumented)
     robolectricRuntimeDeps34(libs.robolectric.android.all.instrumented35)
     androidTestImplementation(libs.bundles.testing.android)
+    androidTestImplementation(libs.hilt.android.testing)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
+    kspAndroidTest(libs.hilt.compiler)
 }
 
 dependencyCheck {

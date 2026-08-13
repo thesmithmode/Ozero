@@ -987,6 +987,7 @@ class SingboxEngineProbeTest {
             override suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile> =
                 emptyList()
             override suspend fun getById(id: Long): ProxyProfile? = null
+            override fun getByIdFlow(id: Long): Flow<ProxyProfile?> = MutableStateFlow(null)
             override suspend fun insert(profile: ProxyProfile): Long = profile.id
             override suspend fun insertAll(profiles: List<ProxyProfile>) = Unit
             override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =

@@ -128,17 +128,12 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
             val restarted = withTimeoutOrNull(RESTART_START_TIMEOUT_MS) {
                 tunnelController.state.first {
                     it is TunnelState.Connected ||
-                        it is TunnelState.Connecting ||
-                        it is TunnelState.Probing ||
                         it is TunnelState.Failed
                 }
             }
             return when (restarted) {
-                is TunnelState.Connected,
-                is TunnelState.Connecting,
-                is TunnelState.Probing,
-                -> {
-                    tunnelController.onSwitchingFinished("runtime config restart started")
+                is TunnelState.Connected -> {
+                    tunnelController.onSwitchingFinished("runtime config restart connected")
                     true
                 }
                 is TunnelState.Failed -> {

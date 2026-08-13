@@ -17,6 +17,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.app.vpn.singboxRuntimeFingerprint
 import ru.ozero.commonvpn.RuntimeFailureRouter
@@ -95,8 +99,10 @@ object SingboxModule {
     @Provides
     @Singleton
     fun provideRawUpdater(
+        db: SingboxDatabase,
         groupDao: SubscriptionGroupDao,
         profileDao: ProxyProfileDao,
+        @SingboxPrefs dataStore: DataStore<Preferences>,
     ): RawUpdater =
         RawUpdater(
             okHttpClient = SubscriptionTrustClientFactory.createSystem(),
@@ -104,6 +110,16 @@ object SingboxModule {
             profileDao = profileDao,
             userCaOkHttpClient = SubscriptionTrustClientFactory.create(),
             insecureOkHttpClient = SubscriptionTrustClientFactory.createInsecure(),
+            database = db,
+            onProfilesRemoved = { removedProfileIds ->
+                dataStore.edit { prefs ->
+                    val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
+                    if (selectedProfileId != null && selectedProfileId in removedProfileIds) {
+                        prefs.remove(SingboxProbeService.SELECTED_PROFILE_KEY)
+                        prefs.remove(SingboxProbeService.BEAN_KEY)
+                    }
+                }
+            },
         )
 
     @Provides
@@ -132,16 +148,30 @@ object SingboxModule {
         proxyChainDao: ProxyChainDao,
     ): EngineRuntimeConfigProvider = object : EngineRuntimeConfigProvider {
         override val engineId: EngineId = EngineId.SINGBOX
+        private val selectedProfile = dataStore.data
+            .map { prefs -> prefs[SingboxProbeService.SELECTED_PROFILE_KEY] }
+            .distinctUntilChanged()
+            .flatMapLatest { profileId ->
+                if (profileId == null || profileId == SingboxEngine.SELECTED_AUTO) {
+                    flowOf(null)
+                } else {
+                    profileDao.getByIdFlow(profileId)
+                }
+            }
         override val changes = combine(
             dataStore.data,
             profileDao.getAutoCandidatesFlow(MAX_SINGBOX_RUNTIME_PROFILE_SCAN),
             proxyChainDao.getAllFlow(),
-        ) { prefs, profiles, chainSteps ->
+            selectedProfile,
+        ) { prefs, profiles, chainSteps, selected ->
             singboxRuntimeFingerprint(
                 prefs = prefs,
-                profiles = profiles,
+                profiles = if (selected == null || profiles.any { it.id == selected.id }) {
+                    profiles
+                } else {
+                    profiles + selected
+                },
                 chainSteps = chainSteps,
-                resolveProfileById = profileDao::getById,
             )
         }
         override val includeStarting: Boolean = false

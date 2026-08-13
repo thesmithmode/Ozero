@@ -178,6 +178,20 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
+    fun `non-http add group url sets validation error and skips insert`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+
+        harness.viewModel.onAddGroupFieldChanged(name = "Invalid", url = "ftp://example.com/sub")
+        harness.viewModel.onAddGroupConfirm()
+        advanceUntilIdle()
+
+        assertEquals("invalid_url", harness.viewModel.state.value.addGroupError)
+        assertTrue(harness.insertedGroups.isEmpty())
+    }
+
+    @Test
     fun `blank add group name uses generated default name`() = runTest {
         val harness = Harness()
         harness.startStateCollection(backgroundScope)
@@ -453,7 +467,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
-    fun `onSetAutoSelect toggles selected profile preference and clears bean`() = runTest {
+    fun `onSetAutoSelect behaves as one-way radio selection and clears bean`() = runTest {
         val profile = profile(id = 51L, groupId = 1L, name = "Chosen", userOrder = 0)
         val harness = Harness(initialProfiles = listOf(profile))
         harness.startStateCollection(backgroundScope)
@@ -470,7 +484,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         harness.viewModel.onSetAutoSelect(false)
         advanceUntilIdle()
 
-        assertFalse(harness.prefsFlow.value.contains(SingboxProbeService.SELECTED_PROFILE_KEY))
+        assertEquals(-1L, harness.prefsFlow.value[SingboxProbeService.SELECTED_PROFILE_KEY])
         assertNull(harness.prefsFlow.value[SingboxProbeService.BEAN_KEY])
     }
 
@@ -1174,6 +1188,9 @@ class SingboxEngineSettingsViewModelCoverageTest {
             flow.value.filter { it.groupId == groupId }.sortedByAutoPriority().take(limit)
 
         override suspend fun getById(id: Long): ProxyProfile? = flow.value.find { it.id == id }
+
+        override fun getByIdFlow(id: Long): Flow<ProxyProfile?> =
+            flow.map { profiles -> profiles.find { it.id == id } }
 
         override suspend fun insert(profile: ProxyProfile): Long {
             insertedProfiles += profile

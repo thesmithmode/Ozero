@@ -3,9 +3,11 @@
 package ru.ozero.singboxsubscription
 
 import io.mockk.every
+import io.mockk.firstArg
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
@@ -15,9 +17,6 @@ import okhttp3.mockwebserver.MockWebServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import ru.ozero.singboxconfig.BeanSupportDecision
-import ru.ozero.singboxconfig.ConfigBuilder
-import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
@@ -246,7 +245,7 @@ class RawUpdaterTest {
     }
 
     @Test
-    fun `should use fallback server names when imported bean has blank name`() = runBlocking {
+    fun `should deduplicate identical unnamed links and use fallback server name`() = runBlocking {
         val unnamed =
             "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443?type=tcp&security=none"
         server.enqueue(MockResponse().setBody("$unnamed\n$unnamed"))
@@ -254,7 +253,7 @@ class RawUpdaterTest {
 
         rawUpdater.refresh(g)
 
-        assertEquals(listOf("Server 1", "Server 2"), profileDao.profiles.map { it.name })
+        assertEquals(listOf("Server 1"), profileDao.profiles.map { it.name })
     }
 
     @Test
@@ -536,7 +535,9 @@ class RawUpdaterTest {
             every { code } returns 200
         }
         val mockedCall = mockk<Call>(relaxed = true)
-        every { mockedCall.execute() } returns mockedResponse
+        every { mockedCall.enqueue(any()) } answers {
+            firstArg<Callback>().onResponse(mockedCall, mockedResponse)
+        }
 
         val mockedClient = mockk<OkHttpClient>()
         every { mockedClient.newCall(any()) } returns mockedCall
@@ -658,39 +659,23 @@ class RawUpdaterTest {
     }
 
     @Test
-    fun `unsupported profile becoming supported preserves id and diagnostics`() = runBlocking {
+    fun `unsupported-only refresh keeps last usable subscription`() = runBlocking {
         val unsupported =
             "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443" +
                 "?type=xhttp&security=none#Unsupported"
-        val supported =
-            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443" +
-                "?type=ws&security=none&path=/ws#Supported"
-        server.enqueue(MockResponse().setBody(unsupported))
         val g = group()
-
+        server.enqueue(MockResponse().setBody(vless1))
         rawUpdater.refresh(g)
         val first = profileDao.profiles.single()
-        assertTrue(
-            ConfigBuilder.supportDecision(KryoSerializer.deserialize<VLESSBean>(first.beanBlob))
-                is BeanSupportDecision.Unsupported,
-        )
-        profileDao.profiles[0] = first.copy(
-            latencyMs = 321,
-            probeError = "unsupported transport",
-            lastProbeAt = 123_456L,
-        )
 
-        server.enqueue(MockResponse().setBody(supported))
-        rawUpdater.refresh(g)
+        server.enqueue(MockResponse().setBody(unsupported))
+        val result = rawUpdater.refresh(g)
 
-        val refreshed = profileDao.profiles.single()
-        assertEquals(first.id, refreshed.id)
-        assertEquals(321, refreshed.latencyMs)
-        assertEquals("unsupported transport", refreshed.probeError)
-        assertEquals(123_456L, refreshed.lastProbeAt)
-        assertTrue(
-            ConfigBuilder.supportDecision(KryoSerializer.deserialize<VLESSBean>(refreshed.beanBlob))
-                is BeanSupportDecision.Supported,
+        assertTrue(result.isFailure)
+        assertEquals(first, profileDao.profiles.single())
+        assertEquals(
+            SubscriptionRefreshErrorCode.NO_PROFILES,
+            groupDao.groups.first { it.id == g.id }.lastRefreshErrorCode,
         )
     }
 
@@ -1106,7 +1091,9 @@ class RawUpdaterTest {
             every { code } returns 200
         }
         val mockedCall = mockk<Call>(relaxed = true)
-        every { mockedCall.execute() } returns mockedResponse
+        every { mockedCall.enqueue(any()) } answers {
+            firstArg<Callback>().onResponse(mockedCall, mockedResponse)
+        }
         val mockedClient = mockk<OkHttpClient>()
         every { mockedClient.newCall(any()) } returns mockedCall
         rawUpdater = RawUpdater(mockedClient, groupDao, profileDao)
@@ -1157,5 +1144,32 @@ class RawUpdaterTest {
         assertFalse(profileDao.profiles.any { it.id == 801L })
         assertTrue(profileDao.profiles.any { it.id == 802L && it.groupId == other.id })
         assertTrue(profileDao.profiles.any { it.groupId == target.id && it.name == "S1" })
+    }
+
+    @Test
+    fun `should report removed profile ids after successful replacement`() = runBlocking {
+        val removedIds = mutableSetOf<Long>()
+        rawUpdater = RawUpdater(
+            okHttpClient = OkHttpClient(),
+            groupDao = groupDao,
+            profileDao = profileDao,
+            onProfilesRemoved = { removedIds += it },
+        )
+        val g = group()
+        profileDao.profiles.add(
+            ru.ozero.singboxroom.entity.ProxyProfile(
+                id = 901L,
+                groupId = g.id,
+                name = "Removed",
+                beanBlob = byteArrayOf(9, 0, 1),
+                protocolType = RawUpdater.PROTOCOL_VLESS,
+            ),
+        )
+        server.enqueue(MockResponse().setBody(vless1))
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isSuccess)
+        assertEquals(setOf(901L), removedIds)
     }
 }

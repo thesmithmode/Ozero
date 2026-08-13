@@ -32,6 +32,9 @@ class FakeProxyProfileDao : ProxyProfileDao {
     override suspend fun getById(id: Long): ProxyProfile? =
         profiles.firstOrNull { it.id == id }
 
+    override fun getByIdFlow(id: Long): Flow<ProxyProfile?> =
+        flowOf(profiles.firstOrNull { it.id == id })
+
     override fun getAllFlow(): Flow<List<ProxyProfile>> =
         flowOf(profiles.sortedWith(compareBy<ProxyProfile> { it.groupId }.thenBy { it.userOrder }.thenBy { it.id }))
 

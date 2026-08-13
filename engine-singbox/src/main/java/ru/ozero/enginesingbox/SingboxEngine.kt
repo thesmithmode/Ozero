@@ -810,7 +810,7 @@ class SingboxEngine @Inject constructor(
             ?.let(::migrateProfileBlobBlocking)
         val selectedBlob = selectedProfile?.beanBlob
         val savedRecovery = cachedBlob
-            ?.takeIf { selectedBlob == null }
+            ?.takeIf { selectedBlob == null && cachedSelectedProfileId == null }
             ?.let(::recoverPersistedProfileWithoutProtocol)
         val blob = selectedBlob ?: savedRecovery?.let { KryoSerializer.serialize(it.bean) } ?: return null
         val type = selectedProfile?.protocolType ?: savedRecovery?.let { protocolTypeOf(it.bean) }

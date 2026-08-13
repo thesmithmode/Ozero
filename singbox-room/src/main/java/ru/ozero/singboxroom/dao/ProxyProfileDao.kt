@@ -24,6 +24,9 @@ interface ProxyProfileDao {
     @Query("SELECT * FROM proxy_profiles WHERE id = :id")
     suspend fun getById(id: Long): ProxyProfile?
 
+    @Query("SELECT * FROM proxy_profiles WHERE id = :id")
+    fun getByIdFlow(id: Long): Flow<ProxyProfile?>
+
     @Query("SELECT * FROM proxy_profiles ORDER BY groupId ASC, userOrder ASC, id ASC")
     fun getAllFlow(): Flow<List<ProxyProfile>>
 

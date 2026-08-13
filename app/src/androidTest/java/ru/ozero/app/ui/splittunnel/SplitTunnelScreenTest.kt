@@ -1,8 +1,9 @@
 package ru.ozero.app.ui.splittunnel
 
-import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -119,8 +120,8 @@ class SplitTunnelScreenTest {
             ),
         )
         composeRule.onNodeWithTag(SplitTunnelTestTags.MODE_DESCRIPTION).assertIsDisplayed()
-        composeRule.onNodeWithTag(SplitTunnelTestTags.APPS_LIST).assertDoesNotExist()
-        composeRule.onNodeWithTag(SplitTunnelTestTags.SEARCH).assertDoesNotExist()
+        composeRule.onAllNodesWithTag(SplitTunnelTestTags.APPS_LIST).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(SplitTunnelTestTags.SEARCH).assertCountEquals(0)
     }
 
     @Test
@@ -133,7 +134,7 @@ class SplitTunnelScreenTest {
             ),
         )
         composeRule.onNodeWithTag(SplitTunnelTestTags.MODE_DESCRIPTION).assertIsDisplayed()
-        composeRule.onNodeWithTag(SplitTunnelTestTags.APPS_LIST).assertDoesNotExist()
+        composeRule.onAllNodesWithTag(SplitTunnelTestTags.APPS_LIST).assertCountEquals(0)
     }
 
     @Test
@@ -145,7 +146,7 @@ class SplitTunnelScreenTest {
                 apps = listOf(AppRow("com.foo", "Foo", isSystem = false, included = false)),
             ),
         )
-        composeRule.onNodeWithTag(SplitTunnelTestTags.MODE_DESCRIPTION).assertDoesNotExist()
+        composeRule.onAllNodesWithTag(SplitTunnelTestTags.MODE_DESCRIPTION).assertCountEquals(0)
         composeRule.onNodeWithTag(SplitTunnelTestTags.APP_ROW_PREFIX + "com.foo").assertIsDisplayed()
     }
 

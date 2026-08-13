@@ -52,6 +52,9 @@ class SoakTest {
         val targetUrl = args.getString("OZERO_SOAK_TARGET") ?: DEFAULT_TARGET
         val profileUris = listOf(
             "vless" to requireNotNull(args.getString("OZERO_SOAK_VLESS")) { "missing VLESS profile" },
+            "vless_reality" to requireNotNull(args.getString("OZERO_SOAK_VLESS_REALITY")) {
+                "missing VLESS Reality profile"
+            },
             "vmess" to requireNotNull(args.getString("OZERO_SOAK_VMESS")) { "missing VMess profile" },
             "trojan" to requireNotNull(args.getString("OZERO_SOAK_TROJAN")) { "missing Trojan profile" },
         )
@@ -67,7 +70,12 @@ class SoakTest {
         dependencies.settingsRepository().setIpv6Enabled(false)
         dependencies.settingsRepository().setKillswitchEnabled(false)
 
-        val successfulCycles = linkedMapOf("vless" to 0, "vmess" to 0, "trojan" to 0)
+        val successfulCycles = linkedMapOf(
+            "vless" to 0,
+            "vless_reality" to 0,
+            "vmess" to 0,
+            "trojan" to 0,
+        )
         var peakMemoryKb = 0L
         val startedAt = System.currentTimeMillis()
         try {
@@ -215,6 +223,7 @@ class SoakTest {
               "cycles_per_protocol": $cyclesPerProtocol,
               "successful_cycles": {
                 "vless": ${successfulCycles.getValue("vless")},
+                "vless_reality": ${successfulCycles.getValue("vless_reality")},
                 "vmess": ${successfulCycles.getValue("vmess")},
                 "trojan": ${successfulCycles.getValue("trojan")}
               },

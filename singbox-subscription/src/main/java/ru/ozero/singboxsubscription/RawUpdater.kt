@@ -1,8 +1,16 @@
 package ru.ozero.singboxsubscription
 
 import android.util.Log
+import androidx.room.withTransaction
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -13,6 +21,7 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.security.cert.CertPathValidatorException
 import java.security.cert.CertificateException
+import java.util.concurrent.ConcurrentHashMap
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLPeerUnverifiedException
 import ru.ozero.singboxconfig.BeanSupportDecision
@@ -28,6 +37,7 @@ import ru.ozero.singboxfmt.VMessBean
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.normalizeSingboxTransport
 import ru.ozero.singboxfmt.protocolLabel
+import ru.ozero.singboxroom.SingboxDatabase
 import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
@@ -42,8 +52,15 @@ class RawUpdater(
     private val profileDao: ProxyProfileDao,
     private val userCaOkHttpClient: OkHttpClient = okHttpClient,
     private val insecureOkHttpClient: OkHttpClient = okHttpClient,
+    private val database: SingboxDatabase? = null,
+    private val onProfilesRemoved: suspend (Set<Long>) -> Unit = {},
 ) {
-    suspend fun refresh(group: SubscriptionGroup): Result<Int> = withContext(Dispatchers.IO) {
+    private val refreshLocks = ConcurrentHashMap<Long, Mutex>()
+
+    suspend fun refresh(group: SubscriptionGroup): Result<Int> =
+        refreshLocks.computeIfAbsent(group.id) { Mutex() }.withLock { refreshLocked(group) }
+
+    private suspend fun refreshLocked(group: SubscriptionGroup): Result<Int> = withContext(Dispatchers.IO) {
         val lastAttemptAt = System.currentTimeMillis()
         val attemptedGroup = group.copy(lastAttemptAt = lastAttemptAt)
         val result = runCatching<Int> {
@@ -60,11 +77,15 @@ class RawUpdater(
                 val body = response.body?.readUtf8Limited(MAX_SUBSCRIPTION_BYTES) ?: ""
                 val subInfo = SubscriptionInfoParser.parse(response.header("Subscription-Userinfo"))
 
-                val beans = Base64BundleParser.parse(body)
+                val parsedBeans = Base64BundleParser.parse(body)
                     .ifEmpty { RawShareLinksParser.parse(body) }
+                if (parsedBeans.isEmpty()) throw SubscriptionNoProfilesException()
+                val parsedWindow = parsedBeans.take(MAX_PROFILES_PER_GROUP)
+                logSupportDiagnostics(group.id, parsedWindow)
+                val beans = parsedWindow.filter { ConfigBuilder.supportDecision(it) is BeanSupportDecision.Supported }
                 if (beans.isEmpty()) throw SubscriptionNoProfilesException()
 
-                val profiles = beans.take(MAX_PROFILES_PER_GROUP).mapIndexed { idx, bean ->
+                val profiles = beans.mapIndexed { idx, bean ->
                     ProxyProfile(
                         groupId = group.id,
                         name = bean.name.ifBlank { "Server ${idx + 1}" },
@@ -72,7 +93,7 @@ class RawUpdater(
                         protocolType = protocolTypeOf(bean),
                         userOrder = idx,
                     )
-                }
+                }.distinctBy { it.stableFullIdentityKey() }
                 val existingProfiles = profileDao.getAutoCandidatesByGroupId(group.id, MAX_PROFILES_PER_GROUP)
                 val incomingBaseKeyCounts = profiles
                     .groupingBy { it.stableBaseIdentityKey() }
@@ -103,36 +124,44 @@ class RawUpdater(
                         profile
                     }
                 }
-
-                profileDao.replaceForGroup(group.id, profilesWithStableIds)
-                logSupportDiagnostics(
-                    group.id,
-                    beans.take(MAX_PROFILES_PER_GROUP),
-                    profileDao.getByGroupIdLimited(group.id, MAX_PROFILES_PER_GROUP),
-                )
+                val retainedProfileIds = profilesWithStableIds.mapTo(mutableSetOf()) { it.id }
+                val removedProfileIds = existingProfiles
+                    .mapTo(mutableSetOf()) { it.id }
+                    .apply { removeAll(retainedProfileIds) }
 
                 val currentGroup = groupDao.getById(group.id) ?: attemptedGroup
                 val usedBytes = subInfo?.let { it.uploadBytes + it.downloadBytes } ?: currentGroup.bytesUsed
                 val remainingBytes = subInfo?.let {
                     maxOf(0L, it.totalBytes - it.uploadBytes - it.downloadBytes)
                 } ?: currentGroup.bytesRemaining
-                groupDao.update(
-                    currentGroup.copy(
-                        lastUpdated = System.currentTimeMillis(),
-                        lastAttemptAt = lastAttemptAt,
-                        lastRefreshErrorCode = null,
-                        lastServerCount = profilesWithStableIds.size,
-                        bytesUsed = usedBytes,
-                        bytesRemaining = remainingBytes,
-                        expiryDate = subInfo?.expiryTimestamp ?: currentGroup.expiryDate,
-                    ),
+                val updatedGroup = currentGroup.copy(
+                    lastUpdated = System.currentTimeMillis(),
+                    lastAttemptAt = lastAttemptAt,
+                    lastRefreshErrorCode = null,
+                    lastServerCount = profilesWithStableIds.size,
+                    bytesUsed = usedBytes,
+                    bytesRemaining = remainingBytes,
+                    expiryDate = subInfo?.expiryTimestamp ?: currentGroup.expiryDate,
                 )
+                if (database != null) {
+                    database.withTransaction {
+                        profileDao.replaceForGroup(group.id, profilesWithStableIds)
+                        groupDao.update(updatedGroup)
+                    }
+                } else {
+                    profileDao.replaceForGroup(group.id, profilesWithStableIds)
+                    groupDao.update(updatedGroup)
+                }
+                if (removedProfileIds.isNotEmpty()) onProfilesRemoved(removedProfileIds)
 
                 Log.i(TAG, "refresh ok groupId=${group.id} servers=${profilesWithStableIds.size}")
                 profilesWithStableIds.size
             }
         }.recoverCatching { e ->
             throw normalizeError(e)
+        }
+        result.exceptionOrNull()?.let { failure ->
+            if (failure is CancellationException) throw failure
         }
         result.exceptionOrNull()?.let { failure ->
             val errorCode = refreshErrorCode(failure)
@@ -162,9 +191,25 @@ class RawUpdater(
         else -> userCaOkHttpClient
     }
 
-    private fun executeRequest(group: SubscriptionGroup, request: Request): Response {
-        return httpClientFor(group).newCall(request).execute()
-    }
+    private suspend fun executeRequest(group: SubscriptionGroup, request: Request): Response =
+        suspendCancellableCoroutine { continuation ->
+            val call = httpClientFor(group).newCall(request)
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, error: IOException) {
+                    continuation.tryResumeWithException(error)?.let(continuation::completeResume)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    val token = continuation.tryResume(response)
+                    if (token == null) {
+                        response.close()
+                    } else {
+                        continuation.completeResume(token)
+                    }
+                }
+            })
+        }
 
     companion object {
         private const val TAG = "RawUpdater"
@@ -177,13 +222,9 @@ class RawUpdater(
         private const val MAX_PROFILES_PER_GROUP = 2_000
         private const val MAX_SUBSCRIPTION_BYTES = 16L * 1024 * 1024
 
-        private fun logSupportDiagnostics(
-            groupId: Long,
-            beans: List<AbstractBean>,
-            profiles: List<ProxyProfile>,
-        ) {
-            val decisions = beans.zip(profiles).map { (bean, profile) ->
-                Triple(bean, profile.id, ConfigBuilder.supportDecision(bean))
+        private fun logSupportDiagnostics(groupId: Long, beans: List<AbstractBean>) {
+            val decisions = beans.map { bean ->
+                Triple(bean, 0L, ConfigBuilder.supportDecision(bean))
             }
             val supportedCount = decisions.count { it.third is BeanSupportDecision.Supported }
             val rejected = decisions.mapNotNull { (bean, profileId, decision) ->
@@ -331,6 +372,9 @@ private fun ResponseBody.readUtf8Limited(maxBytes: Long): String {
     val charset = contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
     return out.toString(charset.name())
 }
+
+fun isSupportedSubscriptionUrl(value: String): Boolean =
+    value.trim().toHttpUrlOrNull()?.host?.isNotBlank() == true
 
 object SubscriptionRefreshErrorCode {
     const val TLS_CERTIFICATE = "tls_certificate"

@@ -82,6 +82,7 @@ class SingboxEngineSettingsAutoSelectTest {
             override suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile> =
                 emptyList()
             override suspend fun getById(id: Long): ProxyProfile? = null
+            override fun getByIdFlow(id: Long): Flow<ProxyProfile?> = MutableStateFlow(null)
             override suspend fun insert(profile: ProxyProfile): Long = profile.id
             override suspend fun insertAll(profiles: List<ProxyProfile>) {}
             override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
@@ -149,7 +150,7 @@ class SingboxEngineSettingsAutoSelectTest {
     }
 
     @Test
-    fun `onSetAutoSelect false removes selectedProfileId from DataStore`() = runTest {
+    fun `onSetAutoSelect false keeps auto selection because item is radio choice`() = runTest {
         prefsFlow.value = mutablePreferencesOf(selectedProfileKey to -1L)
         val vm = buildViewModel()
         backgroundScope.launch(Dispatchers.Main) { vm.state.collect {} }
@@ -158,7 +159,7 @@ class SingboxEngineSettingsAutoSelectTest {
         vm.onSetAutoSelect(false)
         advanceUntilIdle()
 
-        assertNull(prefsFlow.value[selectedProfileKey])
+        assertTrue(prefsFlow.value[selectedProfileKey] == -1L)
     }
 
     @Test
@@ -203,7 +204,7 @@ class SingboxEngineSettingsAutoSelectTest {
     }
 
     @Test
-    fun `onSetAutoSelect false after enable then state reflects isAutoSelectMode false`() = runTest {
+    fun `onSetAutoSelect false after enable keeps auto mode selected`() = runTest {
         val vm = buildViewModel()
         backgroundScope.launch(Dispatchers.Main) { vm.state.collect {} }
         advanceUntilIdle()
@@ -213,6 +214,6 @@ class SingboxEngineSettingsAutoSelectTest {
         vm.onSetAutoSelect(false)
         advanceUntilIdle()
 
-        assertFalse(vm.state.value.isAutoSelectMode)
+        assertTrue(vm.state.value.isAutoSelectMode)
     }
 }

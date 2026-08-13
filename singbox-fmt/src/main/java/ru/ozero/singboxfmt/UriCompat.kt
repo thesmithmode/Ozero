@@ -12,7 +12,7 @@ internal class UriCompat private constructor(private val raw: String) {
     private val parsedHost: String? get() = uri?.host
     private val parsedUserInfo: String? get() = uri?.userInfo
 
-    val host: String? get() = parsedHost ?: authorityFallback?.host
+    val host: String? get() = (parsedHost ?: authorityFallback?.host)?.removeSurrounding("[", "]")
     val port: Int get() = if (parsedPort > 0) parsedPort else authorityFallback?.port ?: -1
     val userInfo: String? get() = parsedUserInfo ?: authorityFallback?.userInfo
     val fragment: String? get() = uri?.fragment ?: rawFragmentFallback()

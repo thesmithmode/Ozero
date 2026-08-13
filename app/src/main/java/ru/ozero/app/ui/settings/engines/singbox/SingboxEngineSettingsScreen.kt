@@ -154,8 +154,18 @@ private fun SingboxSettingsContent(
         if (state.groups.isNotEmpty()) {
             AutoSelectModeItem(
                 isSelected = state.isAutoSelectMode,
-                onClick = { viewModel.onSetAutoSelect(!state.isAutoSelectMode) },
+                onClick = { viewModel.onSetAutoSelect(true) },
             )
+            if (!state.isAutoSelectMode) {
+                state.allProfiles.firstOrNull { it.id == state.selectedProfileId }?.let { selectedProfile ->
+                    Text(
+                        text = stringResource(R.string.singbox_current_server, selectedProfile.name),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 12.dp, bottom = 4.dp),
+                    )
+                }
+            }
             Spacer(Modifier.height(4.dp))
             HorizontalDivider()
             Spacer(Modifier.height(8.dp))
@@ -442,7 +452,7 @@ private fun SubscriptionGroupItem(
                     Icon(Icons.Default.Close, contentDescription = null)
                 }
             } else {
-                TextButton(onClick = actions.onPing, enabled = state.profiles.isNotEmpty()) {
+                TextButton(onClick = actions.onPing) {
                     Text(
                         text = stringResource(R.string.singbox_group_ping),
                         style = MaterialTheme.typography.labelSmall,
@@ -677,7 +687,15 @@ private fun AddGroupDialog(
                     singleLine = true,
                     isError = error != null,
                     supportingText = if (error != null) {
-                        { Text(stringResource(R.string.singbox_add_error_empty_fields)) }
+                        {
+                            Text(
+                                if (error == "invalid_url") {
+                                    stringResource(R.string.singbox_refresh_error_invalid_url)
+                                } else {
+                                    stringResource(R.string.singbox_add_error_empty_fields)
+                                },
+                            )
+                        }
                     } else {
                         null
                     },
