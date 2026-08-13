@@ -37,7 +37,30 @@ class SingboxEngineServiceTest {
         assertTrue(stopAndWaitBlock.contains("SingboxRuntime.stop()"))
         assertTrue(stopAndWaitBlock.contains("getOrDefault(false)"))
         assertTrue(stopAndWaitBlock.contains("Process.killProcess"))
-        assertTrue(stopAndWaitBlock.contains("AtomicBoolean"))
+        assertTrue(stopAndWaitBlock.contains("launchHardWatchdog"))
+        assertTrue(source.contains("AtomicBoolean"))
+    }
+
+    @Test
+    fun `all native start entry points use hard process watchdog`() {
+        val startWithConfig = source.substringAfter("override fun startWithConfig(")
+            .substringBefore("override fun startWithConfigFile(")
+        val startWithConfigFile = source.substringAfter("override fun startWithConfigFile(")
+            .substringBefore("override fun startProxyMode(")
+        val startProxyMode = source.substringAfter("override fun startProxyMode(")
+            .substringBefore("override fun startProxyModeIfIdle(")
+        val startProxyModeIfIdle = source.substringAfter("override fun startProxyModeIfIdle(")
+            .substringBefore("override fun stop()")
+        val watchdog = source.substringAfter("private fun <T> startRuntimeWithWatchdog")
+            .substringBefore("private fun stopRuntimeAndWait")
+
+        listOf(startWithConfig, startWithConfigFile, startProxyMode, startProxyModeIfIdle).forEach { block ->
+            assertTrue(block.contains("startRuntimeWithWatchdog"))
+        }
+        assertTrue(watchdog.contains("launchHardWatchdog"))
+        assertTrue(watchdog.contains("DEFAULT_START_TIMEOUT_MS"))
+        assertTrue(watchdog.contains("compareAndSet(false, true)"))
+        assertTrue(source.contains("Process.killProcess"))
     }
 
     @Test
@@ -61,7 +84,7 @@ class SingboxEngineServiceTest {
     @Test
     fun `stats do not fake active connections from runtime flag`() {
         val statsBlock = source.substringAfter("override fun getStats()")
-            .substringBefore("override fun registerStatusCallback")
+            .substringBefore("override fun onCreate()")
         assertTrue(statsBlock.contains("SingboxStats()"))
         assertFalse(statsBlock.contains("activeConnections = if"))
         assertFalse(statsBlock.contains("SingboxRuntime.isRunning()) 1"))

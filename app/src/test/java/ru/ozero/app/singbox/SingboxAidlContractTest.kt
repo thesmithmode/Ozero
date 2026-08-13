@@ -59,15 +59,6 @@ class SingboxAidlContractTest {
     }
 
     @Test
-    fun `should ISingboxEngineProcess define registerStatusCallback`() {
-        val content = aidlFile("ISingboxEngineProcess.aidl")
-        assertTrue(
-            content.contains("registerStatusCallback"),
-            "ISingboxEngineProcess must have registerStatusCallback",
-        )
-    }
-
-    @Test
     fun `should ISingboxProtector be defined with protect method`() {
         val content = aidlFile("ISingboxProtector.aidl")
         assertTrue(
@@ -76,15 +67,6 @@ class SingboxAidlContractTest {
         )
         assertTrue(content.contains("import android.os.ParcelFileDescriptor"))
         assertTrue(!content.contains("protect(int"), "raw file descriptor numbers cannot cross Binder")
-    }
-
-    @Test
-    fun `should ISingboxStatusCallback be defined`() {
-        val content = aidlFile("ISingboxStatusCallback.aidl")
-        assertTrue(
-            content.contains("onStatusChanged") || content.contains("void "),
-            "ISingboxStatusCallback must have at least one callback method",
-        )
     }
 
     @Test

@@ -13,7 +13,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 import ru.ozero.enginesingbox.ISingboxEngineProcess
 import ru.ozero.enginesingbox.ISingboxProtector
-import ru.ozero.enginesingbox.ISingboxStatusCallback
 import ru.ozero.enginesingbox.SingboxStats
 import ru.ozero.enginesingbox.singboxConfigFingerprint
 import ru.ozero.enginescore.PersistentLoggers
@@ -37,14 +36,16 @@ class SingboxEngineService : Service() {
                     "startWithConfig entry rawFd=$rawFd configLen=${singboxJsonConfig.length} " +
                         "fingerprint=${singboxJsonConfig.singboxConfigFingerprint()}",
                 )
-                kotlinx.coroutines.runBlocking {
-                    SingboxRuntime.start(
-                        this@SingboxEngineService,
-                        rawFd,
-                        singboxJsonConfig,
-                        SingboxProtectorBridge(protector),
-                        detachedTunFd,
-                    )
+                startRuntimeWithWatchdog {
+                    runBlocking {
+                        SingboxRuntime.start(
+                            this@SingboxEngineService,
+                            rawFd,
+                            singboxJsonConfig,
+                            SingboxProtectorBridge(protector),
+                            detachedTunFd,
+                        )
+                    }
                 }
                 check(detachedTunFd.state == TunFdOwnershipState.PROVIDED_TO_LIBBOX)
             } catch (t: Throwable) {
@@ -62,20 +63,22 @@ class SingboxEngineService : Service() {
             val rawFd = tunFd.detachFd()
             val detachedTunFd = DetachedTunFd(rawFd)
             try {
-                val json = java.io.File(configFilePath).readText()
-                PersistentLoggers.debug(
-                    TAG,
-                    "startWithConfigFile entry rawFd=$rawFd configLen=${json.length} " +
-                        "fingerprint=${json.singboxConfigFingerprint()}",
-                )
-                kotlinx.coroutines.runBlocking {
-                    SingboxRuntime.start(
-                        this@SingboxEngineService,
-                        rawFd,
-                        json,
-                        SingboxProtectorBridge(protector),
-                        detachedTunFd,
+                startRuntimeWithWatchdog {
+                    val json = java.io.File(configFilePath).readText()
+                    PersistentLoggers.debug(
+                        TAG,
+                        "startWithConfigFile entry rawFd=$rawFd configLen=${json.length} " +
+                            "fingerprint=${json.singboxConfigFingerprint()}",
                     )
+                    runBlocking {
+                        SingboxRuntime.start(
+                            this@SingboxEngineService,
+                            rawFd,
+                            json,
+                            SingboxProtectorBridge(protector),
+                            detachedTunFd,
+                        )
+                    }
                 }
                 check(detachedTunFd.state == TunFdOwnershipState.PROVIDED_TO_LIBBOX)
             } catch (t: Throwable) {
@@ -95,13 +98,15 @@ class SingboxEngineService : Service() {
                     "fingerprint=${singboxJsonConfig.singboxConfigFingerprint()}",
             )
             try {
-                kotlinx.coroutines.runBlocking {
-                    SingboxRuntime.start(
-                        this@SingboxEngineService,
-                        NO_TUN_FD,
-                        singboxJsonConfig,
-                        SingboxProtectorBridge(protector),
-                    )
+                startRuntimeWithWatchdog {
+                    runBlocking {
+                        SingboxRuntime.start(
+                            this@SingboxEngineService,
+                            NO_TUN_FD,
+                            singboxJsonConfig,
+                            SingboxProtectorBridge(protector),
+                        )
+                    }
                 }
             } catch (t: Throwable) {
                 PersistentLoggers.error(
@@ -116,12 +121,14 @@ class SingboxEngineService : Service() {
         override fun startProxyModeIfIdle(
             singboxJsonConfig: String,
             protector: ISingboxProtector,
-        ): Boolean = runBlocking {
-            SingboxRuntime.startIfIdle(
-                this@SingboxEngineService,
-                singboxJsonConfig,
-                SingboxProtectorBridge(protector),
-            )
+        ): Boolean = startRuntimeWithWatchdog {
+            runBlocking {
+                SingboxRuntime.startIfIdle(
+                    this@SingboxEngineService,
+                    singboxJsonConfig,
+                    SingboxProtectorBridge(protector),
+                )
+            }
         }
 
         override fun stop() {
@@ -134,19 +141,29 @@ class SingboxEngineService : Service() {
 
         override fun processId(): Int = android.os.Process.myPid()
 
+        private fun <T> startRuntimeWithWatchdog(block: () -> T): T {
+            val finished = launchHardWatchdog(
+                DEFAULT_START_TIMEOUT_MS,
+                "native start watchdog expired; terminating isolated runtime",
+                START_WATCHDOG_THREAD_NAME,
+            )
+            return try {
+                val result = block()
+                check(finished.compareAndSet(false, true)) { "native start watchdog expired" }
+                result
+            } catch (t: Throwable) {
+                finished.set(true)
+                throw t
+            }
+        }
+
         private fun stopRuntimeAndWait(timeoutMs: Long): Boolean {
             val boundedTimeoutMs = timeoutMs.coerceAtLeast(1L)
-            val finished = AtomicBoolean(false)
-            Thread({
-                android.os.SystemClock.sleep(boundedTimeoutMs)
-                if (finished.compareAndSet(false, true)) {
-                    PersistentLoggers.error(TAG, "native stop watchdog expired; terminating isolated runtime")
-                    android.os.Process.killProcess(android.os.Process.myPid())
-                }
-            }, STOP_WATCHDOG_THREAD_NAME).apply {
-                isDaemon = true
-                start()
-            }
+            val finished = launchHardWatchdog(
+                boundedTimeoutMs,
+                "native stop watchdog expired; terminating isolated runtime",
+                STOP_WATCHDOG_THREAD_NAME,
+            )
             val stopped = runCatching {
                 runBlocking {
                     withTimeoutOrNull(boundedTimeoutMs) {
@@ -170,6 +187,25 @@ class SingboxEngineService : Service() {
             return stopped
         }
 
+        private fun launchHardWatchdog(
+            timeoutMs: Long,
+            timeoutMessage: String,
+            threadName: String,
+        ): AtomicBoolean {
+            val finished = AtomicBoolean(false)
+            Thread({
+                android.os.SystemClock.sleep(timeoutMs)
+                if (finished.compareAndSet(false, true)) {
+                    PersistentLoggers.error(TAG, timeoutMessage)
+                    android.os.Process.killProcess(android.os.Process.myPid())
+                }
+            }, threadName).apply {
+                isDaemon = true
+                start()
+            }
+            return finished
+        }
+
         override fun getStats(): SingboxStats {
             val status = SingboxRuntime.getLastStatus()
             return if (status != null) {
@@ -183,14 +219,6 @@ class SingboxEngineService : Service() {
             } else {
                 SingboxStats()
             }
-        }
-
-        override fun registerStatusCallback(cb: ISingboxStatusCallback?) {}
-
-        override fun urlTest(profileId: Long): Long = -1
-
-        override fun setPerAppPackages(packages: Array<String>?, isAllowList: Boolean) {
-            PersistentLoggers.warn(TAG, "per-app routing not yet implemented")
         }
     }
 
@@ -218,8 +246,10 @@ class SingboxEngineService : Service() {
 
     companion object {
         private const val TAG = "SingboxEngineService"
+        private const val DEFAULT_START_TIMEOUT_MS = 15_000L
         private const val DEFAULT_STOP_TIMEOUT_MS = 3_000L
         private const val NO_TUN_FD = -1
+        private const val START_WATCHDOG_THREAD_NAME = "singbox-runtime-start-watchdog"
         private const val STOP_WATCHDOG_THREAD_NAME = "singbox-runtime-watchdog"
     }
 }
