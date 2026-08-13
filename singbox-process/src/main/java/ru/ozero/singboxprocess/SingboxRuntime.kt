@@ -56,7 +56,16 @@ internal object SingboxRuntime {
     private var commandServer: CommandServer? = null
 
     @Volatile
+    private var platformInterface: OzeroPlatformInterface? = null
+
+    @Volatile
+    private var commandServerHandler: OzeroCommandServerHandler? = null
+
+    @Volatile
     private var logClient: CommandClient? = null
+
+    @Volatile
+    private var logClientHandler: NativeLogHandler? = null
 
     @Volatile
     private var nativeLogJob: Job? = null
@@ -108,6 +117,7 @@ internal object SingboxRuntime {
                     runCatching { oldServer.closeService() }
                     runCatching { oldServer.close() }
                     commandServer = null
+                    releaseServerCallbacks()
                     lastStatus = null
                 }
                 startLocked(context, tunFd, singboxJsonConfig, protectorBridge, detachedTunFd)
@@ -151,11 +161,20 @@ internal object SingboxRuntime {
             failureDiagnostics,
         )
         val handler = OzeroCommandServerHandler()
+        platformInterface = platform
+        commandServerHandler = handler
 
         recordCheckpoint("pre-CommandServer")
-        val server = CommandServer(handler, platform)
+        val server = createCommandServer(handler, platform)
         recordCheckpoint("post-CommandServer")
-        server.start()
+        try {
+            server.start()
+        } catch (e: Exception) {
+            PersistentLoggers.error(TAG, "command server start failed exceptionClass=${e::class.java.simpleName}")
+            runCatching { server.close() }
+            releaseServerCallbacks()
+            throw e
+        }
         recordCheckpoint("post-start socket-ready")
 
         try {
@@ -163,7 +182,8 @@ internal object SingboxRuntime {
             recordCheckpoint("checkConfig-passed")
         } catch (e: Exception) {
             PersistentLoggers.error(TAG, "checkConfig failed exceptionClass=${e::class.java.simpleName}")
-            server.close()
+            runCatching { server.close() }
+            releaseServerCallbacks()
             throw e
         }
 
@@ -176,7 +196,8 @@ internal object SingboxRuntime {
                 TAG,
                 "startOrReloadService failed exceptionClass=${e::class.java.simpleName}",
             )
-            server.close()
+            runCatching { server.close() }
+            releaseServerCallbacks()
             throw e
         }
 
@@ -201,6 +222,7 @@ internal object SingboxRuntime {
                     }
             }
             commandServer = null
+            releaseServerCallbacks()
             lastStatus = null
             nativeFailureDiagnostics = null
             persistCheckpoint("runtime-stopped")
@@ -208,9 +230,26 @@ internal object SingboxRuntime {
         }
     }
 
-    fun isRunning(): Boolean = commandServer != null
+    fun isRunning(): Boolean =
+        commandServer != null && platformInterface != null && commandServerHandler != null
 
     fun getLastStatus(): StatusMessage? = lastStatus
+
+    private fun releaseServerCallbacks() {
+        platformInterface = null
+        commandServerHandler = null
+    }
+
+    private fun createCommandServer(
+        handler: OzeroCommandServerHandler,
+        platform: OzeroPlatformInterface,
+    ): CommandServer = try {
+        CommandServer(handler, platform)
+    } catch (e: Exception) {
+        PersistentLoggers.error(TAG, "command server creation failed exceptionClass=${e::class.java.simpleName}")
+        releaseServerCallbacks()
+        throw e
+    }
 
     private fun launchNativeLogSubscription(
         failureDiagnostics: NativeFailureDiagnostics = checkNotNull(nativeFailureDiagnostics),
@@ -236,17 +275,22 @@ internal object SingboxRuntime {
             options.addCommand(Libbox.CommandStatus)
             options.statusInterval = STATUS_INTERVAL_NANOS
             lateinit var client: CommandClient
+            val handler = NativeLogHandler(
+                failureDiagnostics = failureDiagnostics,
+                isCurrent = { nativeLogSessions.isCurrent(generation, client, logClient) },
+                onDisconnected = { handleNativeLogDisconnected(generation, client) },
+            )
             client = CommandClient(
-                NativeLogHandler(
-                    failureDiagnostics = failureDiagnostics,
-                    isCurrent = { nativeLogSessions.isCurrent(generation, client, logClient) },
-                    onDisconnected = { handleNativeLogDisconnected(generation, client) },
-                ),
+                handler,
                 options,
             )
             expectedClient = client
-            if (!nativeLogSessions.isActive(generation)) return
+            if (!nativeLogSessions.isActive(generation)) {
+                disconnectNativeLogClient(client)
+                return@runCatching
+            }
             logClient = client
+            logClientHandler = handler
             withTimeout(NATIVE_LOG_CONNECT_TIMEOUT_MS) {
                 runInterruptible { client.connect() }
             }
@@ -273,12 +317,16 @@ internal object SingboxRuntime {
         nativeLogJob = null
         val client = logClient
         if (client != null) withContext(Dispatchers.IO) { disconnectNativeLogClient(client) }
+        logClientHandler = null
         lastStatus = null
     }
 
     private fun disconnectNativeLogClient(expectedClient: CommandClient) {
         val client = expectedClient
-        if (client === logClient) logClient = null
+        if (client === logClient) {
+            logClient = null
+            logClientHandler = null
+        }
         runCatching { client.disconnect() }
             .onFailure {
                 PersistentLoggers.warn(
@@ -292,6 +340,7 @@ internal object SingboxRuntime {
         if (!nativeLogSessions.isCurrent(generation, client, logClient)) return
         lastStatus = null
         logClient = null
+        logClientHandler = null
         if (nativeLogSessionActive && nativeLogSessions.claimReconnect(generation)) {
             launchNativeLogSubscription(reconnect = true)
         }

@@ -601,6 +601,26 @@ class RealWarpSdkBridgeTest {
     }
 
     @Test
+    fun `reprotect and detach serialize native handle access`() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginewarp/RealWarpSdkBridge.kt",
+        ).readText()
+        val reprotect = source.substringAfter("override fun reprotectSockets()")
+            .substringBefore("override suspend fun startProxy")
+        val detach = source.substringAfter("override suspend fun detachTun()")
+            .substringBefore("override suspend fun stopProxy")
+        val forceTerminate = source.substringAfter("override fun forceTerminate()")
+            .substringBefore("private fun closeRuntimeIfIdle")
+
+        assertTrue(source.contains("private val nativeHandleLock = Any()"))
+        assertTrue(reprotect.contains("synchronized(nativeHandleLock)"))
+        assertTrue(detach.contains("synchronized(nativeHandleLock) { awgRuntime.turnOff(h) }"))
+        assertTrue(detach.contains("savedProtector = null"))
+        assertTrue(forceTerminate.contains("synchronized(nativeHandleLock)"))
+    }
+
+    @Test
     fun `concurrent detachTun не вызывает double awgTurnOff на одном handle`() = runTest {
         val runtime = FakeAwgRuntime(returnHandle = 7, socketV4 = 100)
         val (bridge, _) = bridgeWith(runtime)
