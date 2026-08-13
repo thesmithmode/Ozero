@@ -17,6 +17,7 @@ class SoakExternalProbeService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val targetUrl = requireNotNull(intent?.getStringExtra(EXTRA_URL))
+
         @Suppress("DEPRECATION")
         val receiver = requireNotNull(intent.getParcelableExtra<ResultReceiver>(EXTRA_RECEIVER))
         thread(name = "soak-external-http") {
