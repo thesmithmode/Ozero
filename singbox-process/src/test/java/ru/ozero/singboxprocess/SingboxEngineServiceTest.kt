@@ -166,7 +166,7 @@ class SingboxEngineServiceTest {
         assertTrue(connectBlock.contains("NativeLogConnection(client, handler)"))
         assertTrue(connectBlock.contains("nativeLogConnection = connection"))
         assertTrue(disconnectBlock.contains("connection.client.disconnect()"))
-        assertTrue(disconnectBlock.contains("Reference.reachabilityFence(connection.handler)"))
+        assertTrue(disconnectBlock.contains("synchronized(connection.handler) { Unit }"))
         assertTrue(disconnectBlock.contains("retainedFailedLogConnections.add(connection)"))
     }
 

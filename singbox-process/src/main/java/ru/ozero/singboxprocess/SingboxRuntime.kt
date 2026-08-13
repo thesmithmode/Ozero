@@ -39,7 +39,6 @@ import kotlinx.coroutines.withTimeout
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginesingbox.SingboxRuntimeCheckpointStore
 import java.io.File
-import java.lang.ref.Reference
 import java.security.KeyStore
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -354,7 +353,7 @@ internal object SingboxRuntime {
                 )
             }
             .isSuccess
-        Reference.reachabilityFence(connection.handler)
+        synchronized(connection.handler) { Unit }
         if (disconnected) {
             if (nativeLogConnection === connection) nativeLogConnection = null
             retainedFailedLogConnections.remove(connection)
