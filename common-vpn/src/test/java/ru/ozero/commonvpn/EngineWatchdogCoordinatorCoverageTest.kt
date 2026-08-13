@@ -241,6 +241,32 @@ class EngineWatchdogCoordinatorCoverageTest {
     }
 
     @Test
+    fun `starting routed probe watchdog again cancels previous watcher`() = runTest {
+        val plugin = FakeWatchdogPlugin(
+            id = EngineId.SINGBOX,
+            probeResults = listOf(ProbeResult.Success(1)),
+        )
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            plugins = setOf(plugin),
+            controller = connectedController(plugin.id),
+            tunFd = mockk(relaxed = true),
+            killswitch = true,
+        )
+
+        try {
+            watchdog.startRoutedProbeWatchdog(plugin.id)
+            watchdog.startRoutedProbeWatchdog(plugin.id)
+            advanceTimeBy(EngineWatchdogCoordinator.ROUTED_PROBE_WATCHDOG_POLL_MS)
+            runCurrent()
+
+            assertEquals(1, plugin.probeCalls)
+        } finally {
+            watchdog.cancelWatchers()
+        }
+    }
+
+    @Test
     fun `peer watchdog recovers after peers disappear after first peer`() = runTest {
         val plugin = FakeWatchdogPlugin(
             stats = listOf(EngineStats(activeConnections = 1), EngineStats(activeConnections = 0)),
