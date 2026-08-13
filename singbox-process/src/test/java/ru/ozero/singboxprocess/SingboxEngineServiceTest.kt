@@ -135,8 +135,11 @@ class SingboxEngineServiceTest {
             .substringBefore("suspend fun stop()")
         val releaseBlock = runtimeSource.substringAfter("private fun releaseServerCallbacks()")
             .substringBefore("private fun launchNativeLogSubscription")
+        val createBlock = runtimeSource.substringAfter("private fun createCommandServer")
+            .substringBefore("private fun launchNativeLogSubscription")
 
-        assertTrue(startBlock.split("releaseServerCallbacks()").size >= 6)
+        assertTrue(startBlock.split("releaseServerCallbacks()").size >= 5)
+        assertTrue(createBlock.contains("releaseServerCallbacks()"))
         assertTrue(releaseBlock.contains("platformInterface = null"))
         assertTrue(releaseBlock.contains("commandServerHandler = null"))
     }
