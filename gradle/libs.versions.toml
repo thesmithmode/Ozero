@@ -63,7 +63,7 @@ ktlint = "12.1.1"
 jacoco = "0.8.12"
 
 # Robolectric (для runtime Room migration tests — JVM SQLite)
-robolectric = "4.13"
+robolectric = "4.16.1"
 robolectricAndroidAllInstrumented = "13-robolectric-9030017-i6"
 robolectricAndroidAllInstrumented35 = "14-robolectric-10818077-i6"
 
