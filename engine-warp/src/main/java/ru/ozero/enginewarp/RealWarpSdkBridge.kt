@@ -20,6 +20,7 @@ class RealWarpSdkBridge(
     private val tunnelHandle = AtomicInteger(INVALID_HANDLE)
     private val proxyHandle = AtomicInteger(INVALID_HANDLE)
     private val lifecycleLock = Mutex()
+    private val nativeHandleLock = Any()
 
     @Volatile private var savedProtector: VpnSocketProtector? = null
 
@@ -48,13 +49,15 @@ class RealWarpSdkBridge(
     }
 
     override fun reprotectSockets() {
-        val handle = tunnelHandle.get()
-        if (handle == INVALID_HANDLE) return
-        val protector = savedProtector ?: return
-        val v4 = runCatching { awgRuntime.getSocketV4(handle) }.getOrDefault(-1)
-        val v6 = runCatching { awgRuntime.getSocketV6(handle) }.getOrDefault(-1)
-        PersistentLoggers.debug(TAG, "reprotectSockets network change: v4=$v4 v6=$v6 handle=$handle")
-        protectSockets(v4, v6, protector)
+        synchronized(nativeHandleLock) {
+            val handle = tunnelHandle.get()
+            if (handle == INVALID_HANDLE) return
+            val protector = savedProtector ?: return
+            val v4 = runCatching { awgRuntime.getSocketV4(handle) }.getOrDefault(-1)
+            val v6 = runCatching { awgRuntime.getSocketV6(handle) }.getOrDefault(-1)
+            PersistentLoggers.debug(TAG, "reprotectSockets network change: v4=$v4 v6=$v6 handle=$handle")
+            protectSockets(v4, v6, protector)
+        }
     }
 
     override suspend fun startProxy(
@@ -149,13 +152,16 @@ class RealWarpSdkBridge(
     }
 
     private fun closeStaleHandle() {
-        val staleHandle = tunnelHandle.getAndSet(INVALID_HANDLE)
+        val staleHandle = synchronized(nativeHandleLock) {
+            savedProtector = null
+            tunnelHandle.getAndSet(INVALID_HANDLE)
+        }
         if (staleHandle == INVALID_HANDLE) return
         PersistentLoggers.warn(
             TAG,
             "attachTun: stale handle=$staleHandle обнаружен — закрываю до нового awgTurnOn",
         )
-        runCatching { awgRuntime.turnOff(staleHandle) }
+        runCatching { synchronized(nativeHandleLock) { awgRuntime.turnOff(staleHandle) } }
             .onFailure { PersistentLoggers.error(TAG, "stale awgTurnOff failed: ${it.message}") }
     }
 
@@ -289,7 +295,10 @@ class RealWarpSdkBridge(
     override suspend fun detachTun() {
         withContext(Dispatchers.IO) {
             lifecycleLock.withLock {
-                val h = tunnelHandle.getAndSet(INVALID_HANDLE)
+                val h = synchronized(nativeHandleLock) {
+                    savedProtector = null
+                    tunnelHandle.getAndSet(INVALID_HANDLE)
+                }
                 if (h == INVALID_HANDLE) {
                     closeRuntimeIfIdle()
                     return@withLock
@@ -298,7 +307,7 @@ class RealWarpSdkBridge(
                 val thread = Thread.currentThread().name
                 PersistentLoggers.debug(TAG, "awgTurnOff JNI entry handle=$h thread=$thread")
                 try {
-                    awgRuntime.turnOff(h)
+                    synchronized(nativeHandleLock) { awgRuntime.turnOff(h) }
                     val dt = System.currentTimeMillis() - started
                     PersistentLoggers.debug(TAG, "awgTurnOff JNI exit handle=$h dt=${dt}ms thread=$thread")
                     // Go goroutines from the killed tunnel don't stop synchronously.
@@ -340,10 +349,12 @@ class RealWarpSdkBridge(
     }
 
     override fun forceTerminate() {
-        tunnelHandle.set(INVALID_HANDLE)
-        proxyHandle.set(INVALID_HANDLE)
-        savedProtector = null
-        awgRuntime.forceTerminate()
+        synchronized(nativeHandleLock) {
+            tunnelHandle.set(INVALID_HANDLE)
+            proxyHandle.set(INVALID_HANDLE)
+            savedProtector = null
+            awgRuntime.forceTerminate()
+        }
     }
 
     private fun closeRuntimeIfIdle() {

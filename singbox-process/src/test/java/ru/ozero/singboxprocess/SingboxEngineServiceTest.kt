@@ -20,6 +20,11 @@ class SingboxEngineServiceTest {
         "singbox-process/src/main/java/ru/ozero/singboxprocess/SingboxEngineService.kt",
     ).readText()
 
+    private val runtimeSource = File(
+        locateRepoRoot(),
+        "singbox-process/src/main/java/ru/ozero/singboxprocess/SingboxRuntime.kt",
+    ).readText()
+
     @Test
     fun `stop waits for runtime shutdown before returning`() {
         val stopBlock = source.substringAfter("override fun stop()")
@@ -104,16 +109,58 @@ class SingboxEngineServiceTest {
 
     @Test
     fun `profile probe start checks idle state under runtime mutex`() {
-        val runtime = File(
-            locateRepoRoot(),
-            "singbox-process/src/main/java/ru/ozero/singboxprocess/SingboxRuntime.kt",
-        ).readText()
-        val guardedStart = runtime.substringAfter("suspend fun startIfIdle")
+        val guardedStart = runtimeSource.substringAfter("suspend fun startIfIdle")
             .substringBefore("private fun startLocked")
 
         assertTrue(guardedStart.contains("mutex.withLock"))
         assertTrue(guardedStart.contains("if (commandServer != null) return@withLock false"))
         assertTrue(guardedStart.contains("startLocked"))
+    }
+
+    @Test
+    fun `runtime retains gomobile callbacks until native service stops`() {
+        val startBlock = runtimeSource.substringAfter("private fun startLocked")
+            .substringBefore("suspend fun stop()")
+        val stopBlock = runtimeSource.substringAfter("suspend fun stop()")
+            .substringBefore("fun isRunning()")
+
+        assertTrue(startBlock.contains("platformInterface = platform"))
+        assertTrue(startBlock.contains("commandServerHandler = handler"))
+        assertTrue(stopBlock.contains("releaseServerCallbacks()"))
+    }
+
+    @Test
+    fun `runtime releases gomobile callbacks on restart and failed start`() {
+        val startBlock = runtimeSource.substringAfter("suspend fun start(")
+            .substringBefore("suspend fun stop()")
+        val releaseBlock = runtimeSource.substringAfter("private fun releaseServerCallbacks()")
+            .substringBefore("private fun launchNativeLogSubscription")
+
+        assertTrue(startBlock.split("releaseServerCallbacks()").size >= 6)
+        assertTrue(releaseBlock.contains("platformInterface = null"))
+        assertTrue(releaseBlock.contains("commandServerHandler = null"))
+    }
+
+    @Test
+    fun `runtime health requires live gomobile callbacks`() {
+        val runningBlock = runtimeSource.substringAfter("fun isRunning(): Boolean")
+            .substringBefore("fun getLastStatus()")
+
+        assertTrue(runningBlock.contains("commandServer != null"))
+        assertTrue(runningBlock.contains("platformInterface != null"))
+        assertTrue(runningBlock.contains("commandServerHandler != null"))
+    }
+
+    @Test
+    fun `native diagnostics retains gomobile callback while client is connected`() {
+        val connectBlock = runtimeSource.substringAfter("private suspend fun connectNativeLogSubscription")
+            .substringBefore("private suspend fun stopNativeLogSubscription")
+        val disconnectBlock = runtimeSource.substringAfter("private fun disconnectNativeLogClient")
+            .substringBefore("private fun handleNativeLogDisconnected")
+
+        assertTrue(runtimeSource.contains("private var logClientHandler: NativeLogHandler? = null"))
+        assertTrue(connectBlock.contains("logClientHandler = handler"))
+        assertTrue(disconnectBlock.contains("logClientHandler = null"))
     }
 
     private class FakeTrustManager(

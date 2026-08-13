@@ -817,46 +817,38 @@ class RealUrnetworkSdkBridgeContractTest {
     }
 
     @Test
-    fun `runStartOnMain регистрирует addJwtRefreshListener — JWT auto-refresh обновляет localState`() {
+    fun `runStartOnMain attaches owned JWT refresh subscription`() {
         val startBlock = source.substringAfter("private suspend fun runStartOnMain")
             .substringBefore("override suspend fun stop")
         assertTrue(
-            startBlock.contains("addJwtRefreshListener"),
-            "runStartOnMain обязан вызывать addJwtRefreshListener — без него JWT-refresh SDK не обновляет " +
-                "localState.byClientJwt, следующий bridge.start перезапишет refreshed token старым из configStore.",
-        )
-        val listenerBody = startBlock.substringAfter("addJwtRefreshListener {")
-            .substringBefore("applyDeviceFields")
-        assertTrue(
-            listenerBody.contains("bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable)"),
-            "addJwtRefreshListener callback must marshal LocalState mutation onto the main thread.",
-        )
-        assertTrue(
-            listenerBody.contains("localState.byClientJwt = "),
-            "addJwtRefreshListener callback обязан сохранять newJwt в localState.byClientJwt — " +
-                "иначе SDK RotationJWT не персистится через lifecycle bridge.stop()/start().",
+            startBlock.contains("attachJwtRefreshListener(d, localState, \"node\")"),
+            "runStartOnMain must use the lifecycle-owned JWT subscription.",
         )
     }
 
     @Test
-    fun `ensureDeviceOnMain addJwtRefreshListener присутствует — reuse device получает JWT listener`() {
+    fun `ensureDeviceOnMain reuses lifecycle owned JWT subscription`() {
         val ensureBlock = source.substringAfter("private suspend fun ensureDeviceOnMain")
             .substringBefore("private fun applyDeviceFields")
         assertTrue(
-            ensureBlock.contains("addJwtRefreshListener"),
-            "ensureDeviceOnMain обязан вызывать addJwtRefreshListener — если runStartOnMain переиспользует " +
-                "этот device, JWT refresh listener иначе никогда не будет добавлен к нему.",
+            ensureBlock.contains("attachJwtRefreshListener(device, localState, \"ensureDevice\")"),
+            "Location bootstrap must replace rather than accumulate the JWT subscription.",
         )
-        val listenerBody = ensureBlock.substringAfter("addJwtRefreshListener {")
-            .substringBefore("applyDeviceFields")
-        assertTrue(
-            listenerBody.contains("bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable)"),
-            "ensureDevice addJwtRefreshListener callback must marshal LocalState mutation onto the main thread.",
-        )
-        assertTrue(
-            listenerBody.contains("localState.byClientJwt = "),
-            "ensureDevice addJwtRefreshListener callback обязан сохранять newJwt в localState.byClientJwt.",
-        )
+    }
+
+    @Test
+    fun `JWT refresh listener is deduplicated and closed on teardown`() {
+        val listenerBlock = source.substringAfter("private fun attachJwtRefreshListener")
+            .substringBefore("private fun detachJwtRefreshListener")
+        val stopBlock = source.substringAfter("private suspend fun stopUnderLock")
+            .substringBefore("private fun closeDevice")
+
+        assertTrue(source.contains("private val jwtRefreshSubRef = AtomicReference<Sub?>(null)"))
+        assertTrue(source.contains("private val jwtRefreshGeneration = AtomicLong(0L)"))
+        assertTrue(listenerBlock.contains("jwtRefreshGeneration.get() != generation"))
+        assertTrue(listenerBlock.contains("localState.byClientJwt == newJwt"))
+        assertTrue(listenerBlock.contains("jwtRefreshSubRef.getAndSet(sub)"))
+        assertTrue(stopBlock.contains("detachJwtRefreshListener()"))
     }
 
     @Test

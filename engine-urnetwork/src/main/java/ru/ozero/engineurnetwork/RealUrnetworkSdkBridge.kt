@@ -32,6 +32,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
@@ -61,6 +62,8 @@ class RealUrnetworkSdkBridge(
     private val connectVcRef = AtomicReference<ConnectViewController?>(null)
     private val connectionStatusSubRef = AtomicReference<Sub?>(null)
     private val selectedLocationSubRef = AtomicReference<Sub?>(null)
+    private val jwtRefreshSubRef = AtomicReference<Sub?>(null)
+    private val jwtRefreshGeneration = AtomicLong(0L)
     private val connectionStatusRef = AtomicReference<String?>(null)
     private val tunnelStartedRef = AtomicBoolean(false)
     private val connectIssuedRef = AtomicBoolean(false)
@@ -185,24 +188,7 @@ class RealUrnetworkSdkBridge(
             }.onFailure {
                 PersistentLoggers.warn(TAG, "node start: session keys init threw: ${it.message}")
             }
-            runCatching {
-                d.addJwtRefreshListener { newJwt ->
-                    bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable) {
-                        runCatching { localState.byClientJwt = newJwt }
-                            .onSuccess {
-                                PersistentLoggers.debug(TAG, "node start: credential refreshed - state updated")
-                            }
-                            .onFailure {
-                                PersistentLoggers.warn(
-                                    TAG,
-                                    "node start: credential refresh persist threw: ${it.message}",
-                                )
-                            }
-                    }
-                }
-            }.onFailure {
-                PersistentLoggers.warn(TAG, "node start: credential refresh listener threw: ${it.message}")
-            }
+            attachJwtRefreshListener(d, localState, "node")
             applyDeviceFields(d, localState, DeviceInitMode.FULL_START)
             PersistentLoggers.debug(TAG, "node start: instance created - fields applied")
             deviceRef.set(d)
@@ -294,6 +280,7 @@ class RealUrnetworkSdkBridge(
             contractStatusListener.detach()
             detachConnectionStatusListener()
             detachSelectedLocationListener()
+            detachJwtRefreshListener()
             tunnelStartedRef.set(false)
             connectIssuedRef.set(false)
             sharingTrafficLogged.set(false)
@@ -517,19 +504,7 @@ class RealUrnetworkSdkBridge(
                 Log.i(TAG, "ensureDevice: provideSecretKeys not found - generating new keys")
             }
         }
-        runCatching {
-            device.addJwtRefreshListener { newJwt ->
-                bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable) {
-                    runCatching {
-                        localState.byClientJwt = newJwt
-                    }.onSuccess {
-                        Log.i(TAG, "ensureDevice: SDK JWT refreshed - localState updated")
-                    }.onFailure {
-                        PersistentLoggers.warn(TAG, "ensureDevice: JWT refresh localState: ${it.message}")
-                    }
-                }
-            }
-        }.onFailure { PersistentLoggers.warn(TAG, "ensureDevice: addJwtRefreshListener threw: ${it.message}") }
+        attachJwtRefreshListener(device, localState, "ensureDevice")
         applyDeviceFields(device, localState, DeviceInitMode.LOCATION_BROWSE)
         deviceRef.set(device)
         Log.i(TAG, "initDeviceForLocations: device ready for location browse - applyDeviceFields done")
@@ -758,6 +733,43 @@ class RealUrnetworkSdkBridge(
         }
     }
 
+    private fun attachJwtRefreshListener(
+        device: DeviceLocal,
+        localState: LocalState,
+        source: String,
+    ) {
+        detachJwtRefreshListener()
+        val generation = jwtRefreshGeneration.incrementAndGet()
+        val sub = runCatching {
+            device.addJwtRefreshListener { newJwt ->
+                bridgeScope.launch(Dispatchers.Main.immediate + NonCancellable) {
+                    if (jwtRefreshGeneration.get() != generation) return@launch
+                    val unchanged = runCatching { localState.byClientJwt == newJwt }.getOrDefault(false)
+                    if (unchanged) return@launch
+                    runCatching { localState.byClientJwt = newJwt }
+                        .onSuccess {
+                            PersistentLoggers.debug(TAG, "$source: credential refreshed - state updated")
+                        }
+                        .onFailure {
+                            PersistentLoggers.warn(TAG, "$source: credential refresh persist threw: ${it.message}")
+                        }
+                }
+            }
+        }.getOrElse {
+            PersistentLoggers.warn(TAG, "$source: credential refresh listener threw: ${it.message}")
+            return
+        }
+        jwtRefreshSubRef.getAndSet(sub)?.also { previous -> runCatching { previous.close() } }
+    }
+
+    private fun detachJwtRefreshListener() {
+        jwtRefreshGeneration.incrementAndGet()
+        jwtRefreshSubRef.getAndSet(null)?.also { sub ->
+            runCatching { sub.close() }
+                .onFailure { PersistentLoggers.warn(TAG, "credential refresh listener close threw: ${it.message}") }
+        }
+    }
+
     private fun refreshSelectedLocation(cv: ConnectViewController?) {
         val location = runCatching { cv?.selectedLocation }.getOrNull() ?: return
         if (location.isMeaningfulConnectLocation()) {
@@ -938,6 +950,7 @@ class RealUrnetworkSdkBridge(
         if (running.get()) return
         tunnelStartedRef.set(false)
         connectIssuedRef.set(false)
+        detachJwtRefreshListener()
         deviceRef.getAndSet(null)?.also { runCatching { it.close() } }
     }
 
