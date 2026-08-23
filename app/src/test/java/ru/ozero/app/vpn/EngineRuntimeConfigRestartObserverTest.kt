@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -28,6 +29,13 @@ import ru.ozero.enginefptn.FptnConfig
 import ru.ozero.enginefptn.runtimeFingerprint
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EngineRuntimeConfigProvider
+import ru.ozero.enginescore.settings.AppMode
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
+import ru.ozero.enginescore.settings.HostsMode
+import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginescore.settings.SplitTunnelMode
+import ru.ozero.enginescore.settings.TrafficMode
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.VLESSBean
@@ -776,6 +784,7 @@ class EngineRuntimeConfigRestartObserverTest {
             dataStore = flowDataStore(prefs),
             profileDao = fakeProfileDao(profiles),
             proxyChainDao = fakeProxyChainDao(chain),
+            settingsRepository = staticSettingsRepository(),
         )
 
         val baseline = provider.changes.first()
@@ -821,6 +830,7 @@ class EngineRuntimeConfigRestartObserverTest {
                 dataStore = flowDataStore(prefs),
                 profileDao = fakeProfileDao(profiles),
                 proxyChainDao = fakeProxyChainDao(chain),
+                settingsRepository = staticSettingsRepository(),
             )
 
             val baseline = provider.changes.first()
@@ -859,6 +869,7 @@ class EngineRuntimeConfigRestartObserverTest {
             dataStore = flowDataStore(prefs),
             profileDao = fakeProfileDao(profiles),
             proxyChainDao = fakeProxyChainDao(chain),
+            settingsRepository = staticSettingsRepository(),
         )
 
         val baseline = provider.changes.first()
@@ -890,12 +901,20 @@ class EngineRuntimeConfigRestartObserverTest {
             dataStore = flowDataStore(prefs),
             profileDao = profileDao,
             proxyChainDao = fakeProxyChainDao(MutableStateFlow(emptyList())),
+            settingsRepository = staticSettingsRepository(),
         )
 
         val fingerprint = provider.changes.first()
 
         assertEquals(
-            listOf(1L, byteArrayOf(9).contentHashCode(), emptyList<Pair<Long, Int>>(), emptyList<String>()),
+            SingboxRuntimeFingerprint(
+                selectedProfileId = 1L,
+                selectedProfile = RuntimeProfilePayload(1L, 0, listOf(9.toByte())),
+                autoSelectProfiles = emptyList(),
+                chainProfiles = emptyList(),
+                dnsServers = emptyList(),
+                ipv6Enabled = false,
+            ),
             fingerprint,
         )
     }
@@ -922,6 +941,7 @@ class EngineRuntimeConfigRestartObserverTest {
             dataStore = flowDataStore(prefs),
             profileDao = fakeProfileDao(profiles),
             proxyChainDao = fakeProxyChainDao(chain),
+            settingsRepository = staticSettingsRepository(),
         )
 
         val baseline = provider.changes.first()
@@ -958,6 +978,7 @@ class EngineRuntimeConfigRestartObserverTest {
             dataStore = flowDataStore(prefs),
             profileDao = fakeProfileDao(profiles),
             proxyChainDao = fakeProxyChainDao(chain),
+            settingsRepository = staticSettingsRepository(),
         )
 
         val baseline = provider.changes.first()
@@ -1002,6 +1023,7 @@ class EngineRuntimeConfigRestartObserverTest {
             dataStore = flowDataStore(prefs),
             profileDao = fakeProfileDao(profiles),
             proxyChainDao = fakeProxyChainDao(chain),
+            settingsRepository = staticSettingsRepository(),
         )
 
         val baseline = provider.changes.first()
@@ -1030,6 +1052,30 @@ class EngineRuntimeConfigRestartObserverTest {
                 return updated
             }
         }
+
+    private fun staticSettingsRepository(): SettingsRepository = object : SettingsRepository {
+        override val settings: Flow<SettingsModel> = MutableStateFlow(SettingsModel.DEFAULT)
+        override suspend fun setSplitMode(mode: SplitTunnelMode) = Unit
+        override suspend fun setIpv6Enabled(enabled: Boolean) = Unit
+        override suspend fun setAutoStart(enabled: Boolean) = Unit
+        override suspend fun setTrafficMode(mode: TrafficMode) = Unit
+        override suspend fun setManualEngine(engine: EngineId?) = Unit
+        override suspend fun setEngineAutoPriority(priority: List<EngineId>) = Unit
+        override suspend fun setUrnetworkEnabled(enabled: Boolean) = Unit
+        override suspend fun setUrnetworkJwt(jwt: String?) = Unit
+        override suspend fun setUrnetworkCountryCode(code: String?) = Unit
+        override suspend fun setByedpiWinningArgs(args: String?) = Unit
+        override suspend fun setByedpiDefaultAccepted(accepted: Boolean) = Unit
+        override suspend fun setByedpiUseUiMode(enabled: Boolean) = Unit
+        override suspend fun setByedpiUiSettings(settings: ByeDpiUiSettings) = Unit
+        override suspend fun setCustomDnsServers(servers: List<String>) = Unit
+        override suspend fun setHostsMode(mode: HostsMode) = Unit
+        override suspend fun setHosts(hosts: List<String>) = Unit
+        override suspend fun setUiLocaleTag(tag: String?) = Unit
+        override suspend fun setAppMode(mode: AppMode) = Unit
+        override suspend fun setKillswitchEnabled(enabled: Boolean) = Unit
+        override suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean) = Unit
+    }
 
     private fun fakeProfileDao(
         flow: MutableStateFlow<List<ProxyProfile>>,

@@ -18,6 +18,9 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -57,56 +60,56 @@ class SoakTest {
             ?.toIntOrNull()
             ?: DEFAULT_CYCLES_PER_PROTOCOL
         require(cyclesPerProtocol in 1..MAX_CYCLES_PER_PROTOCOL)
-        val realityUri = requireNotNull(args.getString("OZERO_SOAK_VLESS_REALITY")) {
-            "missing VLESS Reality profile"
+        val requireReality = args.getString("OZERO_SOAK_REQUIRE_REALITY") == "1"
+        val realityOnly = args.getString("OZERO_SOAK_REALITY_ONLY") == "1"
+        val realityInput = if (requireReality) {
+            SoakProfileInput(
+                "vless_reality",
+                requireNotNull(args.getString("OZERO_SOAK_VLESS_REALITY")),
+                requireNotNull(args.getString("OZERO_SOAK_REALITY_TARGET")),
+                requireNotNull(args.getString("OZERO_SOAK_REALITY_MARKER")),
+            )
+        } else {
+            null
         }
-        val realityTarget = requireNotNull(args.getString("OZERO_SOAK_REALITY_TARGET")) {
-            "missing Reality target"
-        }
-        val realityMarker = requireNotNull(args.getString("OZERO_SOAK_REALITY_MARKER")) {
-            "missing Reality marker"
-        }
-        val realityInput = SoakProfileInput(
-            "vless_reality",
-            realityUri,
-            realityTarget,
-            realityMarker,
-        )
         val targetContext = instrumentation.targetContext
         val testContext = instrumentation.context
         val dependencies = EntryPointAccessors.fromApplication(
             targetContext.applicationContext,
             SoakTestEntryPoint::class.java,
         )
-        val subscriptionProfiles = loadSubscriptionProfiles(dependencies)
-        val profiles = listOf(
-            subscriptionProfiles.getValue("vless"),
-            seedProfile(dependencies, realityInput),
-            subscriptionProfiles.getValue("vmess"),
-            subscriptionProfiles.getValue("trojan"),
-        )
+        val profiles = if (realityOnly) {
+            listOf(seedProfile(dependencies, requireNotNull(realityInput)))
+        } else {
+            val subscriptionProfiles = loadSubscriptionProfiles(dependencies)
+            buildList {
+                add(subscriptionProfiles.getValue("vless"))
+                realityInput?.let { add(seedProfile(dependencies, it)) }
+                add(subscriptionProfiles.getValue("vmess"))
+                add(subscriptionProfiles.getValue("trojan"))
+            }
+        }
         dependencies.settingsRepository().setTrafficMode(TrafficMode.TUN)
         dependencies.settingsRepository().setManualEngine(EngineId.SINGBOX)
         dependencies.settingsRepository().setIpv6Enabled(false)
         dependencies.settingsRepository().setKillswitchEnabled(false)
 
-        val successfulCycles = linkedMapOf(
-            "vless" to 0,
-            "vless_reality" to 0,
-            "vmess" to 0,
-            "trojan" to 0,
-        )
+        val successfulCycles = profiles.associateTo(linkedMapOf()) { it.protocol to 0 }
         var peakMemoryKb = 0L
         val startedAt = System.currentTimeMillis()
         try {
             profiles.forEach { soakProfile ->
                 selectProfile(dependencies.singboxDataStore(), soakProfile.profile)
-                repeat(cyclesPerProtocol) {
+                repeat(cyclesPerProtocol) { cycle ->
                     stopVpn(targetContext, dependencies.tunnelController())
                     startVpn(targetContext)
                     awaitConnected(dependencies.tunnelController())
-                    if (soakProfile.protocol == "vless") {
-                        refreshSelectedSubscription(dependencies, soakProfile.profile)
+                    if (soakProfile.protocol == "vless" && cycle == 0) {
+                        refreshSelectedSubscription(
+                            dependencies,
+                            soakProfile.profile,
+                            dependencies.tunnelController(),
+                        )
                     }
                     val probe = probeFromExternalUid(
                         testContext,
@@ -187,16 +190,32 @@ class SoakTest {
         )
     }
 
-    private suspend fun refreshSelectedSubscription(
+    private suspend fun CoroutineScope.refreshSelectedSubscription(
         dependencies: SoakTestEntryPoint,
         selectedProfile: ProxyProfile,
+        controller: TunnelController,
     ) {
         val group = requireNotNull(dependencies.subscriptionGroupDao().getById(selectedProfile.groupId))
+        val restart = async(start = CoroutineStart.UNDISPATCHED) {
+            withTimeout(START_TIMEOUT_MS) {
+                controller.state.first {
+                    it is TunnelState.Connecting ||
+                        it is TunnelState.Disconnecting ||
+                        it is TunnelState.Idle ||
+                        it is TunnelState.Failed
+                }
+            }
+        }
         check(dependencies.rawUpdater().refresh(group).getOrThrow() == 3) {
             "active subscription refresh failed"
         }
         val selected = requireNotNull(dependencies.proxyProfileDao().getById(selectedProfile.id))
         check(selected.id == selectedProfile.id) { "active selected profile was replaced" }
+        check(!selected.beanBlob.contentEquals(selectedProfile.beanBlob)) {
+            "subscription refresh did not update the selected profile payload"
+        }
+        check(restart.await() !is TunnelState.Failed) { "runtime restart failed after payload refresh" }
+        awaitConnected(controller)
     }
 
     private fun parseProfile(uri: String): AbstractBean = when {
@@ -288,17 +307,17 @@ class SoakTest {
         durationMs: Long,
     ) {
         val output = requireNotNull(context.getExternalFilesDir(null)).resolve(METRICS_FILE)
+        val successfulCyclesJson = successfulCycles.entries.joinToString(
+            separator = ",",
+            prefix = "{",
+            postfix = "}",
+        ) { (name, count) -> "\"$name\": $count" }
         output.writeText(
             """
             {
               "test": "SingboxTunSoak",
               "cycles_per_protocol": $cyclesPerProtocol,
-              "successful_cycles": {
-                "vless": ${successfulCycles.getValue("vless")},
-                "vless_reality": ${successfulCycles.getValue("vless_reality")},
-                "vmess": ${successfulCycles.getValue("vmess")},
-                "trojan": ${successfulCycles.getValue("trojan")}
-              },
+              "successful_cycles": $successfulCyclesJson,
               "peak_memory_mb": ${peakMemoryKb / 1024.0},
               "duration_ms": $durationMs
             }

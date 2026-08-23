@@ -28,9 +28,19 @@ concurrency:
 
 jobs:
   soak:
-    name: ARM64 TUN — VLESS, Reality, VMess, Trojan
+    name: ARM64 TUN — ${{ matrix.name }}
     runs-on: macos-14
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: VLESS, VMess, Trojan
+            require_reality: '0'
+            expected_protocols: 'vless,vmess,trojan'
+          - name: VLESS Reality
+            require_reality: '1'
+            expected_protocols: 'vless_reality'
     permissions:
       contents: read
     env:
@@ -125,6 +135,7 @@ jobs:
           test -s singbox-core/src/main/jniLibs/arm64-v8a/libbox.so
 
       - name: Require private Reality soak secrets
+        if: matrix.require_reality == '1'
         env:
           OZERO_SOAK_REALITY_URI: ${{ secrets.OZERO_SOAK_REALITY_URI }}
           OZERO_SOAK_REALITY_TARGET: ${{ secrets.OZERO_SOAK_REALITY_TARGET }}
@@ -174,13 +185,21 @@ jobs:
 
           mkdir -p "$RUNNER_TEMP/soak-http"
           printf 'ozero-singbox-routed\n' > "$RUNNER_TEMP/soak-http/ozero-soak-marker"
-          cat > "$RUNNER_TEMP/soak-http/subscription.txt" <<EOF
+          cat > "$RUNNER_TEMP/soak-http/subscription-v1.txt" <<EOF
           vless://$vless_uuid@10.0.2.2:18081?security=none&type=tcp#VLESS%20subscription
           vmess://$vmess_uuid@10.0.2.2:18082?security=none&type=tcp&encryption=auto#VMess%20subscription
           trojan://$trojan_password@10.0.2.2:18083?security=tls&sni=localhost&allowInsecure=1&type=tcp#Trojan%20subscription
           vless://$vless_uuid@10.0.2.2:18081?security=none&type=xhttp#Unsupported%20transport
           EOF
-          python3 -m http.server 18080 --bind 0.0.0.0 --directory "$RUNNER_TEMP/soak-http" > "$RUNNER_TEMP/soak-http.log" 2>&1 &
+          cat > "$RUNNER_TEMP/soak-http/subscription-v2.txt" <<EOF
+          vless://$vless_uuid@10.0.2.2:18081?security=none&type=tcp#VLESS%20refreshed
+          vmess://$vmess_uuid@10.0.2.2:18082?security=none&type=tcp&encryption=auto#VMess%20subscription
+          trojan://$trojan_password@10.0.2.2:18083?security=tls&sni=localhost&allowInsecure=1&type=tcp#Trojan%20subscription
+          vless://$vless_uuid@10.0.2.2:18081?security=none&type=xhttp#Unsupported%20transport
+          EOF
+          python3 .github/soak/subscription-server.py \
+            --directory "$RUNNER_TEMP/soak-http" \
+            --port 18080 > "$RUNNER_TEMP/soak-http.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/soak-http.pid"
           for port in 18080 18081 18082 18083; do
             for attempt in {1..30}; do
@@ -229,26 +248,33 @@ jobs:
               -w \
               -e OZERO_SOAK 1 \
               -e OZERO_SOAK_CYCLES "$SOAK_CYCLES" \
-              -e OZERO_SOAK_VLESS "vless://$OZERO_SOAK_VLESS_UUID@10.0.2.2:18081?security=none&type=tcp" \
+              -e OZERO_SOAK_REQUIRE_REALITY "${{ matrix.require_reality }}" \
+              -e OZERO_SOAK_REALITY_ONLY "${{ matrix.require_reality }}" \
               -e OZERO_SOAK_VLESS_REALITY "$OZERO_SOAK_REALITY_URI" \
               -e OZERO_SOAK_REALITY_TARGET "$OZERO_SOAK_REALITY_TARGET" \
               -e OZERO_SOAK_REALITY_MARKER "$OZERO_SOAK_REALITY_MARKER" \
-              -e OZERO_SOAK_VMESS "vmess://$OZERO_SOAK_VMESS_UUID@10.0.2.2:18082?security=none&type=tcp&encryption=auto" \
-              -e OZERO_SOAK_TROJAN "trojan://$OZERO_SOAK_TROJAN_PASSWORD@10.0.2.2:18083?security=tls&sni=localhost&allowInsecure=1&type=tcp" \
               -e class ru.ozero.app.soak.SoakTest \
               ru.ozero.app.test/androidx.test.runner.AndroidJUnitRunner \
               | tee "$RUNNER_TEMP/soak-output.txt" || status=$?
             adb logcat -d > "$RUNNER_TEMP/soak-logcat.txt"
+            if grep -E -q 'FATAL EXCEPTION|Fatal signal|DeadObjectException' "$RUNNER_TEMP/soak-logcat.txt"; then
+              status=1
+            fi
             adb pull /sdcard/Android/data/ru.ozero.app/files/soak-metrics.json soak-metrics.json || status=1
             test -s soak-metrics.json || status=1
             grep -q 'OK (1 test)' "$RUNNER_TEMP/soak-output.txt" || status=1
-            SOAK_EXPECTED_CYCLES="$SOAK_CYCLES" python3 -c 'import json, os; data=json.load(open("soak-metrics.json", encoding="utf-8")); expected=int(os.environ["SOAK_EXPECTED_CYCLES"]); actual=data["successful_cycles"]; assert data["cycles_per_protocol"] == expected; assert all(actual[name] == expected for name in ("vless", "vless_reality", "vmess", "trojan"))' || status=1
-            for protocol in vless vmess trojan; do
+            SOAK_EXPECTED_CYCLES="$SOAK_CYCLES" SOAK_EXPECTED_PROTOCOLS="${{ matrix.expected_protocols }}" python3 -c 'import json, os; data=json.load(open("soak-metrics.json", encoding="utf-8")); expected=int(os.environ["SOAK_EXPECTED_CYCLES"]); protocols=os.environ["SOAK_EXPECTED_PROTOCOLS"].split(","); actual=data["successful_cycles"]; assert data["cycles_per_protocol"] == expected; assert set(actual) == set(protocols); assert all(actual[name] == expected for name in protocols)' || status=1
+            IFS=, read -ra protocols <<< "${{ matrix.expected_protocols }}"
+            for protocol in "${protocols[@]}"; do
               hits=$(grep -Ec "\\[${protocol}-in\\].*inbound connection" "$RUNNER_TEMP/singbox-server.log" || true)
-              (( hits >= SOAK_CYCLES )) || status=1
+              if [[ "$protocol" != "vless_reality" ]]; then
+                (( hits >= SOAK_CYCLES )) || status=1
+              fi
             done
-            reality_hits=$(curl --fail --silent --show-error --max-time 15 "$OZERO_SOAK_REALITY_HITS_URL" | tr -d '[:space:]') || status=1
-            [[ "$reality_hits" =~ ^[0-9]+$ ]] && (( reality_hits >= SOAK_CYCLES )) || status=1
+            if [[ "${{ matrix.require_reality }}" == '1' ]]; then
+              reality_hits=$(curl --fail --silent --show-error --max-time 15 "$OZERO_SOAK_REALITY_HITS_URL" | tr -d '[:space:]') || status=1
+              [[ "$reality_hits" =~ ^[0-9]+$ ]] && (( reality_hits >= SOAK_CYCLES )) || status=1
+            fi
             exit "$status"
 
       - name: Write job summary
