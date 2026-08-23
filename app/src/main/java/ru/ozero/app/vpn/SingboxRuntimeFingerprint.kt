@@ -79,7 +79,19 @@ internal fun singboxRuntimeFingerprint(
 }
 
 private fun ProxyProfile.toRuntimePayload(): RuntimeProfilePayload =
-    RuntimeProfilePayload(id = id, protocolType = protocolType, beanPayload = beanBlob.toList())
+    RuntimeProfilePayload(id = id, protocolType = protocolType, beanPayload = runtimeBeanPayload())
+
+internal fun ProxyProfile.runtimeBeanPayload(): List<Byte> =
+    when (val recovered = PersistedProfileRecovery.recover(beanBlob, protocolType)) {
+        is RecoveryResult.Success -> runCatching {
+            ConfigBuilder.buildSingboxConfigFromCanonical(
+                ConfigBuilder.canonicalBean(recovered.bean),
+                dnsServers = emptyList(),
+                ipv6Enabled = false,
+            ).encodeToByteArray().toList()
+        }.getOrElse { beanBlob.toList() }
+        is RecoveryResult.Failure -> beanBlob.toList()
+    }
 
 private val SINGBOX_DNS_SERVERS_KEY = stringSetPreferencesKey("singbox_dns_servers")
 
@@ -99,7 +111,7 @@ internal suspend fun singboxRuntimeFingerprint(
     resolveProfileById: suspend (Long) -> ProxyProfile?,
     autoProfiles: List<ProxyProfile> = profiles,
     ipv6Enabled: Boolean = false,
-): SingboxRuntimeFingerprint {
+): SingboxRuntimeFingerprint? {
     val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
     if (selectedProfileId == SingboxEngine.SELECTED_AUTO) {
         return singboxRuntimeFingerprint(prefs, profiles, chainSteps, autoProfiles, ipv6Enabled)
@@ -121,5 +133,8 @@ internal suspend fun singboxRuntimeFingerprint(
             resolveProfileById(profileId)?.let(::add)
         }
     }
-    return singboxRuntimeFingerprint(prefs, resolvedProfiles, chainSteps, autoProfiles, ipv6Enabled)
+    val fingerprint = singboxRuntimeFingerprint(prefs, resolvedProfiles, chainSteps, autoProfiles, ipv6Enabled)
+    val hasIncompleteSelection = selectedProfileId != null && fingerprint.selectedProfile == null
+    val hasIncompleteChain = fingerprint.chainProfiles.any { it.profile == null }
+    return fingerprint.takeUnless { hasIncompleteSelection || hasIncompleteChain }
 }

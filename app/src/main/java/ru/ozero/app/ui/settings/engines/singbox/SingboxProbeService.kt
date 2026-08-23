@@ -350,7 +350,6 @@ private class SingboxServiceProfileProbe(
     ): Map<Long, SingboxProbeOutcome> {
         if (targets.isEmpty()) return emptyMap()
         val localProtector = ProfileProbeProtector()
-        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(settings.timeoutMs.toLong())
         coroutineContext.ensureActive()
         val ports = allocateProbePorts(targets.size)
         val config = runCatching {
@@ -364,7 +363,7 @@ private class SingboxServiceProfileProbe(
         }.getOrElse {
             return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_FAILED))
         }
-        val binding = bindProcess(deadlineNanos)
+        val binding = bindProcess()
             ?: return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_FAILED))
         var shouldStop = false
         try {
@@ -384,16 +383,13 @@ private class SingboxServiceProfileProbe(
             coroutineContext.ensureActive()
             if (!waitWhileProcessAlive(
                     binding,
-                    minOf(PROBE_START_DELAY_MS, remainingTimeoutMs(deadlineNanos)?.toLong() ?: 0L),
+                    PROBE_START_DELAY_MS,
                 )
             ) {
                 return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
             }
             if (binding.processDied.get()) {
                 return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
-            }
-            if (remainingTimeoutMs(deadlineNanos) == null) {
-                return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_TIMEOUT))
             }
             val running = runCatching { process.runtimeRunning() }.getOrDefault(false)
             if (binding.processDied.get()) {
@@ -403,6 +399,7 @@ private class SingboxServiceProfileProbe(
                 return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_FAILED))
             }
             coroutineContext.ensureActive()
+            val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(settings.timeoutMs.toLong())
             val results = coroutineScope {
                 targets.zip(ports).map { (target, port) ->
                     async(Dispatchers.IO) {
@@ -493,7 +490,7 @@ private class SingboxServiceProfileProbe(
         outcome: SingboxProbeOutcome,
     ): Map<Long, SingboxProbeOutcome> = targets.associate { it.profileId to outcome }
 
-    private fun bindProcess(deadlineNanos: Long): Binding? {
+    private fun bindProcess(): Binding? {
         val latch = CountDownLatch(1)
         var process: ISingboxEngineProcess? = null
         var binder: IBinder? = null
@@ -529,8 +526,7 @@ private class SingboxServiceProfileProbe(
             runCatching { context.unbindService(connection) }
             return null
         }
-        val bindTimeoutMs = remainingTimeoutMs(deadlineNanos)?.coerceAtMost(BIND_TIMEOUT_MS) ?: 0
-        if (bindTimeoutMs <= 0 || !latch.await(bindTimeoutMs, TimeUnit.MILLISECONDS)) {
+        if (!latch.await(BIND_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
             runCatching { context.unbindService(connection) }
             return null
         }

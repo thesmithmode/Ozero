@@ -128,6 +128,32 @@ class SingboxRuntimeFingerprintTest {
         )
     }
 
+    @Test
+    fun `fingerprint ignores display name stored inside bean payload`() {
+        val prefs = prefs(selected = 10L)
+
+        assertEquals(
+            singboxRuntimeFingerprint(prefs, listOf(profile(10, validBean("Original"))), emptyList()),
+            singboxRuntimeFingerprint(prefs, listOf(profile(10, validBean("Renamed"))), emptyList()),
+        )
+    }
+
+    @Test
+    fun `fingerprint changes when outbound server changes`() {
+        val prefs = prefs(selected = 10L)
+        val first = validBean("Server")
+        val second = KryoSerializer.serialize(
+            KryoSerializer.deserialize<VLESSBean>(first).apply {
+                serverAddress = "replacement.example.com"
+            },
+        )
+
+        assertNotEquals(
+            singboxRuntimeFingerprint(prefs, listOf(profile(10, first)), emptyList()),
+            singboxRuntimeFingerprint(prefs, listOf(profile(10, second)), emptyList()),
+        )
+    }
+
     private fun prefs(
         selected: Long? = null,
         bean: ByteArray? = null,
@@ -155,12 +181,23 @@ class SingboxRuntimeFingerprintTest {
         latencyMs = latency,
     )
 
-    private fun ProxyProfile.toPayload() = RuntimeProfilePayload(id, protocolType, beanBlob.toList())
+    private fun ProxyProfile.toPayload() = RuntimeProfilePayload(id, protocolType, runtimeBeanPayload())
 
     private fun validBlob(id: Long): ByteArray = KryoSerializer.serialize(
         VLESSBean().apply {
             uuid = "12345678-1234-1234-1234-${id.toString().padStart(12, '0')}"
             serverAddress = "s$id.example.com"
+            serverPort = 443
+            type = "tcp"
+            security = "none"
+        },
+    )
+
+    private fun validBean(name: String): ByteArray = KryoSerializer.serialize(
+        VLESSBean().apply {
+            this.name = name
+            uuid = "12345678-1234-1234-1234-123456789012"
+            serverAddress = "server.example.com"
             serverPort = 443
             type = "tcp"
             security = "none"
