@@ -262,7 +262,7 @@ class SingboxEngine @Inject constructor(
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
-        lifecycleMutex.withLock {
+        return lifecycleMutex.withLock {
             lifecycleGeneration.incrementAndGet()
 
             chainMode = upstream !is Upstream.None || config.proxyMode
@@ -575,7 +575,7 @@ class SingboxEngine @Inject constructor(
     }
 
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
-        lifecycleMutex.withLock {
+        return lifecycleMutex.withLock {
             if (chainMode) return@withLock TunAttachResult.Failure("chain mode - TUN not used")
             val json = pendingConfig ?: return@withLock TunAttachResult.Failure("attachTun called before start()")
             val p = proxy ?: run {
@@ -1092,6 +1092,7 @@ class SingboxEngine @Inject constructor(
             .mapNotNull { PersistedProfileRecovery.recover(blob, it) as? RecoveryResult.Success }
             .singleOrNull()
 
+    @Suppress("CognitiveComplexMethod")
     private fun bindOrFail(): StartResult.Failure? {
         synchronized(bindLock) {
             if (proxy != null) return null

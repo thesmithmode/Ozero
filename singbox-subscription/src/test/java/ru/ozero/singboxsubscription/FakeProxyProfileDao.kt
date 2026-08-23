@@ -83,7 +83,14 @@ class FakeProxyProfileDao : ProxyProfileDao {
         }
     }
 
-    override suspend fun updateProbeResultIfCurrent(id: Long, protocolType: Int, beanBlob: ByteArray, latency: Int, probeError: String?, lastProbeAt: Long): Int {
+    override suspend fun updateProbeResultIfCurrent(
+        id: Long,
+        protocolType: Int,
+        beanBlob: ByteArray,
+        latency: Int,
+        probeError: String?,
+        lastProbeAt: Long,
+    ): Int {
         val current = getById(id) ?: return 0
         if (current.protocolType != protocolType || !current.beanBlob.contentEquals(beanBlob)) return 0
         updateProbeResult(id, latency, probeError, lastProbeAt)

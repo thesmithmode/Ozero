@@ -2,6 +2,7 @@ package ru.ozero.singboxfmt
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class V2RayFmtParseVLESSTest {

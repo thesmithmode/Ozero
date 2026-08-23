@@ -37,9 +37,11 @@ class SubscriptionUpdateWorker @AssistedInject constructor(
         val results = groups.map { group ->
             rawUpdater.refresh(group)
         }
-        return if (results.any { result ->
-            result.exceptionOrNull()?.let(::isTransientSubscriptionRefreshFailure) == true
-        }) {
+        return if (
+            results.any { result ->
+                result.exceptionOrNull()?.let(::isTransientSubscriptionRefreshFailure) == true
+            }
+        ) {
             Result.retry()
         } else {
             Result.success()

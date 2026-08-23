@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import ru.ozero.singboxroom.entity.ProxyProfile
 
 @Dao
+@Suppress("TooManyFunctions")
 interface ProxyProfileDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(profile: ProxyProfile): Long

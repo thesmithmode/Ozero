@@ -462,14 +462,14 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                 .filter { ConfigBuilder.supportDecision(it) is BeanSupportDecision.Supported }
                 .take(MAX_IMPORT_PROFILES)
                 .mapIndexed { idx, bean ->
-                ProxyProfile(
-                    groupId = groupId,
-                    name = bean.name.ifBlank { "Server ${idx + 1}" },
-                    beanBlob = KryoSerializer.serialize(bean),
-                    protocolType = protocolTypeOf(bean),
-                    userOrder = idx,
-                )
-            }
+                    ProxyProfile(
+                        groupId = groupId,
+                        name = bean.name.ifBlank { "Server ${idx + 1}" },
+                        beanBlob = KryoSerializer.serialize(bean),
+                        protocolType = protocolTypeOf(bean),
+                        userOrder = idx,
+                    )
+                }
             if (profiles.isEmpty()) {
                 val createdGroup = groupDao.getById(groupId)
                 if (createdGroup != null) groupDao.delete(createdGroup)
@@ -515,14 +515,14 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                 .filter { ConfigBuilder.supportDecision(it) is BeanSupportDecision.Supported }
                 .take(MAX_IMPORT_PROFILES)
                 .mapIndexed { idx, bean ->
-                ProxyProfile(
-                    groupId = groupId,
-                    name = bean.name.ifBlank { "Server ${idx + 1}" },
-                    beanBlob = KryoSerializer.serialize(bean),
-                    protocolType = protocolTypeOf(bean),
-                    userOrder = idx,
-                )
-            }
+                    ProxyProfile(
+                        groupId = groupId,
+                        name = bean.name.ifBlank { "Server ${idx + 1}" },
+                        beanBlob = KryoSerializer.serialize(bean),
+                        protocolType = protocolTypeOf(bean),
+                        userOrder = idx,
+                    )
+                }
             if (profiles.isEmpty()) {
                 val createdGroup = groupDao.getById(groupId)
                 if (createdGroup != null) groupDao.delete(createdGroup)

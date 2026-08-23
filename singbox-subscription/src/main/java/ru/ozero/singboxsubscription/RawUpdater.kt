@@ -61,6 +61,7 @@ class RawUpdater(
     suspend fun refresh(group: SubscriptionGroup): Result<Int> =
         refreshLocks.computeIfAbsent(group.id) { Mutex() }.withLock { refreshLocked(group) }
 
+    @Suppress("LongMethod", "CyclomaticComplexMethod", "CognitiveComplexMethod")
     private suspend fun refreshLocked(group: SubscriptionGroup): Result<Int> = withContext(Dispatchers.IO) {
         val lastAttemptAt = System.currentTimeMillis()
         val refreshGeneration = beginRefresh(group.id, lastAttemptAt)
@@ -464,17 +465,21 @@ private class SubscriptionBodyTooLargeException : IOException("Subscription body
 
 fun isTransientSubscriptionRefreshFailure(error: Throwable): Boolean {
     val causes = generateSequence(error) { it.cause }.toList()
-    if (causes.any {
-        it is SubscriptionNoProfilesException ||
-            it is SubscriptionBodyTooLargeException ||
-            it is SubscriptionRefreshStaleException
-    }) {
+    if (
+        causes.any {
+            it is SubscriptionNoProfilesException ||
+                it is SubscriptionBodyTooLargeException ||
+                it is SubscriptionRefreshStaleException
+        }
+    ) {
         return false
     }
     val http = causes.filterIsInstance<SubscriptionHttpException>().firstOrNull()
     if (http != null) {
-        return http.statusCode == 408 || http.statusCode == 425 ||
-            http.statusCode == 429 || http.statusCode in 500..599
+        return http.statusCode == 408 ||
+            http.statusCode == 425 ||
+            http.statusCode == 429 ||
+            http.statusCode in 500..599
     }
     if (causes.any { it is SSLHandshakeException || it is SSLPeerUnverifiedException }) return false
     return causes.any { it is SocketTimeoutException || it is UnknownHostException || it is IOException }

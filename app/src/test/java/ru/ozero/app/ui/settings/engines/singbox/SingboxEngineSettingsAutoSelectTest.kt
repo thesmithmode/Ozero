@@ -106,7 +106,14 @@ class SingboxEngineSettingsAutoSelectTest {
             override suspend fun getIdsByGroupId(groupId: Long): List<Long> = emptyList()
             override suspend fun deleteByIds(ids: List<Long>) {}
             override suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long) {}
-            override suspend fun updateProbeResultIfCurrent(id: Long, protocolType: Int, beanBlob: ByteArray, latency: Int, probeError: String?, lastProbeAt: Long): Int = 0
+            override suspend fun updateProbeResultIfCurrent(
+                id: Long,
+                protocolType: Int,
+                beanBlob: ByteArray,
+                latency: Int,
+                probeError: String?,
+                lastProbeAt: Long,
+            ): Int = 0
             override suspend fun countByGroupId(groupId: Long): Int = 0
             override suspend fun update(profile: ProxyProfile) {}
             override suspend fun delete(profile: ProxyProfile) {}
