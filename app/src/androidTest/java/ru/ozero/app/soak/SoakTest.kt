@@ -19,9 +19,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -113,7 +111,7 @@ class SoakTest {
                     startVpn(targetContext)
                     awaitConnected(dependencies.tunnelController())
                     if (soakProfile.protocol == "vless" && cycle == 0) {
-                        refreshSelectedSubscription(
+                        refreshSelectedSubscriptionMetadata(
                             dependencies,
                             soakProfile.profile,
                             dependencies.tunnelController(),
@@ -219,22 +217,12 @@ class SoakTest {
         )
     }
 
-    private suspend fun CoroutineScope.refreshSelectedSubscription(
+    private suspend fun refreshSelectedSubscriptionMetadata(
         dependencies: SoakTestEntryPoint,
         selectedProfile: ProxyProfile,
         controller: TunnelController,
     ) {
         val group = requireNotNull(dependencies.subscriptionGroupDao().getById(selectedProfile.groupId))
-        val restart = async(start = CoroutineStart.UNDISPATCHED) {
-            withTimeout(START_TIMEOUT_MS) {
-                controller.state.first {
-                    it is TunnelState.Connecting ||
-                        it is TunnelState.Disconnecting ||
-                        it is TunnelState.Idle ||
-                        it is TunnelState.Failed
-                }
-            }
-        }
         check(subscriptionUpdater().refresh(group).getOrThrow() == 3) {
             "active subscription refresh failed"
         }
@@ -243,7 +231,10 @@ class SoakTest {
         check(!selected.beanBlob.contentEquals(selectedProfile.beanBlob)) {
             "subscription refresh did not update the selected profile payload"
         }
-        check(restart.await() !is TunnelState.Failed) { "runtime restart failed after payload refresh" }
+        delay(RUNTIME_REFRESH_SETTLE_MS)
+        check(controller.state.value is TunnelState.Connected) {
+            "display-only subscription refresh interrupted the runtime"
+        }
         awaitConnected(controller)
     }
 
@@ -386,7 +377,7 @@ class SoakTest {
 
     private fun subscriptionUpdater(): RawUpdater =
         EntryPointAccessors.fromApplication(
-            applicationContext,
+            InstrumentationRegistry.getInstrumentation().targetContext.applicationContext,
             SingboxSubscriptionEntryPoint::class.java,
         ).rawUpdater()
 
@@ -399,6 +390,7 @@ class SoakTest {
         private const val START_TIMEOUT_MS = 30_000L
         private const val STOP_TIMEOUT_MS = 10_000L
         private const val PROBE_TIMEOUT_MS = 15_000L
+        private const val RUNTIME_REFRESH_SETTLE_MS = 500L
         private const val METRICS_FILE = "soak-metrics.json"
         private const val TAG = "SingboxSoak"
     }
