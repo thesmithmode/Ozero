@@ -52,6 +52,7 @@ class RawUpdaterTest {
         "ss://YWVzLTEyOC1nY206cGFzcy1vbmU@ss.example.com:8388#SS1"
     private val shadowsocks2 =
         "ss://YWVzLTEyOC1nY206cGFzcy10d28@ss.example.com:8388#SS2"
+    private val realityPublicKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
     @BeforeEach
     fun setUp() {
@@ -765,10 +766,10 @@ class RawUpdaterTest {
     fun `should preserve duplicate VLESS ids by flow when provider reorders rows`() = runBlocking {
         val vision =
             "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup.example.com:443" +
-                "?type=tcp&security=reality&flow=xtls-rprx-vision&pbk=pub&sid=01#Vision"
+                "?type=tcp&security=reality&flow=xtls-rprx-vision&pbk=$realityPublicKey&sid=01#Vision"
         val blankFlow =
             "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup.example.com:443" +
-                "?type=tcp&security=reality&pbk=pub&sid=01#Blank"
+                "?type=tcp&security=reality&pbk=$realityPublicKey&sid=01#Blank"
         server.enqueue(MockResponse().setBody("$vision\n$blankFlow"))
         val g = group()
 
@@ -909,10 +910,10 @@ class RawUpdaterTest {
             val g = group()
             val withVisionFlow =
                 "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup-full.example.com:443" +
-                    "?type=tcp&security=reality&pbk=pub&sid=01&flow=xtls-rprx-vision#Vision"
+                    "?type=tcp&security=reality&pbk=$realityPublicKey&sid=01&flow=xtls-rprx-vision#Vision"
             val withNoFlow =
                 "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup-full.example.com:443" +
-                    "?type=tcp&security=reality&pbk=pub&sid=01#NoFlow"
+                    "?type=tcp&security=reality&pbk=$realityPublicKey&sid=01#NoFlow"
             val existingVisionProfile = ru.ozero.singboxroom.entity.ProxyProfile(
                 groupId = g.id,
                 name = "Vision",
@@ -979,7 +980,7 @@ class RawUpdaterTest {
     }
 
     @Test
-    fun `should preserve duplicate Shadowsocks ids by plugin when provider reorders rows`() = runBlocking {
+    fun `should reject Shadowsocks plugins without replacing a usable snapshot`() = runBlocking {
         val pluginA =
             """
             {
@@ -1037,17 +1038,14 @@ class RawUpdaterTest {
         server.enqueue(MockResponse().setBody(pluginA))
         val g = group()
 
-        rawUpdater.refresh(g)
-        val firstByName = profileDao.profiles.associateBy { it.name }
-        val pluginAId = firstByName.getValue("Plugin A").id
-        val pluginBId = firstByName.getValue("Plugin B").id
+        val first = rawUpdater.refresh(g)
 
         server.enqueue(MockResponse().setBody(pluginB))
-        rawUpdater.refresh(g)
-        val secondByName = profileDao.profiles.associateBy { it.name }
+        val second = rawUpdater.refresh(g)
 
-        assertEquals(pluginAId, secondByName.getValue("Plugin A").id)
-        assertEquals(pluginBId, secondByName.getValue("Plugin B").id)
+        assertTrue(first.isFailure)
+        assertTrue(second.isFailure)
+        assertTrue(profileDao.profiles.isEmpty())
     }
 
     @Test
