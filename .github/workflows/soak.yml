@@ -15,6 +15,7 @@ on:
     branches: [dev]
     paths:
       - '.github/soak/**'
+      - '.github/scripts/**'
       - '.github/workflows/soak.yml'
       - 'app/**'
       - 'common-vpn/**'
