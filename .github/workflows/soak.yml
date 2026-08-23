@@ -129,9 +129,10 @@ jobs:
           OZERO_SOAK_REALITY_URI: ${{ secrets.OZERO_SOAK_REALITY_URI }}
           OZERO_SOAK_REALITY_TARGET: ${{ secrets.OZERO_SOAK_REALITY_TARGET }}
           OZERO_SOAK_REALITY_MARKER: ${{ secrets.OZERO_SOAK_REALITY_MARKER }}
+          OZERO_SOAK_REALITY_HITS_URL: ${{ secrets.OZERO_SOAK_REALITY_HITS_URL }}
         run: |
           set -euo pipefail
-          for name in OZERO_SOAK_REALITY_URI OZERO_SOAK_REALITY_TARGET OZERO_SOAK_REALITY_MARKER; do
+          for name in OZERO_SOAK_REALITY_URI OZERO_SOAK_REALITY_TARGET OZERO_SOAK_REALITY_MARKER OZERO_SOAK_REALITY_HITS_URL; do
             test -n "${!name}" || { echo "::error::$name is required for the private Reality soak"; exit 1; }
           done
 
@@ -186,6 +187,7 @@ jobs:
           OZERO_SOAK_REALITY_URI: ${{ secrets.OZERO_SOAK_REALITY_URI }}
           OZERO_SOAK_REALITY_TARGET: ${{ secrets.OZERO_SOAK_REALITY_TARGET }}
           OZERO_SOAK_REALITY_MARKER: ${{ secrets.OZERO_SOAK_REALITY_MARKER }}
+          OZERO_SOAK_REALITY_HITS_URL: ${{ secrets.OZERO_SOAK_REALITY_HITS_URL }}
         with:
           api-level: ${{ inputs['api-level'] || '30' }}
           arch: arm64-v8a
@@ -221,6 +223,8 @@ jobs:
               hits=$(grep -Ec "\\[${protocol}-in\\].*inbound connection" "$RUNNER_TEMP/singbox-server.log" || true)
               (( hits >= SOAK_CYCLES )) || status=1
             done
+            reality_hits=$(curl --fail --silent --show-error --max-time 15 "$OZERO_SOAK_REALITY_HITS_URL" | tr -d '[:space:]') || status=1
+            [[ "$reality_hits" =~ ^[0-9]+$ ]] && (( reality_hits >= SOAK_CYCLES )) || status=1
             exit "$status"
 
       - name: Write job summary

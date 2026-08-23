@@ -601,6 +601,13 @@ class SingboxProbeServiceTest {
             }
         }
 
+        override suspend fun updateProbeResultIfCurrent(id: Long, protocolType: Int, beanBlob: ByteArray, latency: Int, probeError: String?, lastProbeAt: Long): Int {
+            val current = knownProfiles[id] ?: return 0
+            if (current.protocolType != protocolType || !current.beanBlob.contentEquals(beanBlob)) return 0
+            updateProbeResult(id, latency, probeError, lastProbeAt)
+            return 1
+        }
+
         override suspend fun insert(profile: ProxyProfile): Long = profile.id
         override suspend fun insertAll(profiles: List<ProxyProfile>) = Unit
         override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =

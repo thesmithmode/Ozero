@@ -70,6 +70,7 @@ class SingboxEngineSettingsAutoSelectTest {
             override suspend fun count(): Int = groupsFlow.value.size
             override suspend fun insert(group: SubscriptionGroup): Long = group.id
             override suspend fun update(group: SubscriptionGroup) {}
+            override suspend fun updateAllowInsecureTls(id: Long, enabled: Boolean) {}
 
             override suspend fun tryBeginRefresh(id: Long, expectedGeneration: Long, attemptAt: Long): Int = 0
 
@@ -105,6 +106,7 @@ class SingboxEngineSettingsAutoSelectTest {
             override suspend fun getIdsByGroupId(groupId: Long): List<Long> = emptyList()
             override suspend fun deleteByIds(ids: List<Long>) {}
             override suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long) {}
+            override suspend fun updateProbeResultIfCurrent(id: Long, protocolType: Int, beanBlob: ByteArray, latency: Int, probeError: String?, lastProbeAt: Long): Int = 0
             override suspend fun countByGroupId(groupId: Long): Int = 0
             override suspend fun update(profile: ProxyProfile) {}
             override suspend fun delete(profile: ProxyProfile) {}

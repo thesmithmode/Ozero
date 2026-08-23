@@ -1115,6 +1115,8 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
                 override suspend fun update(group: SubscriptionGroup) = Unit
 
+                override suspend fun updateAllowInsecureTls(id: Long, enabled: Boolean) = Unit
+
                 override suspend fun tryBeginRefresh(
                     id: Long,
                     expectedGeneration: Long,
@@ -1255,6 +1257,8 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
         override suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long) =
             Unit
+
+        override suspend fun updateProbeResultIfCurrent(id: Long, protocolType: Int, beanBlob: ByteArray, latency: Int, probeError: String?, lastProbeAt: Long): Int = 0
 
         override suspend fun countByGroupId(groupId: Long): Int = flow.value.count { it.groupId == groupId }
 

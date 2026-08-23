@@ -226,9 +226,14 @@ class SingboxProbeService internal constructor(
         latency: Int,
         error: String?,
     ) {
-        val current = getById(expected.id) ?: return
-        if (!current.sameProbeIdentity(expected)) return
-        updateProbeResult(expected.id, latency, error, System.currentTimeMillis())
+        updateProbeResultIfCurrent(
+            id = expected.id,
+            protocolType = expected.protocolType,
+            beanBlob = expected.beanBlob,
+            latency = latency,
+            probeError = error,
+            lastProbeAt = System.currentTimeMillis(),
+        )
     }
 
     private data class ProbeResult(

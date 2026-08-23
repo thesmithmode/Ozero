@@ -125,6 +125,7 @@ class SingboxEngineAutoSelectTest {
                 profilesByGroup[groupId]?.map { it.id } ?: emptyList()
             override suspend fun deleteByIds(ids: List<Long>) {}
             override suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long) {}
+            override suspend fun updateProbeResultIfCurrent(id: Long, protocolType: Int, beanBlob: ByteArray, latency: Int, probeError: String?, lastProbeAt: Long): Int = 0
             override suspend fun countByGroupId(groupId: Long): Int =
                 profilesByGroup[groupId]?.size ?: 0
             override suspend fun update(profile: ProxyProfile) {}
@@ -220,13 +221,13 @@ class SingboxEngineAutoSelectTest {
 
     @Test
     fun `buildManualConfig passes singbox DNS settings`() {
-        val blob = makeVlessBlob()
+        val selected = makeProfile(42L, 1L, "proxy.example.com", 443)
         val prefs = mutablePreferencesOf(
-            beanKey to blob,
+            beanKey to selected.beanBlob,
             selectedProfileKey to 42L,
             dnsServersKey to setOf("9.9.9.9", "149.112.112.112"),
         )
-        val engine = buildEngine(prefs = prefs)
+        val engine = buildEngine(prefs = prefs, profilesByGroup = mapOf(1L to listOf(selected)))
         awaitInit()
 
         val result = engine.buildManualConfig(null)
@@ -238,13 +239,13 @@ class SingboxEngineAutoSelectTest {
 
     @Test
     fun `tunSpec filters cached IPv6 DNS after IPv6 disabled config build`() = kotlinx.coroutines.test.runTest {
-        val blob = makeVlessBlob()
+        val selected = makeProfile(42L, 1L, "proxy.example.com", 443)
         val prefs = mutablePreferencesOf(
-            beanKey to blob,
+            beanKey to selected.beanBlob,
             selectedProfileKey to 42L,
             dnsServersKey to setOf("8.8.8.8", "2001:4860:4860::8888"),
         )
-        val engine = buildEngine(prefs = prefs)
+        val engine = buildEngine(prefs = prefs, profilesByGroup = mapOf(1L to listOf(selected)))
         awaitInit()
 
         engine.buildManualConfig(SettingsModel(ipv6Enabled = false))
@@ -291,9 +292,9 @@ class SingboxEngineAutoSelectTest {
 
     @Test
     fun `should return single-profile config when manual profile selected`() {
-        val blob = makeVlessBlob()
-        val prefs = mutablePreferencesOf(beanKey to blob, selectedProfileKey to 42L)
-        val engine = buildEngine(prefs = prefs)
+        val selected = makeProfile(42L, 1L, "proxy.example.com", 443)
+        val prefs = mutablePreferencesOf(beanKey to selected.beanBlob, selectedProfileKey to 42L)
+        val engine = buildEngine(prefs = prefs, profilesByGroup = mapOf(1L to listOf(selected)))
         awaitInit()
 
         val result = engine.buildManualConfig(null)

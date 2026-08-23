@@ -611,16 +611,23 @@ class SingboxEngine @Inject constructor(
                         clearPendingStart()
                         return@runCatching TunAttachResult.Failure("sing-box runtime failed to start")
                     }
-                    if (!isCurrentLifecycle(generation)) {
+                    val published = synchronized(bindLock) {
+                        if (!isCurrentLifecycle(generation) || proxy !== p) {
+                            false
+                        } else {
+                            activeSocksPort = pendingSocksPort
+                            activeTunAutoSelect = pendingTunAutoSelect
+                            pendingTunAutoSelect = false
+                            pendingSocksPort = 0
+                            pendingConfig = null
+                            true
+                        }
+                    }
+                    if (!published) {
                         stopRuntimeAfterFailedReadiness(p)
                         clearPendingStart()
                         return@runCatching TunAttachResult.Failure("stale sing-box attach")
                     }
-                    activeSocksPort = pendingSocksPort
-                    activeTunAutoSelect = pendingTunAutoSelect
-                    pendingTunAutoSelect = false
-                    pendingSocksPort = 0
-                    pendingConfig = null
                     PersistentLoggers.debug(
                         TAG,
                         "startWithConfig sent over AIDL activePort=$activeSocksPort " +
@@ -837,7 +844,7 @@ class SingboxEngine @Inject constructor(
             ?.let(::migrateProfileBlobBlocking)
         val selectedBlob = selectedProfile?.beanBlob
         val savedRecovery = cachedBlob
-            ?.takeIf { selectedBlob == null }
+            ?.takeIf { selectedBlob == null && cachedSelectedProfileId == null }
             ?.let(::recoverPersistedProfileWithoutProtocol)
         val blob = selectedBlob ?: savedRecovery?.let { KryoSerializer.serialize(it.bean) } ?: return null
         val type = selectedProfile?.protocolType ?: savedRecovery?.let { protocolTypeOf(it.bean) }
@@ -1101,18 +1108,20 @@ class SingboxEngine @Inject constructor(
                     val connectedProcessId = runCatching { proxy?.processId() ?: -1 }.getOrDefault(-1)
                     engineProcessId = connectedProcessId
                     val recipient = IBinder.DeathRecipient {
-                        if (!isCurrentConnection(connectionId, connection)) return@DeathRecipient
-                        proxy = null
-                        engineBinder = null
-                        lifecycleGeneration.incrementAndGet()
-                        clearRuntimeState()
-                        logProcessExitInfo(connectedProcessId)
-                        engineProcessId = -1
-                        val ref = serviceConn
-                        serviceConn = null
-                        if (ref != null) runCatching { context.unbindService(ref) }
-                        PersistentLoggers.warn(TAG, "SingboxEngineService binder died — :engine_singbox crash")
-                        runCatching { onProcessDied() }
+                        synchronized(bindLock) {
+                            if (!isCurrentConnection(connectionId, connection)) return@synchronized
+                            proxy = null
+                            engineBinder = null
+                            lifecycleGeneration.incrementAndGet()
+                            clearRuntimeState()
+                            logProcessExitInfo(connectedProcessId)
+                            engineProcessId = -1
+                            val ref = serviceConn
+                            serviceConn = null
+                            if (ref != null) runCatching { context.unbindService(ref) }
+                            PersistentLoggers.warn(TAG, "SingboxEngineService binder died — :engine_singbox crash")
+                            runCatching { onProcessDied() }
+                        }
                     }
                     deathRecipient = recipient
                     if (runCatching { binder.linkToDeath(recipient, 0) }.isFailure) {
@@ -1125,35 +1134,39 @@ class SingboxEngine @Inject constructor(
                 }
 
                 override fun onServiceDisconnected(name: ComponentName) {
-                    if (!isCurrentConnection(connectionId, this)) return
-                    proxy = null
-                    engineBinder = null
-                    lifecycleGeneration.incrementAndGet()
-                    clearRuntimeState()
-                    logProcessExitInfo(engineProcessId)
-                    engineProcessId = -1
-                    unlinkDeath()
-                    val ref = serviceConn
-                    serviceConn = null
-                    if (ref != null) runCatching { context.unbindService(ref) }
-                    PersistentLoggers.warn(TAG, "SingboxEngineService disconnected — system unbind")
-                    runCatching { onProcessDied() }
+                    synchronized(bindLock) {
+                        if (!isCurrentConnection(connectionId, this)) return@synchronized
+                        proxy = null
+                        engineBinder = null
+                        lifecycleGeneration.incrementAndGet()
+                        clearRuntimeState()
+                        logProcessExitInfo(engineProcessId)
+                        engineProcessId = -1
+                        unlinkDeath()
+                        val ref = serviceConn
+                        serviceConn = null
+                        if (ref != null) runCatching { context.unbindService(ref) }
+                        PersistentLoggers.warn(TAG, "SingboxEngineService disconnected — system unbind")
+                        runCatching { onProcessDied() }
+                    }
                 }
 
                 override fun onBindingDied(name: ComponentName?) {
-                    if (!isCurrentConnection(connectionId, this)) return
-                    proxy = null
-                    engineBinder = null
-                    lifecycleGeneration.incrementAndGet()
-                    clearRuntimeState()
-                    logProcessExitInfo(engineProcessId)
-                    engineProcessId = -1
-                    unlinkDeath()
-                    val ref = serviceConn
-                    serviceConn = null
-                    if (ref != null) runCatching { context.unbindService(ref) }
-                    PersistentLoggers.warn(TAG, "SingboxEngineService binding died")
-                    runCatching { onProcessDied() }
+                    synchronized(bindLock) {
+                        if (!isCurrentConnection(connectionId, this)) return@synchronized
+                        proxy = null
+                        engineBinder = null
+                        lifecycleGeneration.incrementAndGet()
+                        clearRuntimeState()
+                        logProcessExitInfo(engineProcessId)
+                        engineProcessId = -1
+                        unlinkDeath()
+                        val ref = serviceConn
+                        serviceConn = null
+                        if (ref != null) runCatching { context.unbindService(ref) }
+                        PersistentLoggers.warn(TAG, "SingboxEngineService binding died")
+                        runCatching { onProcessDied() }
+                    }
                 }
             }
             serviceConn = conn

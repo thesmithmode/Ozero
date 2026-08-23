@@ -139,10 +139,18 @@ class SingboxEngineProbeTest {
 
     @Test
     fun `missing declared chain profile is retained as typed failure`() {
+        val selected = ProxyProfile(
+            id = 1L,
+            groupId = 1L,
+            name = "Selected",
+            beanBlob = makeVlessBlob("selected.example"),
+            protocolType = SingboxEngine.PROTOCOL_VLESS,
+        )
         val engine = buildEngine(chainProfileIds = listOf(1L, 99L))
         Thread.sleep(100)
         engine.setPrivateField("cachedSelectedProfileId", 1L)
-        engine.setPrivateField("cachedBlob", makeVlessBlob())
+        engine.setPrivateField("cachedBlob", selected.beanBlob)
+        engine.setPrivateField("cachedProfilesById", mapOf(selected.id to selected))
 
         val config = assertIs<EngineConfig.Singbox>(engine.buildManualConfig(null))
         val result = assertIs<BuildConfigResult.Failure>(engine.buildPendingConfigForTest(config))
@@ -155,10 +163,18 @@ class SingboxEngineProbeTest {
     @Test
     fun `declared chain longer than auto limit is not silently truncated`() {
         val wrapperIds = (2L..52L).toList()
+        val selected = ProxyProfile(
+            id = 1L,
+            groupId = 1L,
+            name = "Selected",
+            beanBlob = makeVlessBlob("selected.example"),
+            protocolType = SingboxEngine.PROTOCOL_VLESS,
+        )
         val engine = buildEngine(chainProfileIds = listOf(1L) + wrapperIds)
         Thread.sleep(100)
         engine.setPrivateField("cachedSelectedProfileId", 1L)
-        engine.setPrivateField("cachedBlob", makeVlessBlob())
+        engine.setPrivateField("cachedBlob", selected.beanBlob)
+        engine.setPrivateField("cachedProfilesById", mapOf(selected.id to selected))
 
         val config = assertIs<EngineConfig.Singbox>(engine.buildManualConfig(null))
         val result = assertIs<BuildConfigResult.Failure>(engine.buildPendingConfigForTest(config))
@@ -1002,6 +1018,7 @@ class SingboxEngineProbeTest {
                 probeError: String?,
                 lastProbeAt: Long,
             ) = Unit
+            override suspend fun updateProbeResultIfCurrent(id: Long, protocolType: Int, beanBlob: ByteArray, latency: Int, probeError: String?, lastProbeAt: Long): Int = 0
             override suspend fun countByGroupId(groupId: Long): Int = 0
             override suspend fun update(profile: ProxyProfile) = Unit
             override suspend fun delete(profile: ProxyProfile) = Unit

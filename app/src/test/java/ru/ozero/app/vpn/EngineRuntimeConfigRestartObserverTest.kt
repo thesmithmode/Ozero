@@ -1058,6 +1058,7 @@ class EngineRuntimeConfigRestartObserverTest {
             override suspend fun deleteByIds(ids: List<Long>) = Unit
             override suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long) =
                 Unit
+            override suspend fun updateProbeResultIfCurrent(id: Long, protocolType: Int, beanBlob: ByteArray, latency: Int, probeError: String?, lastProbeAt: Long): Int = 0
             override suspend fun countByGroupId(groupId: Long): Int = flow.value.count { it.groupId == groupId }
             override suspend fun update(profile: ProxyProfile) = Unit
             override suspend fun delete(profile: ProxyProfile) = Unit

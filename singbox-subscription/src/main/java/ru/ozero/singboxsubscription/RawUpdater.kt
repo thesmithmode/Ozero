@@ -270,7 +270,7 @@ class RawUpdater(
                     if (!continuation.isActive) {
                         response.close()
                     } else {
-                        continuation.resume(response)
+                        continuation.resume(response) { _, pendingResponse, _ -> pendingResponse.close() }
                     }
                 }
             })

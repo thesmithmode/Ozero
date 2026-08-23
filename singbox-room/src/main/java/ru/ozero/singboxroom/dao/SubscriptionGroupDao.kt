@@ -36,6 +36,9 @@ interface SubscriptionGroupDao {
     @Update
     suspend fun update(group: SubscriptionGroup)
 
+    @Query("UPDATE subscription_groups SET allowInsecureTls = :enabled WHERE id = :id")
+    suspend fun updateAllowInsecureTls(id: Long, enabled: Boolean)
+
     @Query(
         """
         UPDATE subscription_groups

@@ -127,6 +127,22 @@ interface ProxyProfileDao {
     )
     suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long)
 
+    @Query(
+        """
+        UPDATE proxy_profiles
+        SET latencyMs = :latency, probeError = :probeError, lastProbeAt = :lastProbeAt
+        WHERE id = :id AND protocolType = :protocolType AND beanBlob = :beanBlob
+        """,
+    )
+    suspend fun updateProbeResultIfCurrent(
+        id: Long,
+        protocolType: Int,
+        beanBlob: ByteArray,
+        latency: Int,
+        probeError: String?,
+        lastProbeAt: Long,
+    ): Int
+
     @Query("SELECT COUNT(*) FROM proxy_profiles WHERE groupId = :groupId")
     suspend fun countByGroupId(groupId: Long): Int
 
