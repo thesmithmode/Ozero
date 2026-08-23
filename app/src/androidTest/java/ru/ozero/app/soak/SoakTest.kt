@@ -7,6 +7,7 @@ import android.os.Debug
 import android.os.Handler
 import android.os.Looper
 import android.os.ResultReceiver
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -98,10 +99,12 @@ class SoakTest {
         val successfulCycles = profiles.associateTo(linkedMapOf()) { it.protocol to 0 }
         var peakMemoryKb = 0L
         val startedAt = System.currentTimeMillis()
+        Log.i(TAG, "start profiles=${profiles.size} cycles=$cyclesPerProtocol realityOnly=$realityOnly")
         try {
             profiles.forEach { soakProfile ->
                 selectProfile(dependencies.singboxDataStore(), soakProfile.profile)
                 repeat(cyclesPerProtocol) { cycle ->
+                    Log.i(TAG, "cycle protocol=${soakProfile.protocol} index=${cycle + 1}/$cyclesPerProtocol phase=start")
                     stopVpn(targetContext, dependencies.tunnelController())
                     startVpn(targetContext)
                     awaitConnected(dependencies.tunnelController())
@@ -124,9 +127,11 @@ class SoakTest {
                         successfulCycles.getValue(soakProfile.protocol) + 1
                     peakMemoryKb = maxOf(peakMemoryKb, currentMemoryKb())
                     stopVpn(targetContext, dependencies.tunnelController())
+                    Log.i(TAG, "cycle protocol=${soakProfile.protocol} index=${cycle + 1}/$cyclesPerProtocol phase=done")
                 }
             }
             if (!realityOnly) {
+                Log.i(TAG, "auto-select phase=start")
                 selectAutoProfile(dependencies.singboxDataStore())
                 startVpn(targetContext)
                 awaitConnected(dependencies.tunnelController())
@@ -139,6 +144,7 @@ class SoakTest {
                 }
                 check(probe.markerMatch) { "auto-select routed HTTP returned an unexpected marker" }
                 stopVpn(targetContext, dependencies.tunnelController())
+                Log.i(TAG, "auto-select phase=done")
             }
         } finally {
             runCatching { stopVpn(targetContext, dependencies.tunnelController()) }
@@ -149,6 +155,7 @@ class SoakTest {
                 peakMemoryKb,
                 System.currentTimeMillis() - startedAt,
             )
+            Log.i(TAG, "finish successfulCycles=$successfulCycles")
         }
 
         check(successfulCycles.values.all { it == cyclesPerProtocol })
@@ -380,6 +387,7 @@ class SoakTest {
         private const val STOP_TIMEOUT_MS = 10_000L
         private const val PROBE_TIMEOUT_MS = 15_000L
         private const val METRICS_FILE = "soak-metrics.json"
+        private const val TAG = "SingboxSoak"
     }
 }
 
