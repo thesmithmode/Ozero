@@ -43,6 +43,32 @@
         "certificate_path": ".github/soak/server-cert.pem",
         "key_path": ".github/soak/server-key.pem"
       }
+    },
+    {
+      "type": "vless",
+      "tag": "vless-reality-in",
+      "listen": "0.0.0.0",
+      "listen_port": 18084,
+      "users": [
+        {
+          "uuid": "${OZERO_SOAK_REALITY_UUID}"
+        }
+      ],
+      "tls": {
+        "enabled": true,
+        "server_name": "localhost",
+        "reality": {
+          "enabled": true,
+          "handshake": {
+            "server": "127.0.0.1",
+            "server_port": 18085
+          },
+          "private_key": "${OZERO_SOAK_REALITY_PRIVATE_KEY}",
+          "short_id": [
+            "${OZERO_SOAK_REALITY_SHORT_ID}"
+          ]
+        }
+      }
     }
   ],
   "outbounds": [
@@ -57,7 +83,8 @@
         "inbound": [
           "vless-in",
           "vmess-in",
-          "trojan-in"
+          "trojan-in",
+          "vless-reality-in"
         ],
         "ip_cidr": "10.0.2.2/32",
         "port": 18080,

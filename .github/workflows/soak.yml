@@ -37,10 +37,12 @@ jobs:
         include:
           - name: VLESS, VMess, Trojan
             require_reality: '0'
-            expected_protocols: 'vless,vmess,trojan'
+            expected_metrics_protocols: 'vless,vmess,trojan'
+            expected_server_inbounds: 'vless,vmess,trojan'
           - name: VLESS Reality
             require_reality: '1'
-            expected_protocols: 'vless_reality'
+            expected_metrics_protocols: 'vless_reality'
+            expected_server_inbounds: 'vless-reality'
     permissions:
       contents: read
     env:
@@ -134,40 +136,16 @@ jobs:
           test -s singbox-core/libs/libbox.jar
           test -s singbox-core/src/main/jniLibs/arm64-v8a/libbox.so
 
-      - name: Require private Reality soak secrets
-        if: matrix.require_reality == '1'
-        env:
-          OZERO_SOAK_REALITY_URI: ${{ secrets.OZERO_SOAK_REALITY_URI }}
-          OZERO_SOAK_REALITY_TARGET: ${{ secrets.OZERO_SOAK_REALITY_TARGET }}
-          OZERO_SOAK_REALITY_MARKER: ${{ secrets.OZERO_SOAK_REALITY_MARKER }}
-          OZERO_SOAK_REALITY_HITS_URL: ${{ secrets.OZERO_SOAK_REALITY_HITS_URL }}
-        run: |
-          set -euo pipefail
-          for name in OZERO_SOAK_REALITY_URI OZERO_SOAK_REALITY_TARGET OZERO_SOAK_REALITY_MARKER OZERO_SOAK_REALITY_HITS_URL; do
-            test -n "${!name}" || { echo "::error::$name is required for the private Reality soak"; exit 1; }
-          done
-
       - name: Start ephemeral protocol servers
         run: |
           set -euo pipefail
           vless_uuid=$(uuidgen | tr '[:upper:]' '[:lower:]')
           vmess_uuid=$(uuidgen | tr '[:upper:]' '[:lower:]')
           trojan_password=$(openssl rand -hex 24)
+          reality_uuid=$(uuidgen | tr '[:upper:]' '[:lower:]')
           echo "OZERO_SOAK_VLESS_UUID=$vless_uuid" >> "$GITHUB_ENV"
           echo "OZERO_SOAK_VMESS_UUID=$vmess_uuid" >> "$GITHUB_ENV"
           echo "OZERO_SOAK_TROJAN_PASSWORD=$trojan_password" >> "$GITHUB_ENV"
-          OZERO_SOAK_VLESS_UUID="$vless_uuid" \
-            OZERO_SOAK_VMESS_UUID="$vmess_uuid" \
-            OZERO_SOAK_TROJAN_PASSWORD="$trojan_password" \
-            python3 - <<'PY'
-          import os
-          from pathlib import Path
-          from string import Template
-
-          source = Path('.github/soak/sing-box-server.json')
-          target = Path(os.environ['RUNNER_TEMP']) / 'sing-box-server.json'
-          target.write_text(Template(source.read_text()).substitute(os.environ), encoding='utf-8')
-          PY
           openssl req -x509 -newkey rsa:2048 -nodes \
             -keyout .github/soak/server-key.pem \
             -out .github/soak/server-cert.pem \
@@ -179,6 +157,35 @@ jobs:
           echo "${SINGBOX_SERVER_ARCHIVE_SHA256}  $archive" | shasum -a 256 --check
           tar -xzf "$archive" -C "$RUNNER_TEMP"
           binary="$RUNNER_TEMP/sing-box-${SINGBOX_VERSION}-darwin-arm64/sing-box"
+          reality_keypair=$("$binary" generate reality-keypair)
+          reality_private_key=$(awk '/PrivateKey/ { print $NF }' <<< "$reality_keypair")
+          reality_public_key=$(awk '/PublicKey/ { print $NF }' <<< "$reality_keypair")
+          reality_short_id=$(openssl rand -hex 8)
+          test -n "$reality_private_key"
+          test -n "$reality_public_key"
+          echo "OZERO_SOAK_VLESS_REALITY=vless://$reality_uuid@10.0.2.2:18084?security=reality&encryption=none&type=tcp&sni=localhost&fp=chrome&pbk=$reality_public_key&sid=$reality_short_id#VLESS%20Reality" >> "$GITHUB_ENV"
+          echo "OZERO_SOAK_REALITY_TARGET=http://10.0.2.2:18080/ozero-soak-marker" >> "$GITHUB_ENV"
+          echo "OZERO_SOAK_REALITY_MARKER=ozero-singbox-routed" >> "$GITHUB_ENV"
+          OZERO_SOAK_VLESS_UUID="$vless_uuid" \
+            OZERO_SOAK_VMESS_UUID="$vmess_uuid" \
+            OZERO_SOAK_TROJAN_PASSWORD="$trojan_password" \
+            OZERO_SOAK_REALITY_UUID="$reality_uuid" \
+            OZERO_SOAK_REALITY_PRIVATE_KEY="$reality_private_key" \
+            OZERO_SOAK_REALITY_SHORT_ID="$reality_short_id" \
+            python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from string import Template
+
+          source = Path('.github/soak/sing-box-server.json')
+          target = Path(os.environ['RUNNER_TEMP']) / 'sing-box-server.json'
+          target.write_text(Template(source.read_text()).substitute(os.environ), encoding='utf-8')
+          PY
+          openssl s_server -accept 18085 \
+            -cert .github/soak/server-cert.pem \
+            -key .github/soak/server-key.pem \
+            -www > "$RUNNER_TEMP/reality-decoy.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/reality-decoy.pid"
           "$binary" check -c "$RUNNER_TEMP/sing-box-server.json"
           "$binary" run -c "$RUNNER_TEMP/sing-box-server.json" > "$RUNNER_TEMP/singbox-server.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/singbox-server.pid"
@@ -201,7 +208,7 @@ jobs:
             --directory "$RUNNER_TEMP/soak-http" \
             --port 18080 > "$RUNNER_TEMP/soak-http.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/soak-http.pid"
-          for port in 18080 18081 18082 18083; do
+          for port in 18080 18081 18082 18083 18084 18085; do
             for attempt in {1..30}; do
               nc -z 127.0.0.1 "$port" && break
               sleep 1
@@ -226,11 +233,6 @@ jobs:
 
       - name: Run real Sing-box TUN soak
         uses: reactivecircus/android-emulator-runner@v2
-        env:
-          OZERO_SOAK_REALITY_URI: ${{ secrets.OZERO_SOAK_REALITY_URI }}
-          OZERO_SOAK_REALITY_TARGET: ${{ secrets.OZERO_SOAK_REALITY_TARGET }}
-          OZERO_SOAK_REALITY_MARKER: ${{ secrets.OZERO_SOAK_REALITY_MARKER }}
-          OZERO_SOAK_REALITY_HITS_URL: ${{ secrets.OZERO_SOAK_REALITY_HITS_URL }}
         with:
           api-level: ${{ inputs['api-level'] || '30' }}
           arch: arm64-v8a
@@ -250,7 +252,7 @@ jobs:
               -e OZERO_SOAK_CYCLES "$SOAK_CYCLES" \
               -e OZERO_SOAK_REQUIRE_REALITY "${{ matrix.require_reality }}" \
               -e OZERO_SOAK_REALITY_ONLY "${{ matrix.require_reality }}" \
-              -e OZERO_SOAK_VLESS_REALITY "$OZERO_SOAK_REALITY_URI" \
+              -e OZERO_SOAK_VLESS_REALITY "$OZERO_SOAK_VLESS_REALITY" \
               -e OZERO_SOAK_REALITY_TARGET "$OZERO_SOAK_REALITY_TARGET" \
               -e OZERO_SOAK_REALITY_MARKER "$OZERO_SOAK_REALITY_MARKER" \
               -e class ru.ozero.app.soak.SoakTest \
@@ -266,18 +268,12 @@ jobs:
             adb pull /sdcard/Android/data/ru.ozero.app/files/soak-metrics.json soak-metrics.json || status=1
             test -s soak-metrics.json || status=1
             grep -q 'OK (1 test)' "$RUNNER_TEMP/soak-output.txt" || status=1
-            SOAK_EXPECTED_CYCLES="$SOAK_CYCLES" SOAK_EXPECTED_PROTOCOLS="${{ matrix.expected_protocols }}" python3 -c 'import json, os; data=json.load(open("soak-metrics.json", encoding="utf-8")); expected=int(os.environ["SOAK_EXPECTED_CYCLES"]); protocols=os.environ["SOAK_EXPECTED_PROTOCOLS"].split(","); actual=data["successful_cycles"]; assert data["cycles_per_protocol"] == expected; assert set(actual) == set(protocols); assert all(actual[name] == expected for name in protocols)' || status=1
-            IFS=, read -ra protocols <<< "${{ matrix.expected_protocols }}"
+            SOAK_EXPECTED_CYCLES="$SOAK_CYCLES" SOAK_EXPECTED_PROTOCOLS="${{ matrix.expected_metrics_protocols }}" python3 -c 'import json, os; data=json.load(open("soak-metrics.json", encoding="utf-8")); expected=int(os.environ["SOAK_EXPECTED_CYCLES"]); protocols=os.environ["SOAK_EXPECTED_PROTOCOLS"].split(","); actual=data["successful_cycles"]; assert data["cycles_per_protocol"] == expected; assert set(actual) == set(protocols); assert all(actual[name] == expected for name in protocols)' || status=1
+            IFS=, read -ra protocols <<< "${{ matrix.expected_server_inbounds }}"
             for protocol in "${protocols[@]}"; do
               hits=$(grep -Ec "\\[${protocol}-in\\].*inbound connection" "$RUNNER_TEMP/singbox-server.log" || true)
-              if [[ "$protocol" != "vless_reality" ]]; then
-                (( hits >= SOAK_CYCLES )) || status=1
-              fi
+              (( hits >= SOAK_CYCLES )) || status=1
             done
-            if [[ "${{ matrix.require_reality }}" == '1' ]]; then
-              reality_hits=$(curl --fail --silent --show-error --max-time 15 "$OZERO_SOAK_REALITY_HITS_URL" | tr -d '[:space:]') || status=1
-              [[ "$reality_hits" =~ ^[0-9]+$ ]] && (( reality_hits >= SOAK_CYCLES )) || status=1
-            fi
             exit "$status"
 
       - name: Write job summary
@@ -298,6 +294,7 @@ jobs:
         run: |
           cp "$RUNNER_TEMP/singbox-server.log" singbox-server.log 2>/dev/null || true
           cp "$RUNNER_TEMP/soak-http.log" soak-http.log 2>/dev/null || true
+          cp "$RUNNER_TEMP/reality-decoy.log" reality-decoy.log 2>/dev/null || true
 
       - name: Upload soak evidence
         uses: actions/upload-artifact@v6
@@ -310,5 +307,6 @@ jobs:
             ${{ runner.temp }}/soak-logcat.txt
             singbox-server.log
             soak-http.log
+            reality-decoy.log
           if-no-files-found: warn
           retention-days: 30
