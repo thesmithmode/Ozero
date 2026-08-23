@@ -104,7 +104,10 @@ class SoakTest {
             profiles.forEach { soakProfile ->
                 selectProfile(dependencies.singboxDataStore(), soakProfile.profile)
                 repeat(cyclesPerProtocol) { cycle ->
-                    Log.i(TAG, "cycle protocol=${soakProfile.protocol} index=${cycle + 1}/$cyclesPerProtocol phase=start")
+                    Log.i(
+                        TAG,
+                        "cycle protocol=${soakProfile.protocol} index=${cycle + 1}/$cyclesPerProtocol phase=start",
+                    )
                     stopVpn(targetContext, dependencies.tunnelController())
                     startVpn(targetContext)
                     awaitConnected(dependencies.tunnelController())
@@ -127,7 +130,10 @@ class SoakTest {
                         successfulCycles.getValue(soakProfile.protocol) + 1
                     peakMemoryKb = maxOf(peakMemoryKb, currentMemoryKb())
                     stopVpn(targetContext, dependencies.tunnelController())
-                    Log.i(TAG, "cycle protocol=${soakProfile.protocol} index=${cycle + 1}/$cyclesPerProtocol phase=done")
+                    Log.i(
+                        TAG,
+                        "cycle protocol=${soakProfile.protocol} index=${cycle + 1}/$cyclesPerProtocol phase=done",
+                    )
                 }
             }
             if (!realityOnly) {
