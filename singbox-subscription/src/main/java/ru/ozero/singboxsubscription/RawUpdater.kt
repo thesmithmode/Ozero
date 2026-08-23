@@ -66,6 +66,11 @@ class RawUpdater(
         val lastAttemptAt = System.currentTimeMillis()
         val refreshGeneration = beginRefresh(group.id, lastAttemptAt)
             ?: return@withContext Result.failure(SubscriptionRefreshStaleException())
+        Log.i(
+            TAG,
+            "refresh started groupId=${group.id} generation=$refreshGeneration " +
+                "tlsMode=${group.subscriptionTlsMode()}",
+        )
         val result = runCatching<Int> {
             val request = Request.Builder()
                 .url(group.subscriptionUrl)
@@ -77,6 +82,11 @@ class RawUpdater(
                     throw SubscriptionHttpException(response.code)
                 }
                 val body = response.body?.readUtf8Limited(MAX_SUBSCRIPTION_BYTES) ?: ""
+                Log.i(
+                    TAG,
+                    "refresh response groupId=${group.id} generation=$refreshGeneration " +
+                        "http=${response.code} bodyChars=${body.length}",
+                )
                 val subInfo = SubscriptionInfoParser.parse(response.header("Subscription-Userinfo"))
 
                 val parsedBeans = Base64BundleParser.parse(body)
@@ -192,9 +202,14 @@ class RawUpdater(
                     }
                 }
                 if (!committed) {
+                    Log.i(TAG, "refresh superseded groupId=${group.id} generation=$refreshGeneration")
                     return@use 0
                 }
-                Log.i(TAG, "refresh ok groupId=${group.id} servers=${profilesWithStableIds.size}")
+                Log.i(
+                    TAG,
+                    "refresh committed groupId=${group.id} generation=$refreshGeneration " +
+                        "servers=${profilesWithStableIds.size}",
+                )
                 profilesWithStableIds.size
             }
         }.recoverCatching { e ->
@@ -483,6 +498,12 @@ fun isTransientSubscriptionRefreshFailure(error: Throwable): Boolean {
     }
     if (causes.any { it is SSLHandshakeException || it is SSLPeerUnverifiedException }) return false
     return causes.any { it is SocketTimeoutException || it is UnknownHostException || it is IOException }
+}
+
+private fun SubscriptionGroup.subscriptionTlsMode(): String = when {
+    isBuiltin -> "system"
+    allowInsecureTls -> "insecure"
+    else -> "user-ca"
 }
 
 private fun ProxyProfile.stableBaseIdentityKey(): String =

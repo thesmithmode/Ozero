@@ -263,12 +263,12 @@ class SingboxEngine @Inject constructor(
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
         return lifecycleMutex.withLock {
-            lifecycleGeneration.incrementAndGet()
+            val generation = lifecycleGeneration.incrementAndGet()
 
             chainMode = upstream !is Upstream.None || config.proxyMode
             PersistentLoggers.debug(
                 TAG,
-                "start: proxyMode=${config.proxyMode} upstream=${upstream::class.simpleName} " +
+                "start generation=$generation proxyMode=${config.proxyMode} upstream=${upstream::class.simpleName} " +
                     "protocolType=${config.protocolType} autoCount=${config.autoSelectBeanBlobs.size} " +
                     "chainCount=${config.chainBeanBlobs.size} " +
                     "hasWireGuard=${config.wireGuardConfig != null} beanBytes=${config.beanBlob.size}",
@@ -589,7 +589,7 @@ class SingboxEngine @Inject constructor(
                 runCatching {
                     PersistentLoggers.debug(
                         TAG,
-                        "attachTun start rawFd=$tunFd pendingPort=$pendingSocksPort " +
+                        "attachTun start generation=$generation rawFd=$tunFd pendingPort=$pendingSocksPort " +
                             "fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
                     )
                     p.startWithConfig(transportPfd, json, localProtector)
@@ -603,7 +603,7 @@ class SingboxEngine @Inject constructor(
                     }
                     PersistentLoggers.debug(
                         TAG,
-                        "attachTun AIDL returned rawFd=$tunFd pendingPort=$pendingSocksPort " +
+                        "attachTun AIDL returned generation=$generation rawFd=$tunFd pendingPort=$pendingSocksPort " +
                             "runtimeRunning=$runtimeRunning",
                     )
                     if (!runtimeRunning) {
@@ -630,7 +630,7 @@ class SingboxEngine @Inject constructor(
                     }
                     PersistentLoggers.debug(
                         TAG,
-                        "startWithConfig sent over AIDL activePort=$activeSocksPort " +
+                        "startWithConfig sent generation=$generation activePort=$activeSocksPort " +
                             "autoSelect=$activeTunAutoSelect",
                     )
                     TunAttachResult.Success
@@ -724,19 +724,35 @@ class SingboxEngine @Inject constructor(
     }
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
-        val process = proxy ?: return EnginePlugin.ReadyResult.Timeout("sing-box process is not connected")
+        val generation = lifecycleGeneration.get()
+        val process = proxy ?: return EnginePlugin.ReadyResult.Timeout("sing-box process is not connected").also {
+            PersistentLoggers.warn(TAG, "readiness failed generation=$generation stage=process-not-connected")
+        }
         val runtimeRunning = runCatching { process.runtimeRunning() }.getOrDefault(false)
         if (!runtimeRunning) {
+            PersistentLoggers.warn(TAG, "readiness failed generation=$generation stage=runtime-not-running")
             return EnginePlugin.ReadyResult.Timeout("sing-box runtime is not running")
         }
         val port = activeSocksPort
         if (!awaitLocalSocksReady(port)) {
+            PersistentLoggers.warn(TAG, "readiness failed generation=$generation stage=socks-not-ready port=$port")
             return EnginePlugin.ReadyResult.Timeout("sing-box SOCKS5 listener is not ready")
         }
         return when (val result = routedProbe.probe(port)) {
-            is RoutedProbeResult.Success -> EnginePlugin.ReadyResult.Ready
-            is RoutedProbeResult.Failure ->
+            is RoutedProbeResult.Success -> EnginePlugin.ReadyResult.Ready.also {
+                PersistentLoggers.debug(
+                    TAG,
+                    "readiness passed generation=$generation port=$port latencyMs=${result.latencyMs}",
+                )
+            }
+            is RoutedProbeResult.Failure -> {
+                PersistentLoggers.warn(
+                    TAG,
+                    "readiness failed generation=$generation stage=routed-probe " +
+                        "port=$port reason=${result.reason}",
+                )
                 EnginePlugin.ReadyResult.Timeout(result.reason.probeFailureMessage())
+            }
         }
     }
 
