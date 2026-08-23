@@ -883,6 +883,64 @@ class EngineRuntimeConfigRestartObserverTest {
     }
 
     @Test
+    fun `singbox metadata refresh causes no restart and runtime refresh causes exactly one`() = runTest(dispatcher) {
+        val prefs = MutableStateFlow<Preferences>(mutablePreferencesOf(singboxSelectedProfileKey to 1L))
+        val profiles = MutableStateFlow(listOf(proxyProfile(id = 1, blob = namedSingboxBlob("Original"))))
+        val provider = SingboxModule.provideSingboxRuntimeConfigProvider(
+            dataStore = flowDataStore(prefs),
+            profileDao = fakeProfileDao(profiles),
+            proxyChainDao = fakeProxyChainDao(MutableStateFlow(emptyList())),
+            settingsRepository = staticSettingsRepository(),
+        )
+        val state = MutableStateFlow<TunnelState>(TunnelState.Connected(EngineId.SINGBOX, 1080))
+        val restarts = mutableListOf<String>()
+        EngineRuntimeConfigRestartObserver(setOf(provider)).start(
+            scope = observerScope(),
+            exceptionHandler = CoroutineExceptionHandler { _, _ -> },
+            state = state,
+            restart = { reason -> restarts.add(reason).let { true } },
+        )
+        runCurrent()
+
+        profiles.value = listOf(proxyProfile(id = 1, blob = namedSingboxBlob("Renamed")))
+        runCurrent()
+        profiles.value = listOf(proxyProfile(id = 1, blob = validSingboxBlob(2)))
+        runCurrent()
+
+        assertEquals(listOf(provider.restartReason), restarts)
+    }
+
+    @Test
+    fun `singbox selected deletion suppresses incomplete Room snapshot and restarts once after selection clears`() =
+        runTest(dispatcher) {
+            val prefs = MutableStateFlow<Preferences>(mutablePreferencesOf(singboxSelectedProfileKey to 1L))
+            val profiles = MutableStateFlow(listOf(proxyProfile(id = 1, blob = validSingboxBlob(1))))
+            val provider = SingboxModule.provideSingboxRuntimeConfigProvider(
+                dataStore = flowDataStore(prefs),
+                profileDao = fakeProfileDao(profiles),
+                proxyChainDao = fakeProxyChainDao(MutableStateFlow(emptyList())),
+                settingsRepository = staticSettingsRepository(),
+            )
+            val state = MutableStateFlow<TunnelState>(TunnelState.Connected(EngineId.SINGBOX, 1080))
+            val restarts = mutableListOf<String>()
+            EngineRuntimeConfigRestartObserver(setOf(provider)).start(
+                scope = observerScope(),
+                exceptionHandler = CoroutineExceptionHandler { _, _ -> },
+                state = state,
+                restart = { reason -> restarts.add(reason).let { true } },
+            )
+            runCurrent()
+
+            profiles.value = emptyList()
+            runCurrent()
+            assertTrue(restarts.isEmpty())
+            prefs.value = mutablePreferencesOf()
+            runCurrent()
+
+            assertEquals(listOf(provider.restartReason), restarts)
+        }
+
+    @Test
     fun `singbox runtime provider resolves selected profile from dao when flow cache misses`() = runTest(dispatcher) {
         val prefs = MutableStateFlow<Preferences>(
             mutablePreferencesOf(
@@ -1160,6 +1218,17 @@ class EngineRuntimeConfigRestartObserverTest {
         VLESSBean().apply {
             uuid = "12345678-1234-1234-1234-${seed.toString().padStart(12, '0')}"
             serverAddress = "s$seed.example.com"
+            serverPort = 443
+            type = "tcp"
+            security = "none"
+        },
+    )
+
+    private fun namedSingboxBlob(name: String): ByteArray = KryoSerializer.serialize(
+        VLESSBean().apply {
+            this.name = name
+            uuid = "12345678-1234-1234-1234-123456789012"
+            serverAddress = "server.example.com"
             serverPort = 443
             type = "tcp"
             security = "none"

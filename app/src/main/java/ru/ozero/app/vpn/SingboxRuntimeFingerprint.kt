@@ -84,9 +84,13 @@ private fun ProxyProfile.toRuntimePayload(): RuntimeProfilePayload =
 
 internal fun ProxyProfile.runtimeBeanPayload(): List<Byte> =
     when (val recovered = PersistedProfileRecovery.recover(beanBlob, protocolType)) {
-        is RecoveryResult.Success -> KryoSerializer.serialize(
-            ConfigBuilder.canonicalBean(recovered.bean).value.apply { name = "" },
-        ).toList()
+        is RecoveryResult.Success -> runCatching {
+            ConfigBuilder.buildSingboxConfigFromCanonical(
+                ConfigBuilder.canonicalBean(recovered.bean),
+                dnsServers = emptyList(),
+                ipv6Enabled = false,
+            ).encodeToByteArray().toList()
+        }.getOrElse { beanBlob.toList() }
         is RecoveryResult.Failure -> beanBlob.toList()
     }
 
@@ -108,7 +112,7 @@ internal suspend fun singboxRuntimeFingerprint(
     resolveProfileById: suspend (Long) -> ProxyProfile?,
     autoProfiles: List<ProxyProfile> = profiles,
     ipv6Enabled: Boolean = false,
-): SingboxRuntimeFingerprint {
+): SingboxRuntimeFingerprint? {
     val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
     if (selectedProfileId == SingboxEngine.SELECTED_AUTO) {
         return singboxRuntimeFingerprint(prefs, profiles, chainSteps, autoProfiles, ipv6Enabled)
@@ -130,5 +134,8 @@ internal suspend fun singboxRuntimeFingerprint(
             resolveProfileById(profileId)?.let(::add)
         }
     }
-    return singboxRuntimeFingerprint(prefs, resolvedProfiles, chainSteps, autoProfiles, ipv6Enabled)
+    val fingerprint = singboxRuntimeFingerprint(prefs, resolvedProfiles, chainSteps, autoProfiles, ipv6Enabled)
+    val hasIncompleteSelection = selectedProfileId != null && fingerprint.selectedProfile == null
+    val hasIncompleteChain = fingerprint.chainProfiles.any { it.profile == null }
+    return fingerprint.takeUnless { hasIncompleteSelection || hasIncompleteChain }
 }

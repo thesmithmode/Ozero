@@ -23,6 +23,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assume
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -217,23 +218,28 @@ class SoakTest {
         )
     }
 
-    private suspend fun refreshSelectedSubscriptionMetadata(
+    private suspend fun CoroutineScope.refreshSelectedSubscriptionMetadata(
         dependencies: SoakTestEntryPoint,
         selectedProfile: ProxyProfile,
         controller: TunnelController,
     ) {
         val group = requireNotNull(dependencies.subscriptionGroupDao().getById(selectedProfile.groupId))
-        check(subscriptionUpdater().refresh(group).getOrThrow() == 3) {
-            "active subscription refresh failed"
+        val lifecycleViolation = async(start = CoroutineStart.UNDISPATCHED) {
+            controller.state.first { it !is TunnelState.Connected }
         }
-        val selected = requireNotNull(dependencies.proxyProfileDao().getById(selectedProfile.id))
-        check(selected.id == selectedProfile.id) { "active selected profile was replaced" }
-        check(!selected.beanBlob.contentEquals(selectedProfile.beanBlob)) {
-            "subscription refresh did not update the selected profile payload"
-        }
-        delay(RUNTIME_REFRESH_SETTLE_MS)
-        check(controller.state.value is TunnelState.Connected) {
-            "display-only subscription refresh interrupted the runtime"
+        try {
+            check(subscriptionUpdater().refresh(group).getOrThrow() == 3) {
+                "active subscription refresh failed"
+            }
+            val selected = requireNotNull(dependencies.proxyProfileDao().getById(selectedProfile.id))
+            check(selected.id == selectedProfile.id) { "active selected profile was replaced" }
+            check(!selected.beanBlob.contentEquals(selectedProfile.beanBlob)) {
+                "subscription refresh did not update the selected profile payload"
+            }
+            val transition = withTimeoutOrNull(RUNTIME_REFRESH_OBSERVATION_MS) { lifecycleViolation.await() }
+            check(transition == null) { "display-only subscription refresh changed runtime state to $transition" }
+        } finally {
+            lifecycleViolation.cancel()
         }
         awaitConnected(controller)
     }
@@ -390,7 +396,7 @@ class SoakTest {
         private const val START_TIMEOUT_MS = 30_000L
         private const val STOP_TIMEOUT_MS = 10_000L
         private const val PROBE_TIMEOUT_MS = 15_000L
-        private const val RUNTIME_REFRESH_SETTLE_MS = 500L
+        private const val RUNTIME_REFRESH_OBSERVATION_MS = 2_000L
         private const val METRICS_FILE = "soak-metrics.json"
         private const val TAG = "SingboxSoak"
     }

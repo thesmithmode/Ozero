@@ -143,7 +143,9 @@ class SingboxRuntimeFingerprintTest {
         val prefs = prefs(selected = 10L)
         val first = validBean("Server")
         val second = KryoSerializer.serialize(
-            KryoSerializer.deserialize(first).apply { serverAddress = "replacement.example.com" },
+            KryoSerializer.deserialize<VLESSBean>(first).apply {
+                serverAddress = "replacement.example.com"
+            },
         )
 
         assertNotEquals(
