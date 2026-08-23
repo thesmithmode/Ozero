@@ -160,6 +160,7 @@ object SingboxModule {
                 prefs = prefs,
                 profiles = profiles,
                 chainSteps = chainSteps,
+                resolveProfileById = profileDao::getById,
                 autoProfiles = autoProfiles,
                 ipv6Enabled = settings.ipv6Enabled,
             )

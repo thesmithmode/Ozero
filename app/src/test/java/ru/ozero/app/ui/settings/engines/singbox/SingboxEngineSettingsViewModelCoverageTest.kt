@@ -766,8 +766,8 @@ class SingboxEngineSettingsViewModelCoverageTest {
         harness.viewModel.onGroupExpand(1L)
         advanceUntilIdle()
 
-        assertEquals(500, harness.viewModel.state.value.allProfiles.size)
-        assertEquals(500, harness.viewModel.state.value.groupProfiles.getValue(1L).size)
+        assertEquals(600, harness.viewModel.state.value.allProfiles.size)
+        assertEquals(600, harness.viewModel.state.value.groupProfiles.getValue(1L).size)
     }
 
     @Test

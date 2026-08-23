@@ -736,7 +736,7 @@ class EngineRuntimeConfigRestartObserverTest {
         assertTrue(coordinator.contains("startForegroundService").not())
         assertTrue(coordinator.contains("TunnelState.Disconnecting"))
         assertTrue(coordinator.contains("TunnelState.Probing"))
-        assertTrue(coordinator.contains("onSwitchingFinished(\"runtime config restart started\")"))
+        assertTrue(coordinator.contains("onSwitchingFinished(\"runtime config restart connected\")"))
         assertTrue(coordinator.contains("abortQueuedRestarts()"))
         assertTrue(coordinator.contains("restartQueue.clear()"))
         assertTrue(coordinator.contains("restartInProgress = false"))

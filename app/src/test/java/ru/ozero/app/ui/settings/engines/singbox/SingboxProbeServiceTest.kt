@@ -156,6 +156,7 @@ class SingboxProbeServiceTest {
             beanBlob = byteArrayOf(1, 2, 3),
             protocolType = SingboxEngine.PROTOCOL_VLESS,
         )
+        knownProfiles[corrupted.id] = corrupted
         val probe = CountingProfileProbe()
         val events = mutableListOf<Pair<Long, Boolean>>()
 
