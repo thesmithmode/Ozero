@@ -6,6 +6,13 @@ import kotlin.test.assertTrue
 
 class SingboxEngineExitIpProbeSentinelTest {
 
+    private val source: String by lazy {
+        File(
+            System.getProperty("user.dir") ?: ".",
+            "src/main/java/ru/ozero/enginesingbox/SingboxEngine.kt",
+        ).readText()
+    }
+
     @Test
     fun `singbox exit ip probe uses local socks endpoint instead of direct app fetch`() {
         val source = File(

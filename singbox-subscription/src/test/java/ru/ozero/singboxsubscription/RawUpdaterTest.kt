@@ -3,7 +3,6 @@
 package ru.ozero.singboxsubscription
 
 import io.mockk.every
-import io.mockk.firstArg
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import okhttp3.Call
@@ -544,7 +543,7 @@ class RawUpdaterTest {
         }
         val mockedCall = mockk<Call>(relaxed = true)
         every { mockedCall.enqueue(any()) } answers {
-            firstArg<Callback>().onResponse(mockedCall, mockedResponse)
+            (args.first() as Callback).onResponse(mockedCall, mockedResponse)
         }
 
         val mockedClient = mockk<OkHttpClient>()
@@ -1100,7 +1099,7 @@ class RawUpdaterTest {
         }
         val mockedCall = mockk<Call>(relaxed = true)
         every { mockedCall.enqueue(any()) } answers {
-            firstArg<Callback>().onResponse(mockedCall, mockedResponse)
+            (args.first() as Callback).onResponse(mockedCall, mockedResponse)
         }
         val mockedClient = mockk<OkHttpClient>()
         every { mockedClient.newCall(any()) } returns mockedCall

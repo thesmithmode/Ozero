@@ -116,6 +116,10 @@ internal suspend fun singboxRuntimeFingerprint(
     if (missingProfileIds.isEmpty()) {
         return singboxRuntimeFingerprint(prefs, profiles, chainSteps, autoProfiles, ipv6Enabled)
     }
-    val resolvedProfiles = profiles + missingProfileIds.mapNotNull(resolveProfileById)
+    val resolvedProfiles = profiles + buildList {
+        missingProfileIds.forEach { profileId ->
+            resolveProfileById(profileId)?.let(::add)
+        }
+    }
     return singboxRuntimeFingerprint(prefs, resolvedProfiles, chainSteps, autoProfiles, ipv6Enabled)
 }
