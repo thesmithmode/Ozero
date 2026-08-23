@@ -86,6 +86,7 @@ class SingboxProbeService internal constructor(
         updateManualSelection: Boolean = true,
     ) {
         val prefs = dataStore.data.first()
+        val selectedProfileAtStart = prefs[SELECTED_PROFILE_KEY]
         val settings = settingsRepository?.settings?.first() ?: SettingsModel.DEFAULT
         val probeSettings = SingboxProfileProbeSettings(
             timeoutMs = prefs[PROBE_TIMEOUT_MS_KEY].normalizedSingboxProbeTimeoutMs(),
@@ -166,7 +167,7 @@ class SingboxProbeService internal constructor(
             ?.takeIf { it.sameProbeIdentity(best) }
             ?: return
         dataStore.edit { prefs ->
-            if (prefs[SELECTED_PROFILE_KEY] == SingboxEngine.SELECTED_AUTO) return@edit
+            if (prefs[SELECTED_PROFILE_KEY] != selectedProfileAtStart) return@edit
             prefs[SELECTED_PROFILE_KEY] = currentBest.id
             prefs[BEAN_KEY] = currentBest.beanBlob
         }

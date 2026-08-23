@@ -424,6 +424,35 @@ class SingboxProbeServiceTest {
     }
 
     @Test
+    fun `probe auto selection does not overwrite a newer selection`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf(selectedProfileKey to 1L))
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val profile = makeProfile(id = 2L, host = "probe.example", port = 443)
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val probe = object : SingboxProfileProbe {
+            override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
+                started.complete(Unit)
+                release.await()
+                return 10
+            }
+        }
+
+        val job = launch {
+            SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(listOf(profile))
+        }
+        started.await()
+        prefsFlow.value = mutablePreferencesOf(selectedProfileKey to 3L)
+        release.complete(Unit)
+        job.join()
+
+        assertEquals(3L, prefsFlow.value[selectedProfileKey])
+        assertNull(prefsFlow.value[beanKey])
+        assertEquals(10, dao.latencies[2L])
+    }
+
+    @Test
     fun `probeAndAutoSelect with empty profiles leaves prefs and latencies unchanged`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
