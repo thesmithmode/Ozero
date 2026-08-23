@@ -9,6 +9,7 @@ import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxconfig.PersistedProfileRecovery
 import ru.ozero.singboxconfig.RecoveryResult
+import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxroom.entity.ProxyChainStep
 import ru.ozero.singboxroom.entity.ProxyProfile
 

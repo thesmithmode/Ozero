@@ -15,6 +15,7 @@ import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
@@ -143,6 +144,7 @@ object SingboxModule {
     @Provides
     @Singleton
     @IntoSet
+    @OptIn(FlowPreview::class)
     fun provideSingboxRuntimeConfigProvider(
         @SingboxPrefs dataStore: DataStore<Preferences>,
         profileDao: ProxyProfileDao,
@@ -172,4 +174,5 @@ object SingboxModule {
     }
 
     private const val MAX_SINGBOX_RUNTIME_PROFILE_SCAN = 2_000
+    private const val SINGBOX_RUNTIME_SETTLE_MS = 100L
 }
