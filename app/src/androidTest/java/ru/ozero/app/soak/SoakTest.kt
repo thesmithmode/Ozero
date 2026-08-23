@@ -34,6 +34,7 @@ import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.TrafficMode
 import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
@@ -124,6 +125,20 @@ class SoakTest {
                     peakMemoryKb = maxOf(peakMemoryKb, currentMemoryKb())
                     stopVpn(targetContext, dependencies.tunnelController())
                 }
+            }
+            if (!realityOnly) {
+                selectAutoProfile(dependencies.singboxDataStore())
+                startVpn(targetContext)
+                awaitConnected(dependencies.tunnelController())
+                val probe = probeFromExternalUid(testContext, DEFAULT_TARGET, DEFAULT_MARKER)
+                check(probe.vpnTransport) {
+                    "auto-select external probe did not use Android VPN transport"
+                }
+                check(probe.httpCode in 200..299) {
+                    "auto-select routed HTTP failed code=${probe.httpCode}"
+                }
+                check(probe.markerMatch) { "auto-select routed HTTP returned an unexpected marker" }
+                stopVpn(targetContext, dependencies.tunnelController())
             }
         } finally {
             runCatching { stopVpn(targetContext, dependencies.tunnelController()) }
@@ -238,6 +253,16 @@ class SoakTest {
             prefs[SingboxProbeService.BEAN_KEY] = profile.beanBlob
         }
         dataStore.data.first { it[SingboxProbeService.SELECTED_PROFILE_KEY] == profile.id }
+    }
+
+    private suspend fun selectAutoProfile(dataStore: DataStore<Preferences>) {
+        dataStore.edit { prefs ->
+            prefs[SingboxProbeService.SELECTED_PROFILE_KEY] = SingboxEngine.SELECTED_AUTO
+            prefs.remove(SingboxProbeService.BEAN_KEY)
+        }
+        dataStore.data.first {
+            it[SingboxProbeService.SELECTED_PROFILE_KEY] == SingboxEngine.SELECTED_AUTO
+        }
     }
 
     private fun startVpn(context: Context) {
