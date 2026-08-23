@@ -139,6 +139,24 @@ jobs:
       - name: Start ephemeral protocol servers
         run: |
           set -euo pipefail
+          vless_uuid=$(uuidgen | tr '[:upper:]' '[:lower:]')
+          vmess_uuid=$(uuidgen | tr '[:upper:]' '[:lower:]')
+          trojan_password=$(openssl rand -hex 24)
+          echo "OZERO_SOAK_VLESS_UUID=$vless_uuid" >> "$GITHUB_ENV"
+          echo "OZERO_SOAK_VMESS_UUID=$vmess_uuid" >> "$GITHUB_ENV"
+          echo "OZERO_SOAK_TROJAN_PASSWORD=$trojan_password" >> "$GITHUB_ENV"
+          OZERO_SOAK_VLESS_UUID="$vless_uuid" \
+            OZERO_SOAK_VMESS_UUID="$vmess_uuid" \
+            OZERO_SOAK_TROJAN_PASSWORD="$trojan_password" \
+            python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from string import Template
+
+          source = Path('.github/soak/sing-box-server.json')
+          target = Path(os.environ['RUNNER_TEMP']) / 'sing-box-server.json'
+          target.write_text(Template(source.read_text()).substitute(os.environ), encoding='utf-8')
+          PY
           openssl req -x509 -newkey rsa:2048 -nodes \
             -keyout .github/soak/server-key.pem \
             -out .github/soak/server-cert.pem \
@@ -150,12 +168,18 @@ jobs:
           echo "${SINGBOX_SERVER_ARCHIVE_SHA256}  $archive" | shasum -a 256 --check
           tar -xzf "$archive" -C "$RUNNER_TEMP"
           binary="$RUNNER_TEMP/sing-box-${SINGBOX_VERSION}-darwin-arm64/sing-box"
-          "$binary" check -c .github/soak/sing-box-server.json
-          "$binary" run -c .github/soak/sing-box-server.json > "$RUNNER_TEMP/singbox-server.log" 2>&1 &
+          "$binary" check -c "$RUNNER_TEMP/sing-box-server.json"
+          "$binary" run -c "$RUNNER_TEMP/sing-box-server.json" > "$RUNNER_TEMP/singbox-server.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/singbox-server.pid"
 
           mkdir -p "$RUNNER_TEMP/soak-http"
           printf 'ozero-singbox-routed\n' > "$RUNNER_TEMP/soak-http/ozero-soak-marker"
+          cat > "$RUNNER_TEMP/soak-http/subscription.txt" <<EOF
+          vless://$vless_uuid@10.0.2.2:18081?security=none&type=tcp#VLESS%20subscription
+          vmess://$vmess_uuid@10.0.2.2:18082?security=none&type=tcp&encryption=auto#VMess%20subscription
+          trojan://$trojan_password@10.0.2.2:18083?security=tls&sni=localhost&allowInsecure=1&type=tcp#Trojan%20subscription
+          vless://$vless_uuid@10.0.2.2:18081?security=none&type=xhttp#Unsupported%20transport
+          EOF
           python3 -m http.server 18080 --bind 0.0.0.0 --directory "$RUNNER_TEMP/soak-http" > "$RUNNER_TEMP/soak-http.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/soak-http.pid"
           for port in 18080 18081 18082 18083; do
@@ -205,12 +229,12 @@ jobs:
               -w \
               -e OZERO_SOAK 1 \
               -e OZERO_SOAK_CYCLES "$SOAK_CYCLES" \
-              -e OZERO_SOAK_VLESS 'vless://5f21f2e4-c0df-4e5a-8d21-e80266fd3083@10.0.2.2:18081?security=none&type=tcp' \
+              -e OZERO_SOAK_VLESS "vless://$OZERO_SOAK_VLESS_UUID@10.0.2.2:18081?security=none&type=tcp" \
               -e OZERO_SOAK_VLESS_REALITY "$OZERO_SOAK_REALITY_URI" \
               -e OZERO_SOAK_REALITY_TARGET "$OZERO_SOAK_REALITY_TARGET" \
               -e OZERO_SOAK_REALITY_MARKER "$OZERO_SOAK_REALITY_MARKER" \
-              -e OZERO_SOAK_VMESS 'vmess://ab61a8a5-bce6-4c39-8f40-d97142eedca6@10.0.2.2:18082?security=none&type=tcp&encryption=auto' \
-              -e OZERO_SOAK_TROJAN 'trojan://ozero-ephemeral-soak@10.0.2.2:18083?security=tls&sni=localhost&allowInsecure=1&type=tcp' \
+              -e OZERO_SOAK_VMESS "vmess://$OZERO_SOAK_VMESS_UUID@10.0.2.2:18082?security=none&type=tcp&encryption=auto" \
+              -e OZERO_SOAK_TROJAN "trojan://$OZERO_SOAK_TROJAN_PASSWORD@10.0.2.2:18083?security=tls&sni=localhost&allowInsecure=1&type=tcp" \
               -e class ru.ozero.app.soak.SoakTest \
               ru.ozero.app.test/androidx.test.runner.AndroidJUnitRunner \
               | tee "$RUNNER_TEMP/soak-output.txt" || status=$?

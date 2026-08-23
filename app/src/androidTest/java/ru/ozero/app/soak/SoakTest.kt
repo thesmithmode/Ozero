@@ -13,7 +13,10 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -27,14 +30,19 @@ import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.TrafficMode
+import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.singboxfmt.AbstractBean
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.V2RayFmt
 import ru.ozero.singboxfmt.VLESSBean
 import ru.ozero.singboxfmt.VMessBean
+import ru.ozero.singboxroom.dao.ProxyProfileDao
+import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
+import ru.ozero.singboxsubscription.RawUpdater
 
 @RunWith(AndroidJUnit4::class)
 class SoakTest {
@@ -49,32 +57,20 @@ class SoakTest {
             ?.toIntOrNull()
             ?: DEFAULT_CYCLES_PER_PROTOCOL
         require(cyclesPerProtocol in 1..MAX_CYCLES_PER_PROTOCOL)
-        val targetUrl = args.getString("OZERO_SOAK_TARGET") ?: DEFAULT_TARGET
-        val profileInputs = listOf(
-            SoakProfileInput(
-                "vless",
-                requireNotNull(args.getString("OZERO_SOAK_VLESS")) { "missing VLESS profile" },
-                targetUrl,
-                DEFAULT_MARKER,
-            ),
-            SoakProfileInput(
-                "vless_reality",
-                requireNotNull(args.getString("OZERO_SOAK_VLESS_REALITY")) { "missing VLESS Reality profile" },
-                requireNotNull(args.getString("OZERO_SOAK_REALITY_TARGET")) { "missing Reality target" },
-                requireNotNull(args.getString("OZERO_SOAK_REALITY_MARKER")) { "missing Reality marker" },
-            ),
-            SoakProfileInput(
-                "vmess",
-                requireNotNull(args.getString("OZERO_SOAK_VMESS")) { "missing VMess profile" },
-                targetUrl,
-                DEFAULT_MARKER,
-            ),
-            SoakProfileInput(
-                "trojan",
-                requireNotNull(args.getString("OZERO_SOAK_TROJAN")) { "missing Trojan profile" },
-                targetUrl,
-                DEFAULT_MARKER,
-            ),
+        val realityUri = requireNotNull(args.getString("OZERO_SOAK_VLESS_REALITY")) {
+            "missing VLESS Reality profile"
+        }
+        val realityTarget = requireNotNull(args.getString("OZERO_SOAK_REALITY_TARGET")) {
+            "missing Reality target"
+        }
+        val realityMarker = requireNotNull(args.getString("OZERO_SOAK_REALITY_MARKER")) {
+            "missing Reality marker"
+        }
+        val realityInput = SoakProfileInput(
+            "vless_reality",
+            realityUri,
+            realityTarget,
+            realityMarker,
         )
         val targetContext = instrumentation.targetContext
         val testContext = instrumentation.context
@@ -82,7 +78,13 @@ class SoakTest {
             targetContext.applicationContext,
             SoakTestEntryPoint::class.java,
         )
-        val profiles = seedProfiles(dependencies, profileInputs)
+        val subscriptionProfiles = loadSubscriptionProfiles(dependencies)
+        val profiles = listOf(
+            subscriptionProfiles.getValue("vless"),
+            seedProfile(dependencies, realityInput),
+            subscriptionProfiles.getValue("vmess"),
+            subscriptionProfiles.getValue("trojan"),
+        )
         dependencies.settingsRepository().setTrafficMode(TrafficMode.TUN)
         dependencies.settingsRepository().setManualEngine(EngineId.SINGBOX)
         dependencies.settingsRepository().setIpv6Enabled(false)
@@ -103,6 +105,9 @@ class SoakTest {
                     stopVpn(targetContext, dependencies.tunnelController())
                     startVpn(targetContext)
                     awaitConnected(dependencies.tunnelController())
+                    if (soakProfile.protocol == "vless") {
+                        refreshSelectedSubscription(dependencies, soakProfile.profile)
+                    }
                     val probe = probeFromExternalUid(
                         testContext,
                         soakProfile.targetUrl,
@@ -131,29 +136,67 @@ class SoakTest {
         check(successfulCycles.values.all { it == cyclesPerProtocol })
     }
 
-    private suspend fun seedProfiles(
+    private suspend fun loadSubscriptionProfiles(
         dependencies: SoakTestEntryPoint,
-        inputs: List<SoakProfileInput>,
-    ): List<SoakProfile> {
+    ): Map<String, SoakProfile> {
         val groupId = dependencies.subscriptionGroupDao().insert(
-            SubscriptionGroup(name = "Sing-box soak", autoUpdate = false),
+            SubscriptionGroup(
+                name = "Sing-box local subscription",
+                subscriptionUrl = LOCAL_SUBSCRIPTION_URL,
+                autoUpdate = false,
+            ),
         )
-        return inputs.mapIndexed { index, input ->
-            val bean = parseProfile(input.uri)
-            val profile = ProxyProfile(
-                groupId = groupId,
-                name = bean.javaClass.simpleName,
-                beanBlob = KryoSerializer.serialize(bean),
-                protocolType = protocolType(bean),
-                userOrder = index,
-            )
-            SoakProfile(
-                protocol = input.protocol,
-                profile = profile.copy(id = dependencies.proxyProfileDao().insert(profile)),
-                targetUrl = input.targetUrl,
-                expectedMarker = input.expectedMarker,
-            )
+        val group = requireNotNull(dependencies.subscriptionGroupDao().getById(groupId))
+        check(dependencies.rawUpdater().refresh(group).getOrThrow() == 3) {
+            "subscription must import exactly three supported profiles"
         }
+        val refreshedGroup = requireNotNull(dependencies.subscriptionGroupDao().getById(groupId))
+        check(refreshedGroup.lastServerCount == 3) { "subscription reported an unexpected server count" }
+        val profiles = dependencies.proxyProfileDao().getByGroupId(groupId)
+        check(profiles.size == 3) { "unsupported subscription profile was persisted" }
+        return profiles.associate { profile ->
+            val protocol = when (profile.protocolType) {
+                0 -> "vless"
+                1 -> "vmess"
+                2 -> "trojan"
+                else -> error("unexpected subscription protocol ${profile.protocolType}")
+            }
+            protocol to SoakProfile(protocol, profile, DEFAULT_TARGET, DEFAULT_MARKER)
+        }
+    }
+
+    private suspend fun seedProfile(
+        dependencies: SoakTestEntryPoint,
+        input: SoakProfileInput,
+    ): SoakProfile {
+        val groupId = dependencies.subscriptionGroupDao().insert(
+            SubscriptionGroup(name = "Sing-box Reality soak", autoUpdate = false),
+        )
+        val bean = parseProfile(input.uri)
+        val profile = ProxyProfile(
+            groupId = groupId,
+            name = bean.javaClass.simpleName,
+            beanBlob = KryoSerializer.serialize(bean),
+            protocolType = protocolType(bean),
+        )
+        return SoakProfile(
+            protocol = input.protocol,
+            profile = profile.copy(id = dependencies.proxyProfileDao().insert(profile)),
+            targetUrl = input.targetUrl,
+            expectedMarker = input.expectedMarker,
+        )
+    }
+
+    private suspend fun refreshSelectedSubscription(
+        dependencies: SoakTestEntryPoint,
+        selectedProfile: ProxyProfile,
+    ) {
+        val group = requireNotNull(dependencies.subscriptionGroupDao().getById(selectedProfile.groupId))
+        check(dependencies.rawUpdater().refresh(group).getOrThrow() == 3) {
+            "active subscription refresh failed"
+        }
+        val selected = requireNotNull(dependencies.proxyProfileDao().getById(selectedProfile.id))
+        check(selected.id == selectedProfile.id) { "active selected profile was replaced" }
     }
 
     private fun parseProfile(uri: String): AbstractBean = when {
@@ -287,10 +330,28 @@ class SoakTest {
         private const val DEFAULT_CYCLES_PER_PROTOCOL = 20
         private const val MAX_CYCLES_PER_PROTOCOL = 100
         private const val DEFAULT_TARGET = "http://10.0.2.2:18080/ozero-soak-marker"
+        private const val LOCAL_SUBSCRIPTION_URL = "http://10.0.2.2:18080/subscription.txt"
         private const val DEFAULT_MARKER = "ozero-singbox-routed"
         private const val START_TIMEOUT_MS = 30_000L
         private const val STOP_TIMEOUT_MS = 10_000L
         private const val PROBE_TIMEOUT_MS = 15_000L
         private const val METRICS_FILE = "soak-metrics.json"
     }
+}
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface SoakTestEntryPoint {
+    fun settingsRepository(): SettingsRepository
+
+    fun tunnelController(): TunnelController
+
+    fun subscriptionGroupDao(): SubscriptionGroupDao
+
+    fun proxyProfileDao(): ProxyProfileDao
+
+    fun rawUpdater(): RawUpdater
+
+    @SingboxPrefs
+    fun singboxDataStore(): DataStore<Preferences>
 }

@@ -11,7 +11,7 @@
       "listen_port": 18081,
       "users": [
         {
-          "uuid": "5f21f2e4-c0df-4e5a-8d21-e80266fd3083"
+          "uuid": "${OZERO_SOAK_VLESS_UUID}"
         }
       ]
     },
@@ -22,7 +22,7 @@
       "listen_port": 18082,
       "users": [
         {
-          "uuid": "ab61a8a5-bce6-4c39-8f40-d97142eedca6",
+          "uuid": "${OZERO_SOAK_VMESS_UUID}",
           "alterId": 0
         }
       ]
@@ -34,7 +34,7 @@
       "listen_port": 18083,
       "users": [
         {
-          "password": "ozero-ephemeral-soak"
+          "password": "${OZERO_SOAK_TROJAN_PASSWORD}"
         }
       ],
       "tls": {
