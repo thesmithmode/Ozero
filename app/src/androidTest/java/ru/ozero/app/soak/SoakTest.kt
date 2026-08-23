@@ -28,6 +28,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Assume
 import org.junit.Test
 import org.junit.runner.RunWith
+import ru.ozero.app.di.SingboxSubscriptionEntryPoint
 import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.commonvpn.TunnelController
@@ -178,7 +179,7 @@ class SoakTest {
             ),
         )
         val group = requireNotNull(dependencies.subscriptionGroupDao().getById(groupId))
-        check(dependencies.rawUpdater().refresh(group).getOrThrow() == 3) {
+        check(subscriptionUpdater().refresh(group).getOrThrow() == 3) {
             "subscription must import exactly three supported profiles"
         }
         val refreshedGroup = requireNotNull(dependencies.subscriptionGroupDao().getById(groupId))
@@ -234,7 +235,7 @@ class SoakTest {
                 }
             }
         }
-        check(dependencies.rawUpdater().refresh(group).getOrThrow() == 3) {
+        check(subscriptionUpdater().refresh(group).getOrThrow() == 3) {
             "active subscription refresh failed"
         }
         val selected = requireNotNull(dependencies.proxyProfileDao().getById(selectedProfile.id))
@@ -383,6 +384,12 @@ class SoakTest {
         val expectedMarker: String,
     )
 
+    private fun subscriptionUpdater(): RawUpdater =
+        EntryPointAccessors.fromApplication(
+            applicationContext,
+            SingboxSubscriptionEntryPoint::class.java,
+        ).rawUpdater()
+
     companion object {
         private const val DEFAULT_CYCLES_PER_PROTOCOL = 20
         private const val MAX_CYCLES_PER_PROTOCOL = 100
@@ -407,8 +414,6 @@ interface SoakTestEntryPoint {
     fun subscriptionGroupDao(): SubscriptionGroupDao
 
     fun proxyProfileDao(): ProxyProfileDao
-
-    fun rawUpdater(): RawUpdater
 
     @SingboxPrefs
     fun singboxDataStore(): DataStore<Preferences>
