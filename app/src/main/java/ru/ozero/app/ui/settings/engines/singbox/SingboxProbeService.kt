@@ -38,7 +38,6 @@ import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginesingbox.ISingboxEngineProcess
 import ru.ozero.enginesingbox.ISingboxProtector
 import ru.ozero.enginesingbox.RoutedProbeCancellation
-import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.SingboxHttp204RoutedProbe
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.singboxconfig.ConfigBuilder
@@ -167,7 +166,9 @@ class SingboxProbeService internal constructor(
             ?.takeIf { it.sameProbeIdentity(best) }
             ?: return
         dataStore.edit { prefs ->
-            if (prefs[SELECTED_PROFILE_KEY] != selectedProfileAtStart) return@edit
+            if (selectedProfileAtStart == SELECTED_AUTO || prefs[SELECTED_PROFILE_KEY] != selectedProfileAtStart) {
+                return@edit
+            }
             prefs[SELECTED_PROFILE_KEY] = currentBest.id
             prefs[BEAN_KEY] = currentBest.beanBlob
         }
@@ -254,6 +255,7 @@ class SingboxProbeService internal constructor(
         val SELECTED_PROFILE_KEY = longPreferencesKey("singbox_selected_profile_id")
         const val LATENCY_UNTESTED = -1
         const val LATENCY_FAILED = -2
+        private const val SELECTED_AUTO = -1L
         const val MAX_CONCURRENT_PROFILE_PROBES = 10
         const val PROBE_ERROR_UNSUPPORTED = "unsupported"
         const val PROBE_ERROR_FAILED = "probe failed"

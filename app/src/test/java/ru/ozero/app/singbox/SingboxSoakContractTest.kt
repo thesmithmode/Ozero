@@ -11,6 +11,7 @@ class SingboxSoakContractTest {
     fun `soak uses arm64 app build and exercises real VPN traffic`() {
         val root = locateRepoRoot()
         val workflow = File(root, ".github/workflows/soak.yml").readText()
+        val runner = File(root, ".github/soak/run-singbox-tun-soak.sh").readText()
         val soak = File(
             root,
             "app/src/androidTest/java/ru/ozero/app/soak/SoakTest.kt",
@@ -23,9 +24,9 @@ class SingboxSoakContractTest {
         assertTrue(workflow.contains("OZERO_SOAK_VLESS"))
         assertTrue(workflow.contains("OZERO_SOAK_VMESS"))
         assertTrue(workflow.contains("OZERO_SOAK_TROJAN"))
-        assertTrue(workflow.contains("OK (1 test)"))
-        assertTrue(workflow.contains("successful_cycles"))
-        assertTrue(workflow.contains("inbound connection"))
+        assertTrue(runner.contains("OK (1 test)"))
+        assertTrue(runner.contains("successful_cycles"))
+        assertTrue(runner.contains("inbound connection"))
         assertTrue(soak.contains("OzeroVpnService.ACTION_START"))
         assertTrue(soak.contains("TunnelState.Connected"))
         assertTrue(soak.contains("probeFromExternalUid"))
