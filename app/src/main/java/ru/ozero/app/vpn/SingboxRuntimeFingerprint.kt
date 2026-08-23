@@ -12,40 +12,74 @@ import ru.ozero.singboxconfig.RecoveryResult
 import ru.ozero.singboxroom.entity.ProxyChainStep
 import ru.ozero.singboxroom.entity.ProxyProfile
 
+internal data class SingboxRuntimeFingerprint(
+    val selectedProfileId: Long?,
+    val selectedProfile: RuntimeProfilePayload?,
+    val autoSelectProfiles: List<RuntimeProfilePayload>,
+    val chainProfiles: List<RuntimeChainPayload>,
+    val dnsServers: List<String>,
+    val ipv6Enabled: Boolean,
+)
+
+internal data class RuntimeProfilePayload(
+    val id: Long?,
+    val protocolType: Int?,
+    val beanPayload: List<Byte>,
+)
+
+internal data class RuntimeChainPayload(
+    val profileId: Long,
+    val profile: RuntimeProfilePayload?,
+)
+
 internal fun singboxRuntimeFingerprint(
     prefs: Preferences,
     profiles: List<ProxyProfile>,
     chainSteps: List<ProxyChainStep>,
-): Any {
+    autoProfiles: List<ProxyProfile> = profiles,
+    ipv6Enabled: Boolean = false,
+): SingboxRuntimeFingerprint {
     val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
-    val dnsFingerprint = prefs[SINGBOX_DNS_SERVERS_KEY]?.toList()?.sorted().orEmpty()
-    if (selectedProfileId == SingboxEngine.SELECTED_AUTO) {
-        val supportedProfiles = profiles
+    val profilesById = profiles.associateBy { it.id }
+    val dnsServers = prefs[SINGBOX_DNS_SERVERS_KEY]?.toList()?.sorted().orEmpty()
+    val selectedProfile = when (selectedProfileId) {
+        null -> prefs[SingboxProbeService.BEAN_KEY]?.let { RuntimeProfilePayload(null, null, it.toList()) }
+        SingboxEngine.SELECTED_AUTO -> null
+        else -> profilesById[selectedProfileId]?.toRuntimePayload()
+    }
+    val autoSelectProfiles = if (selectedProfileId == SingboxEngine.SELECTED_AUTO) {
+        autoProfiles
             .asSequence()
             .take(MAX_AUTO_SELECT_FINGERPRINT_SCAN)
             .filter(::isSupportedRoutableProfile)
             .toList()
-        val profileBlobHashes = prioritizeSingboxAutoProfiles(
-            supportedProfiles,
-            MAX_AUTO_SELECT_FINGERPRINT_PROFILES,
-        )
+            .let { prioritizeSingboxAutoProfiles(it, MAX_AUTO_SELECT_FINGERPRINT_PROFILES) }
+            .map(ProxyProfile::toRuntimePayload)
+    } else {
+        emptyList()
+    }
+    val chainProfiles = if (selectedProfileId == SingboxEngine.SELECTED_AUTO) {
+        emptyList()
+    } else {
+        chainSteps
             .asSequence()
-            .map { profile -> profile.id to profile.beanBlob.contentHashCode() }
+            .map { it.profileId }
+            .filter { it != selectedProfileId }
+            .map { id -> RuntimeChainPayload(id, profilesById[id]?.toRuntimePayload()) }
             .toList()
-        return listOf(selectedProfileId, profileBlobHashes, dnsFingerprint)
     }
-    val profilesById = profiles.associateBy { it.id }
-    val selectedBlobHash = when {
-        selectedProfileId == null -> prefs[SingboxProbeService.BEAN_KEY]?.contentHashCode() ?: 0
-        selectedProfileId in profilesById -> profilesById.getValue(selectedProfileId).beanBlob.contentHashCode()
-        else -> 0
-    }
-    val activeProfileBlobHashes = chainSteps
-        .map { it.profileId }
-        .filter { it != selectedProfileId }
-        .mapNotNull { id -> profilesById[id]?.let { id to it.beanBlob.contentHashCode() } }
-    return listOf(selectedProfileId, selectedBlobHash, activeProfileBlobHashes, dnsFingerprint)
+    return SingboxRuntimeFingerprint(
+        selectedProfileId = selectedProfileId,
+        selectedProfile = selectedProfile,
+        autoSelectProfiles = autoSelectProfiles,
+        chainProfiles = chainProfiles,
+        dnsServers = dnsServers,
+        ipv6Enabled = ipv6Enabled,
+    )
 }
+
+private fun ProxyProfile.toRuntimePayload(): RuntimeProfilePayload =
+    RuntimeProfilePayload(id = id, protocolType = protocolType, beanPayload = beanBlob.toList())
 
 private val SINGBOX_DNS_SERVERS_KEY = stringSetPreferencesKey("singbox_dns_servers")
 
@@ -63,10 +97,12 @@ internal suspend fun singboxRuntimeFingerprint(
     profiles: List<ProxyProfile>,
     chainSteps: List<ProxyChainStep>,
     resolveProfileById: suspend (Long) -> ProxyProfile?,
-): Any {
+    autoProfiles: List<ProxyProfile> = profiles,
+    ipv6Enabled: Boolean = false,
+): SingboxRuntimeFingerprint {
     val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
     if (selectedProfileId == SingboxEngine.SELECTED_AUTO) {
-        return singboxRuntimeFingerprint(prefs, profiles, chainSteps)
+        return singboxRuntimeFingerprint(prefs, profiles, chainSteps, autoProfiles, ipv6Enabled)
     }
     val profilesById = profiles.associateBy { it.id }
     val missingProfileIds = buildList {
@@ -78,8 +114,8 @@ internal suspend fun singboxRuntimeFingerprint(
             .forEach(::add)
     }
     if (missingProfileIds.isEmpty()) {
-        return singboxRuntimeFingerprint(prefs, profiles, chainSteps)
+        return singboxRuntimeFingerprint(prefs, profiles, chainSteps, autoProfiles, ipv6Enabled)
     }
-    val resolvedProfiles = profiles + missingProfileIds.mapNotNull { id -> resolveProfileById(id) }
-    return singboxRuntimeFingerprint(prefs, resolvedProfiles, chainSteps)
+    val resolvedProfiles = profiles + missingProfileIds.mapNotNull(resolveProfileById)
+    return singboxRuntimeFingerprint(prefs, resolvedProfiles, chainSteps, autoProfiles, ipv6Enabled)
 }

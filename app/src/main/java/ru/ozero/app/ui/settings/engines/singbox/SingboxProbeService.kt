@@ -102,7 +102,11 @@ class SingboxProbeService internal constructor(
                         schema = recovered.detectedSchemas.joinToString("+") { it.name }.ifEmpty { "none" },
                         reason = recovered.category.name,
                     )
-                    profileDao.updateProbeResult(profile.id, LATENCY_FAILED, PROBE_ERROR_UNSUPPORTED)
+                    profileDao.updateProbeResultIfCurrent(
+                        expected = profile,
+                        latency = LATENCY_FAILED,
+                        error = PROBE_ERROR_UNSUPPORTED,
+                    )
                     null
                 }
                 is RecoveryResult.Success -> profile to recovered.bean
@@ -134,11 +138,15 @@ class SingboxProbeService internal constructor(
             indexedBatch.forEach { candidate ->
                 when (val outcome = outcomes[candidate.profile.id] ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)) {
                     is SingboxProbeOutcome.Success -> {
-                        profileDao.updateProbeResult(candidate.profile.id, outcome.latencyMs, null)
+                        profileDao.updateProbeResultIfCurrent(candidate.profile, outcome.latencyMs, null)
                         results.add(ProbeResult(candidate.index, candidate.profile, outcome.latencyMs))
                     }
                     is SingboxProbeOutcome.Failure -> {
-                        profileDao.updateProbeResult(candidate.profile.id, LATENCY_FAILED, outcome.error)
+                        profileDao.updateProbeResultIfCurrent(
+                            candidate.profile,
+                            LATENCY_FAILED,
+                            outcome.error,
+                        )
                         results.add(ProbeResult(candidate.index, candidate.profile, LATENCY_FAILED))
                     }
                     SingboxProbeOutcome.SkippedActiveRuntime -> Unit
@@ -154,10 +162,13 @@ class SingboxProbeService internal constructor(
             ?.profile
             ?: return
         if (!updateManualSelection) return
+        val currentBest = profileDao.getById(best.id)
+            ?.takeIf { it.sameProbeIdentity(best) }
+            ?: return
         dataStore.edit { prefs ->
             if (prefs[SELECTED_PROFILE_KEY] == SingboxEngine.SELECTED_AUTO) return@edit
-            prefs[SELECTED_PROFILE_KEY] = best.id
-            prefs[BEAN_KEY] = best.beanBlob
+            prefs[SELECTED_PROFILE_KEY] = currentBest.id
+            prefs[BEAN_KEY] = currentBest.beanBlob
         }
     }
 
@@ -210,8 +221,14 @@ class SingboxProbeService internal constructor(
         }.awaitAll().toMap()
     }
 
-    private suspend fun ProxyProfileDao.updateProbeResult(id: Long, latency: Int, error: String?) {
-        updateProbeResult(id, latency, error, System.currentTimeMillis())
+    private suspend fun ProxyProfileDao.updateProbeResultIfCurrent(
+        expected: ProxyProfile,
+        latency: Int,
+        error: String?,
+    ) {
+        val current = getById(expected.id) ?: return
+        if (!current.sameProbeIdentity(expected)) return
+        updateProbeResult(expected.id, latency, error, System.currentTimeMillis())
     }
 
     private data class ProbeResult(
@@ -243,6 +260,9 @@ class SingboxProbeService internal constructor(
         val SINGBOX_DNS_SERVERS_KEY = stringSetPreferencesKey("singbox_dns_servers")
     }
 }
+
+private fun ProxyProfile.sameProbeIdentity(other: ProxyProfile): Boolean =
+    id == other.id && protocolType == other.protocolType && beanBlob.contentEquals(other.beanBlob)
 
 internal fun interface SingboxProfileProbe {
     suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int

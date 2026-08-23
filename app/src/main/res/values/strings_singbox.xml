@@ -12,6 +12,7 @@
     <string name="singbox_manual_links_name_hint">Имя группы (необязательно)</string>
     <string name="singbox_manual_links_error_empty">Вставьте хотя бы одну ссылку</string>
     <string name="singbox_manual_links_error_parse">Не найдено валидных ссылок</string>
+    <string name="singbox_manual_links_error_unsupported">Поддерживаемые профили не найдены</string>
     <string name="singbox_group_refresh">Обновить</string>
     <string name="singbox_group_delete">Удалить</string>
     <string name="singbox_group_delete_confirm_title">Удалить подписку?</string>

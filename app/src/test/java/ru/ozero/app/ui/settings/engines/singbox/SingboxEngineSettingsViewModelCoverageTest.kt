@@ -1115,6 +1115,24 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
                 override suspend fun update(group: SubscriptionGroup) = Unit
 
+                override suspend fun tryBeginRefresh(
+                    id: Long,
+                    expectedGeneration: Long,
+                    attemptAt: Long,
+                ): Int = 0
+
+                override suspend fun commitRefresh(
+                    id: Long,
+                    refreshGeneration: Long,
+                    lastUpdated: Long,
+                    lastAttemptAt: Long,
+                    lastRefreshErrorCode: String?,
+                    lastServerCount: Int,
+                    bytesUsed: Long,
+                    bytesRemaining: Long,
+                    expiryDate: Long,
+                ): Int = 0
+
                 override suspend fun delete(group: SubscriptionGroup) {
                     groupsFlow.value = groupsFlow.value.filterNot { it.id == group.id }
                 }
@@ -1273,6 +1291,10 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
         override suspend fun clear() {
             flow.value = emptyList()
+        }
+
+        override suspend fun deleteByProfileIds(profileIds: Set<Long>) {
+            flow.value = flow.value.filterNot { it.profileId in profileIds }
         }
 
         override suspend fun insertAll(steps: List<ProxyChainStep>) {

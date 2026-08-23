@@ -24,6 +24,7 @@ import java.security.cert.CertificateException
 import java.util.concurrent.ConcurrentHashMap
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLPeerUnverifiedException
+import kotlin.coroutines.resume
 import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.BeanSupportError
 import ru.ozero.singboxconfig.ConfigBuilder
@@ -62,9 +63,9 @@ class RawUpdater(
 
     private suspend fun refreshLocked(group: SubscriptionGroup): Result<Int> = withContext(Dispatchers.IO) {
         val lastAttemptAt = System.currentTimeMillis()
-        val attemptedGroup = group.copy(lastAttemptAt = lastAttemptAt)
+        val refreshGeneration = beginRefresh(group.id, lastAttemptAt)
+            ?: return@withContext Result.failure(SubscriptionRefreshStaleException())
         val result = runCatching<Int> {
-            groupDao.update(attemptedGroup)
             val request = Request.Builder()
                 .url(group.subscriptionUrl)
                 .header("User-Agent", USER_AGENT)
@@ -124,12 +125,8 @@ class RawUpdater(
                         profile
                     }
                 }
-                val retainedProfileIds = profilesWithStableIds.mapTo(mutableSetOf()) { it.id }
-                val removedProfileIds = existingProfiles
-                    .mapTo(mutableSetOf()) { it.id }
-                    .apply { removeAll(retainedProfileIds) }
-
-                val currentGroup = groupDao.getById(group.id) ?: attemptedGroup
+                val currentGroup = groupDao.getById(group.id)
+                    ?: group.copy(lastAttemptAt = lastAttemptAt, refreshGeneration = refreshGeneration)
                 val usedBytes = subInfo?.let { it.uploadBytes + it.downloadBytes } ?: currentGroup.bytesUsed
                 val remainingBytes = subInfo?.let {
                     maxOf(0L, it.totalBytes - it.uploadBytes - it.downloadBytes)
@@ -143,17 +140,59 @@ class RawUpdater(
                     bytesRemaining = remainingBytes,
                     expiryDate = subInfo?.expiryTimestamp ?: currentGroup.expiryDate,
                 )
-                if (database != null) {
+                val committed = if (database != null) {
+                    var didCommit = false
+                    var removedProfileIds = emptySet<Long>()
                     database.withTransaction {
-                        profileDao.replaceForGroup(group.id, profilesWithStableIds)
-                        groupDao.update(updatedGroup)
+                        val current = groupDao.getById(group.id)
+                        if (current?.refreshGeneration == refreshGeneration) {
+                            removedProfileIds = profileDao.replaceForGroupAndReturnRemovedIds(
+                                group.id,
+                                profilesWithStableIds,
+                            )
+                            didCommit = groupDao.commitRefresh(
+                                id = group.id,
+                                refreshGeneration = refreshGeneration,
+                                lastUpdated = updatedGroup.lastUpdated,
+                                lastAttemptAt = updatedGroup.lastAttemptAt,
+                                lastRefreshErrorCode = updatedGroup.lastRefreshErrorCode,
+                                lastServerCount = updatedGroup.lastServerCount,
+                                bytesUsed = updatedGroup.bytesUsed,
+                                bytesRemaining = updatedGroup.bytesRemaining,
+                                expiryDate = updatedGroup.expiryDate,
+                            ) == 1
+                        }
                     }
+                    if (didCommit && removedProfileIds.isNotEmpty()) onProfilesRemoved(removedProfileIds)
+                    didCommit
                 } else {
-                    profileDao.replaceForGroup(group.id, profilesWithStableIds)
-                    groupDao.update(updatedGroup)
+                    if (groupDao.getById(group.id)?.refreshGeneration != refreshGeneration) {
+                        false
+                    } else {
+                        val removedProfileIds = profileDao.replaceForGroupAndReturnRemovedIds(
+                            group.id,
+                            profilesWithStableIds,
+                        )
+                        val didCommit = groupDao.commitRefresh(
+                            id = group.id,
+                            refreshGeneration = refreshGeneration,
+                            lastUpdated = updatedGroup.lastUpdated,
+                            lastAttemptAt = updatedGroup.lastAttemptAt,
+                            lastRefreshErrorCode = updatedGroup.lastRefreshErrorCode,
+                            lastServerCount = updatedGroup.lastServerCount,
+                            bytesUsed = updatedGroup.bytesUsed,
+                            bytesRemaining = updatedGroup.bytesRemaining,
+                            expiryDate = updatedGroup.expiryDate,
+                        ) == 1
+                        if (didCommit && removedProfileIds.isNotEmpty()) {
+                            onProfilesRemoved(removedProfileIds)
+                        }
+                        didCommit
+                    }
                 }
-                if (removedProfileIds.isNotEmpty()) onProfilesRemoved(removedProfileIds)
-
+                if (!committed) {
+                    return@use 0
+                }
                 Log.i(TAG, "refresh ok groupId=${group.id} servers=${profilesWithStableIds.size}")
                 profilesWithStableIds.size
             }
@@ -164,32 +203,50 @@ class RawUpdater(
             if (failure is CancellationException) throw failure
         }
         result.exceptionOrNull()?.let { failure ->
-            recordRefreshFailure(group, attemptedGroup, lastAttemptAt, failure)
+            recordRefreshFailure(group.id, refreshGeneration, lastAttemptAt, failure)
         }
         result
     }
 
+    private suspend fun beginRefresh(groupId: Long, attemptAt: Long): Long? {
+        repeat(MAX_BEGIN_ATTEMPTS) {
+            val current = groupDao.getById(groupId) ?: return null
+            val nextGeneration = current.refreshGeneration + 1
+            if (groupDao.tryBeginRefresh(groupId, current.refreshGeneration, attemptAt) == 1) {
+                return nextGeneration
+            }
+        }
+        return null
+    }
+
     private suspend fun recordRefreshFailure(
-        group: SubscriptionGroup,
-        attemptedGroup: SubscriptionGroup,
+        groupId: Long,
+        refreshGeneration: Long,
         lastAttemptAt: Long,
         failure: Throwable,
     ) {
         val errorCode = refreshErrorCode(failure)
         runCatching {
-            val currentGroup = groupDao.getById(group.id) ?: attemptedGroup
-            groupDao.update(
-                currentGroup.copy(
+            val currentGroup = groupDao.getById(groupId)
+            if (currentGroup?.refreshGeneration == refreshGeneration) {
+                groupDao.commitRefresh(
+                    id = groupId,
+                    refreshGeneration = refreshGeneration,
+                    lastUpdated = currentGroup.lastUpdated,
                     lastAttemptAt = lastAttemptAt,
                     lastRefreshErrorCode = errorCode,
-                ),
-            )
+                    lastServerCount = currentGroup.lastServerCount,
+                    bytesUsed = currentGroup.bytesUsed,
+                    bytesRemaining = currentGroup.bytesRemaining,
+                    expiryDate = currentGroup.expiryDate,
+                )
+            }
         }.onFailure { statusFailure ->
             if (statusFailure !== failure) failure.addSuppressed(statusFailure)
         }
         Log.w(
             TAG,
-            "refresh failed groupId=${group.id} code=$errorCode " +
+            "refresh failed groupId=$groupId code=$errorCode " +
                 "causes=${failure.safeCauseDiagnostics()}",
         )
     }
@@ -206,15 +263,14 @@ class RawUpdater(
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
                 override fun onFailure(call: Call, error: IOException) {
-                    continuation.tryResumeWithException(error)?.let(continuation::completeResume)
+                    if (continuation.isActive) continuation.resumeWith(Result.failure(error))
                 }
 
                 override fun onResponse(call: Call, response: Response) {
-                    val token = continuation.tryResume(response)
-                    if (token == null) {
+                    if (!continuation.isActive) {
                         response.close()
                     } else {
-                        continuation.completeResume(token)
+                        continuation.resume(response)
                     }
                 }
             })
@@ -230,6 +286,7 @@ class RawUpdater(
         private const val USER_AGENT = "mihomo/1.19.23"
         private const val MAX_PROFILES_PER_GROUP = 2_000
         private const val MAX_SUBSCRIPTION_BYTES = 16L * 1024 * 1024
+        private const val MAX_BEGIN_ATTEMPTS = 8
 
         private fun logSupportDiagnostics(groupId: Long, beans: List<AbstractBean>) {
             val decisions = beans.map { bean ->
@@ -397,11 +454,31 @@ object SubscriptionRefreshErrorCode {
     const val UNKNOWN = "unknown"
 }
 
-private class SubscriptionHttpException(statusCode: Int) : IOException("Subscription HTTP $statusCode")
+private class SubscriptionHttpException(val statusCode: Int) : IOException("Subscription HTTP $statusCode")
+
+private class SubscriptionRefreshStaleException : IOException("Subscription refresh superseded")
 
 private class SubscriptionNoProfilesException : IOException("Subscription contains no supported servers")
 
 private class SubscriptionBodyTooLargeException : IOException("Subscription body too large")
+
+fun isTransientSubscriptionRefreshFailure(error: Throwable): Boolean {
+    val causes = generateSequence(error) { it.cause }.toList()
+    if (causes.any {
+        it is SubscriptionNoProfilesException ||
+            it is SubscriptionBodyTooLargeException ||
+            it is SubscriptionRefreshStaleException
+    }) {
+        return false
+    }
+    val http = causes.filterIsInstance<SubscriptionHttpException>().firstOrNull()
+    if (http != null) {
+        return http.statusCode == 408 || http.statusCode == 425 ||
+            http.statusCode == 429 || http.statusCode in 500..599
+    }
+    if (causes.any { it is SSLHandshakeException || it is SSLPeerUnverifiedException }) return false
+    return causes.any { it is SocketTimeoutException || it is UnknownHostException || it is IOException }
+}
 
 private fun ProxyProfile.stableBaseIdentityKey(): String =
     listOf(

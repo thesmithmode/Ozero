@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
@@ -64,6 +66,7 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 
 internal enum class BuildConfigFailureCategory {
@@ -241,6 +244,9 @@ class SingboxEngine @Inject constructor(
     private var activeAutoSelect: Boolean = false
 
     private val bindLock = Any()
+    private val lifecycleMutex = Mutex()
+    private val lifecycleGeneration = AtomicLong(0)
+    private val connectionGeneration = AtomicLong(0)
 
     private val localProtector = object : ISingboxProtector.Stub() {
         override fun protect(socket: ParcelFileDescriptor): Boolean = socket.use {
@@ -256,58 +262,61 @@ class SingboxEngine @Inject constructor(
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult {
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
+        lifecycleMutex.withLock {
+            lifecycleGeneration.incrementAndGet()
 
-        chainMode = upstream !is Upstream.None || config.proxyMode
-        PersistentLoggers.debug(
-            TAG,
-            "start: proxyMode=${config.proxyMode} upstream=${upstream::class.simpleName} " +
-                "protocolType=${config.protocolType} autoCount=${config.autoSelectBeanBlobs.size} " +
-                "chainCount=${config.chainBeanBlobs.size} " +
-                "hasWireGuard=${config.wireGuardConfig != null} beanBytes=${config.beanBlob.size}",
-        )
-        if (config.proxyMode && upstream is Upstream.None) {
-            return startProxyMode(config, upstream = null)
-        }
-        if (chainMode) {
-            return when (upstream) {
-                is Upstream.Socks5 -> startChainMode(config, upstream)
-                else -> StartResult.Failure("SingboxEngine chain requires Socks5, got $upstream")
+            chainMode = upstream !is Upstream.None || config.proxyMode
+            PersistentLoggers.debug(
+                TAG,
+                "start: proxyMode=${config.proxyMode} upstream=${upstream::class.simpleName} " +
+                    "protocolType=${config.protocolType} autoCount=${config.autoSelectBeanBlobs.size} " +
+                    "chainCount=${config.chainBeanBlobs.size} " +
+                    "hasWireGuard=${config.wireGuardConfig != null} beanBytes=${config.beanBlob.size}",
+            )
+            if (config.proxyMode && upstream is Upstream.None) {
+                return@withLock startProxyMode(config, upstream = null)
             }
-        }
-
-        activeSocksPort = 0
-        activeAutoSelect = config.autoSelectBeanBlobs.isNotEmpty()
-        pendingSocksPort = 0
-        pendingConfig = null
-        val probePort = allocateChainPort()
-        val json = when (val result = buildPendingConfig(config, probePort)) {
-            is BuildConfigResult.Success -> result.json
-            is BuildConfigResult.Failure -> {
-                activeAutoSelect = false
-                PersistentLoggers.warn(
-                    TAG,
-                    "singbox config rejected profileId=${cachedSelectedProfileId ?: "unknown"} " +
-                        "category=${result.category} reason=${result.reason ?: "none"} " +
-                        "exceptionClass=${result.exceptionClass ?: "none"} " +
-                        "inputs=${result.inputFailures.failureCounts()}",
-                )
-                return StartResult.Failure(result.stableReason())
+            if (chainMode) {
+                return@withLock when (upstream) {
+                    is Upstream.Socks5 -> startChainMode(config, upstream)
+                    else -> StartResult.Failure("SingboxEngine chain requires Socks5, got $upstream")
+                }
             }
-        }
-        PersistentLoggers.debug(
-            TAG,
-            "start TUN config built probePort=$probePort fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
-        )
 
-        bindOrFail()?.let {
-            clearPendingStart()
-            return it
-        }
+            activeSocksPort = 0
+            activeAutoSelect = config.autoSelectBeanBlobs.isNotEmpty()
+            pendingSocksPort = 0
+            pendingConfig = null
+            val probePort = allocateChainPort()
+            val json = when (val result = buildPendingConfig(config, probePort)) {
+                is BuildConfigResult.Success -> result.json
+                is BuildConfigResult.Failure -> {
+                    activeAutoSelect = false
+                    PersistentLoggers.warn(
+                        TAG,
+                        "singbox config rejected profileId=${cachedSelectedProfileId ?: "unknown"} " +
+                            "category=${result.category} reason=${result.reason ?: "none"} " +
+                            "exceptionClass=${result.exceptionClass ?: "none"} " +
+                            "inputs=${result.inputFailures.failureCounts()}",
+                    )
+                    return@withLock StartResult.Failure(result.stableReason())
+                }
+            }
+            PersistentLoggers.debug(
+                TAG,
+                "start TUN config built probePort=$probePort fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
+            )
 
-        pendingConfig = json
-        pendingSocksPort = probePort
-        pendingTunAutoSelect = config.autoSelectBeanBlobs.isNotEmpty()
-        return StartResult.Success(socksPort = 0)
+            bindOrFail()?.let {
+                clearPendingStart()
+                return@withLock it
+            }
+
+            pendingConfig = json
+            pendingSocksPort = probePort
+            pendingTunAutoSelect = config.autoSelectBeanBlobs.isNotEmpty()
+            StartResult.Success(socksPort = 0)
+        }
     }
 
     private fun buildPendingConfig(config: EngineConfig.Singbox, probeSocksPort: Int): BuildConfigResult {
@@ -566,62 +575,77 @@ class SingboxEngine @Inject constructor(
     }
 
     override suspend fun attachTun(tunFd: Int): TunAttachResult {
-        if (chainMode) return TunAttachResult.Failure("chain mode - TUN not used")
-        val json = pendingConfig ?: return TunAttachResult.Failure("attachTun called before start()")
-        val p = proxy ?: run {
-            clearPendingStart()
-            return TunAttachResult.Failure("SingboxEngineService not connected")
-        }
-        val transportPfd = ParcelFileDescriptor.fromFd(tunFd)
-        var runtimeStarted = false
-        val result = try {
-            runCatching {
-                PersistentLoggers.debug(
-                    TAG,
-                    "attachTun start rawFd=$tunFd pendingPort=$pendingSocksPort " +
-                        "fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
-                )
-                p.startWithConfig(transportPfd, json, localProtector)
-                runtimeStarted = true
-                delay(150)
-                val runtimeRunning = runCatching { p.runtimeRunning() }.getOrDefault(false)
-                PersistentLoggers.debug(
-                    TAG,
-                    "attachTun AIDL returned rawFd=$tunFd pendingPort=$pendingSocksPort runtimeRunning=$runtimeRunning",
-                )
-                if (!runtimeRunning) {
-                    stopRuntimeAfterFailedReadiness(p)
-                    clearPendingStart()
-                    return@runCatching TunAttachResult.Failure("sing-box runtime failed to start")
-                }
-                activeSocksPort = pendingSocksPort
-                activeTunAutoSelect = pendingTunAutoSelect
-                pendingTunAutoSelect = false
-                pendingSocksPort = 0
-                pendingConfig = null
-                PersistentLoggers.debug(
-                    TAG,
-                    "startWithConfig sent over AIDL activePort=$activeSocksPort autoSelect=$activeTunAutoSelect",
-                )
-                TunAttachResult.Success
-            }.getOrElse {
-                if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)
+        lifecycleMutex.withLock {
+            if (chainMode) return@withLock TunAttachResult.Failure("chain mode - TUN not used")
+            val json = pendingConfig ?: return@withLock TunAttachResult.Failure("attachTun called before start()")
+            val p = proxy ?: run {
                 clearPendingStart()
-                if (it is CancellationException) throw it
-                PersistentLoggers.error(
-                    TAG,
-                    "startWithConfig failed exceptionClass=${it::class.java.simpleName} stableCategory=aidl",
-                )
-                TunAttachResult.Failure("AIDL failed")
+                return@withLock TunAttachResult.Failure("SingboxEngineService not connected")
             }
-        } finally {
-            runCatching { transportPfd.close() }
+            val generation = lifecycleGeneration.get()
+            val transportPfd = ParcelFileDescriptor.fromFd(tunFd)
+            var runtimeStarted = false
+            val result = try {
+                runCatching {
+                    PersistentLoggers.debug(
+                        TAG,
+                        "attachTun start rawFd=$tunFd pendingPort=$pendingSocksPort " +
+                            "fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
+                    )
+                    p.startWithConfig(transportPfd, json, localProtector)
+                    runtimeStarted = true
+                    delay(150)
+                    val runtimeRunning = runCatching { p.runtimeRunning() }.getOrDefault(false)
+                    if (!isCurrentLifecycle(generation)) {
+                        stopRuntimeAfterFailedReadiness(p)
+                        clearPendingStart()
+                        return@runCatching TunAttachResult.Failure("stale sing-box attach")
+                    }
+                    PersistentLoggers.debug(
+                        TAG,
+                        "attachTun AIDL returned rawFd=$tunFd pendingPort=$pendingSocksPort " +
+                            "runtimeRunning=$runtimeRunning",
+                    )
+                    if (!runtimeRunning) {
+                        stopRuntimeAfterFailedReadiness(p)
+                        clearPendingStart()
+                        return@runCatching TunAttachResult.Failure("sing-box runtime failed to start")
+                    }
+                    if (!isCurrentLifecycle(generation)) {
+                        stopRuntimeAfterFailedReadiness(p)
+                        clearPendingStart()
+                        return@runCatching TunAttachResult.Failure("stale sing-box attach")
+                    }
+                    activeSocksPort = pendingSocksPort
+                    activeTunAutoSelect = pendingTunAutoSelect
+                    pendingTunAutoSelect = false
+                    pendingSocksPort = 0
+                    pendingConfig = null
+                    PersistentLoggers.debug(
+                        TAG,
+                        "startWithConfig sent over AIDL activePort=$activeSocksPort " +
+                            "autoSelect=$activeTunAutoSelect",
+                    )
+                    TunAttachResult.Success
+                }.getOrElse {
+                    if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)
+                    clearPendingStart()
+                    if (it is CancellationException) throw it
+                    PersistentLoggers.error(
+                        TAG,
+                        "startWithConfig failed exceptionClass=${it::class.java.simpleName} stableCategory=aidl",
+                    )
+                    TunAttachResult.Failure("AIDL failed")
+                }
+            } finally {
+                runCatching { transportPfd.close() }
+            }
+            if (result == TunAttachResult.Success) {
+                runCatching { ParcelFileDescriptor.adoptFd(tunFd).close() }
+                    .onFailure { PersistentLoggers.warn(TAG, "attachTun raw fd close failed: ${it.message}") }
+            }
+            return@withLock result
         }
-        if (result == TunAttachResult.Success) {
-            runCatching { ParcelFileDescriptor.adoptFd(tunFd).close() }
-                .onFailure { PersistentLoggers.warn(TAG, "attachTun raw fd close failed: ${it.message}") }
-        }
-        return result
     }
 
     private fun stopRuntimeAfterFailedReadiness(p: ISingboxEngineProcess) {
@@ -632,21 +656,24 @@ class SingboxEngine @Inject constructor(
     }
 
     override suspend fun stop() {
-        pendingConfig = null
-        pendingTunAutoSelect = false
-        pendingSocksPort = 0
-        chainMode = false
-        activeAutoSelect = false
-        activeTunAutoSelect = false
-        activeSocksPort = 0
-        val p = proxy
-        if (p != null) {
-            runCatching {
-                val stopped = p.stopAndWait(REMOTE_STOP_TIMEOUT_MS)
-                if (!stopped) PersistentLoggers.warn(TAG, "proxy.stopAndWait() timed out")
-            }.onFailure { logConfigException("proxy stop", it) }
+        lifecycleMutex.withLock {
+            lifecycleGeneration.incrementAndGet()
+            pendingConfig = null
+            pendingTunAutoSelect = false
+            pendingSocksPort = 0
+            chainMode = false
+            activeAutoSelect = false
+            activeTunAutoSelect = false
+            activeSocksPort = 0
+            val p = proxy
+            if (p != null) {
+                runCatching {
+                    val stopped = p.stopAndWait(REMOTE_STOP_TIMEOUT_MS)
+                    if (!stopped) PersistentLoggers.warn(TAG, "proxy.stopAndWait() timed out")
+                }.onFailure { logConfigException("proxy stop", it) }
+            }
+            close()
         }
-        close()
     }
 
     override fun stopTimeoutMs(): Long = ENGINE_STOP_TIMEOUT_MS
@@ -810,7 +837,7 @@ class SingboxEngine @Inject constructor(
             ?.let(::migrateProfileBlobBlocking)
         val selectedBlob = selectedProfile?.beanBlob
         val savedRecovery = cachedBlob
-            ?.takeIf { selectedBlob == null && cachedSelectedProfileId == null }
+            ?.takeIf { selectedBlob == null }
             ?.let(::recoverPersistedProfileWithoutProtocol)
         val blob = selectedBlob ?: savedRecovery?.let { KryoSerializer.serialize(it.bean) } ?: return null
         val type = selectedProfile?.protocolType ?: savedRecovery?.let { protocolTypeOf(it.bean) }
@@ -1061,18 +1088,23 @@ class SingboxEngine @Inject constructor(
     private fun bindOrFail(): StartResult.Failure? {
         synchronized(bindLock) {
             if (proxy != null) return null
+            val connectionId = connectionGeneration.incrementAndGet()
             serviceConn?.let { runCatching { context.unbindService(it) } }
             unlinkDeath()
             val latch = CountDownLatch(1)
             val conn = object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+                    if (!isCurrentConnection(connectionId, this)) return
+                    val connection = this
                     proxy = ISingboxEngineProcess.Stub.asInterface(binder)
                     engineBinder = binder
                     val connectedProcessId = runCatching { proxy?.processId() ?: -1 }.getOrDefault(-1)
                     engineProcessId = connectedProcessId
                     val recipient = IBinder.DeathRecipient {
+                        if (!isCurrentConnection(connectionId, connection)) return@DeathRecipient
                         proxy = null
                         engineBinder = null
+                        lifecycleGeneration.incrementAndGet()
                         clearRuntimeState()
                         logProcessExitInfo(connectedProcessId)
                         engineProcessId = -1
@@ -1093,8 +1125,10 @@ class SingboxEngine @Inject constructor(
                 }
 
                 override fun onServiceDisconnected(name: ComponentName) {
+                    if (!isCurrentConnection(connectionId, this)) return
                     proxy = null
                     engineBinder = null
+                    lifecycleGeneration.incrementAndGet()
                     clearRuntimeState()
                     logProcessExitInfo(engineProcessId)
                     engineProcessId = -1
@@ -1107,8 +1141,10 @@ class SingboxEngine @Inject constructor(
                 }
 
                 override fun onBindingDied(name: ComponentName?) {
+                    if (!isCurrentConnection(connectionId, this)) return
                     proxy = null
                     engineBinder = null
+                    lifecycleGeneration.incrementAndGet()
                     clearRuntimeState()
                     logProcessExitInfo(engineProcessId)
                     engineProcessId = -1
@@ -1120,22 +1156,26 @@ class SingboxEngine @Inject constructor(
                     runCatching { onProcessDied() }
                 }
             }
+            serviceConn = conn
             val component = ComponentName(context, "ru.ozero.singboxprocess.SingboxEngineService")
             val intent = Intent().apply { this.component = component }
             val bound = context.bindService(intent, conn, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
             if (!bound) {
                 runCatching { context.unbindService(conn) }
+                if (isCurrentConnection(connectionId, conn)) serviceConn = null
                 return StartResult.Failure("bindService failed for SingboxEngineService — registered in manifest?")
             }
-            serviceConn = conn
             if (!latch.await(CONNECT_TIMEOUT_S, TimeUnit.SECONDS)) {
                 runCatching { context.unbindService(conn) }
-                serviceConn = null
+                if (isCurrentConnection(connectionId, conn)) {
+                    connectionGeneration.incrementAndGet()
+                    serviceConn = null
+                }
                 return StartResult.Failure("SingboxEngineService bind timeout after ${CONNECT_TIMEOUT_S}s")
             }
             return if (proxy == null) {
                 runCatching { context.unbindService(conn) }
-                serviceConn = null
+                if (isCurrentConnection(connectionId, conn)) serviceConn = null
                 StartResult.Failure("SingboxEngineService proxy null after bind")
             } else {
                 null
@@ -1156,8 +1196,14 @@ class SingboxEngine @Inject constructor(
         activeSocksPort = 0
     }
 
+    private fun isCurrentLifecycle(generation: Long): Boolean = lifecycleGeneration.get() == generation
+
+    private fun isCurrentConnection(generation: Long, connection: ServiceConnection): Boolean =
+        connectionGeneration.get() == generation && serviceConn === connection
+
     private fun close() {
         synchronized(bindLock) {
+            connectionGeneration.incrementAndGet()
             unlinkDeath()
             proxy = null
             serviceConn?.let { runCatching { context.unbindService(it) } }

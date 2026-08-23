@@ -35,8 +35,6 @@ jobs:
     env:
       SINGBOX_VERSION: '1.13.12'
       SINGBOX_SERVER_ARCHIVE_SHA256: '43eef86f0ea4a79c3696974f397a963c46a457ee46d1ffac9aa913944a5fc986'
-      XRAY_VERSION: '26.3.27'
-      XRAY_SERVER_ARCHIVE_SHA256: '2e93a67e8aa1936ecefb307e120830fcbd4c643ab9b1c46a2d0838d5f8409eaf'
 
     steps:
       - name: Checkout code
@@ -125,6 +123,17 @@ jobs:
           test -s singbox-core/libs/libbox.jar
           test -s singbox-core/src/main/jniLibs/arm64-v8a/libbox.so
 
+      - name: Require private Reality soak secrets
+        env:
+          OZERO_SOAK_REALITY_URI: ${{ secrets.OZERO_SOAK_REALITY_URI }}
+          OZERO_SOAK_REALITY_TARGET: ${{ secrets.OZERO_SOAK_REALITY_TARGET }}
+          OZERO_SOAK_REALITY_MARKER: ${{ secrets.OZERO_SOAK_REALITY_MARKER }}
+        run: |
+          set -euo pipefail
+          for name in OZERO_SOAK_REALITY_URI OZERO_SOAK_REALITY_TARGET OZERO_SOAK_REALITY_MARKER; do
+            test -n "${!name}" || { echo "::error::$name is required for the private Reality soak"; exit 1; }
+          done
+
       - name: Start ephemeral protocol servers
         run: |
           set -euo pipefail
@@ -143,65 +152,11 @@ jobs:
           "$binary" run -c .github/soak/sing-box-server.json > "$RUNNER_TEMP/singbox-server.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/singbox-server.pid"
 
-          xray_archive="$RUNNER_TEMP/xray.zip"
-          xray_url="https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-macos-arm64-v8a.zip"
-          curl --fail --location --retry 3 "$xray_url" --output "$xray_archive"
-          echo "${XRAY_SERVER_ARCHIVE_SHA256}  $xray_archive" | shasum -a 256 --check
-          mkdir -p "$RUNNER_TEMP/xray"
-          unzip -q "$xray_archive" -d "$RUNNER_TEMP/xray"
-          xray="$RUNNER_TEMP/xray/xray"
-          key_pair=$("$xray" x25519)
-          private_key=$(printf '%s\n' "$key_pair" | awk -F': ' '/PrivateKey|Private key/ {print $2; exit}')
-          public_key=$(printf '%s\n' "$key_pair" | awk -F': ' '/Password|PublicKey|Public key/ {print $2; exit}')
-          test -n "$private_key"
-          test -n "$public_key"
-          jq -n \
-            --arg privateKey "$private_key" \
-            --arg accessLog "$RUNNER_TEMP/xray-access.log" \
-            --arg errorLog "$RUNNER_TEMP/xray-error.log" \
-            '{
-              log: {access: $accessLog, error: $errorLog, loglevel: "debug"},
-              inbounds: [{
-                tag: "vless-reality-in",
-                listen: "0.0.0.0",
-                port: 18084,
-                protocol: "vless",
-                settings: {
-                  clients: [{id: "6ba85179-8f75-4e09-8f61-ae0f58b196fd", flow: "xtls-rprx-vision"}],
-                  decryption: "none"
-                },
-                streamSettings: {
-                  network: "tcp",
-                  security: "reality",
-                  realitySettings: {
-                    show: false,
-                    target: "127.0.0.1:18083",
-                    xver: 0,
-                    serverNames: ["localhost"],
-                    privateKey: $privateKey,
-                    shortIds: ["0123456789abcdef"]
-                  }
-                }
-              }],
-              outbounds: [{
-                tag: "marker",
-                protocol: "freedom",
-                settings: {
-                  redirect: "127.0.0.1:18080"
-                }
-              }],
-              routing: {rules: [{type: "field", inboundTag: ["vless-reality-in"], outboundTag: "marker"}]}
-            }' > "$RUNNER_TEMP/xray-reality-server.json"
-          "$xray" run -test -config "$RUNNER_TEMP/xray-reality-server.json"
-          "$xray" run -config "$RUNNER_TEMP/xray-reality-server.json" > "$RUNNER_TEMP/xray-console.log" 2>&1 &
-          echo $! > "$RUNNER_TEMP/xray-server.pid"
-          echo "SOAK_REALITY_PUBLIC_KEY=$public_key" >> "$GITHUB_ENV"
-
           mkdir -p "$RUNNER_TEMP/soak-http"
           printf 'ozero-singbox-routed\n' > "$RUNNER_TEMP/soak-http/ozero-soak-marker"
           python3 -m http.server 18080 --bind 0.0.0.0 --directory "$RUNNER_TEMP/soak-http" > "$RUNNER_TEMP/soak-http.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/soak-http.pid"
-          for port in 18080 18081 18082 18083 18084; do
+          for port in 18080 18081 18082 18083; do
             for attempt in {1..30}; do
               nc -z 127.0.0.1 "$port" && break
               sleep 1
@@ -226,6 +181,10 @@ jobs:
 
       - name: Run real Sing-box TUN soak
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          OZERO_SOAK_REALITY_URI: ${{ secrets.OZERO_SOAK_REALITY_URI }}
+          OZERO_SOAK_REALITY_TARGET: ${{ secrets.OZERO_SOAK_REALITY_TARGET }}
+          OZERO_SOAK_REALITY_MARKER: ${{ secrets.OZERO_SOAK_REALITY_MARKER }}
         with:
           api-level: ${{ inputs['api-level'] || '30' }}
           arch: arm64-v8a
@@ -244,7 +203,9 @@ jobs:
               -e OZERO_SOAK 1 \
               -e OZERO_SOAK_CYCLES "$SOAK_CYCLES" \
               -e OZERO_SOAK_VLESS 'vless://5f21f2e4-c0df-4e5a-8d21-e80266fd3083@10.0.2.2:18081?security=none&type=tcp' \
-              -e OZERO_SOAK_VLESS_REALITY "vless://6ba85179-8f75-4e09-8f61-ae0f58b196fd@10.0.2.2:18084?type=tcp&security=reality&sni=localhost&fp=chrome&pbk=${SOAK_REALITY_PUBLIC_KEY}&sid=0123456789abcdef&flow=xtls-rprx-vision" \
+              -e OZERO_SOAK_VLESS_REALITY "$OZERO_SOAK_REALITY_URI" \
+              -e OZERO_SOAK_REALITY_TARGET "$OZERO_SOAK_REALITY_TARGET" \
+              -e OZERO_SOAK_REALITY_MARKER "$OZERO_SOAK_REALITY_MARKER" \
               -e OZERO_SOAK_VMESS 'vmess://ab61a8a5-bce6-4c39-8f40-d97142eedca6@10.0.2.2:18082?security=none&type=tcp&encryption=auto' \
               -e OZERO_SOAK_TROJAN 'trojan://ozero-ephemeral-soak@10.0.2.2:18083?security=tls&sni=localhost&allowInsecure=1&type=tcp' \
               -e class ru.ozero.app.soak.SoakTest \
@@ -259,8 +220,6 @@ jobs:
               hits=$(grep -Ec "\\[${protocol}-in\\].*inbound connection" "$RUNNER_TEMP/singbox-server.log" || true)
               (( hits >= SOAK_CYCLES )) || status=1
             done
-            reality_hits=$(grep -Ec '\[vless-reality-in -> marker\]' "$RUNNER_TEMP/xray-access.log" || true)
-            (( reality_hits >= SOAK_CYCLES )) || status=1
             exit "$status"
 
       - name: Write job summary
@@ -281,9 +240,6 @@ jobs:
         run: |
           cp "$RUNNER_TEMP/singbox-server.log" singbox-server.log 2>/dev/null || true
           cp "$RUNNER_TEMP/soak-http.log" soak-http.log 2>/dev/null || true
-          cp "$RUNNER_TEMP/xray-access.log" xray-access.log 2>/dev/null || true
-          cp "$RUNNER_TEMP/xray-error.log" xray-error.log 2>/dev/null || true
-          cp "$RUNNER_TEMP/xray-console.log" xray-console.log 2>/dev/null || true
 
       - name: Upload soak evidence
         uses: actions/upload-artifact@v6
@@ -296,8 +252,5 @@ jobs:
             ${{ runner.temp }}/soak-logcat.txt
             singbox-server.log
             soak-http.log
-            xray-access.log
-            xray-error.log
-            xray-console.log
           if-no-files-found: warn
           retention-days: 30

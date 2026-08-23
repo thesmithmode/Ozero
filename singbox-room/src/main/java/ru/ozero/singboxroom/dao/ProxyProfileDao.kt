@@ -103,6 +103,17 @@ interface ProxyProfileDao {
         }
     }
 
+    @Transaction
+    suspend fun replaceForGroupAndReturnRemovedIds(
+        groupId: Long,
+        profiles: List<ProxyProfile>,
+    ): Set<Long> {
+        val existingIds = getIdsByGroupId(groupId).toSet()
+        val retainedIds = profiles.mapNotNull { it.id.takeIf { id -> id != 0L } }.toSet()
+        replaceForGroup(groupId, profiles)
+        return existingIds - retainedIds
+    }
+
     companion object {
         const val MAX_SQL_BIND_IDS = 500
     }

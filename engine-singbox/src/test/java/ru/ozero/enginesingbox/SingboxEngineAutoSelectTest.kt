@@ -158,6 +158,10 @@ class SingboxEngineAutoSelectTest {
                 flow.value = emptyList()
             }
 
+            override suspend fun deleteByProfileIds(profileIds: Set<Long>) {
+                flow.value = flow.value.filterNot { it.profileId in profileIds }
+            }
+
             override suspend fun insertAll(steps: List<ProxyChainStep>) {
                 flow.value = steps
             }
@@ -330,6 +334,7 @@ class SingboxEngineAutoSelectTest {
                 ProxyChainStep(profileId = selected.id, userOrder = 1),
             )
             override suspend fun clear() = Unit
+            override suspend fun deleteByProfileIds(profileIds: Set<Long>) = Unit
             override suspend fun insertAll(steps: List<ProxyChainStep>) = Unit
             override suspend fun replace(profileIds: List<Long>) = Unit
         }

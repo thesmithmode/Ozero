@@ -20,6 +20,7 @@ import ru.ozero.singboxcore.Libsingboxgojni
 
 class SingboxEngineService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val stopLock = Any()
 
     private val binder = object : ISingboxEngineProcess.Stub() {
 
@@ -135,7 +136,9 @@ class SingboxEngineService : Service() {
             stopAndWait(DEFAULT_STOP_TIMEOUT_MS)
         }
 
-        override fun stopAndWait(timeoutMs: Long): Boolean = stopRuntimeAndWait(timeoutMs)
+        override fun stopAndWait(timeoutMs: Long): Boolean = synchronized(stopLock) {
+            stopRuntimeAndWait(timeoutMs)
+        }
 
         override fun runtimeRunning(): Boolean = SingboxRuntime.isRunning()
 

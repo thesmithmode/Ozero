@@ -55,6 +55,20 @@ class DetachedTunFdTest {
     }
 
     @Test
+    fun `host close is one compare and set transition after libbox transfer`() {
+        val closed = mutableListOf<Int>()
+        val ownership = DetachedTunFd(44, closed::add)
+
+        ownership.provideToLibbox()
+
+        assertTrue(ownership.closeOwnedByHost())
+        assertFalse(ownership.closeOwnedByHost())
+        assertFalse(ownership.closeIfDetached())
+        assertEquals(TunFdOwnershipState.CLOSED, ownership.state)
+        assertEquals(listOf(44), closed)
+    }
+
+    @Test
     fun `proxy mode has no detached tun ownership`() {
         val ownership: DetachedTunFd? = null
 

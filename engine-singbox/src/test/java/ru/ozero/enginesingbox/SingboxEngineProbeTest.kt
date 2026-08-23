@@ -1015,6 +1015,7 @@ class SingboxEngineProbeTest {
             override fun getAllFlow(): Flow<List<ProxyChainStep>> = MutableStateFlow(steps)
             override suspend fun getAll(): List<ProxyChainStep> = steps
             override suspend fun clear() = Unit
+            override suspend fun deleteByProfileIds(profileIds: Set<Long>) = Unit
             override suspend fun insertAll(steps: List<ProxyChainStep>) = Unit
             override suspend fun replace(profileIds: List<Long>) = Unit
         }

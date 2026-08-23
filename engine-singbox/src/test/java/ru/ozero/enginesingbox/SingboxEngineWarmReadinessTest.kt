@@ -189,6 +189,7 @@ class SingboxEngineWarmReadinessTest {
             override fun getAllFlow(): Flow<List<ProxyChainStep>> = MutableStateFlow(emptyList())
             override suspend fun getAll(): List<ProxyChainStep> = emptyList()
             override suspend fun clear() = Unit
+            override suspend fun deleteByProfileIds(profileIds: Set<Long>) = Unit
             override suspend fun insertAll(steps: List<ProxyChainStep>) = Unit
             override suspend fun replace(profileIds: List<Long>) = Unit
         }

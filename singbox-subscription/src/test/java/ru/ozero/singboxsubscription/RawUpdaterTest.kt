@@ -26,6 +26,7 @@ import ru.ozero.singboxsubscription.parser.RawShareLinksParser
 import java.security.cert.CertPathValidatorException
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
+import java.net.SocketTimeoutException
 import javax.net.ssl.SSLHandshakeException
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -282,6 +283,13 @@ class RawUpdaterTest {
         assertTrue(updated.lastAttemptAt >= before)
         assertEquals(null, updated.lastRefreshErrorCode)
         assertEquals(1, updated.lastServerCount)
+        assertEquals(1L, updated.refreshGeneration)
+    }
+
+    @Test
+    fun `transient failure classifier does not retry unsupported refresh`() {
+        assertTrue(isTransientSubscriptionRefreshFailure(SocketTimeoutException("timeout")))
+        assertFalse(isTransientSubscriptionRefreshFailure(IllegalArgumentException("unsupported")))
     }
 
     @Test

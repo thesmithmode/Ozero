@@ -146,6 +146,9 @@ internal object SingboxRuntime {
         protectorBridge: SingboxProtectorBridge,
         detachedTunFd: DetachedTunFd?,
     ) {
+        check(detachedTunFd == null || detachedTunFd.fd == tunFd) {
+            "detached TUN fd does not match runtime fd"
+        }
         PersistentLoggers.debug(TAG, "start configLen=${singboxJsonConfig.length} fd=$tunFd")
 
         val socketFile = File(basePath, "command.sock")
@@ -469,7 +472,8 @@ internal object SingboxRuntime {
 
         override fun openTun(options: TunOptions): Int {
             PersistentLoggers.debug(TAG, "openTun mtu=${options.mtu}")
-            return detachedTunFd?.provideToLibbox() ?: tunFd
+            val providedFd = detachedTunFd?.provideToLibbox()
+            return providedFd ?: tunFd
         }
 
         fun closeTunFd() {

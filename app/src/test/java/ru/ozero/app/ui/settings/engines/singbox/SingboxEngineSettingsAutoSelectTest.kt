@@ -70,6 +70,20 @@ class SingboxEngineSettingsAutoSelectTest {
             override suspend fun count(): Int = groupsFlow.value.size
             override suspend fun insert(group: SubscriptionGroup): Long = group.id
             override suspend fun update(group: SubscriptionGroup) {}
+
+            override suspend fun tryBeginRefresh(id: Long, expectedGeneration: Long, attemptAt: Long): Int = 0
+
+            override suspend fun commitRefresh(
+                id: Long,
+                refreshGeneration: Long,
+                lastUpdated: Long,
+                lastAttemptAt: Long,
+                lastRefreshErrorCode: String?,
+                lastServerCount: Int,
+                bytesUsed: Long,
+                bytesRemaining: Long,
+                expiryDate: Long,
+            ): Int = 0
             override suspend fun delete(group: SubscriptionGroup) {}
         }
         val profileDao = object : ProxyProfileDao {
@@ -102,6 +116,9 @@ class SingboxEngineSettingsAutoSelectTest {
             override suspend fun getAll(): List<ProxyChainStep> = chainStepsFlow.value
             override suspend fun clear() {
                 chainStepsFlow.value = emptyList()
+            }
+            override suspend fun deleteByProfileIds(profileIds: Set<Long>) {
+                chainStepsFlow.value = chainStepsFlow.value.filterNot { it.profileId in profileIds }
             }
             override suspend fun insertAll(steps: List<ProxyChainStep>) {
                 chainStepsFlow.value = steps

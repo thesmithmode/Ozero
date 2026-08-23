@@ -19,6 +19,9 @@ interface ProxyChainDao {
     @Query("DELETE FROM proxy_chain_steps")
     suspend fun clear()
 
+    @Query("DELETE FROM proxy_chain_steps WHERE profileId IN (:profileIds)")
+    suspend fun deleteByProfileIds(profileIds: Set<Long>)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(steps: List<ProxyChainStep>)
 

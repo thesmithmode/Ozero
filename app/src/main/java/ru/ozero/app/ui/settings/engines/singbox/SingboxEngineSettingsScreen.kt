@@ -883,6 +883,7 @@ private fun AddManualLinksDialog(
                             Text(
                                 when (error) {
                                     "empty" -> stringResource(R.string.singbox_manual_links_error_empty)
+                                    "unsupported" -> stringResource(R.string.singbox_manual_links_error_unsupported)
                                     else -> stringResource(R.string.singbox_manual_links_error_parse)
                                 },
                             )

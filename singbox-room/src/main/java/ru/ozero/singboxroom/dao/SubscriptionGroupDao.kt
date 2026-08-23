@@ -36,6 +36,40 @@ interface SubscriptionGroupDao {
     @Update
     suspend fun update(group: SubscriptionGroup)
 
+    @Query(
+        """
+        UPDATE subscription_groups
+        SET lastAttemptAt = :attemptAt, refreshGeneration = refreshGeneration + 1
+        WHERE id = :id AND refreshGeneration = :expectedGeneration
+        """,
+    )
+    suspend fun tryBeginRefresh(id: Long, expectedGeneration: Long, attemptAt: Long): Int
+
+    @Query(
+        """
+        UPDATE subscription_groups
+        SET lastUpdated = :lastUpdated,
+            lastAttemptAt = :lastAttemptAt,
+            lastRefreshErrorCode = :lastRefreshErrorCode,
+            lastServerCount = :lastServerCount,
+            bytesUsed = :bytesUsed,
+            bytesRemaining = :bytesRemaining,
+            expiryDate = :expiryDate
+        WHERE id = :id AND refreshGeneration = :refreshGeneration
+        """,
+    )
+    suspend fun commitRefresh(
+        id: Long,
+        refreshGeneration: Long,
+        lastUpdated: Long,
+        lastAttemptAt: Long,
+        lastRefreshErrorCode: String?,
+        lastServerCount: Int,
+        bytesUsed: Long,
+        bytesRemaining: Long,
+        expiryDate: Long,
+    ): Int
+
     @Delete
     suspend fun delete(group: SubscriptionGroup)
 

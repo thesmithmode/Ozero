@@ -50,13 +50,31 @@ class SoakTest {
             ?: DEFAULT_CYCLES_PER_PROTOCOL
         require(cyclesPerProtocol in 1..MAX_CYCLES_PER_PROTOCOL)
         val targetUrl = args.getString("OZERO_SOAK_TARGET") ?: DEFAULT_TARGET
-        val profileUris = listOf(
-            "vless" to requireNotNull(args.getString("OZERO_SOAK_VLESS")) { "missing VLESS profile" },
-            "vless_reality" to requireNotNull(args.getString("OZERO_SOAK_VLESS_REALITY")) {
-                "missing VLESS Reality profile"
-            },
-            "vmess" to requireNotNull(args.getString("OZERO_SOAK_VMESS")) { "missing VMess profile" },
-            "trojan" to requireNotNull(args.getString("OZERO_SOAK_TROJAN")) { "missing Trojan profile" },
+        val profileInputs = listOf(
+            SoakProfileInput(
+                "vless",
+                requireNotNull(args.getString("OZERO_SOAK_VLESS")) { "missing VLESS profile" },
+                targetUrl,
+                DEFAULT_MARKER,
+            ),
+            SoakProfileInput(
+                "vless_reality",
+                requireNotNull(args.getString("OZERO_SOAK_VLESS_REALITY")) { "missing VLESS Reality profile" },
+                requireNotNull(args.getString("OZERO_SOAK_REALITY_TARGET")) { "missing Reality target" },
+                requireNotNull(args.getString("OZERO_SOAK_REALITY_MARKER")) { "missing Reality marker" },
+            ),
+            SoakProfileInput(
+                "vmess",
+                requireNotNull(args.getString("OZERO_SOAK_VMESS")) { "missing VMess profile" },
+                targetUrl,
+                DEFAULT_MARKER,
+            ),
+            SoakProfileInput(
+                "trojan",
+                requireNotNull(args.getString("OZERO_SOAK_TROJAN")) { "missing Trojan profile" },
+                targetUrl,
+                DEFAULT_MARKER,
+            ),
         )
         val targetContext = instrumentation.targetContext
         val testContext = instrumentation.context
@@ -64,7 +82,7 @@ class SoakTest {
             targetContext.applicationContext,
             SoakTestEntryPoint::class.java,
         )
-        val profiles = seedProfiles(dependencies, profileUris)
+        val profiles = seedProfiles(dependencies, profileInputs)
         dependencies.settingsRepository().setTrafficMode(TrafficMode.TUN)
         dependencies.settingsRepository().setManualEngine(EngineId.SINGBOX)
         dependencies.settingsRepository().setIpv6Enabled(false)
@@ -85,7 +103,11 @@ class SoakTest {
                     stopVpn(targetContext, dependencies.tunnelController())
                     startVpn(targetContext)
                     awaitConnected(dependencies.tunnelController())
-                    val probe = probeFromExternalUid(testContext, targetUrl)
+                    val probe = probeFromExternalUid(
+                        testContext,
+                        soakProfile.targetUrl,
+                        soakProfile.expectedMarker,
+                    )
                     check(probe.vpnTransport) { "external probe did not use Android VPN transport" }
                     check(probe.httpCode in 200..299) { "external routed HTTP failed code=${probe.httpCode}" }
                     check(probe.markerMatch) { "external routed HTTP returned an unexpected marker" }
@@ -111,13 +133,13 @@ class SoakTest {
 
     private suspend fun seedProfiles(
         dependencies: SoakTestEntryPoint,
-        uris: List<Pair<String, String>>,
+        inputs: List<SoakProfileInput>,
     ): List<SoakProfile> {
         val groupId = dependencies.subscriptionGroupDao().insert(
             SubscriptionGroup(name = "Sing-box soak", autoUpdate = false),
         )
-        return uris.mapIndexed { index, (protocol, uri) ->
-            val bean = parseProfile(uri)
+        return inputs.mapIndexed { index, input ->
+            val bean = parseProfile(input.uri)
             val profile = ProxyProfile(
                 groupId = groupId,
                 name = bean.javaClass.simpleName,
@@ -126,8 +148,10 @@ class SoakTest {
                 userOrder = index,
             )
             SoakProfile(
-                protocol = protocol,
+                protocol = input.protocol,
                 profile = profile.copy(id = dependencies.proxyProfileDao().insert(profile)),
+                targetUrl = input.targetUrl,
+                expectedMarker = input.expectedMarker,
             )
         }
     }
@@ -180,7 +204,11 @@ class SoakTest {
         }
     }
 
-    private suspend fun probeFromExternalUid(context: Context, targetUrl: String): ExternalProbeResult {
+    private suspend fun probeFromExternalUid(
+        context: Context,
+        targetUrl: String,
+        expectedMarker: String,
+    ): ExternalProbeResult {
         val result = CompletableDeferred<ExternalProbeResult>()
         val receiver = object : ResultReceiver(Handler(Looper.getMainLooper())) {
             override fun onReceiveResult(resultCode: Int, resultData: Bundle) {
@@ -196,6 +224,7 @@ class SoakTest {
         val started = context.startService(
             Intent(context, SoakExternalProbeService::class.java)
                 .putExtra(SoakExternalProbeService.EXTRA_URL, targetUrl)
+                .putExtra(SoakExternalProbeService.EXTRA_EXPECTED_MARKER, expectedMarker)
                 .putExtra(SoakExternalProbeService.EXTRA_RECEIVER, receiver),
         )
         check(started != null) { "external probe service did not start" }
@@ -243,12 +272,22 @@ class SoakTest {
     private data class SoakProfile(
         val protocol: String,
         val profile: ProxyProfile,
+        val targetUrl: String,
+        val expectedMarker: String,
+    )
+
+    private data class SoakProfileInput(
+        val protocol: String,
+        val uri: String,
+        val targetUrl: String,
+        val expectedMarker: String,
     )
 
     companion object {
         private const val DEFAULT_CYCLES_PER_PROTOCOL = 20
         private const val MAX_CYCLES_PER_PROTOCOL = 100
         private const val DEFAULT_TARGET = "http://10.0.2.2:18080/ozero-soak-marker"
+        private const val DEFAULT_MARKER = "ozero-singbox-routed"
         private const val START_TIMEOUT_MS = 30_000L
         private const val STOP_TIMEOUT_MS = 10_000L
         private const val PROBE_TIMEOUT_MS = 15_000L

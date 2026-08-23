@@ -42,6 +42,13 @@ class SingboxEngineServiceTest {
     }
 
     @Test
+    fun `remote stop calls share one serialized lifecycle gate`() {
+        assertTrue(source.contains("private val stopLock = Any()"))
+        assertTrue(source.contains("synchronized(stopLock)"))
+        assertTrue(source.contains("stopRuntimeAndWait(timeoutMs)"))
+    }
+
+    @Test
     fun `all native start entry points use hard process watchdog`() {
         val startWithConfig = source.substringAfter("override fun startWithConfig(")
             .substringBefore("override fun startWithConfigFile(")

@@ -44,6 +44,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SingboxProbeServiceTest {
+    companion object {
+        private val knownProfiles = ConcurrentHashMap<Long, ProxyProfile>()
+    }
+
     @Test
     fun `profile probe returns typed final failure without diagnostic detail`() {
         val source = java.io.File(
@@ -391,6 +395,34 @@ class SingboxProbeServiceTest {
     }
 
     @Test
+    fun `probe result is ignored when profile payload changes during the probe`() = runTest {
+        val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        val dataStore = flowDataStore(prefsFlow)
+        val dao = FakeProxyProfileDao()
+        val profile = makeProfile(id = 17L, host = "replace-during-probe.example", port = 443)
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val probe = object : SingboxProfileProbe {
+            override suspend fun probeLatencyMs(bean: AbstractBean, settings: SingboxProfileProbeSettings): Int {
+                started.complete(Unit)
+                release.await()
+                return 10
+            }
+        }
+
+        val job = launch {
+            SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(listOf(profile))
+        }
+        started.await()
+        knownProfiles[profile.id] = profile.copy(beanBlob = byteArrayOf(1, 2, 3))
+        release.complete(Unit)
+        job.join()
+
+        assertTrue(dao.latencies.isEmpty())
+        assertNull(prefsFlow.value[selectedProfileKey])
+    }
+
+    @Test
     fun `probeAndAutoSelect with empty profiles leaves prefs and latencies unchanged`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
@@ -539,7 +571,7 @@ class SingboxProbeServiceTest {
                 },
             ),
             protocolType = SingboxEngine.PROTOCOL_VLESS,
-        )
+        ).also { knownProfiles[it.id] = it }
 
     private fun flowDataStore(prefsFlow: MutableStateFlow<Preferences>): DataStore<Preferences> =
         object : DataStore<Preferences> {
@@ -556,6 +588,10 @@ class SingboxProbeServiceTest {
         val latencies = ConcurrentHashMap<Long, Int>()
         val errors = ConcurrentHashMap<Long, String>()
 
+        init {
+            knownProfiles.clear()
+        }
+
         override suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long) {
             latencies[id] = latency
             if (probeError == null) {
@@ -569,7 +605,7 @@ class SingboxProbeServiceTest {
         override suspend fun insertAll(profiles: List<ProxyProfile>) = Unit
         override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
             profiles.map { it.id.takeIf { id -> id != 0L } ?: 1L }
-        override suspend fun getById(id: Long): ProxyProfile? = null
+        override suspend fun getById(id: Long): ProxyProfile? = knownProfiles[id]
         override fun getByIdFlow(id: Long): Flow<ProxyProfile?> = MutableStateFlow(null)
         override fun getAllFlow(): Flow<List<ProxyProfile>> = MutableStateFlow(emptyList())
         override fun getAllLimitedFlow(limit: Int): Flow<List<ProxyProfile>> = MutableStateFlow(emptyList())

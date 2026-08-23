@@ -30,9 +30,16 @@ internal class DetachedTunFd(
     }
 
     fun closeOwnedByHost(): Boolean {
-        val previous = ownership.getAndSet(TunFdOwnershipState.CLOSED)
-        if (previous == TunFdOwnershipState.CLOSED) return false
-        closeFd(fd)
-        return true
+        while (true) {
+            when (val current = ownership.get()) {
+                TunFdOwnershipState.CLOSED -> return false
+                TunFdOwnershipState.DETACHED,
+                TunFdOwnershipState.PROVIDED_TO_LIBBOX,
+                -> if (ownership.compareAndSet(current, TunFdOwnershipState.CLOSED)) {
+                    closeFd(fd)
+                    return true
+                }
+            }
+        }
     }
 }

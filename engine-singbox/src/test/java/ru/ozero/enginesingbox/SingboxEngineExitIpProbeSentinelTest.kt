@@ -139,6 +139,28 @@ class SingboxEngineExitIpProbeSentinelTest {
             "SingboxEngine stop timeout must exceed remote stopAndWait timeout so ChainOrchestrator does not cancel it early",
         )
     }
+
+    @Test
+    fun `singbox ignores stale service callbacks and attach generations`() {
+        assertTrue(source.contains("private val lifecycleMutex = Mutex()"))
+        assertTrue(source.contains("private val lifecycleGeneration = AtomicLong(0)"))
+        assertTrue(source.contains("private val connectionGeneration = AtomicLong(0)"))
+        assertTrue(source.contains("isCurrentConnection(connectionId, connection)"))
+        assertTrue(source.contains("isCurrentLifecycle(generation)"))
+        assertTrue(source.contains("lifecycleGeneration.incrementAndGet()"))
+    }
+
+    @Test
+    fun `singbox serializes attach and stop around remote native lifecycle`() {
+        val attachBlock = source.substringAfter("override suspend fun attachTun")
+            .substringBefore("private fun stopRuntimeAfterFailedReadiness")
+        val stopBlock = source.substringAfter("override suspend fun stop()")
+            .substringBefore("override fun stopTimeoutMs")
+
+        assertTrue(attachBlock.contains("lifecycleMutex.withLock"))
+        assertTrue(stopBlock.contains("lifecycleMutex.withLock"))
+        assertTrue(stopBlock.contains("p.stopAndWait(REMOTE_STOP_TIMEOUT_MS)"))
+    }
 }
 
 private fun String.hasCallWithArgs(call: String, vararg args: String): Boolean {
