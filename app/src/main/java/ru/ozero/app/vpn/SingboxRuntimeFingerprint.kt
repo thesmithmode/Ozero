@@ -9,6 +9,7 @@ import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.ConfigBuilder
 import ru.ozero.singboxconfig.PersistedProfileRecovery
 import ru.ozero.singboxconfig.RecoveryResult
+import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxroom.entity.ProxyChainStep
 import ru.ozero.singboxroom.entity.ProxyProfile
 
@@ -79,7 +80,15 @@ internal fun singboxRuntimeFingerprint(
 }
 
 private fun ProxyProfile.toRuntimePayload(): RuntimeProfilePayload =
-    RuntimeProfilePayload(id = id, protocolType = protocolType, beanPayload = beanBlob.toList())
+    RuntimeProfilePayload(id = id, protocolType = protocolType, beanPayload = runtimeBeanPayload())
+
+internal fun ProxyProfile.runtimeBeanPayload(): List<Byte> =
+    when (val recovered = PersistedProfileRecovery.recover(beanBlob, protocolType)) {
+        is RecoveryResult.Success -> KryoSerializer.serialize(
+            ConfigBuilder.canonicalBean(recovered.bean).value.apply { name = "" },
+        ).toList()
+        is RecoveryResult.Failure -> beanBlob.toList()
+    }
 
 private val SINGBOX_DNS_SERVERS_KEY = stringSetPreferencesKey("singbox_dns_servers")
 

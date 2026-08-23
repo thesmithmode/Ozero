@@ -275,7 +275,7 @@ jobs:
         uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: singbox-arm64-soak-evidence
+          name: singbox-arm64-soak-evidence-${{ matrix.require_reality }}
           path: |
             soak-metrics.json
             ${{ runner.temp }}/soak-output.txt
