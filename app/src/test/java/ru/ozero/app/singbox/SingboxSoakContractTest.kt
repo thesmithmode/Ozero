@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class SingboxSoakContractTest {
 
     @Test
-    fun `soak runs native arm64 app and exercises real VPN traffic`() {
+    fun `soak runs native x86_64 app and exercises real VPN traffic`() {
         val root = locateRepoRoot()
         val workflow = File(root, ".github/workflows/soak.yml").readText()
         val runner = File(root, ".github/soak/run-singbox-tun-soak.sh").readText()
@@ -30,6 +30,9 @@ class SingboxSoakContractTest {
         assertTrue(workflow.contains("runs-on: ubuntu-latest"))
         assertTrue(workflow.contains("arch: x86_64"))
         assertTrue(workflow.contains("-Pozero.soak.x86_64=true"))
+        assertTrue(workflow.contains("Build libhev for x86_64 soak APK"))
+        assertTrue(workflow.contains("APP_ABI=\"x86_64\""))
+        assertTrue(workflow.contains("libhev-ozero-socks5-tunnel.so"))
         assertTrue(appBuild.contains("val soakX86_64"))
         assertTrue(engineBuild.contains("val soakX86_64"))
         assertTrue(appBuild.contains("val supportedAbis"))
