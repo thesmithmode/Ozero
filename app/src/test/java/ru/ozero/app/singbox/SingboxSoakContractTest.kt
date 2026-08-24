@@ -17,6 +17,11 @@ class SingboxSoakContractTest {
             "app/src/androidTest/java/ru/ozero/app/soak/SoakTest.kt",
         ).readText()
         val manifest = File(root, "app/src/androidTest/AndroidManifest.xml").readText()
+        val debugManifest = File(root, "app/src/debug/AndroidManifest.xml").readText()
+        val debugNetworkSecurity = File(
+            root,
+            "app/src/debug/res/xml/network_security_config_debug.xml",
+        ).readText()
 
         assertTrue(workflow.contains("default: '35'"))
         assertTrue(workflow.contains("target: google_apis"))
@@ -24,6 +29,9 @@ class SingboxSoakContractTest {
         assertFalse(workflow.contains("arch: arm64-v8a"))
         assertTrue(workflow.contains("download-libbox-aar.sh"))
         assertFalse(workflow.contains("gh release download singbox-1.13.12"))
+        assertTrue(debugManifest.contains("@xml/network_security_config_debug"))
+        assertTrue(debugNetworkSecurity.contains("cleartextTrafficPermitted=\"true\""))
+        assertTrue(debugNetworkSecurity.contains(">10.0.2.2</domain>"))
         assertTrue(workflow.contains(":app:assembleDebugAndroidTest"))
         assertTrue(workflow.contains("OZERO_SOAK_VLESS"))
         assertTrue(workflow.contains("OZERO_SOAK_VMESS"))
