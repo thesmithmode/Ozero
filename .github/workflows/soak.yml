@@ -10,7 +10,7 @@ on:
       api-level:
         description: 'Android emulator API level for native ARM64 APK validation'
         required: false
-        default: '35'
+        default: '30'
   push:
     branches: [dev]
     paths:
@@ -245,7 +245,7 @@ jobs:
           OZERO_SOAK_EXPECTED_METRICS_PROTOCOLS: ${{ matrix.expected_metrics_protocols }}
           OZERO_SOAK_EXPECTED_SERVER_INBOUNDS: ${{ matrix.expected_server_inbounds }}
         with:
-          api-level: ${{ inputs['api-level'] || '35' }}
+          api-level: ${{ inputs['api-level'] || '30' }}
           target: google_apis
           arch: arm64-v8a
           profile: pixel_5

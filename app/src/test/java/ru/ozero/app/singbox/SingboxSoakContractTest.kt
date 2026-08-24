@@ -23,7 +23,7 @@ class SingboxSoakContractTest {
             "app/src/debug/res/xml/network_security_config_debug.xml",
         ).readText()
 
-        assertTrue(workflow.contains("default: '35'"))
+        assertTrue(workflow.contains("default: '30'"))
         assertTrue(workflow.contains("target: google_apis"))
         assertTrue(workflow.contains("runs-on: macos-14"))
         assertTrue(workflow.contains("arch: arm64-v8a"))
