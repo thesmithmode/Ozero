@@ -59,7 +59,7 @@ class ConfigBuilderBranchCoverageTest {
     }
 
     @Test
-    fun `tls block falls back to domain server address not websocket host`() {
+    fun `tls block uses websocket host before domain server address`() {
         val json = ConfigBuilder.buildSingboxConfig(
             vless().apply {
                 security = "tls"
@@ -68,8 +68,8 @@ class ConfigBuilderBranchCoverageTest {
             },
         )
 
-        assertContains(json, "\"server_name\":\"server.example.com\"")
-        assertFalse(json.contains("\"server_name\":\"front.example.com\""))
+        assertContains(json, "\"server_name\":\"front.example.com\"")
+        assertFalse(json.contains("\"server_name\":\"server.example.com\""))
     }
 
     @Test
