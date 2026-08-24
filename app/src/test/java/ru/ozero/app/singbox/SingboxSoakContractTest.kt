@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class SingboxSoakContractTest {
 
     @Test
-    fun `soak uses arm64 app build and exercises real VPN traffic`() {
+    fun `soak runs arm64 app through api 35 translation and exercises real VPN traffic`() {
         val root = locateRepoRoot()
         val workflow = File(root, ".github/workflows/soak.yml").readText()
         val runner = File(root, ".github/soak/run-singbox-tun-soak.sh").readText()
@@ -18,8 +18,12 @@ class SingboxSoakContractTest {
         ).readText()
         val manifest = File(root, "app/src/androidTest/AndroidManifest.xml").readText()
 
-        assertTrue(workflow.contains("arch: arm64-v8a"))
-        assertFalse(workflow.contains("arch: x86_64"))
+        assertTrue(workflow.contains("default: '35'"))
+        assertTrue(workflow.contains("target: google_apis"))
+        assertTrue(workflow.contains("arch: x86_64"))
+        assertFalse(workflow.contains("arch: arm64-v8a"))
+        assertTrue(workflow.contains("download-libbox-aar.sh"))
+        assertFalse(workflow.contains("gh release download singbox-1.13.12"))
         assertTrue(workflow.contains(":app:assembleDebugAndroidTest"))
         assertTrue(workflow.contains("OZERO_SOAK_VLESS"))
         assertTrue(workflow.contains("OZERO_SOAK_VMESS"))
