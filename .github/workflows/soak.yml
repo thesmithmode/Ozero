@@ -8,7 +8,7 @@ on:
         required: false
         default: '20'
       api-level:
-        description: 'Android emulator API level with ARM ABI translation'
+        description: 'Android emulator API level for native ARM64 APK validation'
         required: false
         default: '35'
   push:
@@ -29,7 +29,7 @@ concurrency:
 jobs:
   soak:
     name: ARM64 APK TUN — ${{ matrix.name }}
-    runs-on: ubuntu-24.04
+    runs-on: macos-14
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -47,7 +47,7 @@ jobs:
       contents: read
     env:
       SINGBOX_VERSION: '1.13.12'
-      SINGBOX_SERVER_ARCHIVE_SHA256: '1540533adb3df24f5ad5f14b5c7ca3dbc2401b10a1c1eb278fcadcada47ec6c4'
+      SINGBOX_SERVER_ARCHIVE_SHA256: '43eef86f0ea4a79c3696974f397a963c46a457ee46d1ffac9aa913944a5fc986'
 
     steps:
       - name: Checkout code
@@ -63,6 +63,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Enable Android emulator acceleration
+        if: runner.os == 'Linux'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
@@ -158,11 +159,11 @@ jobs:
             -days 1 \
             -subj '/CN=localhost'
           archive="$RUNNER_TEMP/sing-box.tar.gz"
-          url="https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz"
+          url="https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-darwin-arm64.tar.gz"
           curl --fail --location --retry 3 "$url" --output "$archive"
-          echo "${SINGBOX_SERVER_ARCHIVE_SHA256}  $archive" | sha256sum --check
+          test "$(shasum -a 256 "$archive" | awk '{print $1}')" = "$SINGBOX_SERVER_ARCHIVE_SHA256"
           tar -xzf "$archive" -C "$RUNNER_TEMP"
-          binary="$RUNNER_TEMP/sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box"
+          binary="$RUNNER_TEMP/sing-box-${SINGBOX_VERSION}-darwin-arm64/sing-box"
           reality_keypair=$("$binary" generate reality-keypair)
           reality_private_key=$(awk '/PrivateKey/ { print $NF }' <<< "$reality_keypair")
           reality_public_key=$(awk '/PublicKey/ { print $NF }' <<< "$reality_keypair")
@@ -246,7 +247,7 @@ jobs:
         with:
           api-level: ${{ inputs['api-level'] || '35' }}
           target: google_apis
-          arch: x86_64
+          arch: arm64-v8a
           profile: pixel_5
           emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           script: bash .github/soak/run-singbox-tun-soak.sh
