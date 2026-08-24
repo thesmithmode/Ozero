@@ -258,13 +258,13 @@ class ConfigBuilderVLESSTest {
     }
 
     @Test
-    fun `tls server name falls back to server address when server address is domain`() {
+    fun `tls server name follows websocket host when server address is domain`() {
         val bean = makeBean(host = "proxy.example.com", type = "ws", security = "tls").apply {
             this.host = "front.example.com"
         }
         val json = ConfigBuilder.buildSingboxConfig(bean)
 
-        assertContains(json, "\"server_name\":\"proxy.example.com\"")
+        assertContains(json, "\"server_name\":\"front.example.com\"")
         assertContains(json, "\"Host\":\"front.example.com\"")
     }
 

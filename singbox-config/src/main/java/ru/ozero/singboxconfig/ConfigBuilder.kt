@@ -861,17 +861,9 @@ private fun tlsServerName(bean: StandardV2RayBean): String {
     if (bean.sni.isNotEmpty()) return bean.sni.trim()
     val host = bean.host.trim()
     val server = bean.serverAddress.trim().trim('[', ']')
-    if (bean.canUseHostAsTlsServerName(host, server)) return host
+    if (host.isDomainNameForSni()) return host
     return if (server.isDomainNameForSni()) server else ""
 }
-
-private fun StandardV2RayBean.canUseHostAsTlsServerName(host: String, server: String): Boolean =
-    host.isDomainNameForSni() &&
-        when (security) {
-            "reality" -> true
-            "tls" -> server.isIpAddressForSni()
-            else -> false
-        }
 
 private fun String.isIpAddressForSni(): Boolean =
     isNotEmpty() && (all { it.isDigit() || it == '.' } || ":" in this)
