@@ -30,6 +30,7 @@ class SingboxSoakContractTest {
         assertTrue(workflow.contains("download-libbox-aar.sh"))
         assertFalse(workflow.contains("gh release download singbox-1.13.12"))
         assertTrue(debugManifest.contains("@xml/network_security_config_debug"))
+        assertTrue(debugManifest.contains("tools:replace=\"android:networkSecurityConfig\""))
         assertTrue(debugNetworkSecurity.contains("cleartextTrafficPermitted=\"true\""))
         assertTrue(debugNetworkSecurity.contains(">10.0.2.2</domain>"))
         assertTrue(workflow.contains(":app:assembleDebugAndroidTest"))
