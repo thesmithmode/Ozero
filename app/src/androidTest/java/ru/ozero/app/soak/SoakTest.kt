@@ -123,6 +123,7 @@ class SoakTest {
                         )
                     }
                     val probe = probeFromExternalUid(
+                        targetContext,
                         testContext,
                         soakProfile.targetUrl,
                         soakProfile.expectedMarker,
@@ -145,7 +146,12 @@ class SoakTest {
                 selectAutoProfile(dependencies.singboxDataStore())
                 startVpn(targetContext)
                 awaitConnected(dependencies.tunnelController())
-                val probe = probeFromExternalUid(testContext, DEFAULT_TARGET, DEFAULT_MARKER)
+                val probe = probeFromExternalUid(
+                    targetContext,
+                    testContext,
+                    DEFAULT_TARGET,
+                    DEFAULT_MARKER,
+                )
                 check(probe.vpnTransport) {
                     "auto-select external probe did not use Android VPN transport"
                 }
@@ -307,7 +313,8 @@ class SoakTest {
     }
 
     private suspend fun probeFromExternalUid(
-        context: Context,
+        callbackContext: Context,
+        probeContext: Context,
         targetUrl: String,
         expectedMarker: String,
     ): ExternalProbeResult {
@@ -331,22 +338,25 @@ class SoakTest {
             }
         }
         ContextCompat.registerReceiver(
-            context,
+            callbackContext,
             receiver,
             IntentFilter(resultAction),
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         try {
-            context.sendBroadcast(
-                Intent(context, SoakExternalProbeReceiver::class.java)
+            probeContext.sendBroadcast(
+                Intent(probeContext, SoakExternalProbeReceiver::class.java)
                     .putExtra(SoakExternalProbeReceiver.EXTRA_URL, targetUrl)
                     .putExtra(SoakExternalProbeReceiver.EXTRA_EXPECTED_MARKER, expectedMarker)
                     .putExtra(SoakExternalProbeReceiver.EXTRA_RESULT_ACTION, resultAction)
-                    .putExtra(SoakExternalProbeReceiver.EXTRA_RESULT_PACKAGE, context.packageName),
+                    .putExtra(
+                        SoakExternalProbeReceiver.EXTRA_RESULT_PACKAGE,
+                        callbackContext.packageName,
+                    ),
             )
             return withTimeout(PROBE_TIMEOUT_MS) { result.await() }
         } finally {
-            context.unregisterReceiver(receiver)
+            callbackContext.unregisterReceiver(receiver)
         }
     }
 
