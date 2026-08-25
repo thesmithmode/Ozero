@@ -2,8 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <application android:usesCleartextTraffic="true">
-        <service
-            android:name="ru.ozero.app.soak.SoakExternalProbeService"
+        <receiver
+            android:name="ru.ozero.app.soak.SoakExternalProbeReceiver"
             android:exported="true"
             android:process=":soak_probe" />
     </application>

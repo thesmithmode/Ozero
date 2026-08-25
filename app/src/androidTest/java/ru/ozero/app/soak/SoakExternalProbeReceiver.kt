@@ -1,43 +1,43 @@
 package ru.ozero.app.soak
 
-import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Bundle
-import android.os.IBinder
 import android.os.ResultReceiver
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
 
-class SoakExternalProbeService : Service() {
+class SoakExternalProbeReceiver : BroadcastReceiver() {
 
-    override fun onBind(intent: Intent?): IBinder? = null
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val targetUrl = requireNotNull(intent?.getStringExtra(EXTRA_URL))
-        val expectedMarker = requireNotNull(intent.getStringExtra(EXTRA_EXPECTED_MARKER))
-
-        @Suppress("DEPRECATION")
-        val receiver = requireNotNull(intent.getParcelableExtra<ResultReceiver>(EXTRA_RECEIVER))
+    override fun onReceive(context: Context, intent: Intent) {
+        val pendingResult = goAsync()
         thread(name = "soak-external-http") {
-            val vpnTransport = hasVpnTransport()
-            val response = request(targetUrl, expectedMarker)
-            receiver.send(
-                response.httpCode,
-                Bundle().apply {
-                    putBoolean(RESULT_VPN_TRANSPORT, vpnTransport)
-                    putBoolean(RESULT_MARKER_MATCH, response.markerMatch)
-                },
-            )
-            stopSelf(startId)
+            try {
+                val targetUrl = requireNotNull(intent.getStringExtra(EXTRA_URL))
+                val expectedMarker = requireNotNull(intent.getStringExtra(EXTRA_EXPECTED_MARKER))
+                @Suppress("DEPRECATION")
+                val receiver = requireNotNull(intent.getParcelableExtra<ResultReceiver>(EXTRA_RECEIVER))
+                val vpnTransport = hasVpnTransport(context)
+                val response = request(targetUrl, expectedMarker)
+                receiver.send(
+                    response.httpCode,
+                    Bundle().apply {
+                        putBoolean(RESULT_VPN_TRANSPORT, vpnTransport)
+                        putBoolean(RESULT_MARKER_MATCH, response.markerMatch)
+                    },
+                )
+            } finally {
+                pendingResult.finish()
+            }
         }
-        return START_NOT_STICKY
     }
 
-    private fun hasVpnTransport(): Boolean {
-        val connectivity = getSystemService(ConnectivityManager::class.java)
+    private fun hasVpnTransport(context: Context): Boolean {
+        val connectivity = context.getSystemService(ConnectivityManager::class.java)
         val network = connectivity.activeNetwork ?: return false
         val capabilities = connectivity.getNetworkCapabilities(network) ?: return false
         return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)

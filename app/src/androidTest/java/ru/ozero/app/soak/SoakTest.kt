@@ -319,19 +319,18 @@ class SoakTest {
                 result.complete(
                     ExternalProbeResult(
                         httpCode = resultCode,
-                        vpnTransport = resultData.getBoolean(SoakExternalProbeService.RESULT_VPN_TRANSPORT),
-                        markerMatch = resultData.getBoolean(SoakExternalProbeService.RESULT_MARKER_MATCH),
+                        vpnTransport = resultData.getBoolean(SoakExternalProbeReceiver.RESULT_VPN_TRANSPORT),
+                        markerMatch = resultData.getBoolean(SoakExternalProbeReceiver.RESULT_MARKER_MATCH),
                     ),
                 )
             }
         }
-        val started = context.startService(
-            Intent(context, SoakExternalProbeService::class.java)
-                .putExtra(SoakExternalProbeService.EXTRA_URL, targetUrl)
-                .putExtra(SoakExternalProbeService.EXTRA_EXPECTED_MARKER, expectedMarker)
-                .putExtra(SoakExternalProbeService.EXTRA_RECEIVER, receiver),
+        context.sendBroadcast(
+            Intent(context, SoakExternalProbeReceiver::class.java)
+                .putExtra(SoakExternalProbeReceiver.EXTRA_URL, targetUrl)
+                .putExtra(SoakExternalProbeReceiver.EXTRA_EXPECTED_MARKER, expectedMarker)
+                .putExtra(SoakExternalProbeReceiver.EXTRA_RECEIVER, receiver),
         )
-        check(started != null) { "external probe service did not start" }
         return withTimeout(PROBE_TIMEOUT_MS) { result.await() }
     }
 
