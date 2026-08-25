@@ -341,7 +341,7 @@ class SoakTest {
             callbackContext,
             receiver,
             IntentFilter(resultAction),
-            ContextCompat.RECEIVER_NOT_EXPORTED,
+            ContextCompat.RECEIVER_EXPORTED,
         )
         try {
             probeContext.sendBroadcast(
