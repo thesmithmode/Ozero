@@ -26,20 +26,15 @@ class SingboxEngineBuildManualConfigSentinelTest {
     }
 
     @Test
-    fun `should SingboxEngine prefer selected row blob over stale BEAN_KEY`() {
+    fun `should manual config use one fresh storage snapshot`() {
         val content = engineFile().readText()
-        val block = content.substringAfter("override fun buildManualConfig(settings: SettingsModel?): EngineConfig?")
-        val rowBlobIdx = block.indexOf("cachedProfilesById[it] ?: resolveProfileByIdBlocking(it)")
-        val beanIdx = block.indexOf("cachedBlob")
-        assertTrue(
-            rowBlobIdx >= 0 &&
-                beanIdx >= 0 &&
-                rowBlobIdx < beanIdx &&
-                block.contains("selectedProfile?.beanBlob") &&
-                block.contains("chainProfileIdsBlocking()") &&
-                block.contains("missingChainProfileIds"),
-            "SingboxEngine must use the selected profile row blob first and fall back to the cached DataStore blob only when the row is missing. Block:\n$block",
-        )
+        val block = content.substringAfter("override suspend fun buildManualConfigAwaitingStorage")
+            .substringBefore("private fun ensurePreferencesCacheInitialized")
+
+        assertTrue(block.contains("loadStorageSnapshot()"))
+        assertTrue(content.contains("private data class SingboxStorageSnapshot"))
+        assertTrue(content.contains("profileDao.getAllFlow().first()"))
+        assertTrue(content.contains("proxyChainDao.getAll()"))
     }
 
     @Test

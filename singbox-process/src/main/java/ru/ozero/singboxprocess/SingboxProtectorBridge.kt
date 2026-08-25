@@ -1,7 +1,6 @@
 package ru.ozero.singboxprocess
 
 import android.os.ParcelFileDescriptor
-import android.os.Process
 import ru.ozero.enginesingbox.ISingboxProtector
 import ru.ozero.enginescore.PersistentLoggers
 
@@ -10,15 +9,14 @@ internal class SingboxProtectorBridge(
 ) {
     fun protect(fd: Int): Boolean = runCatching {
         ParcelFileDescriptor.fromFd(fd).use { socket ->
-            PersistentLoggers.debug(
-                TAG,
-                "protect request sourcePid=${Process.myPid()} sourceDupFd=${socket.fd}",
-            )
             aidlProtector.protect(socket)
         }
-    }.getOrDefault(false).also { result ->
-        PersistentLoggers.debug(TAG, "protect request sourcePid=${Process.myPid()} result=$result")
-    }
+    }.onFailure { failure ->
+        PersistentLoggers.warn(
+            TAG,
+            "protect failed stableCategory=ipc exceptionClass=${failure::class.java.simpleName}",
+        )
+    }.getOrDefault(false)
 
     private companion object {
         const val TAG = "SingboxProtectorBridge"

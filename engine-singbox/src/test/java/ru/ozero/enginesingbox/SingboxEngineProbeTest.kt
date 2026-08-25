@@ -663,6 +663,7 @@ class SingboxEngineProbeTest {
         val engine = buildEngine()
         val process = mockk<ISingboxEngineProcess>()
         every { process.stats } returns SingboxStats(
+            available = true,
             txTotal = 123L,
             rxTotal = 456L,
             activeConnections = 7,

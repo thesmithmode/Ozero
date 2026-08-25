@@ -130,6 +130,15 @@ private data class DecodedProfiles(
     val failures: List<ProfileInputFailure>,
 )
 
+private data class SingboxStorageSnapshot(
+    val selectedProfileId: Long?,
+    val savedBlob: ByteArray?,
+    val dnsServers: List<String>,
+    val profilesById: Map<Long, ProxyProfile>,
+    val autoProfiles: List<ProxyProfile>,
+    val chainProfileIds: List<Long>,
+)
+
 @Suppress("TooManyFunctions", "LargeClass")
 class SingboxEngine @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -548,7 +557,9 @@ class SingboxEngine @Inject constructor(
         return runCatching {
             p.startProxyMode(json, localProtector)
             runtimeStarted = true
-            val runtimeRunning = runCatching { p.runtimeRunning() }.getOrDefault(false)
+            val runtimeRunning = runCatching { p.runtimeRunning() }
+                .onFailure { logIpcFailure("startProxyMode.runtimeRunning", it) }
+                .getOrDefault(false)
             PersistentLoggers.debug(
                 TAG,
                 "startProxyMode AIDL returned port=$port runtimeRunning=$runtimeRunning",
@@ -595,7 +606,9 @@ class SingboxEngine @Inject constructor(
                     p.startWithConfig(transportPfd, json, localProtector)
                     runtimeStarted = true
                     delay(150)
-                    val runtimeRunning = runCatching { p.runtimeRunning() }.getOrDefault(false)
+                    val runtimeRunning = runCatching { p.runtimeRunning() }
+                        .onFailure { logIpcFailure("attachTun.runtimeRunning", it) }
+                        .getOrDefault(false)
                     if (!isCurrentLifecycle(generation)) {
                         stopRuntimeAfterFailedReadiness(p)
                         clearPendingStart()
@@ -728,7 +741,9 @@ class SingboxEngine @Inject constructor(
         val process = proxy ?: return EnginePlugin.ReadyResult.Timeout("sing-box process is not connected").also {
             PersistentLoggers.warn(TAG, "readiness failed generation=$generation stage=process-not-connected")
         }
-        val runtimeRunning = runCatching { process.runtimeRunning() }.getOrDefault(false)
+        val runtimeRunning = runCatching { process.runtimeRunning() }
+            .onFailure { logIpcFailure("awaitReady.runtimeRunning", it) }
+            .getOrDefault(false)
         if (!runtimeRunning) {
             PersistentLoggers.warn(TAG, "readiness failed generation=$generation stage=runtime-not-running")
             return EnginePlugin.ReadyResult.Timeout("sing-box runtime is not running")
@@ -791,8 +806,10 @@ class SingboxEngine @Inject constructor(
         while (true) {
             val p = proxy
             if (p != null) {
-                val s = runCatching { p.stats }.getOrNull()
-                if (s != null) {
+                val s = runCatching { p.stats }
+                    .onFailure { logIpcFailure("stats.getStats", it) }
+                    .getOrNull()
+                if (s?.available == true) {
                     emit(
                         EngineStats(
                             bytesIn = s.rxTotal,
@@ -833,16 +850,18 @@ class SingboxEngine @Inject constructor(
         }
     }
 
-    override fun buildManualConfig(settings: SettingsModel?): EngineConfig? {
+    override fun buildManualConfig(settings: SettingsModel?): EngineConfig? = runBlocking(Dispatchers.IO) {
+        buildManualConfigFromSnapshot(settings, loadStorageSnapshot())
+    }
+
+    private fun buildManualConfigFromSnapshot(
+        settings: SettingsModel?,
+        snapshot: SingboxStorageSnapshot,
+    ): EngineConfig? {
         val ipv6Enabled = settings?.ipv6Enabled ?: false
         cachedIpv6Enabled = ipv6Enabled
-        if (cachedSelectedProfileId == SELECTED_AUTO) {
-            val profiles = cachedAutoProfiles.ifEmpty {
-                runBlocking(Dispatchers.IO) {
-                    profileDao.getAutoCandidatesFlow(MAX_AUTO_PROFILE_SCAN).first()
-                }
-                    .let(::autoSelectProfileWindow)
-            }
+        if (snapshot.selectedProfileId == SELECTED_AUTO) {
+            val profiles = snapshot.autoProfiles
             if (profiles.isEmpty()) return null
             val migratedProfiles = profiles.map(::migrateProfileBlobBlocking)
             return EngineConfig.Singbox(
@@ -850,30 +869,30 @@ class SingboxEngine @Inject constructor(
                 protocolType = PROTOCOL_AUTO_SELECT,
                 autoSelectBeanBlobs = migratedProfiles.map { it.beanBlob },
                 autoSelectProfileIds = migratedProfiles.map { it.id },
-                dnsServers = cachedDnsServers,
+                dnsServers = snapshot.dnsServers,
                 ipv6Enabled = ipv6Enabled,
             )
         }
-        val selectedProfile = cachedSelectedProfileId
+        val selectedProfile = snapshot.selectedProfileId
             ?.takeIf { it != SELECTED_AUTO }
-            ?.let { cachedProfilesById[it] ?: resolveProfileByIdBlocking(it) }
+            ?.let(snapshot.profilesById::get)
             ?.let(::migrateProfileBlobBlocking)
         val selectedBlob = selectedProfile?.beanBlob
-        val savedRecovery = cachedBlob
-            ?.takeIf { selectedBlob == null && cachedSelectedProfileId == null }
+        val savedRecovery = snapshot.savedBlob
+            ?.takeIf { selectedBlob == null && snapshot.selectedProfileId == null }
             ?.let(::recoverPersistedProfileWithoutProtocol)
         val blob = selectedBlob ?: savedRecovery?.let { KryoSerializer.serialize(it.bean) } ?: return null
         val type = selectedProfile?.protocolType ?: savedRecovery?.let { protocolTypeOf(it.bean) }
             ?: run {
                 PersistentLoggers.warn(
                     TAG,
-                    "singbox manual config rejected profileId=${cachedSelectedProfileId ?: "unknown"} category=DESERIALIZATION",
+                    "singbox manual config rejected profileId=${snapshot.selectedProfileId ?: "unknown"} category=DESERIALIZATION",
                 )
                 return null
             }
-        val chainProfileIds = chainProfileIdsBlocking().filter { it != cachedSelectedProfileId }
+        val chainProfileIds = snapshot.chainProfileIds.filter { it != snapshot.selectedProfileId }
         val chainProfiles = chainProfileIds.map { id ->
-            id to (cachedProfilesById[id] ?: resolveProfileByIdBlocking(id))?.let(::migrateProfileBlobBlocking)
+            id to snapshot.profilesById[id]?.let(::migrateProfileBlobBlocking)
         }
         return EngineConfig.Singbox(
             beanBlob = blob,
@@ -884,14 +903,32 @@ class SingboxEngine @Inject constructor(
                 .filter { (_, profile) -> profile == null }
                 .map { it.first }
                 .toSet(),
-            dnsServers = cachedDnsServers,
+            dnsServers = snapshot.dnsServers,
             ipv6Enabled = ipv6Enabled,
         )
     }
 
     override suspend fun buildManualConfigAwaitingStorage(settings: SettingsModel?): EngineConfig? {
-        if (!preferencesCacheInitialized) ensurePreferencesCacheInitialized(dataStore.data.first())
-        return buildManualConfig(settings)
+        return buildManualConfigFromSnapshot(settings, loadStorageSnapshot())
+    }
+
+    private suspend fun loadStorageSnapshot(): SingboxStorageSnapshot {
+        val prefs = dataStore.data.first()
+        val profiles = profileDao.getAllFlow().first().map(::migrateProfileBlob)
+        val profilesById = profiles.associateBy { it.id }
+        val autoProfiles = profileDao.getAutoCandidatesFlow(MAX_AUTO_PROFILE_SCAN)
+            .first()
+            .map { profilesById[it.id] ?: migrateProfileBlob(it) }
+            .let(::autoSelectProfileWindow)
+        return SingboxStorageSnapshot(
+            selectedProfileId = prefs[SELECTED_PROFILE_KEY],
+            savedBlob = prefs[BEAN_KEY],
+            dnsServers = prefs[SINGBOX_DNS_SERVERS_KEY]?.toList()?.ifEmpty { null }
+                ?: EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
+            profilesById = profilesById,
+            autoProfiles = autoProfiles,
+            chainProfileIds = proxyChainDao.getAll().map { it.profileId },
+        )
     }
 
     private fun ensurePreferencesCacheInitialized(prefs: Preferences) {
@@ -1292,6 +1329,14 @@ class SingboxEngine @Inject constructor(
         .replace(Regex("(?i)(token|key|password)=?[^\\s,;]+"), "${'$'}1=<redacted>")
         .replace(Regex("\\s+"), " ")
         .take(2_000)
+
+    private fun logIpcFailure(operation: String, failure: Throwable) {
+        PersistentLoggers.warn(
+            TAG,
+            "operation=$operation stableCategory=ipc exceptionClass=${failure::class.java.simpleName} " +
+                "sanitizedMessage=${sanitizeExitDetail(failure.message.orEmpty())}",
+        )
+    }
 
     private fun allocateChainPort(): Int {
         val offset = chainPortCounter.getAndIncrement() % CHAIN_PORT_RANGE

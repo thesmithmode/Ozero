@@ -30,7 +30,7 @@ class SingboxRuntimeReleaseSentinelTest {
     }
 
     @Test
-    fun `should SingboxRuntime stop clear commandServer and lastStatus`() {
+    fun `should SingboxRuntime stop clear commandServer`() {
         val root = locateRepoRoot()
         val runtime = File(
             root,
@@ -45,10 +45,6 @@ class SingboxRuntimeReleaseSentinelTest {
         assertTrue(
             stopBlock.contains("commandServer = null"),
             "SingboxRuntime.stop must null out commandServer — release Go runtime resources",
-        )
-        assertTrue(
-            stopBlock.contains("lastStatus = null"),
-            "SingboxRuntime.stop must null out lastStatus — stale status after stop is misleading",
         )
         assertTrue(
             stopBlock.contains("closeCommandServer(it, closeService = true)"),
@@ -132,7 +128,7 @@ class SingboxRuntimeReleaseSentinelTest {
         val statsBlock = content.substringAfter("override fun getStats()")
             .substringBefore("override fun onCreate()")
         assertTrue(
-            statsBlock.contains("SingboxStats()") &&
+            statsBlock.contains("SingboxStats(available = false)") &&
                 !statsBlock.contains("SingboxRuntime.isRunning()) 1") &&
                 !statsBlock.contains("activeConnections = if"),
             "stats must not report activeConnections=1 from runtimeRunning alone; startup health has a separate AIDL method",

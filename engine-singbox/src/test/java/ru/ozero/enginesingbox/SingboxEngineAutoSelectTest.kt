@@ -227,6 +227,34 @@ class SingboxEngineAutoSelectTest {
     }
 
     @Test
+    fun `rapid profile and DNS changes build from latest storage snapshot`() = kotlinx.coroutines.test.runTest {
+        val first = makeProfile(41L, 1L, "first.example.com", 443)
+        val second = makeProfile(42L, 1L, "second.example.com", 443)
+        val third = makeProfile(43L, 1L, "third.example.com", 443)
+        val dataStore = fakeDataStore(
+            mutablePreferencesOf(selectedProfileKey to first.id, dnsServersKey to setOf("1.1.1.1")),
+        )
+        val engine = SingboxEngine(
+            context = mockk(relaxed = true),
+            dataStore = dataStore,
+            profileDao = fakeProfileDao(mapOf(1L to listOf(first, second, third))),
+            proxyChainDao = fakeProxyChainDao(listOf(first.id)),
+        )
+
+        dataStore.updateData {
+            mutablePreferencesOf(selectedProfileKey to second.id, dnsServersKey to setOf("8.8.8.8"))
+        }
+        dataStore.updateData {
+            mutablePreferencesOf(selectedProfileKey to third.id, dnsServersKey to setOf("9.9.9.9"))
+        }
+        val result = assertIs<EngineConfig.Singbox>(engine.buildManualConfigAwaitingStorage(null))
+
+        assertTrue(result.beanBlob.contentEquals(third.beanBlob))
+        assertEquals(listOf("9.9.9.9"), result.dnsServers)
+        assertEquals(listOf(first.id), result.chainProfileIds)
+    }
+
+    @Test
     fun `buildManualConfig passes singbox DNS settings`() {
         val selected = makeProfile(42L, 1L, "proxy.example.com", 443)
         val prefs = mutablePreferencesOf(

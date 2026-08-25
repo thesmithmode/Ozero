@@ -5,6 +5,7 @@ import kotlinx.parcelize.Parcelize
 
 @Parcelize
 data class SingboxStats(
+    val available: Boolean = false,
     val txRateProxy: Long = 0L,
     val rxRateProxy: Long = 0L,
     val txTotal: Long = 0L,
