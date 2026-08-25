@@ -114,4 +114,20 @@ class LogSanitizerTest {
 
         assertEquals("class=<redacted-token>", sanitized)
     }
+
+    @Test
+    fun `sanitize applies one policy to singbox json and diagnostic fields`() {
+        val secrets = listOf(
+            "\"server\":\"private.example\"",
+            "\"uuid\":\"12345678-1234-1234-9234-123456789abc\"",
+            "auth=private-auth",
+            "server_name=private-sni.example",
+            "key=private-key",
+        )
+
+        val sanitized = LogSanitizer.sanitize(secrets.joinToString(" "))
+
+        listOf("private.example", "12345678", "private-auth", "private-sni.example", "private-key")
+            .forEach { assertFalse(sanitized.contains(it)) }
+    }
 }

@@ -44,7 +44,7 @@ class SingboxRuntimeDiagnosticsTest {
         assertFalse(redacted.contains("server.example"))
         assertFalse(redacted.contains("json-server.example"))
         assertContains(redacted, "<redacted-uuid>")
-        assertContains(redacted, "<redacted-json>")
+        assertContains(redacted, "<redacted>")
     }
 
     @Test

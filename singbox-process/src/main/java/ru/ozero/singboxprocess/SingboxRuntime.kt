@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import ru.ozero.enginescore.LogSanitizer
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginesingbox.SingboxRuntimeCheckpointStore
 import java.io.File
@@ -365,30 +366,7 @@ internal fun requireConnectivityManager(context: Context): ConnectivityManager =
         "ConnectivityManager unavailable in :engine_singbox process"
     }
 
-internal fun redactSingboxMessage(message: String): String {
-    val noJson = message.replace(Regex("\\{.*}"), "<redacted-json>")
-    val noHeaders = noJson
-        .replace(Regex("(?i)\\bauthorization\\s*:\\s*[^\\r\\n]+"), "authorization: <redacted>")
-        .replace(Regex("(?i)\\bcookie\\s*:\\s*[^\\r\\n]+"), "cookie: <redacted>")
-        .replace(Regex("(?i)\\bbearer\\s+[A-Za-z0-9._~+/=-]+"), "Bearer <redacted>")
-        .replace(Regex("(?i)\\bbasic\\s+[A-Za-z0-9+/=]+"), "Basic <redacted>")
-    val noUrlSecrets = noHeaders
-        .replace(
-            Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"),
-            "<redacted-uuid>",
-        )
-        .replace(Regex("(?i)(https?://)([^/@\\s]+)@"), "$1<redacted>@")
-        .replace(Regex("(https?://[^\\s?#]+)[?#][^\\s]+"), "$1?<redacted>")
-    return noUrlSecrets
-        .replace(
-            Regex(
-                "(?i)\\b(password|username|token|authorization|cookie|private_key|public_key|" +
-                    "short_id|serverAddress|server_address|server_name|server|host|sni|headers)" +
-                    "([\\\"'=:\\s]+)(\\\"[^\\\"]*\\\"|'[^']*'|[^\\\",&;\\s}]+)",
-            ),
-            "$1$2<redacted>",
-        )
-}
+internal fun redactSingboxMessage(message: String): String = LogSanitizer.sanitize(message)
 
 internal fun String.shouldPromoteSingboxMessage(): Boolean =
     contains("error", ignoreCase = true) ||
