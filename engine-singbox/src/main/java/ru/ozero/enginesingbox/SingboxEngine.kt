@@ -1302,7 +1302,7 @@ class SingboxEngine @Inject constructor(
         private const val TUN_DNS_V4 = "172.19.0.2"
         private const val TUN_DNS_V6 = "fdfe:dcba:9876::2"
         private const val TAG = "SingboxEngine"
-        private const val CONNECT_TIMEOUT_S = 5L
+        private const val CONNECT_TIMEOUT_S = 15L
         private const val STATS_POLL_MS = 1_000L
         private const val REMOTE_STOP_TIMEOUT_MS = 3_000L
         private const val ENGINE_STOP_TIMEOUT_MS = 4_000L

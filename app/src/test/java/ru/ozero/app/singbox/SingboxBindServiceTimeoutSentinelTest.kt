@@ -31,6 +31,10 @@ class SingboxBindServiceTimeoutSentinelTest {
             bindOrFail.contains("StartResult.Failure"),
             "bindOrFail must return StartResult.Failure on timeout — not throw, not hang",
         )
+        assertTrue(
+            content.contains("CONNECT_TIMEOUT_S = 15L"),
+            "isolated engine bind must allow a cold process to initialize before failing",
+        )
     }
 
     @Test
