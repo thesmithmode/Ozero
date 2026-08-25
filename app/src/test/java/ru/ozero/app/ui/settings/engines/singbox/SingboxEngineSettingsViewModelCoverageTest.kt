@@ -178,6 +178,20 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
+    fun `non-http add group url sets validation error and skips insert`() = runTest {
+        val harness = Harness()
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+
+        harness.viewModel.onAddGroupFieldChanged(name = "Invalid", url = "ftp://example.com/sub")
+        harness.viewModel.onAddGroupConfirm()
+        advanceUntilIdle()
+
+        assertEquals("invalid_url", harness.viewModel.state.value.addGroupError)
+        assertTrue(harness.insertedGroups.isEmpty())
+    }
+
+    @Test
     fun `blank add group name uses generated default name`() = runTest {
         val harness = Harness()
         harness.startStateCollection(backgroundScope)
@@ -453,7 +467,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
-    fun `onSetAutoSelect toggles selected profile preference and clears bean`() = runTest {
+    fun `onSetAutoSelect behaves as one-way radio selection and clears bean`() = runTest {
         val profile = profile(id = 51L, groupId = 1L, name = "Chosen", userOrder = 0)
         val harness = Harness(initialProfiles = listOf(profile))
         harness.startStateCollection(backgroundScope)
@@ -470,7 +484,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         harness.viewModel.onSetAutoSelect(false)
         advanceUntilIdle()
 
-        assertFalse(harness.prefsFlow.value.contains(SingboxProbeService.SELECTED_PROFILE_KEY))
+        assertEquals(-1L, harness.prefsFlow.value[SingboxProbeService.SELECTED_PROFILE_KEY])
         assertNull(harness.prefsFlow.value[SingboxProbeService.BEAN_KEY])
     }
 
@@ -752,8 +766,8 @@ class SingboxEngineSettingsViewModelCoverageTest {
         harness.viewModel.onGroupExpand(1L)
         advanceUntilIdle()
 
-        assertEquals(500, harness.viewModel.state.value.allProfiles.size)
-        assertEquals(500, harness.viewModel.state.value.groupProfiles.getValue(1L).size)
+        assertEquals(600, harness.viewModel.state.value.allProfiles.size)
+        assertEquals(600, harness.viewModel.state.value.groupProfiles.getValue(1L).size)
     }
 
     @Test
@@ -1101,6 +1115,26 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
                 override suspend fun update(group: SubscriptionGroup) = Unit
 
+                override suspend fun updateAllowInsecureTls(id: Long, enabled: Boolean) = Unit
+
+                override suspend fun tryBeginRefresh(
+                    id: Long,
+                    expectedGeneration: Long,
+                    attemptAt: Long,
+                ): Int = 0
+
+                override suspend fun commitRefresh(
+                    id: Long,
+                    refreshGeneration: Long,
+                    lastUpdated: Long,
+                    lastAttemptAt: Long,
+                    lastRefreshErrorCode: String?,
+                    lastServerCount: Int,
+                    bytesUsed: Long,
+                    bytesRemaining: Long,
+                    expiryDate: Long,
+                ): Int = 0
+
                 override suspend fun delete(group: SubscriptionGroup) {
                     groupsFlow.value = groupsFlow.value.filterNot { it.id == group.id }
                 }
@@ -1175,6 +1209,9 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
         override suspend fun getById(id: Long): ProxyProfile? = flow.value.find { it.id == id }
 
+        override fun getByIdFlow(id: Long): Flow<ProxyProfile?> =
+            flow.map { profiles -> profiles.find { it.id == id } }
+
         override suspend fun insert(profile: ProxyProfile): Long {
             insertedProfiles += profile
             val id = if (profile.id == 0L) (flow.value.maxOfOrNull { it.id } ?: 0L) + 1 else profile.id
@@ -1221,6 +1258,15 @@ class SingboxEngineSettingsViewModelCoverageTest {
         override suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long) =
             Unit
 
+        override suspend fun updateProbeResultIfCurrent(
+            id: Long,
+            protocolType: Int,
+            beanBlob: ByteArray,
+            latency: Int,
+            probeError: String?,
+            lastProbeAt: Long,
+        ): Int = 0
+
         override suspend fun countByGroupId(groupId: Long): Int = flow.value.count { it.groupId == groupId }
 
         override suspend fun update(profile: ProxyProfile) = Unit
@@ -1256,6 +1302,10 @@ class SingboxEngineSettingsViewModelCoverageTest {
 
         override suspend fun clear() {
             flow.value = emptyList()
+        }
+
+        override suspend fun deleteByProfileIds(profileIds: Set<Long>) {
+            flow.value = flow.value.filterNot { it.profileId in profileIds }
         }
 
         override suspend fun insertAll(steps: List<ProxyChainStep>) {

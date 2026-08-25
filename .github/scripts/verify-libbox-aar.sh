@@ -16,7 +16,14 @@ if [ ! -f "$CHECKSUM_FILE" ]; then
 fi
 
 EXPECTED=$(awk '{print $1}' "$CHECKSUM_FILE")
-ACTUAL=$(sha256sum "$AAR_PATH" | awk '{print $1}')
+if command -v sha256sum >/dev/null 2>&1; then
+  ACTUAL=$(sha256sum "$AAR_PATH" | awk '{print $1}')
+elif command -v shasum >/dev/null 2>&1; then
+  ACTUAL=$(shasum -a 256 "$AAR_PATH" | awk '{print $1}')
+else
+  echo "::error::no SHA256 utility is available"
+  exit 1
+fi
 
 if [ "$ACTUAL" != "$EXPECTED" ]; then
   echo "::error::libbox.aar SHA256 mismatch for ${VERSION}: ${ACTUAL} != ${EXPECTED}"

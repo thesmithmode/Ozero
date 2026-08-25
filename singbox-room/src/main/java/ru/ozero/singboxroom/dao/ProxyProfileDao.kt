@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import ru.ozero.singboxroom.entity.ProxyProfile
 
 @Dao
+@Suppress("TooManyFunctions")
 interface ProxyProfileDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(profile: ProxyProfile): Long
@@ -23,6 +24,9 @@ interface ProxyProfileDao {
 
     @Query("SELECT * FROM proxy_profiles WHERE id = :id")
     suspend fun getById(id: Long): ProxyProfile?
+
+    @Query("SELECT * FROM proxy_profiles WHERE id = :id")
+    fun getByIdFlow(id: Long): Flow<ProxyProfile?>
 
     @Query("SELECT * FROM proxy_profiles ORDER BY groupId ASC, userOrder ASC, id ASC")
     fun getAllFlow(): Flow<List<ProxyProfile>>
@@ -100,6 +104,17 @@ interface ProxyProfileDao {
         }
     }
 
+    @Transaction
+    suspend fun replaceForGroupAndReturnRemovedIds(
+        groupId: Long,
+        profiles: List<ProxyProfile>,
+    ): Set<Long> {
+        val existingIds = getIdsByGroupId(groupId).toSet()
+        val retainedIds = profiles.mapNotNull { it.id.takeIf { id -> id != 0L } }.toSet()
+        replaceForGroup(groupId, profiles)
+        return existingIds - retainedIds
+    }
+
     companion object {
         const val MAX_SQL_BIND_IDS = 500
     }
@@ -112,6 +127,22 @@ interface ProxyProfileDao {
         """,
     )
     suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long)
+
+    @Query(
+        """
+        UPDATE proxy_profiles
+        SET latencyMs = :latency, probeError = :probeError, lastProbeAt = :lastProbeAt
+        WHERE id = :id AND protocolType = :protocolType AND beanBlob = :beanBlob
+        """,
+    )
+    suspend fun updateProbeResultIfCurrent(
+        id: Long,
+        protocolType: Int,
+        beanBlob: ByteArray,
+        latency: Int,
+        probeError: String?,
+        lastProbeAt: Long,
+    ): Int
 
     @Query("SELECT COUNT(*) FROM proxy_profiles WHERE groupId = :groupId")
     suspend fun countByGroupId(groupId: Long): Int

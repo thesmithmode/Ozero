@@ -114,6 +114,8 @@ class SingboxEngineAutoSelectTest {
             override suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile> =
                 profilesByGroup[groupId]?.sortedByAutoPriority()?.take(limit) ?: emptyList()
             override suspend fun getById(id: Long): ProxyProfile? = allProfiles.find { it.id == id }
+            override fun getByIdFlow(id: Long): Flow<ProxyProfile?> =
+                MutableStateFlow(allProfiles.find { it.id == id })
             override suspend fun insert(profile: ProxyProfile): Long = profile.id
             override suspend fun insertAll(profiles: List<ProxyProfile>) {}
             override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
@@ -123,6 +125,14 @@ class SingboxEngineAutoSelectTest {
                 profilesByGroup[groupId]?.map { it.id } ?: emptyList()
             override suspend fun deleteByIds(ids: List<Long>) {}
             override suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long) {}
+            override suspend fun updateProbeResultIfCurrent(
+                id: Long,
+                protocolType: Int,
+                beanBlob: ByteArray,
+                latency: Int,
+                probeError: String?,
+                lastProbeAt: Long,
+            ): Int = 0
             override suspend fun countByGroupId(groupId: Long): Int =
                 profilesByGroup[groupId]?.size ?: 0
             override suspend fun update(profile: ProxyProfile) {}
@@ -154,6 +164,10 @@ class SingboxEngineAutoSelectTest {
             override suspend fun getAll(): List<ProxyChainStep> = flow.value
             override suspend fun clear() {
                 flow.value = emptyList()
+            }
+
+            override suspend fun deleteByProfileIds(profileIds: Set<Long>) {
+                flow.value = flow.value.filterNot { it.profileId in profileIds }
             }
 
             override suspend fun insertAll(steps: List<ProxyChainStep>) {
@@ -214,13 +228,13 @@ class SingboxEngineAutoSelectTest {
 
     @Test
     fun `buildManualConfig passes singbox DNS settings`() {
-        val blob = makeVlessBlob()
+        val selected = makeProfile(42L, 1L, "proxy.example.com", 443)
         val prefs = mutablePreferencesOf(
-            beanKey to blob,
+            beanKey to selected.beanBlob,
             selectedProfileKey to 42L,
             dnsServersKey to setOf("9.9.9.9", "149.112.112.112"),
         )
-        val engine = buildEngine(prefs = prefs)
+        val engine = buildEngine(prefs = prefs, profilesByGroup = mapOf(1L to listOf(selected)))
         awaitInit()
 
         val result = engine.buildManualConfig(null)
@@ -232,13 +246,13 @@ class SingboxEngineAutoSelectTest {
 
     @Test
     fun `tunSpec filters cached IPv6 DNS after IPv6 disabled config build`() = kotlinx.coroutines.test.runTest {
-        val blob = makeVlessBlob()
+        val selected = makeProfile(42L, 1L, "proxy.example.com", 443)
         val prefs = mutablePreferencesOf(
-            beanKey to blob,
+            beanKey to selected.beanBlob,
             selectedProfileKey to 42L,
             dnsServersKey to setOf("8.8.8.8", "2001:4860:4860::8888"),
         )
-        val engine = buildEngine(prefs = prefs)
+        val engine = buildEngine(prefs = prefs, profilesByGroup = mapOf(1L to listOf(selected)))
         awaitInit()
 
         engine.buildManualConfig(SettingsModel(ipv6Enabled = false))
@@ -285,9 +299,9 @@ class SingboxEngineAutoSelectTest {
 
     @Test
     fun `should return single-profile config when manual profile selected`() {
-        val blob = makeVlessBlob()
-        val prefs = mutablePreferencesOf(beanKey to blob, selectedProfileKey to 42L)
-        val engine = buildEngine(prefs = prefs)
+        val selected = makeProfile(42L, 1L, "proxy.example.com", 443)
+        val prefs = mutablePreferencesOf(beanKey to selected.beanBlob, selectedProfileKey to 42L)
+        val engine = buildEngine(prefs = prefs, profilesByGroup = mapOf(1L to listOf(selected)))
         awaitInit()
 
         val result = engine.buildManualConfig(null)
@@ -328,6 +342,7 @@ class SingboxEngineAutoSelectTest {
                 ProxyChainStep(profileId = selected.id, userOrder = 1),
             )
             override suspend fun clear() = Unit
+            override suspend fun deleteByProfileIds(profileIds: Set<Long>) = Unit
             override suspend fun insertAll(steps: List<ProxyChainStep>) = Unit
             override suspend fun replace(profileIds: List<Long>) = Unit
         }
@@ -364,6 +379,18 @@ class SingboxEngineAutoSelectTest {
         assertTrue(result is EngineConfig.Singbox)
         assertTrue(result.beanBlob.contentEquals(selected.beanBlob))
         assertTrue(!result.beanBlob.contentEquals(stale))
+    }
+
+    @Test
+    fun `manual profile config rejects stale datastore blob when selected row was removed`() {
+        val stale = makeVlessBlob("removed.example.com", 8443)
+        val prefs = mutablePreferencesOf(beanKey to stale, selectedProfileKey to 42L)
+        val engine = buildEngine(prefs = prefs)
+        awaitInit()
+
+        val result = engine.buildManualConfig(null)
+
+        assertNull(result)
     }
 
     @Test

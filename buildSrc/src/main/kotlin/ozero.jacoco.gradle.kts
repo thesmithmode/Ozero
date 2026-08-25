@@ -245,16 +245,7 @@ if (isAndroid) {
                 .dir("intermediates/classes/debug/transformDebugClassesWithAsm/dirs")
                 .map { it.asFileTree.matching { exclude(excludedClasses) } }
         )
-        executionData.setFrom(
-            fileTree(layout.buildDirectory) {
-                include(
-                    "outputs/unit_test_code_coverage/**/testDebugUnitTest.exec",
-                    "outputs/unit_test_code_coverage/**/test/*.exec",
-                    "jacoco/testDebugUnitTest.exec",
-                    "**/jacoco/testDebugUnitTest.exec",
-                )
-            }
-        )
+        executionData.setFrom(layout.buildDirectory.file("jacoco/testDebugUnitTest.exec"))
 
         reports {
             html.required.set(true)
@@ -276,16 +267,7 @@ if (isAndroid) {
                 .dir("intermediates/classes/debug/transformDebugClassesWithAsm/dirs")
                 .map { it.asFileTree.matching { exclude(excludedClasses) } }
         )
-        executionData.setFrom(
-            fileTree(layout.buildDirectory) {
-                include(
-                    "outputs/unit_test_code_coverage/**/testDebugUnitTest.exec",
-                    "outputs/unit_test_code_coverage/**/test/*.exec",
-                    "jacoco/testDebugUnitTest.exec",
-                    "**/jacoco/testDebugUnitTest.exec",
-                )
-            }
-        )
+        executionData.setFrom(layout.buildDirectory.file("jacoco/testDebugUnitTest.exec"))
 
         violationRules {
             rule {

@@ -76,4 +76,9 @@ class LanRoutesTest {
             assertEquals(a and mask, a, "address не на границе сети: ${c.address}/${c.prefix}")
         }
     }
+
+    @Test
+    fun ipv6BypassLanCapturesOnlyGlobalUnicast() {
+        assertEquals(listOf(LanRoutes.Cidr("2000::", 3)), LanRoutes.BYPASS_LAN_IPV6)
+    }
 }

@@ -104,7 +104,7 @@ class OzeroVpnServiceIpv6BlackholeTest {
             .substringAfter("private suspend fun establishTunForEngine")
             .substringBefore("private fun captureTunIfaceName")
         assertTrue(
-            body.contains("applyEngineTunSpec(spec, ipv6Enabled)"),
+            body.contains("applyEngineTunSpec(routedSpec, ipv6Enabled)"),
             "applyEngineTunSpec обязан получать ipv6Enabled из establishTunForEngine. Body:\n$body",
         )
     }

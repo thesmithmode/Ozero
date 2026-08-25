@@ -43,12 +43,13 @@ class SingboxTunFdLifecycleSentinelTest {
             .substringBefore("private fun stopRuntimeAfterFailedReadiness")
 
         assertTrue(
-            attachTunBlock.contains("ParcelFileDescriptor.adoptFd(tunFd)"),
-            "SingboxEngine must adopt the transferred raw TUN fd so its finally block closes the original descriptor",
+            attachTunBlock.contains("val transportPfd = ParcelFileDescriptor.fromFd(tunFd)"),
+            "SingboxEngine must duplicate the caller-owned raw fd for AIDL transport",
         )
-        assertFalse(
-            attachTunBlock.contains("ParcelFileDescriptor.fromFd(tunFd)"),
-            "fromFd duplicates the transferred raw TUN fd and leaks the original descriptor on every successful attach",
+        assertTrue(
+            attachTunBlock.contains("if (result == TunAttachResult.Success)") &&
+                attachTunBlock.contains("ParcelFileDescriptor.adoptFd(tunFd).close()"),
+            "SingboxEngine must close the caller-owned raw fd only after the remote runtime accepts it",
         )
         assertTrue(
             attachTunBlock.contains("startWithConfig"),

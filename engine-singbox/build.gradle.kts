@@ -3,6 +3,10 @@ plugins {
     id("kotlin-parcelize")
 }
 
+val soakX86_64 = providers.gradleProperty("ozero.soak.x86_64").isPresent
+val supportedAbis =
+    if (soakX86_64) listOf("arm64-v8a", "x86_64") else listOf("arm64-v8a")
+
 android {
     namespace = "ru.ozero.enginesingbox"
 
@@ -12,7 +16,7 @@ android {
 
     defaultConfig {
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            abiFilters += supportedAbis
         }
     }
 }

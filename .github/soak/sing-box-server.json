@@ -1,0 +1,99 @@
+{
+  "log": {
+    "level": "debug",
+    "timestamp": true
+  },
+  "inbounds": [
+    {
+      "type": "vless",
+      "tag": "vless-in",
+      "listen": "0.0.0.0",
+      "listen_port": 18081,
+      "users": [
+        {
+          "uuid": "${OZERO_SOAK_VLESS_UUID}"
+        }
+      ]
+    },
+    {
+      "type": "vmess",
+      "tag": "vmess-in",
+      "listen": "0.0.0.0",
+      "listen_port": 18082,
+      "users": [
+        {
+          "uuid": "${OZERO_SOAK_VMESS_UUID}",
+          "alterId": 0
+        }
+      ]
+    },
+    {
+      "type": "trojan",
+      "tag": "trojan-in",
+      "listen": "0.0.0.0",
+      "listen_port": 18083,
+      "users": [
+        {
+          "password": "${OZERO_SOAK_TROJAN_PASSWORD}"
+        }
+      ],
+      "tls": {
+        "enabled": true,
+        "server_name": "localhost",
+        "certificate_path": ".github/soak/server-cert.pem",
+        "key_path": ".github/soak/server-key.pem"
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "vless-reality-in",
+      "listen": "0.0.0.0",
+      "listen_port": 18084,
+      "users": [
+        {
+          "uuid": "${OZERO_SOAK_REALITY_UUID}"
+        }
+      ],
+      "tls": {
+        "enabled": true,
+        "server_name": "localhost",
+        "reality": {
+          "enabled": true,
+          "handshake": {
+            "server": "127.0.0.1",
+            "server_port": 18085
+          },
+          "private_key": "${OZERO_SOAK_REALITY_PRIVATE_KEY}",
+          "short_id": [
+            "${OZERO_SOAK_REALITY_SHORT_ID}"
+          ]
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "inbound": [
+          "vless-in",
+          "vmess-in",
+          "trojan-in",
+          "vless-reality-in"
+        ],
+        "ip_cidr": "10.0.2.2/32",
+        "port": 18080,
+        "action": "route",
+        "outbound": "direct",
+        "override_address": "127.0.0.1",
+        "override_port": 18080
+      }
+    ],
+    "final": "direct"
+  }
+}

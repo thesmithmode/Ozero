@@ -1,7 +1,6 @@
 package ru.ozero.enginesingbox;
 
 import ru.ozero.enginesingbox.ISingboxProtector;
-import ru.ozero.enginesingbox.ISingboxStatusCallback;
 import ru.ozero.enginesingbox.SingboxStats;
 
 interface ISingboxEngineProcess {
@@ -14,7 +13,4 @@ interface ISingboxEngineProcess {
     boolean runtimeRunning();
     int processId();
     SingboxStats getStats();
-    void registerStatusCallback(ISingboxStatusCallback cb);
-    long urlTest(long profileId);
-    oneway void setPerAppPackages(in String[] packages, boolean isAllowList);
 }

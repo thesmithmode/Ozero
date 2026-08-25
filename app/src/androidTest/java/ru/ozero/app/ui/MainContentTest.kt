@@ -2,10 +2,10 @@ package ru.ozero.app.ui
 
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.test.assertDoesNotExist
-import androidx.compose.ui.test.assertExists
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
@@ -52,7 +52,7 @@ class MainContentTest {
         composeRule.onNodeWithTag(POWER_DISC_TEST_TAG).performClick()
         composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "split_tunnel").performClick()
         composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "settings").performClick()
-        composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "servers").assertDoesNotExist()
+        composeRule.onAllNodesWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "servers").assertCountEquals(0)
 
         assertEquals(listOf("connect", "split", "settings"), events)
     }
@@ -138,7 +138,7 @@ class MainContentTest {
         composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "servers").assertIsDisplayed()
         composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "split_tunnel").assertIsDisplayed()
         composeRule.onNodeWithTag(BOTTOM_DOCK_TAB_TEST_TAG_PREFIX + "settings").assertIsDisplayed()
-        composeRule.onNodeWithTag(MainScreenTestTags.ENGINE_CHIPS_ROW).assertExists()
+        composeRule.onNodeWithTag(MainScreenTestTags.ENGINE_CHIPS_ROW).assertIsDisplayed()
     }
 
     private fun renderSimple(

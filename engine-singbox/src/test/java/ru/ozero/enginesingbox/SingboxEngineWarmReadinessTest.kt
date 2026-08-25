@@ -82,7 +82,7 @@ class SingboxEngineWarmReadinessTest {
             val ready = engine.awaitReady()
 
             assertIs<EnginePlugin.ReadyResult.Ready>(ready)
-            assertEquals(0, routedProbeCalls)
+            assertEquals(1, routedProbeCalls)
             assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
             assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
         }
@@ -164,6 +164,7 @@ class SingboxEngineWarmReadinessTest {
             override suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile> =
                 emptyList()
             override suspend fun getById(id: Long): ProxyProfile? = null
+            override fun getByIdFlow(id: Long): Flow<ProxyProfile?> = MutableStateFlow(null)
             override suspend fun insert(profile: ProxyProfile): Long = profile.id
             override suspend fun insertAll(profiles: List<ProxyProfile>) = Unit
             override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
@@ -178,6 +179,14 @@ class SingboxEngineWarmReadinessTest {
                 probeError: String?,
                 lastProbeAt: Long,
             ) = Unit
+            override suspend fun updateProbeResultIfCurrent(
+                id: Long,
+                protocolType: Int,
+                beanBlob: ByteArray,
+                latency: Int,
+                probeError: String?,
+                lastProbeAt: Long,
+            ): Int = 0
             override suspend fun countByGroupId(groupId: Long): Int = 0
             override suspend fun update(profile: ProxyProfile) = Unit
             override suspend fun delete(profile: ProxyProfile) = Unit
@@ -188,6 +197,7 @@ class SingboxEngineWarmReadinessTest {
             override fun getAllFlow(): Flow<List<ProxyChainStep>> = MutableStateFlow(emptyList())
             override suspend fun getAll(): List<ProxyChainStep> = emptyList()
             override suspend fun clear() = Unit
+            override suspend fun deleteByProfileIds(profileIds: Set<Long>) = Unit
             override suspend fun insertAll(steps: List<ProxyChainStep>) = Unit
             override suspend fun replace(profileIds: List<Long>) = Unit
         }

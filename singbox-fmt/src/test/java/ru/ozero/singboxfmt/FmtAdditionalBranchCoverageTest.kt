@@ -168,7 +168,7 @@ class FmtAdditionalBranchCoverageTest {
         val invalidIpv6Port = UriCompat.parse("vless://user@[2001:db8::2]:bad?type=tcp")
 
         assertEquals("user", ipv6.userInfo)
-        assertEquals("[2001:db8::1]", ipv6.host)
+        assertEquals("2001:db8::1", ipv6.host)
         assertEquals(8443, ipv6.port)
         assertEquals("", ipv6.getQueryParameter("flag"))
         assertEquals("", ipv6.getQueryParameter("empty"))

@@ -2,13 +2,23 @@ package ru.ozero.app.workers
 
 import org.junit.jupiter.api.Test
 import ru.ozero.singboxroom.entity.SubscriptionGroup
+import ru.ozero.singboxsubscription.isTransientSubscriptionRefreshFailure
 import java.io.File
+import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SubscriptionUpdateWorkerTest {
+
+    @Test
+    fun `worker retry classification accepts transient network failures only`() {
+        assertTrue(isTransientSubscriptionRefreshFailure(SocketTimeoutException("timeout")))
+        assertTrue(isTransientSubscriptionRefreshFailure(IOException("connection reset")))
+        assertFalse(isTransientSubscriptionRefreshFailure(IllegalArgumentException("unsupported")))
+    }
 
     @Test
     fun `auto update predicate skips local manual groups without subscription url`() {

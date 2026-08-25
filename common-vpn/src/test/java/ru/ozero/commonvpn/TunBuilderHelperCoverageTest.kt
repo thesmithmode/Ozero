@@ -8,8 +8,49 @@ import org.junit.jupiter.api.Test
 import ru.ozero.commonvpn.split.SplitTunnelConfig
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.settings.SplitTunnelMode
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class TunBuilderHelperCoverageTest {
+
+    @Test
+    fun `BYPASS_LAN removes engine default route before public routes are applied`() {
+        val spec = baseSpec(
+            routeAllV4 = true,
+            routeCidrsV4 = listOf("0.0.0.0/0"),
+            routeAllV6 = true,
+            routeCidrsV6 = listOf("::/0"),
+        )
+
+        val routed = spec.forSplitMode(SplitTunnelMode.BYPASS_LAN)
+
+        assertFalse(routed.routeAllV4)
+        assertTrue(routed.routeCidrsV4.isEmpty())
+        assertFalse(routed.routeAllV6)
+        assertEquals(listOf("2000::/3"), routed.routeCidrsV6)
+    }
+
+    @Test
+    fun `non BYPASS_LAN mode preserves engine routing spec`() {
+        val spec = baseSpec(routeAllV4 = true)
+
+        val routed = spec.forSplitMode(SplitTunnelMode.ALL)
+
+        assertSame(spec, routed)
+    }
+
+    @Test
+    fun `BYPASS_LAN removes explicit engine ipv4 routes too`() {
+        val spec = baseSpec(routeAllV4 = false, routeCidrsV4 = listOf("192.168.0.0/16"))
+
+        val routed = spec.forSplitMode(SplitTunnelMode.BYPASS_LAN)
+
+        assertFalse(routed.routeAllV4)
+        assertTrue(routed.routeCidrsV4.isEmpty())
+        assertTrue(routed.routeCidrsV6.isEmpty())
+    }
 
     @Test
     fun `applyEngineTunSpec applies base session mtu blocking address dns and default v4 route`() {
@@ -27,7 +68,7 @@ class TunBuilderHelperCoverageTest {
         verify(exactly = 1) { builder.addAddress("10.0.0.2", 32) }
         verify(exactly = 1) { builder.addDnsServer("1.1.1.1") }
         verify(exactly = 1) { builder.addDnsServer("8.8.8.8") }
-        verify(exactly = 2) { builder.allowFamily(any()) }
+        verify(exactly = 0) { builder.allowFamily(any()) }
         verify(exactly = 1) { builder.addRoute("0.0.0.0", 0) }
     }
 
@@ -111,7 +152,7 @@ class TunBuilderHelperCoverageTest {
                 ipv6PrefixLength = 128,
                 routeAllV6 = true,
             ),
-            ipv6Enabled = false,
+            ipv6Enabled = true,
         )
 
         verify(exactly = 1) { defaultBuilder.addAddress("fd00::2", 128) }
@@ -126,7 +167,7 @@ class TunBuilderHelperCoverageTest {
                 routeAllV6 = false,
                 routeCidrsV6 = listOf("2001:db8::/32", "bad-v6"),
             ),
-            ipv6Enabled = false,
+            ipv6Enabled = true,
         )
 
         verify(exactly = 1) { cidrBuilder.addAddress("fd00::3", 64) }
@@ -163,6 +204,39 @@ class TunBuilderHelperCoverageTest {
 
         verify(exactly = 0) { builder.addAddress("fd00::4", 128) }
         verify(exactly = 0) { builder.addRoute("::", 0) }
+    }
+
+    @Test
+    fun `applyEngineTunSpec filters ipv6 DNS when ipv6 is disabled`() {
+        val builder = builder()
+
+        helper(builder).applyEngineTunSpec(
+            spec = baseSpec(
+                dnsServers = listOf("1.1.1.1", "2606:4700:4700::1111"),
+                allowFamilyV6 = true,
+                ipv6Address = "fd00::5",
+            ),
+            ipv6Enabled = false,
+        )
+
+        verify(exactly = 1) { builder.addDnsServer("1.1.1.1") }
+        verify(exactly = 0) { builder.addDnsServer("2606:4700:4700::1111") }
+    }
+
+    @Test
+    fun `applyEngineTunSpec retains ipv6 DNS when ipv6 is routed`() {
+        val builder = builder()
+
+        helper(builder).applyEngineTunSpec(
+            spec = baseSpec(
+                dnsServers = listOf("2606:4700:4700::1111"),
+                allowFamilyV6 = true,
+                ipv6Address = "fd00::6",
+            ),
+            ipv6Enabled = true,
+        )
+
+        verify(exactly = 1) { builder.addDnsServer("2606:4700:4700::1111") }
     }
 
     @Test

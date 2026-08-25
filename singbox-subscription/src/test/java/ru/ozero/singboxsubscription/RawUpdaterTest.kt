@@ -6,6 +6,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
@@ -15,9 +16,6 @@ import okhttp3.mockwebserver.MockWebServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import ru.ozero.singboxconfig.BeanSupportDecision
-import ru.ozero.singboxconfig.ConfigBuilder
-import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.ShadowsocksBean
 import ru.ozero.singboxfmt.TrojanBean
 import ru.ozero.singboxfmt.VLESSBean
@@ -27,6 +25,7 @@ import ru.ozero.singboxsubscription.parser.RawShareLinksParser
 import java.security.cert.CertPathValidatorException
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
+import java.net.SocketTimeoutException
 import javax.net.ssl.SSLHandshakeException
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -53,6 +52,7 @@ class RawUpdaterTest {
         "ss://YWVzLTEyOC1nY206cGFzcy1vbmU@ss.example.com:8388#SS1"
     private val shadowsocks2 =
         "ss://YWVzLTEyOC1nY206cGFzcy10d28@ss.example.com:8388#SS2"
+    private val realityPublicKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
     @BeforeEach
     fun setUp() {
@@ -246,7 +246,7 @@ class RawUpdaterTest {
     }
 
     @Test
-    fun `should use fallback server names when imported bean has blank name`() = runBlocking {
+    fun `should deduplicate identical unnamed links and use fallback server name`() = runBlocking {
         val unnamed =
             "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443?type=tcp&security=none"
         server.enqueue(MockResponse().setBody("$unnamed\n$unnamed"))
@@ -254,7 +254,7 @@ class RawUpdaterTest {
 
         rawUpdater.refresh(g)
 
-        assertEquals(listOf("Server 1", "Server 2"), profileDao.profiles.map { it.name })
+        assertEquals(listOf("Server 1"), profileDao.profiles.map { it.name })
     }
 
     @Test
@@ -283,6 +283,13 @@ class RawUpdaterTest {
         assertTrue(updated.lastAttemptAt >= before)
         assertEquals(null, updated.lastRefreshErrorCode)
         assertEquals(1, updated.lastServerCount)
+        assertEquals(1L, updated.refreshGeneration)
+    }
+
+    @Test
+    fun `transient failure classifier does not retry unsupported refresh`() {
+        assertTrue(isTransientSubscriptionRefreshFailure(SocketTimeoutException("timeout")))
+        assertFalse(isTransientSubscriptionRefreshFailure(IllegalArgumentException("unsupported")))
     }
 
     @Test
@@ -536,7 +543,9 @@ class RawUpdaterTest {
             every { code } returns 200
         }
         val mockedCall = mockk<Call>(relaxed = true)
-        every { mockedCall.execute() } returns mockedResponse
+        every { mockedCall.enqueue(any()) } answers {
+            (args.first() as Callback).onResponse(mockedCall, mockedResponse)
+        }
 
         val mockedClient = mockk<OkHttpClient>()
         every { mockedClient.newCall(any()) } returns mockedCall
@@ -658,39 +667,23 @@ class RawUpdaterTest {
     }
 
     @Test
-    fun `unsupported profile becoming supported preserves id and diagnostics`() = runBlocking {
+    fun `unsupported-only refresh keeps last usable subscription`() = runBlocking {
         val unsupported =
             "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443" +
                 "?type=xhttp&security=none#Unsupported"
-        val supported =
-            "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@s1.example.com:443" +
-                "?type=ws&security=none&path=/ws#Supported"
-        server.enqueue(MockResponse().setBody(unsupported))
         val g = group()
-
+        server.enqueue(MockResponse().setBody(vless1))
         rawUpdater.refresh(g)
         val first = profileDao.profiles.single()
-        assertTrue(
-            ConfigBuilder.supportDecision(KryoSerializer.deserialize<VLESSBean>(first.beanBlob))
-                is BeanSupportDecision.Unsupported,
-        )
-        profileDao.profiles[0] = first.copy(
-            latencyMs = 321,
-            probeError = "unsupported transport",
-            lastProbeAt = 123_456L,
-        )
 
-        server.enqueue(MockResponse().setBody(supported))
-        rawUpdater.refresh(g)
+        server.enqueue(MockResponse().setBody(unsupported))
+        val result = rawUpdater.refresh(g)
 
-        val refreshed = profileDao.profiles.single()
-        assertEquals(first.id, refreshed.id)
-        assertEquals(321, refreshed.latencyMs)
-        assertEquals("unsupported transport", refreshed.probeError)
-        assertEquals(123_456L, refreshed.lastProbeAt)
-        assertTrue(
-            ConfigBuilder.supportDecision(KryoSerializer.deserialize<VLESSBean>(refreshed.beanBlob))
-                is BeanSupportDecision.Supported,
+        assertTrue(result.isFailure)
+        assertEquals(first, profileDao.profiles.single())
+        assertEquals(
+            SubscriptionRefreshErrorCode.NO_PROFILES,
+            groupDao.groups.first { it.id == g.id }.lastRefreshErrorCode,
         )
     }
 
@@ -773,10 +766,10 @@ class RawUpdaterTest {
     fun `should preserve duplicate VLESS ids by flow when provider reorders rows`() = runBlocking {
         val vision =
             "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup.example.com:443" +
-                "?type=tcp&security=reality&flow=xtls-rprx-vision&pbk=pub&sid=01#Vision"
+                "?type=tcp&security=reality&flow=xtls-rprx-vision&pbk=$realityPublicKey&sid=01#Vision"
         val blankFlow =
             "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup.example.com:443" +
-                "?type=tcp&security=reality&pbk=pub&sid=01#Blank"
+                "?type=tcp&security=reality&pbk=$realityPublicKey&sid=01#Blank"
         server.enqueue(MockResponse().setBody("$vision\n$blankFlow"))
         val g = group()
 
@@ -917,10 +910,10 @@ class RawUpdaterTest {
             val g = group()
             val withVisionFlow =
                 "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup-full.example.com:443" +
-                    "?type=tcp&security=reality&pbk=pub&sid=01&flow=xtls-rprx-vision#Vision"
+                    "?type=tcp&security=reality&pbk=$realityPublicKey&sid=01&flow=xtls-rprx-vision#Vision"
             val withNoFlow =
                 "vless://aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa@dup-full.example.com:443" +
-                    "?type=tcp&security=reality&pbk=pub&sid=01#NoFlow"
+                    "?type=tcp&security=reality&pbk=$realityPublicKey&sid=01#NoFlow"
             val existingVisionProfile = ru.ozero.singboxroom.entity.ProxyProfile(
                 groupId = g.id,
                 name = "Vision",
@@ -987,7 +980,7 @@ class RawUpdaterTest {
     }
 
     @Test
-    fun `should preserve duplicate Shadowsocks ids by plugin when provider reorders rows`() = runBlocking {
+    fun `should reject Shadowsocks plugins without replacing a usable snapshot`() = runBlocking {
         val pluginA =
             """
             {
@@ -1045,17 +1038,14 @@ class RawUpdaterTest {
         server.enqueue(MockResponse().setBody(pluginA))
         val g = group()
 
-        rawUpdater.refresh(g)
-        val firstByName = profileDao.profiles.associateBy { it.name }
-        val pluginAId = firstByName.getValue("Plugin A").id
-        val pluginBId = firstByName.getValue("Plugin B").id
+        val first = rawUpdater.refresh(g)
 
         server.enqueue(MockResponse().setBody(pluginB))
-        rawUpdater.refresh(g)
-        val secondByName = profileDao.profiles.associateBy { it.name }
+        val second = rawUpdater.refresh(g)
 
-        assertEquals(pluginAId, secondByName.getValue("Plugin A").id)
-        assertEquals(pluginBId, secondByName.getValue("Plugin B").id)
+        assertTrue(first.isFailure)
+        assertTrue(second.isFailure)
+        assertTrue(profileDao.profiles.isEmpty())
     }
 
     @Test
@@ -1106,7 +1096,9 @@ class RawUpdaterTest {
             every { code } returns 200
         }
         val mockedCall = mockk<Call>(relaxed = true)
-        every { mockedCall.execute() } returns mockedResponse
+        every { mockedCall.enqueue(any()) } answers {
+            (args.first() as Callback).onResponse(mockedCall, mockedResponse)
+        }
         val mockedClient = mockk<OkHttpClient>()
         every { mockedClient.newCall(any()) } returns mockedCall
         rawUpdater = RawUpdater(mockedClient, groupDao, profileDao)
@@ -1157,5 +1149,32 @@ class RawUpdaterTest {
         assertFalse(profileDao.profiles.any { it.id == 801L })
         assertTrue(profileDao.profiles.any { it.id == 802L && it.groupId == other.id })
         assertTrue(profileDao.profiles.any { it.groupId == target.id && it.name == "S1" })
+    }
+
+    @Test
+    fun `should report removed profile ids after successful replacement`() = runBlocking {
+        val removedIds = mutableSetOf<Long>()
+        rawUpdater = RawUpdater(
+            okHttpClient = OkHttpClient(),
+            groupDao = groupDao,
+            profileDao = profileDao,
+            onProfilesRemoved = { removedIds += it },
+        )
+        val g = group()
+        profileDao.profiles.add(
+            ru.ozero.singboxroom.entity.ProxyProfile(
+                id = 901L,
+                groupId = g.id,
+                name = "Removed",
+                beanBlob = byteArrayOf(9, 0, 1),
+                protocolType = RawUpdater.PROTOCOL_VLESS,
+            ),
+        )
+        server.enqueue(MockResponse().setBody(vless1))
+
+        val result = rawUpdater.refresh(g)
+
+        assertTrue(result.isSuccess)
+        assertEquals(setOf(901L), removedIds)
     }
 }

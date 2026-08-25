@@ -32,6 +32,9 @@ class FakeProxyProfileDao : ProxyProfileDao {
     override suspend fun getById(id: Long): ProxyProfile? =
         profiles.firstOrNull { it.id == id }
 
+    override fun getByIdFlow(id: Long): Flow<ProxyProfile?> =
+        flowOf(profiles.firstOrNull { it.id == id })
+
     override fun getAllFlow(): Flow<List<ProxyProfile>> =
         flowOf(profiles.sortedWith(compareBy<ProxyProfile> { it.groupId }.thenBy { it.userOrder }.thenBy { it.id }))
 
@@ -78,6 +81,20 @@ class FakeProxyProfileDao : ProxyProfileDao {
                 lastProbeAt = lastProbeAt,
             )
         }
+    }
+
+    override suspend fun updateProbeResultIfCurrent(
+        id: Long,
+        protocolType: Int,
+        beanBlob: ByteArray,
+        latency: Int,
+        probeError: String?,
+        lastProbeAt: Long,
+    ): Int {
+        val current = getById(id) ?: return 0
+        if (current.protocolType != protocolType || !current.beanBlob.contentEquals(beanBlob)) return 0
+        updateProbeResult(id, latency, probeError, lastProbeAt)
+        return 1
     }
 
     override suspend fun countByGroupId(groupId: Long): Int =

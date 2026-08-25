@@ -1,24 +1,53 @@
-name: Soak Test
+name: Sing-box Android Soak
 
 on:
   workflow_dispatch:
     inputs:
-      requests:
-        description: 'Количество HTTP запросов (100 = ~10 мин, 600 = ~1ч)'
+      cycles-per-protocol:
+        description: 'Connect/disconnect cycles for VLESS, VLESS Reality, VMess and Trojan'
         required: false
-        default: '100'
+        default: '20'
       api-level:
-        description: 'Android API level эмулятора'
+        description: 'Android emulator API level for native x86_64 APK validation'
         required: false
-        default: '33'
+        default: '35'
+  push:
+    branches: [dev]
+    paths:
+      - '.github/soak/**'
+      - '.github/scripts/**'
+      - '.github/workflows/soak.yml'
+      - 'app/**'
+      - 'common-vpn/**'
+      - 'engine-singbox/**'
+      - 'singbox-*/**'
+
+concurrency:
+  group: singbox-android-soak-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   soak:
-    name: Soak Test
+    name: x86_64 APK TUN — ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: VLESS, VMess, Trojan
+            require_reality: '0'
+            expected_metrics_protocols: 'vless,vmess,trojan'
+            expected_server_inbounds: 'vless,vmess,trojan'
+          - name: VLESS Reality
+            require_reality: '1'
+            expected_metrics_protocols: 'vless_reality'
+            expected_server_inbounds: 'vless-reality'
     permissions:
       contents: read
+    env:
+      SINGBOX_VERSION: '1.13.12'
+      SINGBOX_SERVER_ARCHIVE_SHA256: '1540533adb3df24f5ad5f14b5c7ca3dbc2401b10a1c1eb278fcadcada47ec6c4'
 
     steps:
       - name: Checkout code
@@ -33,78 +62,269 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - name: Setup Android NDK
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+          add-to-path: false
 
-      - name: Download native binaries
-        run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
-
-      - name: Build debug APK + androidTest APK
-        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
-
-      - name: Enable KVM
+      - name: Enable Android emulator acceleration
         run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
-            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Set soak params from inputs
-        env:
-          REQUESTS_INPUT: ${{ github.event.inputs.requests }}
-          API_LEVEL_INPUT: ${{ github.event.inputs.api-level }}
-        run: |
-          REQUESTS="${REQUESTS_INPUT:-100}"
-          API_LEVEL="${API_LEVEL_INPUT:-33}"
-          if ! [[ "$REQUESTS" =~ ^[0-9]+$ ]]; then echo "::error::bad requests"; exit 1; fi
-          if ! [[ "$API_LEVEL" =~ ^[0-9]+$ ]]; then echo "::error::bad api-level"; exit 1; fi
-          echo "SOAK_REQUESTS=$REQUESTS" >> "$GITHUB_ENV"
-          echo "SOAK_API_LEVEL=$API_LEVEL" >> "$GITHUB_ENV"
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Run soak on emulator
-        uses: reactivecircus/android-emulator-runner@v2
+      - name: Resolve URnetwork SDK release
+        id: urnetwork-aar-tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=$(gh release list --limit 100 --json tagName \
+            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
+            | head -n1 | tr -d '"')
+          test -n "$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Restore URnetwork SDK
+        id: urnetwork-aar-cache
+        uses: actions/cache@v6
         with:
-          api-level: ${{ env.SOAK_API_LEVEL }}
+          path: engine-urnetwork/libs
+          key: urnetwork-aar-${{ steps.urnetwork-aar-tag.outputs.tag }}-go-stripped-v1
+
+      - name: Prepare URnetwork SDK
+        if: steps.urnetwork-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p engine-urnetwork/libs
+          gh release download "${{ steps.urnetwork-aar-tag.outputs.tag }}" -p '*' -D engine-urnetwork/libs --clobber
+          for aar in engine-urnetwork/libs/*.aar; do
+            test -f "$aar"
+            tmpdir=$(mktemp -d)
+            unzip -o "$aar" -d "$tmpdir/aar-exploded"
+            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
+            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
+          done
+
+      - name: Restore verified libbox
+        id: singbox-aar-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            singbox-core/libs
+            singbox-core/libs-stubs
+            singbox-core/src/main/jniLibs
+          key: singbox-libbox-1.13.12-exploded-v7-sha256-7a5fa900e73352a18d55ef7ae55427e3e60ba7208b5848ccf64ec5acdf154867
+
+      - name: Prepare verified libbox
+        if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tmp_aar="$RUNNER_TEMP/libbox.aar"
+          .github/scripts/download-libbox-aar.sh "$tmp_aar" '1.13.12'
+          .github/scripts/verify-libbox-aar.sh "$tmp_aar" '1.13.12'
+          mkdir -p singbox-core/libs singbox-core/libs-stubs "$RUNNER_TEMP/go-stubs" "$RUNNER_TEMP/aar-exploded"
+          unzip -o "$tmp_aar" classes.jar -d "$RUNNER_TEMP"
+          cp "$RUNNER_TEMP/classes.jar" singbox-core/libs/libbox.jar
+          unzip -o "$RUNNER_TEMP/classes.jar" 'go/*.class' -d "$RUNNER_TEMP/go-stubs" 2>/dev/null || true
+          jar cf singbox-core/libs-stubs/go-stubs.jar -C "$RUNNER_TEMP/go-stubs" . 2>/dev/null || true
+          python3 scripts/patch-go-seq.py singbox-core/libs-stubs/go-stubs.jar
+          zip -d singbox-core/libs/libbox.jar 'go/*.class' || true
+          mkdir -p singbox-core/src/main/jniLibs
+          unzip -o "$tmp_aar" 'jni/*' -d "$RUNNER_TEMP/aar-exploded" || true
+          cp -R "$RUNNER_TEMP/aar-exploded/jni/." singbox-core/src/main/jniLibs/
+
+      - name: Verify ARM64 libbox input
+        run: |
+          set -euo pipefail
+          test -s singbox-core/libs/libbox.jar
+          test -s singbox-core/src/main/jniLibs/arm64-v8a/libbox.so
+
+      - name: Start ephemeral protocol servers
+        run: |
+          set -euo pipefail
+          vless_uuid=$(uuidgen | tr '[:upper:]' '[:lower:]')
+          vmess_uuid=$(uuidgen | tr '[:upper:]' '[:lower:]')
+          trojan_password=$(openssl rand -hex 24)
+          reality_uuid=$(uuidgen | tr '[:upper:]' '[:lower:]')
+          echo "OZERO_SOAK_VLESS_UUID=$vless_uuid" >> "$GITHUB_ENV"
+          echo "OZERO_SOAK_VMESS_UUID=$vmess_uuid" >> "$GITHUB_ENV"
+          echo "OZERO_SOAK_TROJAN_PASSWORD=$trojan_password" >> "$GITHUB_ENV"
+          openssl req -x509 -newkey rsa:2048 -nodes \
+            -keyout .github/soak/server-key.pem \
+            -out .github/soak/server-cert.pem \
+            -days 1 \
+            -subj '/CN=localhost'
+          archive="$RUNNER_TEMP/sing-box.tar.gz"
+          url="https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz"
+          curl --fail --location --retry 3 "$url" --output "$archive"
+          test "$(sha256sum "$archive" | awk '{print $1}')" = "$SINGBOX_SERVER_ARCHIVE_SHA256"
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          binary="$RUNNER_TEMP/sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box"
+          reality_keypair=$("$binary" generate reality-keypair)
+          reality_private_key=$(awk '/PrivateKey/ { print $NF }' <<< "$reality_keypair")
+          reality_public_key=$(awk '/PublicKey/ { print $NF }' <<< "$reality_keypair")
+          reality_short_id=$(openssl rand -hex 8)
+          test -n "$reality_private_key"
+          test -n "$reality_public_key"
+          echo "OZERO_SOAK_VLESS_REALITY=vless://$reality_uuid@10.0.2.2:18084?security=reality&encryption=none&type=tcp&sni=localhost&fp=chrome&pbk=$reality_public_key&sid=$reality_short_id#VLESS%20Reality" >> "$GITHUB_ENV"
+          echo "OZERO_SOAK_REALITY_TARGET=http://10.0.2.2:18080/ozero-soak-marker" >> "$GITHUB_ENV"
+          echo "OZERO_SOAK_REALITY_MARKER=ozero-singbox-routed" >> "$GITHUB_ENV"
+          OZERO_SOAK_VLESS_UUID="$vless_uuid" \
+            OZERO_SOAK_VMESS_UUID="$vmess_uuid" \
+            OZERO_SOAK_TROJAN_PASSWORD="$trojan_password" \
+            OZERO_SOAK_REALITY_UUID="$reality_uuid" \
+            OZERO_SOAK_REALITY_PRIVATE_KEY="$reality_private_key" \
+            OZERO_SOAK_REALITY_SHORT_ID="$reality_short_id" \
+            python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from string import Template
+
+          source = Path('.github/soak/sing-box-server.json')
+          target = Path(os.environ['RUNNER_TEMP']) / 'sing-box-server.json'
+          target.write_text(Template(source.read_text()).substitute(os.environ), encoding='utf-8')
+          PY
+          openssl s_server -accept 18085 \
+            -cert .github/soak/server-cert.pem \
+            -key .github/soak/server-key.pem \
+            -www > "$RUNNER_TEMP/reality-decoy.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/reality-decoy.pid"
+          "$binary" check -c "$RUNNER_TEMP/sing-box-server.json"
+          "$binary" run -c "$RUNNER_TEMP/sing-box-server.json" > "$RUNNER_TEMP/singbox-server.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/singbox-server.pid"
+
+          mkdir -p "$RUNNER_TEMP/soak-http"
+          printf 'ozero-singbox-routed\n' > "$RUNNER_TEMP/soak-http/ozero-soak-marker"
+          cat > "$RUNNER_TEMP/soak-http/subscription-v1.txt" <<EOF
+          vless://$vless_uuid@10.0.2.2:18081?security=none&type=tcp#VLESS%20subscription
+          vmess://$vmess_uuid@10.0.2.2:18082?security=none&type=tcp&encryption=auto#VMess%20subscription
+          trojan://$trojan_password@10.0.2.2:18083?security=tls&sni=localhost&allowInsecure=1&type=tcp#Trojan%20subscription
+          vless://$vless_uuid@10.0.2.2:18081?security=none&type=xhttp#Unsupported%20transport
+          EOF
+          cat > "$RUNNER_TEMP/soak-http/subscription-v2.txt" <<EOF
+          vless://$vless_uuid@10.0.2.2:18081?security=none&type=tcp#VLESS%20refreshed
+          vmess://$vmess_uuid@10.0.2.2:18082?security=none&type=tcp&encryption=auto#VMess%20subscription
+          trojan://$trojan_password@10.0.2.2:18083?security=tls&sni=localhost&allowInsecure=1&type=tcp#Trojan%20subscription
+          vless://$vless_uuid@10.0.2.2:18081?security=none&type=xhttp#Unsupported%20transport
+          EOF
+          python3 .github/soak/subscription-server.py \
+            --directory "$RUNNER_TEMP/soak-http" \
+            --port 18080 > "$RUNNER_TEMP/soak-http.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/soak-http.pid"
+          for port in 18080 18081 18082 18083 18084 18085; do
+            for attempt in {1..30}; do
+              nc -z 127.0.0.1 "$port" && break
+              sleep 1
+            done
+            nc -z 127.0.0.1 "$port"
+          done
+
+      - name: Build libhev for x86_64 soak APK
+        env:
+          NDK_PATH: ${{ steps.ndk.outputs.ndk-path }}
+          HEV_REPO: https://github.com/heiher/hev-socks5-tunnel.git
+          HEV_COMMIT_SHA: 54eab54ab4e6e9a708229a89a05578e52074fc6f
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/hev-socks5-tunnel"
+          OUT="common-vpn/src/main/jniLibs/x86_64"
+          git init "$SRC"
+          git -C "$SRC" remote add origin "$HEV_REPO"
+          git -C "$SRC" fetch --no-tags --depth 1 origin "$HEV_COMMIT_SHA"
+          git -C "$SRC" checkout --detach FETCH_HEAD
+          test "$(git -C "$SRC" rev-parse HEAD)" = "$HEV_COMMIT_SHA"
+          git -C "$SRC" submodule update --init --recursive --depth 1
+          cd "$SRC"
+          "$NDK_PATH/ndk-build" \
+            NDK_PROJECT_PATH="$SRC" \
+            APP_BUILD_SCRIPT="$SRC/Android.mk" \
+            NDK_APPLICATION_MK="$SRC/Application.mk" \
+            APP_ABI="x86_64" \
+            APP_PLATFORM=android-24 \
+            APP_CFLAGS="-DPKGNAME=hev" \
+            -j"$(nproc)"
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p "$OUT"
+          cp "$SRC/libs/x86_64/libhev-socks5-tunnel.so" "$OUT/libhev-ozero-socks5-tunnel.so"
+          test -s "$OUT/libhev-ozero-socks5-tunnel.so"
+
+      - name: Build x86_64 debug and instrumentation APKs
+        run: |
+          set -euo pipefail
+          ./gradlew :engine-byedpi:downloadBinaries --stacktrace
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace --continue -Pozero.soak.x86_64=true
+
+      - name: Verify x86_64 APK native libraries
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          unzip -l "$APK" | grep -q 'lib/x86_64/libbox.so'
+          unzip -l "$APK" | grep -q 'lib/x86_64/libhev-ozero-socks5-tunnel.so'
+
+      - name: Resolve soak parameters
+        env:
+          CYCLES_INPUT: ${{ inputs['cycles-per-protocol'] }}
+        run: |
+          set -euo pipefail
+          cycles="${CYCLES_INPUT:-5}"
+          [[ "$cycles" =~ ^[0-9]+$ ]] && (( cycles >= 1 && cycles <= 100 ))
+          echo "SOAK_CYCLES=$cycles" >> "$GITHUB_ENV"
+
+      - name: Run real Sing-box TUN soak
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          OZERO_SOAK_REQUIRE_REALITY: ${{ matrix.require_reality }}
+          OZERO_SOAK_EXPECTED_METRICS_PROTOCOLS: ${{ matrix.expected_metrics_protocols }}
+          OZERO_SOAK_EXPECTED_SERVER_INBOUNDS: ${{ matrix.expected_server_inbounds }}
+        with:
+          api-level: ${{ inputs['api-level'] || '35' }}
+          target: google_apis
           arch: x86_64
-          profile: Nexus 6
-          script: |
-            adb wait-for-device
-            adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            adb shell am instrument \
-              -w \
-              -e OZERO_SOAK 1 \
-              -e OZERO_SOAK_REQUESTS "$SOAK_REQUESTS" \
-              -e class ru.ozero.app.soak.SoakTest \
-              ru.ozero.app.test/androidx.test.runner.AndroidJUnitRunner \
-              | tee /tmp/soak-output.txt
-            adb pull /sdcard/soak-metrics.json ./soak-metrics.json || echo '{}' > soak-metrics.json
+          profile: pixel_5
+          emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash .github/soak/run-singbox-tun-soak.sh
 
       - name: Write job summary
         if: always()
         run: |
-          echo "## Soak Test Results" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          if [ -f soak-metrics.json ]; then
+          echo '## Sing-box x86_64 TUN soak' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          if [ -s soak-metrics.json ]; then
             echo '```json' >> "$GITHUB_STEP_SUMMARY"
             cat soak-metrics.json >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "soak-metrics.json не найден" >> "$GITHUB_STEP_SUMMARY"
+            echo 'Metrics were not produced; soak is failed.' >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Upload soak metrics
-        uses: actions/upload-artifact@v6
+      - name: Collect server log
         if: always()
-        with:
-          name: soak-metrics
-          path: soak-metrics.json
-          retention-days: 30
+        run: |
+          cp "$RUNNER_TEMP/singbox-server.log" singbox-server.log 2>/dev/null || true
+          cp "$RUNNER_TEMP/soak-http.log" soak-http.log 2>/dev/null || true
+          cp "$RUNNER_TEMP/reality-decoy.log" reality-decoy.log 2>/dev/null || true
 
-      - name: Upload logcat
+      - name: Upload soak evidence
         uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: soak-logcat
-          path: /tmp/soak-output.txt
-          retention-days: 7
+          name: singbox-x86_64-soak-evidence-${{ matrix.require_reality }}
+          path: |
+            soak-metrics.json
+            ${{ runner.temp }}/soak-output.txt
+            ${{ runner.temp }}/soak-logcat.txt
+            singbox-server.log
+            soak-http.log
+            reality-decoy.log
+          if-no-files-found: warn
+          retention-days: 30

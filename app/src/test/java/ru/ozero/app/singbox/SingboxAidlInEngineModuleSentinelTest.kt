@@ -13,10 +13,17 @@ class SingboxAidlInEngineModuleSentinelTest {
         val aidlDir = File(root, "engine-singbox/src/main/aidl/ru/ozero/enginesingbox")
         assertTrue(aidlDir.isDirectory, "AIDL dir engine-singbox/src/main/aidl/ru/ozero/enginesingbox/ must exist")
 
-        val aidlFiles = aidlDir.listFiles { f -> f.extension == "aidl" } ?: emptyArray()
+        val aidlFiles = aidlDir.listFiles { f -> f.extension == "aidl" }
+            ?.map { it.name }
+            ?.toSet()
+            .orEmpty()
         assertTrue(
-            aidlFiles.size >= 4,
-            "Must have at least 4 AIDL files, found ${aidlFiles.size}",
+            aidlFiles == setOf(
+                "ISingboxEngineProcess.aidl",
+                "ISingboxProtector.aidl",
+                "SingboxStats.aidl",
+            ),
+            "Unexpected engine-singbox AIDL contract: $aidlFiles",
         )
     }
 

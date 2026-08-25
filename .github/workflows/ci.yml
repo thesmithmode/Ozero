@@ -146,7 +146,7 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber -R "${{ github.repository }}"
+          .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
           .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
@@ -315,7 +315,7 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -333,6 +333,7 @@ jobs:
       - name: coverage verification first
         run: >
           ./gradlew
+          :app:assembleDebugAndroidTest
           :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification
           :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport :common-vpn:jacocoTestCoverageVerification
           :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport :engine-urnetwork:jacocoTestCoverageVerification
@@ -503,7 +504,7 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber -R "${{ github.repository }}"
+          .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
           .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
@@ -639,7 +640,7 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber -R "${{ github.repository }}"
+          .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
           .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
@@ -1216,7 +1217,7 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber -R "${{ github.repository }}"
+          .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
           .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
@@ -1304,7 +1305,7 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -1391,7 +1392,7 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -1478,7 +1479,7 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -1565,7 +1566,7 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -1652,7 +1653,7 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -1739,7 +1740,7 @@ jobs:
         run: |
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
-          gh release download singbox-1.13.12 -p "libbox.aar" -D /tmp --clobber
+          .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar

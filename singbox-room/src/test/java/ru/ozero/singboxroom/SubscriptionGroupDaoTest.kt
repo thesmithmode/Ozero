@@ -219,4 +219,60 @@ class SubscriptionGroupDaoTest {
             },
         )
     }
+
+    @Test
+    fun `migration adds refresh generation with a stable default`() {
+        val statements = mutableListOf<String>()
+        val database = Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java),
+        ) { _, method, args ->
+            if (method.name == "execSQL") statements += args?.first() as String
+            null
+        } as SupportSQLiteDatabase
+
+        SingboxDatabase.MIGRATION_5_6.migrate(database)
+
+        assertEquals(
+            "ALTER TABLE `subscription_groups` ADD COLUMN `refreshGeneration` INTEGER NOT NULL DEFAULT 0",
+            statements.single(),
+        )
+    }
+
+    @Test
+    fun `refresh commit is conditional on persistent generation`() = runBlocking {
+        val id = db.subscriptionGroupDao().insert(SubscriptionGroup(name = "Remote"))
+        val dao = db.subscriptionGroupDao()
+
+        assertEquals(1, dao.tryBeginRefresh(id, expectedGeneration = 0L, attemptAt = 10L))
+        assertEquals(0, dao.tryBeginRefresh(id, expectedGeneration = 0L, attemptAt = 20L))
+        assertEquals(
+            0,
+            dao.commitRefresh(
+                id = id,
+                refreshGeneration = 0L,
+                lastUpdated = 30L,
+                lastAttemptAt = 10L,
+                lastRefreshErrorCode = null,
+                lastServerCount = 1,
+                bytesUsed = 0L,
+                bytesRemaining = 0L,
+                expiryDate = 0L,
+            ),
+        )
+        assertEquals(
+            1,
+            dao.commitRefresh(
+                id = id,
+                refreshGeneration = 1L,
+                lastUpdated = 30L,
+                lastAttemptAt = 10L,
+                lastRefreshErrorCode = null,
+                lastServerCount = 1,
+                bytesUsed = 0L,
+                bytesRemaining = 0L,
+                expiryDate = 0L,
+            ),
+        )
+    }
 }

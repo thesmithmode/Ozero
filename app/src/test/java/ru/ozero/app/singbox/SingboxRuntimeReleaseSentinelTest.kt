@@ -130,7 +130,7 @@ class SingboxRuntimeReleaseSentinelTest {
         )
 
         val statsBlock = content.substringAfter("override fun getStats()")
-            .substringBefore("override fun registerStatusCallback")
+            .substringBefore("override fun onCreate()")
         assertTrue(
             statsBlock.contains("SingboxStats()") &&
                 !statsBlock.contains("SingboxRuntime.isRunning()) 1") &&

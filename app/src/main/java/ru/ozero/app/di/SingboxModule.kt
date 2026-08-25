@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.app.vpn.singboxRuntimeFingerprint
 import ru.ozero.commonvpn.RuntimeFailureRouter
@@ -25,6 +26,7 @@ import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineRuntimeConfigProvider
+import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.singboxroom.SingboxDatabase
 import ru.ozero.singboxroom.dao.ProxyChainDao
 import ru.ozero.singboxroom.dao.ProxyProfileDao
@@ -59,6 +61,7 @@ object SingboxModule {
                 SingboxDatabase.MIGRATION_2_3,
                 SingboxDatabase.MIGRATION_3_4,
                 SingboxDatabase.MIGRATION_4_5,
+                SingboxDatabase.MIGRATION_5_6,
             )
             .build()
 
@@ -95,8 +98,11 @@ object SingboxModule {
     @Provides
     @Singleton
     fun provideRawUpdater(
+        db: SingboxDatabase,
         groupDao: SubscriptionGroupDao,
         profileDao: ProxyProfileDao,
+        proxyChainDao: ProxyChainDao,
+        @SingboxPrefs dataStore: DataStore<Preferences>,
     ): RawUpdater =
         RawUpdater(
             okHttpClient = SubscriptionTrustClientFactory.createSystem(),
@@ -104,6 +110,17 @@ object SingboxModule {
             profileDao = profileDao,
             userCaOkHttpClient = SubscriptionTrustClientFactory.create(),
             insecureOkHttpClient = SubscriptionTrustClientFactory.createInsecure(),
+            database = db,
+            onProfilesRemoved = { removedProfileIds ->
+                proxyChainDao.deleteByProfileIds(removedProfileIds)
+                dataStore.edit { prefs ->
+                    val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
+                    if (selectedProfileId != null && selectedProfileId in removedProfileIds) {
+                        prefs.remove(SingboxProbeService.SELECTED_PROFILE_KEY)
+                        prefs.remove(SingboxProbeService.BEAN_KEY)
+                    }
+                }
+            },
         )
 
     @Provides
@@ -130,20 +147,25 @@ object SingboxModule {
         @SingboxPrefs dataStore: DataStore<Preferences>,
         profileDao: ProxyProfileDao,
         proxyChainDao: ProxyChainDao,
+        settingsRepository: SettingsRepository,
     ): EngineRuntimeConfigProvider = object : EngineRuntimeConfigProvider {
         override val engineId: EngineId = EngineId.SINGBOX
         override val changes = combine(
             dataStore.data,
+            profileDao.getAllFlow(),
             profileDao.getAutoCandidatesFlow(MAX_SINGBOX_RUNTIME_PROFILE_SCAN),
             proxyChainDao.getAllFlow(),
-        ) { prefs, profiles, chainSteps ->
+            settingsRepository.settings,
+        ) { prefs, profiles, autoProfiles, chainSteps, settings ->
             singboxRuntimeFingerprint(
                 prefs = prefs,
                 profiles = profiles,
                 chainSteps = chainSteps,
                 resolveProfileById = profileDao::getById,
+                autoProfiles = autoProfiles,
+                ipv6Enabled = settings.ipv6Enabled,
             )
-        }
+        }.filterNotNull()
         override val includeStarting: Boolean = false
         override val replayAfterStarting: Boolean = true
         override val restartReason: String = "singbox profile changed while connected -> restart"

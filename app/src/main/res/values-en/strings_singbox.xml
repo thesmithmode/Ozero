@@ -12,8 +12,11 @@
     <string name="singbox_manual_links_name_hint">Group name (optional)</string>
     <string name="singbox_manual_links_error_empty">Paste at least one link</string>
     <string name="singbox_manual_links_error_parse">No valid links found</string>
+    <string name="singbox_manual_links_error_unsupported">No supported profiles found</string>
     <string name="singbox_group_refresh">Refresh</string>
     <string name="singbox_group_delete">Delete</string>
+    <string name="singbox_group_delete_confirm_title">Delete subscription?</string>
+    <string name="singbox_group_delete_confirm_message">The “%1$s” group, its servers, and chains will be deleted.</string>
     <string name="singbox_no_profiles_hint">No servers — refresh the subscription</string>
     <string name="singbox_add_group_title">New subscription</string>
     <string name="singbox_group_name_hint">Name</string>

@@ -39,6 +39,9 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
 }
 
 val strippedUrnetworkSdk = layout.buildDirectory.file("generated/urnetwork/URnetworkSdk.aar")
+val soakX86_64 = providers.gradleProperty("ozero.soak.x86_64").isPresent
+val supportedAbis =
+    if (soakX86_64) listOf("arm64-v8a", "x86_64") else listOf("arm64-v8a")
 val stripUrnetworkGoRuntime by tasks.registering(StripGoClassesFromAarTask::class) {
     sourceAar.set(rootProject.layout.projectDirectory.file("engine-urnetwork/libs/URnetworkSdk.aar"))
     outputAar.set(strippedUrnetworkSdk)
@@ -71,7 +74,7 @@ android {
             "\"0000000000000000000000000000000000000000000000000000000000000000\"",
         )
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            abiFilters += supportedAbis
         }
     }
 
@@ -190,8 +193,10 @@ dependencies {
     robolectricRuntimeDeps33(libs.robolectric.android.all.instrumented)
     robolectricRuntimeDeps34(libs.robolectric.android.all.instrumented35)
     androidTestImplementation(libs.bundles.testing.android)
+    androidTestImplementation(libs.hilt.android.testing)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
+    kspAndroidTest(libs.hilt.compiler)
 }
 
 dependencyCheck {

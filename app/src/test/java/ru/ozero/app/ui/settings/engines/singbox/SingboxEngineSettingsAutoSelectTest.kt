@@ -70,6 +70,21 @@ class SingboxEngineSettingsAutoSelectTest {
             override suspend fun count(): Int = groupsFlow.value.size
             override suspend fun insert(group: SubscriptionGroup): Long = group.id
             override suspend fun update(group: SubscriptionGroup) {}
+            override suspend fun updateAllowInsecureTls(id: Long, enabled: Boolean) {}
+
+            override suspend fun tryBeginRefresh(id: Long, expectedGeneration: Long, attemptAt: Long): Int = 0
+
+            override suspend fun commitRefresh(
+                id: Long,
+                refreshGeneration: Long,
+                lastUpdated: Long,
+                lastAttemptAt: Long,
+                lastRefreshErrorCode: String?,
+                lastServerCount: Int,
+                bytesUsed: Long,
+                bytesRemaining: Long,
+                expiryDate: Long,
+            ): Int = 0
             override suspend fun delete(group: SubscriptionGroup) {}
         }
         val profileDao = object : ProxyProfileDao {
@@ -82,6 +97,7 @@ class SingboxEngineSettingsAutoSelectTest {
             override suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile> =
                 emptyList()
             override suspend fun getById(id: Long): ProxyProfile? = null
+            override fun getByIdFlow(id: Long): Flow<ProxyProfile?> = MutableStateFlow(null)
             override suspend fun insert(profile: ProxyProfile): Long = profile.id
             override suspend fun insertAll(profiles: List<ProxyProfile>) {}
             override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
@@ -90,6 +106,14 @@ class SingboxEngineSettingsAutoSelectTest {
             override suspend fun getIdsByGroupId(groupId: Long): List<Long> = emptyList()
             override suspend fun deleteByIds(ids: List<Long>) {}
             override suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long) {}
+            override suspend fun updateProbeResultIfCurrent(
+                id: Long,
+                protocolType: Int,
+                beanBlob: ByteArray,
+                latency: Int,
+                probeError: String?,
+                lastProbeAt: Long,
+            ): Int = 0
             override suspend fun countByGroupId(groupId: Long): Int = 0
             override suspend fun update(profile: ProxyProfile) {}
             override suspend fun delete(profile: ProxyProfile) {}
@@ -101,6 +125,9 @@ class SingboxEngineSettingsAutoSelectTest {
             override suspend fun getAll(): List<ProxyChainStep> = chainStepsFlow.value
             override suspend fun clear() {
                 chainStepsFlow.value = emptyList()
+            }
+            override suspend fun deleteByProfileIds(profileIds: Set<Long>) {
+                chainStepsFlow.value = chainStepsFlow.value.filterNot { it.profileId in profileIds }
             }
             override suspend fun insertAll(steps: List<ProxyChainStep>) {
                 chainStepsFlow.value = steps
@@ -149,7 +176,7 @@ class SingboxEngineSettingsAutoSelectTest {
     }
 
     @Test
-    fun `onSetAutoSelect false removes selectedProfileId from DataStore`() = runTest {
+    fun `onSetAutoSelect false keeps auto selection because item is radio choice`() = runTest {
         prefsFlow.value = mutablePreferencesOf(selectedProfileKey to -1L)
         val vm = buildViewModel()
         backgroundScope.launch(Dispatchers.Main) { vm.state.collect {} }
@@ -158,7 +185,7 @@ class SingboxEngineSettingsAutoSelectTest {
         vm.onSetAutoSelect(false)
         advanceUntilIdle()
 
-        assertNull(prefsFlow.value[selectedProfileKey])
+        assertTrue(prefsFlow.value[selectedProfileKey] == -1L)
     }
 
     @Test
@@ -203,7 +230,7 @@ class SingboxEngineSettingsAutoSelectTest {
     }
 
     @Test
-    fun `onSetAutoSelect false after enable then state reflects isAutoSelectMode false`() = runTest {
+    fun `onSetAutoSelect false after enable keeps auto mode selected`() = runTest {
         val vm = buildViewModel()
         backgroundScope.launch(Dispatchers.Main) { vm.state.collect {} }
         advanceUntilIdle()
@@ -213,6 +240,6 @@ class SingboxEngineSettingsAutoSelectTest {
         vm.onSetAutoSelect(false)
         advanceUntilIdle()
 
-        assertFalse(vm.state.value.isAutoSelectMode)
+        assertTrue(vm.state.value.isAutoSelectMode)
     }
 }

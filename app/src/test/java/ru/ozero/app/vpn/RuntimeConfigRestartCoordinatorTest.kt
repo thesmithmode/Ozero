@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -176,7 +177,7 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Test
-    fun `restart accepts probing handoff without waiting for connected`() = runTest {
+    fun `restart waits through probing until connected`() = runTest {
         val startServiceActions = mutableListOf<String?>()
         val tunnelController = TunnelController()
         tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
@@ -184,6 +185,8 @@ class RuntimeConfigRestartCoordinatorTest {
             tunnelController.setState(TunnelState.Disconnecting)
             launch {
                 tunnelController.setState(TunnelState.Probing(EngineId.WARP))
+                yield()
+                tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
             }
         }
         val coordinator = coordinator(context, tunnelController)

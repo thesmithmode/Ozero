@@ -43,6 +43,46 @@ class FakeSubscriptionGroupDao : SubscriptionGroupDao {
         if (index >= 0) groups[index] = group
     }
 
+    override suspend fun updateAllowInsecureTls(id: Long, enabled: Boolean) {
+        val index = groups.indexOfFirst { it.id == id }
+        if (index >= 0) groups[index] = groups[index].copy(allowInsecureTls = enabled)
+    }
+
+    override suspend fun tryBeginRefresh(id: Long, expectedGeneration: Long, attemptAt: Long): Int {
+        val index = groups.indexOfFirst { it.id == id && it.refreshGeneration == expectedGeneration }
+        if (index < 0) return 0
+        groups[index] = groups[index].copy(
+            lastAttemptAt = attemptAt,
+            refreshGeneration = expectedGeneration + 1,
+        )
+        return 1
+    }
+
+    override suspend fun commitRefresh(
+        id: Long,
+        refreshGeneration: Long,
+        lastUpdated: Long,
+        lastAttemptAt: Long,
+        lastRefreshErrorCode: String?,
+        lastServerCount: Int,
+        bytesUsed: Long,
+        bytesRemaining: Long,
+        expiryDate: Long,
+    ): Int {
+        val index = groups.indexOfFirst { it.id == id && it.refreshGeneration == refreshGeneration }
+        if (index < 0) return 0
+        groups[index] = groups[index].copy(
+            lastUpdated = lastUpdated,
+            lastAttemptAt = lastAttemptAt,
+            lastRefreshErrorCode = lastRefreshErrorCode,
+            lastServerCount = lastServerCount,
+            bytesUsed = bytesUsed,
+            bytesRemaining = bytesRemaining,
+            expiryDate = expiryDate,
+        )
+        return 1
+    }
+
     override suspend fun delete(group: SubscriptionGroup) {
         groups.removeAll { it.id == group.id }
     }

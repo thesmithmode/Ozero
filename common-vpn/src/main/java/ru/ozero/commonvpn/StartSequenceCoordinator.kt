@@ -5,6 +5,7 @@ import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
+import ru.ozero.commonvpn.split.LanRoutes
 import ru.ozero.commonvpn.split.SplitTunnelConfig
 import ru.ozero.commonvpn.split.TunBuilderConfigurator
 import ru.ozero.enginescore.ChainOrchestrator
@@ -18,6 +19,7 @@ import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.SocketProtector
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
+import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.SplitTunnelMode
@@ -33,6 +35,22 @@ class StartSequenceState(
     val sessionIdRef: AtomicReference<Long>,
     val stopping: AtomicBoolean,
 )
+
+internal fun TunSpec.forSplitMode(mode: SplitTunnelMode): TunSpec =
+    if (mode != SplitTunnelMode.BYPASS_LAN) {
+        this
+    } else {
+        copy(
+            routeAllV4 = false,
+            routeCidrsV4 = emptyList(),
+            routeAllV6 = false,
+            routeCidrsV6 = if (routeAllV6) {
+                LanRoutes.BYPASS_LAN_IPV6.map { "${it.address}/${it.prefix}" }
+            } else {
+                routeCidrsV6
+            },
+        )
+    }
 
 class StartSequenceCollaborators(
     val enginePlugins: Set<EnginePlugin>,
@@ -199,7 +217,11 @@ class StartSequenceCoordinator(
                 }
         }
         if (!usesCustomTun) deps.engineWatchdog.startHealthKillswitchWatcher(activeEngineId)
-        if (usesCustomTun) deps.engineWatchdog.startPeerWatchdog(activeEngineId)
+        if (usesCustomTun && activeEngineId == EngineId.SINGBOX) {
+            deps.engineWatchdog.startRoutedProbeWatchdog(activeEngineId)
+        } else if (usesCustomTun) {
+            deps.engineWatchdog.startPeerWatchdog(activeEngineId)
+        }
         deps.engineWatchdog.startStagnationWatchdog(activeEngineId)
         deps.statsLogger.start()
         return true
@@ -417,7 +439,8 @@ class StartSequenceCoordinator(
     ): ParcelFileDescriptor? {
         val plugin = deps.enginePlugins.first { it.id == engineId }
         val spec = plugin.tunSpec() ?: return null
-        val builder = deps.tunBuilderHelper.applyEngineTunSpec(spec, ipv6Enabled)
+        val routedSpec = spec.forSplitMode(splitConfig.mode)
+        val builder = deps.tunBuilderHelper.applyEngineTunSpec(routedSpec, ipv6Enabled)
         TunBuilderConfigurator(packageName).apply(builder, splitConfig, excludeSelf = true)
         PersistentLoggers.debug(
             TAG,

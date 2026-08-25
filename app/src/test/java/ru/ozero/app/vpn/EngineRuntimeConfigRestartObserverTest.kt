@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -28,6 +29,13 @@ import ru.ozero.enginefptn.FptnConfig
 import ru.ozero.enginefptn.runtimeFingerprint
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EngineRuntimeConfigProvider
+import ru.ozero.enginescore.settings.AppMode
+import ru.ozero.enginescore.settings.ByeDpiUiSettings
+import ru.ozero.enginescore.settings.HostsMode
+import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginescore.settings.SplitTunnelMode
+import ru.ozero.enginescore.settings.TrafficMode
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.singboxfmt.KryoSerializer
 import ru.ozero.singboxfmt.VLESSBean
@@ -728,7 +736,7 @@ class EngineRuntimeConfigRestartObserverTest {
         assertTrue(coordinator.contains("startForegroundService").not())
         assertTrue(coordinator.contains("TunnelState.Disconnecting"))
         assertTrue(coordinator.contains("TunnelState.Probing"))
-        assertTrue(coordinator.contains("onSwitchingFinished(\"runtime config restart started\")"))
+        assertTrue(coordinator.contains("onSwitchingFinished(\"runtime config restart connected\")"))
         assertTrue(coordinator.contains("abortQueuedRestarts()"))
         assertTrue(coordinator.contains("restartQueue.clear()"))
         assertTrue(coordinator.contains("restartInProgress = false"))
@@ -776,6 +784,7 @@ class EngineRuntimeConfigRestartObserverTest {
             dataStore = flowDataStore(prefs),
             profileDao = fakeProfileDao(profiles),
             proxyChainDao = fakeProxyChainDao(chain),
+            settingsRepository = staticSettingsRepository(),
         )
 
         val baseline = provider.changes.first()
@@ -821,6 +830,7 @@ class EngineRuntimeConfigRestartObserverTest {
                 dataStore = flowDataStore(prefs),
                 profileDao = fakeProfileDao(profiles),
                 proxyChainDao = fakeProxyChainDao(chain),
+                settingsRepository = staticSettingsRepository(),
             )
 
             val baseline = provider.changes.first()
@@ -859,6 +869,7 @@ class EngineRuntimeConfigRestartObserverTest {
             dataStore = flowDataStore(prefs),
             profileDao = fakeProfileDao(profiles),
             proxyChainDao = fakeProxyChainDao(chain),
+            settingsRepository = staticSettingsRepository(),
         )
 
         val baseline = provider.changes.first()
@@ -870,6 +881,64 @@ class EngineRuntimeConfigRestartObserverTest {
 
         assertNotEquals(baseline, selectedProfileUpdated)
     }
+
+    @Test
+    fun `singbox metadata refresh causes no restart and runtime refresh causes exactly one`() = runTest(dispatcher) {
+        val prefs = MutableStateFlow<Preferences>(mutablePreferencesOf(singboxSelectedProfileKey to 1L))
+        val profiles = MutableStateFlow(listOf(proxyProfile(id = 1, blob = namedSingboxBlob("Original"))))
+        val provider = SingboxModule.provideSingboxRuntimeConfigProvider(
+            dataStore = flowDataStore(prefs),
+            profileDao = fakeProfileDao(profiles),
+            proxyChainDao = fakeProxyChainDao(MutableStateFlow(emptyList())),
+            settingsRepository = staticSettingsRepository(),
+        )
+        val state = MutableStateFlow<TunnelState>(TunnelState.Connected(EngineId.SINGBOX, 1080))
+        val restarts = mutableListOf<String>()
+        EngineRuntimeConfigRestartObserver(setOf(provider)).start(
+            scope = observerScope(),
+            exceptionHandler = CoroutineExceptionHandler { _, _ -> },
+            state = state,
+            restart = { reason -> restarts.add(reason).let { true } },
+        )
+        runCurrent()
+
+        profiles.value = listOf(proxyProfile(id = 1, blob = namedSingboxBlob("Renamed")))
+        runCurrent()
+        profiles.value = listOf(proxyProfile(id = 1, blob = validSingboxBlob(2)))
+        runCurrent()
+
+        assertEquals(listOf(provider.restartReason), restarts)
+    }
+
+    @Test
+    fun `singbox selected deletion suppresses incomplete Room snapshot and restarts once after selection clears`() =
+        runTest(dispatcher) {
+            val prefs = MutableStateFlow<Preferences>(mutablePreferencesOf(singboxSelectedProfileKey to 1L))
+            val profiles = MutableStateFlow(listOf(proxyProfile(id = 1, blob = validSingboxBlob(1))))
+            val provider = SingboxModule.provideSingboxRuntimeConfigProvider(
+                dataStore = flowDataStore(prefs),
+                profileDao = fakeProfileDao(profiles),
+                proxyChainDao = fakeProxyChainDao(MutableStateFlow(emptyList())),
+                settingsRepository = staticSettingsRepository(),
+            )
+            val state = MutableStateFlow<TunnelState>(TunnelState.Connected(EngineId.SINGBOX, 1080))
+            val restarts = mutableListOf<String>()
+            EngineRuntimeConfigRestartObserver(setOf(provider)).start(
+                scope = observerScope(),
+                exceptionHandler = CoroutineExceptionHandler { _, _ -> },
+                state = state,
+                restart = { reason -> restarts.add(reason).let { true } },
+            )
+            runCurrent()
+
+            profiles.value = emptyList()
+            runCurrent()
+            assertTrue(restarts.isEmpty())
+            prefs.value = mutablePreferencesOf()
+            runCurrent()
+
+            assertEquals(listOf(provider.restartReason), restarts)
+        }
 
     @Test
     fun `singbox runtime provider resolves selected profile from dao when flow cache misses`() = runTest(dispatcher) {
@@ -890,12 +959,20 @@ class EngineRuntimeConfigRestartObserverTest {
             dataStore = flowDataStore(prefs),
             profileDao = profileDao,
             proxyChainDao = fakeProxyChainDao(MutableStateFlow(emptyList())),
+            settingsRepository = staticSettingsRepository(),
         )
 
         val fingerprint = provider.changes.first()
 
         assertEquals(
-            listOf(1L, byteArrayOf(9).contentHashCode(), emptyList<Pair<Long, Int>>(), emptyList<String>()),
+            SingboxRuntimeFingerprint(
+                selectedProfileId = 1L,
+                selectedProfile = RuntimeProfilePayload(1L, 0, listOf(9.toByte())),
+                autoSelectProfiles = emptyList(),
+                chainProfiles = emptyList(),
+                dnsServers = emptyList(),
+                ipv6Enabled = false,
+            ),
             fingerprint,
         )
     }
@@ -922,6 +999,7 @@ class EngineRuntimeConfigRestartObserverTest {
             dataStore = flowDataStore(prefs),
             profileDao = fakeProfileDao(profiles),
             proxyChainDao = fakeProxyChainDao(chain),
+            settingsRepository = staticSettingsRepository(),
         )
 
         val baseline = provider.changes.first()
@@ -958,6 +1036,7 @@ class EngineRuntimeConfigRestartObserverTest {
             dataStore = flowDataStore(prefs),
             profileDao = fakeProfileDao(profiles),
             proxyChainDao = fakeProxyChainDao(chain),
+            settingsRepository = staticSettingsRepository(),
         )
 
         val baseline = provider.changes.first()
@@ -1002,6 +1081,7 @@ class EngineRuntimeConfigRestartObserverTest {
             dataStore = flowDataStore(prefs),
             profileDao = fakeProfileDao(profiles),
             proxyChainDao = fakeProxyChainDao(chain),
+            settingsRepository = staticSettingsRepository(),
         )
 
         val baseline = provider.changes.first()
@@ -1031,6 +1111,30 @@ class EngineRuntimeConfigRestartObserverTest {
             }
         }
 
+    private fun staticSettingsRepository(): SettingsRepository = object : SettingsRepository {
+        override val settings: Flow<SettingsModel> = MutableStateFlow(SettingsModel.DEFAULT)
+        override suspend fun setSplitMode(mode: SplitTunnelMode) = Unit
+        override suspend fun setIpv6Enabled(enabled: Boolean) = Unit
+        override suspend fun setAutoStart(enabled: Boolean) = Unit
+        override suspend fun setTrafficMode(mode: TrafficMode) = Unit
+        override suspend fun setManualEngine(engine: EngineId?) = Unit
+        override suspend fun setEngineAutoPriority(priority: List<EngineId>) = Unit
+        override suspend fun setUrnetworkEnabled(enabled: Boolean) = Unit
+        override suspend fun setUrnetworkJwt(jwt: String?) = Unit
+        override suspend fun setUrnetworkCountryCode(code: String?) = Unit
+        override suspend fun setByedpiWinningArgs(args: String?) = Unit
+        override suspend fun setByedpiDefaultAccepted(accepted: Boolean) = Unit
+        override suspend fun setByedpiUseUiMode(enabled: Boolean) = Unit
+        override suspend fun setByedpiUiSettings(settings: ByeDpiUiSettings) = Unit
+        override suspend fun setCustomDnsServers(servers: List<String>) = Unit
+        override suspend fun setHostsMode(mode: HostsMode) = Unit
+        override suspend fun setHosts(hosts: List<String>) = Unit
+        override suspend fun setUiLocaleTag(tag: String?) = Unit
+        override suspend fun setAppMode(mode: AppMode) = Unit
+        override suspend fun setKillswitchEnabled(enabled: Boolean) = Unit
+        override suspend fun setAlwaysOnBannerDismissed(dismissed: Boolean) = Unit
+    }
+
     private fun fakeProfileDao(
         flow: MutableStateFlow<List<ProxyProfile>>,
         lookupById: (Long) -> ProxyProfile? = { id -> flow.value.firstOrNull { it.id == id } },
@@ -1041,6 +1145,7 @@ class EngineRuntimeConfigRestartObserverTest {
             override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
                 profiles.map { it.id.takeIf { id -> id != 0L } ?: 1L }
             override suspend fun getById(id: Long): ProxyProfile? = lookupById(id)
+            override fun getByIdFlow(id: Long): Flow<ProxyProfile?> = flow.map { lookupById(id) }
             override fun getAllFlow() = flow
             override fun getAllLimitedFlow(limit: Int) = flow.map { it.take(limit) }
             override fun getAutoCandidatesFlow(limit: Int) = flow.map { it.sortedByAutoPriority().take(limit) }
@@ -1057,6 +1162,14 @@ class EngineRuntimeConfigRestartObserverTest {
             override suspend fun deleteByIds(ids: List<Long>) = Unit
             override suspend fun updateProbeResult(id: Long, latency: Int, probeError: String?, lastProbeAt: Long) =
                 Unit
+            override suspend fun updateProbeResultIfCurrent(
+                id: Long,
+                protocolType: Int,
+                beanBlob: ByteArray,
+                latency: Int,
+                probeError: String?,
+                lastProbeAt: Long,
+            ): Int = 0
             override suspend fun countByGroupId(groupId: Long): Int = flow.value.count { it.groupId == groupId }
             override suspend fun update(profile: ProxyProfile) = Unit
             override suspend fun delete(profile: ProxyProfile) = Unit
@@ -1084,6 +1197,9 @@ class EngineRuntimeConfigRestartObserverTest {
             override suspend fun clear() {
                 flow.value = emptyList()
             }
+            override suspend fun deleteByProfileIds(profileIds: Set<Long>) {
+                flow.value = flow.value.filterNot { it.profileId in profileIds }
+            }
             override suspend fun insertAll(steps: List<ProxyChainStep>) {
                 flow.value = steps
             }
@@ -1102,6 +1218,17 @@ class EngineRuntimeConfigRestartObserverTest {
         VLESSBean().apply {
             uuid = "12345678-1234-1234-1234-${seed.toString().padStart(12, '0')}"
             serverAddress = "s$seed.example.com"
+            serverPort = 443
+            type = "tcp"
+            security = "none"
+        },
+    )
+
+    private fun namedSingboxBlob(name: String): ByteArray = KryoSerializer.serialize(
+        VLESSBean().apply {
+            this.name = name
+            uuid = "12345678-1234-1234-1234-123456789012"
+            serverAddress = "server.example.com"
             serverPort = 443
             type = "tcp"
             security = "none"

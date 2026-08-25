@@ -139,10 +139,18 @@ class SingboxEngineProbeTest {
 
     @Test
     fun `missing declared chain profile is retained as typed failure`() {
+        val selected = ProxyProfile(
+            id = 1L,
+            groupId = 1L,
+            name = "Selected",
+            beanBlob = makeVlessBlob("selected.example"),
+            protocolType = SingboxEngine.PROTOCOL_VLESS,
+        )
         val engine = buildEngine(chainProfileIds = listOf(1L, 99L))
         Thread.sleep(100)
         engine.setPrivateField("cachedSelectedProfileId", 1L)
-        engine.setPrivateField("cachedBlob", makeVlessBlob())
+        engine.setPrivateField("cachedBlob", selected.beanBlob)
+        engine.setPrivateField("cachedProfilesById", mapOf(selected.id to selected))
 
         val config = assertIs<EngineConfig.Singbox>(engine.buildManualConfig(null))
         val result = assertIs<BuildConfigResult.Failure>(engine.buildPendingConfigForTest(config))
@@ -155,10 +163,18 @@ class SingboxEngineProbeTest {
     @Test
     fun `declared chain longer than auto limit is not silently truncated`() {
         val wrapperIds = (2L..52L).toList()
+        val selected = ProxyProfile(
+            id = 1L,
+            groupId = 1L,
+            name = "Selected",
+            beanBlob = makeVlessBlob("selected.example"),
+            protocolType = SingboxEngine.PROTOCOL_VLESS,
+        )
         val engine = buildEngine(chainProfileIds = listOf(1L) + wrapperIds)
         Thread.sleep(100)
         engine.setPrivateField("cachedSelectedProfileId", 1L)
-        engine.setPrivateField("cachedBlob", makeVlessBlob())
+        engine.setPrivateField("cachedBlob", selected.beanBlob)
+        engine.setPrivateField("cachedProfilesById", mapOf(selected.id to selected))
 
         val config = assertIs<EngineConfig.Singbox>(engine.buildManualConfig(null))
         val result = assertIs<BuildConfigResult.Failure>(engine.buildPendingConfigForTest(config))
@@ -410,9 +426,11 @@ class SingboxEngineProbeTest {
                 SingboxHttp204RoutedProbe.LATENCY_FAILED
             }
             val process = mockk<ISingboxEngineProcess>()
-            val pfd = mockk<ParcelFileDescriptor>(relaxed = true)
-            every { ParcelFileDescriptor.adoptFd(42) } returns pfd
-            every { process.startWithConfig(pfd, any(), any()) } returns Unit
+            val transportPfd = mockk<ParcelFileDescriptor>(relaxed = true)
+            val rawOwner = mockk<ParcelFileDescriptor>(relaxed = true)
+            every { ParcelFileDescriptor.fromFd(42) } returns transportPfd
+            every { ParcelFileDescriptor.adoptFd(42) } returns rawOwner
+            every { process.startWithConfig(transportPfd, any(), any()) } returns Unit
             every { process.runtimeRunning() } returns true
             every { process.stopAndWait(3_000L) } returns true
             engine.setPrivateField("proxy", process)
@@ -429,6 +447,60 @@ class SingboxEngineProbeTest {
             assertEquals(0, engine.privateIntField("pendingSocksPort"))
             assertEquals(49408, engine.privateIntField("activeSocksPort"))
             assertEquals(true, engine.privateBooleanField("activeTunAutoSelect"))
+            verify(exactly = 1) { transportPfd.close() }
+            verify(exactly = 1) { rawOwner.close() }
+        } finally {
+            unmockkStatic(ParcelFileDescriptor::class)
+        }
+    }
+
+    @Test
+    fun `attachTun returns raw fd ownership when remote runtime fails`() = runTest {
+        mockkStatic(ParcelFileDescriptor::class)
+        try {
+            val engine = buildEngine()
+            val process = mockk<ISingboxEngineProcess>()
+            val transportPfd = mockk<ParcelFileDescriptor>(relaxed = true)
+            every { ParcelFileDescriptor.fromFd(42) } returns transportPfd
+            every { process.startWithConfig(transportPfd, any(), any()) } returns Unit
+            every { process.runtimeRunning() } returns false
+            every { process.stopAndWait(3_000L) } returns true
+            engine.setPrivateField("proxy", process)
+            engine.setPrivateField("pendingConfig", "{}")
+            engine.setPrivateField("pendingSocksPort", 49408)
+
+            val result = engine.attachTun(42)
+
+            assertIs<TunAttachResult.Failure>(result)
+            verify(exactly = 1) { transportPfd.close() }
+            verify(exactly = 0) { ParcelFileDescriptor.adoptFd(42) }
+        } finally {
+            unmockkStatic(ParcelFileDescriptor::class)
+        }
+    }
+
+    @Test
+    fun `attachTun keeps successful runtime when raw fd close reports failure`() = runTest {
+        mockkStatic(ParcelFileDescriptor::class)
+        try {
+            val engine = buildEngine()
+            val process = mockk<ISingboxEngineProcess>()
+            val transportPfd = mockk<ParcelFileDescriptor>(relaxed = true)
+            val rawOwner = mockk<ParcelFileDescriptor>()
+            every { ParcelFileDescriptor.fromFd(42) } returns transportPfd
+            every { ParcelFileDescriptor.adoptFd(42) } returns rawOwner
+            every { rawOwner.close() } throws IllegalStateException("close failed")
+            every { process.startWithConfig(transportPfd, any(), any()) } returns Unit
+            every { process.runtimeRunning() } returns true
+            engine.setPrivateField("proxy", process)
+            engine.setPrivateField("pendingConfig", "{}")
+            engine.setPrivateField("pendingSocksPort", 49408)
+
+            val result = engine.attachTun(42)
+
+            assertIs<TunAttachResult.Success>(result)
+            verify(exactly = 1) { transportPfd.close() }
+            verify(exactly = 1) { rawOwner.close() }
         } finally {
             unmockkStatic(ParcelFileDescriptor::class)
         }
@@ -441,9 +513,11 @@ class SingboxEngineProbeTest {
             val engine = buildEngine()
             engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
             val process = mockk<ISingboxEngineProcess>()
-            val pfd = mockk<ParcelFileDescriptor>(relaxed = true)
-            every { ParcelFileDescriptor.adoptFd(42) } returns pfd
-            every { process.startWithConfig(pfd, any(), any()) } returns Unit
+            val transportPfd = mockk<ParcelFileDescriptor>(relaxed = true)
+            val rawOwner = mockk<ParcelFileDescriptor>(relaxed = true)
+            every { ParcelFileDescriptor.fromFd(42) } returns transportPfd
+            every { ParcelFileDescriptor.adoptFd(42) } returns rawOwner
+            every { process.startWithConfig(transportPfd, any(), any()) } returns Unit
             every { process.runtimeRunning() } returns true
             every { process.stopAndWait(3_000L) } returns true
             engine.setPrivateField("proxy", process)
@@ -465,7 +539,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `attachTun readiness ignores external probe failure after local SOCKS is ready`() = runTest {
+    fun `awaitReady rejects external probe failure after local SOCKS is ready`() = runTest {
         mockkStatic(ParcelFileDescriptor::class)
         try {
             val engine = buildEngine()
@@ -475,9 +549,11 @@ class SingboxEngineProbeTest {
                 SingboxHttp204RoutedProbe.LATENCY_FAILED
             }
             val process = mockk<ISingboxEngineProcess>()
-            val pfd = mockk<ParcelFileDescriptor>(relaxed = true)
-            every { ParcelFileDescriptor.adoptFd(42) } returns pfd
-            every { process.startWithConfig(pfd, any(), any()) } returns Unit
+            val transportPfd = mockk<ParcelFileDescriptor>(relaxed = true)
+            val rawOwner = mockk<ParcelFileDescriptor>(relaxed = true)
+            every { ParcelFileDescriptor.fromFd(42) } returns transportPfd
+            every { ParcelFileDescriptor.adoptFd(42) } returns rawOwner
+            every { process.startWithConfig(transportPfd, any(), any()) } returns Unit
             every { process.runtimeRunning() } returns true
             engine.setPrivateField("proxy", process)
             engine.setPrivateField("pendingConfig", "{}")
@@ -490,12 +566,12 @@ class SingboxEngineProbeTest {
 
                 val ready = engine.awaitReady()
 
-                assertIs<EnginePlugin.ReadyResult.Ready>(ready)
+                assertIs<EnginePlugin.ReadyResult.Timeout>(ready)
                 assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
             }
 
             assertIs<TunAttachResult.Success>(result)
-            assertEquals(0, calls)
+            assertEquals(1, calls)
             assertEquals(null, engine.privateField("pendingConfig"))
             assertEquals(0, engine.privateIntField("pendingSocksPort"))
             assertEquals(true, engine.privateBooleanField("activeTunAutoSelect"))
@@ -688,7 +764,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `awaitReady does not depend on routed TLS endpoint after local SOCKS handshake`() = runTest {
+    fun `awaitReady requires routed TLS endpoint after local SOCKS handshake`() = runTest {
         val engine = buildEngine()
         var routedProbeCalls = 0
         engine.routedProbe = object : SingboxRoutedProbe {
@@ -710,8 +786,8 @@ class SingboxEngineProbeTest {
 
             val result = engine.awaitReady()
 
-            assertIs<EnginePlugin.ReadyResult.Ready>(result)
-            assertEquals(0, routedProbeCalls)
+            assertIs<EnginePlugin.ReadyResult.Timeout>(result)
+            assertEquals(1, routedProbeCalls)
             assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
         }
     }
@@ -927,6 +1003,7 @@ class SingboxEngineProbeTest {
             override suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile> =
                 emptyList()
             override suspend fun getById(id: Long): ProxyProfile? = null
+            override fun getByIdFlow(id: Long): Flow<ProxyProfile?> = MutableStateFlow(null)
             override suspend fun insert(profile: ProxyProfile): Long = profile.id
             override suspend fun insertAll(profiles: List<ProxyProfile>) = Unit
             override suspend fun insertAllIgnoringConflicts(profiles: List<ProxyProfile>): List<Long> =
@@ -941,6 +1018,14 @@ class SingboxEngineProbeTest {
                 probeError: String?,
                 lastProbeAt: Long,
             ) = Unit
+            override suspend fun updateProbeResultIfCurrent(
+                id: Long,
+                protocolType: Int,
+                beanBlob: ByteArray,
+                latency: Int,
+                probeError: String?,
+                lastProbeAt: Long,
+            ): Int = 0
             override suspend fun countByGroupId(groupId: Long): Int = 0
             override suspend fun update(profile: ProxyProfile) = Unit
             override suspend fun delete(profile: ProxyProfile) = Unit
@@ -954,6 +1039,7 @@ class SingboxEngineProbeTest {
             override fun getAllFlow(): Flow<List<ProxyChainStep>> = MutableStateFlow(steps)
             override suspend fun getAll(): List<ProxyChainStep> = steps
             override suspend fun clear() = Unit
+            override suspend fun deleteByProfileIds(profileIds: Set<Long>) = Unit
             override suspend fun insertAll(steps: List<ProxyChainStep>) = Unit
             override suspend fun replace(profileIds: List<Long>) = Unit
         }

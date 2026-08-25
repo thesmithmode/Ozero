@@ -56,6 +56,18 @@ class ProxyChainDaoTest {
         assertEquals(emptyList<Long>(), db.proxyChainDao().getAll().map { it.profileId })
     }
 
+    @Test
+    fun `explicit profile cleanup removes only matching chain steps`() = runBlocking {
+        val groupId = db.subscriptionGroupDao().insert(SubscriptionGroup(name = "G"))
+        val first = db.proxyProfileDao().insert(makeProfile(groupId, "RU"))
+        val second = db.proxyProfileDao().insert(makeProfile(groupId, "EU"))
+        db.proxyChainDao().replace(listOf(first, second))
+
+        db.proxyChainDao().deleteByProfileIds(setOf(first))
+
+        assertEquals(listOf(second), db.proxyChainDao().getAll().map { it.profileId })
+    }
+
     private fun makeProfile(groupId: Long, name: String): ProxyProfile =
         ProxyProfile(
             groupId = groupId,

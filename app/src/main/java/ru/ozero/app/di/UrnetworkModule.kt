@@ -72,9 +72,11 @@ object UrnetworkModule {
     fun provideUrnetworkSdkBridge(
         @ApplicationContext context: Context,
         runtimeFailureRouter: RuntimeFailureRouter,
+        configStore: UrnetworkConfigStore,
     ): UrnetworkSdkBridge = RealUrnetworkSdkBridge(
         app = context.applicationContext as Application,
         appVersion = ru.ozero.app.BuildConfig.VERSION_NAME,
+        configStore = configStore,
         onIoLoopDied = { reason ->
             runtimeFailureRouter.handleEngineFailure(EngineId.URNETWORK, reason)
         },

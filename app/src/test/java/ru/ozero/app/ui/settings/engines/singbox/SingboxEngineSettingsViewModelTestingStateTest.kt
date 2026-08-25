@@ -25,6 +25,7 @@ class SingboxEngineSettingsViewModelTestingStateTest {
         val invokeTesting = vm.javaClass.getDeclaredMethod(
             "onProfileTestingChanged",
             Long::class.javaPrimitiveType,
+            Long::class.javaPrimitiveType,
             Boolean::class.javaPrimitiveType,
         )
             .apply { isAccessible = true }
@@ -32,14 +33,14 @@ class SingboxEngineSettingsViewModelTestingStateTest {
             .apply { isAccessible = true }
         val uiStateFlow = uiStateField.get(vm) as MutableStateFlow<*>
 
-        invokeTesting.invoke(vm, 42L, true)
-        invokeTesting.invoke(vm, 42L, true)
+        invokeTesting.invoke(vm, 0L, 42L, true)
+        invokeTesting.invoke(vm, 0L, 42L, true)
         assertTrue((uiStateFlow.value as SingboxSettingsUiState).testingProfileIds.contains(42L))
 
-        invokeTesting.invoke(vm, 42L, false)
+        invokeTesting.invoke(vm, 0L, 42L, false)
         assertTrue((uiStateFlow.value as SingboxSettingsUiState).testingProfileIds.contains(42L))
 
-        invokeTesting.invoke(vm, 42L, false)
+        invokeTesting.invoke(vm, 0L, 42L, false)
         assertFalse((uiStateFlow.value as SingboxSettingsUiState).testingProfileIds.contains(42L))
     }
 
@@ -54,7 +55,7 @@ class SingboxEngineSettingsViewModelTestingStateTest {
         val probeService = mockk<SingboxProbeService>(relaxed = true)
 
         every { groupDao.getAllFlow() } returns emptyFlow()
-        every { profileDao.getAllLimitedFlow(500) } returns emptyFlow()
+        every { profileDao.getAllLimitedFlow(2_000) } returns emptyFlow()
         every { proxyChainDao.getAllFlow() } returns emptyFlow()
 
         return SingboxEngineSettingsViewModel(
