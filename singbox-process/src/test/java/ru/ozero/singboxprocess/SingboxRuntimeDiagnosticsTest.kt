@@ -164,13 +164,14 @@ class SingboxRuntimeDiagnosticsTest {
     }
 
     @Test
-    fun `restart and stop close diagnostics`() {
+    fun `restart and stop close runtime resources`() {
         val restart = runtimeSource.substringAfter("if (oldServer != null)").substringBefore("val socketFile")
         val stop = runtimeSource.substringAfter("suspend fun stop()").substringBefore("fun isRunning()")
 
-        assertContains(restart, "stopNativeLogSubscription()")
-        assertContains(stop, "stopNativeLogSubscription()")
-        assertContains(runtimeSource, "nativeLogJob?.cancelAndJoin()")
-        assertContains(runtimeSource, "client.disconnect()")
+        assertContains(restart, "oldServer.closeService()")
+        assertContains(restart, "oldServer.close()")
+        assertContains(stop, "server.closeService()")
+        assertContains(stop, "server.close()")
+        assertContains(stop, "defaultInterfaceMonitor.stop()")
     }
 }

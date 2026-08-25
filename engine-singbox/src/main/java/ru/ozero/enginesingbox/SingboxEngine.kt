@@ -33,6 +33,7 @@ import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
 import ru.ozero.enginescore.ExitNodeStrategy
+import ru.ozero.enginescore.LogSanitizer
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
@@ -207,6 +208,9 @@ class SingboxEngine @Inject constructor(
     private val lifecycleGeneration = AtomicLong(0)
     private val connectionGeneration = AtomicLong(0)
 
+    @Volatile
+    private var activeProfileId: Long? = null
+
     private val localProtector = object : ISingboxProtector.Stub() {
         override fun protect(socket: ParcelFileDescriptor): Boolean = socket.use {
             val result = VpnSocketProtectorHolder.protect(it.fd)
@@ -219,6 +223,7 @@ class SingboxEngine @Inject constructor(
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
         return lifecycleMutex.withLock {
             val generation = lifecycleGeneration.incrementAndGet()
+            activeProfileId = config.profileId
 
             chainMode = upstream !is Upstream.None || config.proxyMode
             PersistentLoggers.debug(
@@ -859,7 +864,7 @@ class SingboxEngine @Inject constructor(
     }
 
     private suspend fun loadStorageSnapshot(): SingboxStorageSnapshot {
-        while (true) {
+        for (attempt in 0 until STORAGE_SNAPSHOT_MAX_ATTEMPTS) {
             val initialPrefs = dataStore.data.first()
             val selectedProfileId = initialPrefs[SELECTED_PROFILE_KEY]
             val initialChainIds = if (selectedProfileId == SELECTED_AUTO) {
@@ -887,12 +892,18 @@ class SingboxEngine @Inject constructor(
             } else {
                 requestedIds.mapNotNull { profileDao.getById(it) }
             }
-            if (
+            val changedDuringRead =
                 initialPrefs != finalPrefs ||
                 initialChainIds != finalChainIds ||
                 !profiles.sameRuntimeInputs(confirmedProfiles)
-            ) {
+            if (changedDuringRead && attempt < STORAGE_SNAPSHOT_MAX_ATTEMPTS - 1) {
                 continue
+            }
+            if (changedDuringRead) {
+                PersistentLoggers.warn(
+                    TAG,
+                    "operation=loadStorageSnapshot stableCategory=convergence attempts=$STORAGE_SNAPSHOT_MAX_ATTEMPTS",
+                )
             }
             val migratedProfiles = profiles.map { profile -> migrateProfileBlob(profile) }
             return SingboxStorageSnapshot(
@@ -909,6 +920,7 @@ class SingboxEngine @Inject constructor(
                 chainProfileIds = initialChainIds,
             )
         }
+        error("Storage snapshot convergence exhausted")
     }
 
     private fun List<ProxyProfile>.sameRuntimeInputs(other: List<ProxyProfile>): Boolean =
@@ -916,7 +928,6 @@ class SingboxEngine @Inject constructor(
             zip(other).all { (left, right) ->
                 left.id == right.id &&
                     left.protocolType == right.protocolType &&
-                    left.latencyMs == right.latencyMs &&
                     left.beanBlob.contentEquals(right.beanBlob)
             }
 
@@ -1101,7 +1112,7 @@ class SingboxEngine @Inject constructor(
         synchronized(bindLock) {
             if (proxy != null) return null
             val connectionId = connectionGeneration.incrementAndGet()
-            serviceConn?.let { runCatching { context.unbindService(it) } }
+            serviceConn?.let { unbindService(it, "replaceBinding") }
             unlinkDeath()
             val latch = CountDownLatch(1)
             val conn = object : ServiceConnection {
@@ -1110,7 +1121,10 @@ class SingboxEngine @Inject constructor(
                     val connection = this
                     proxy = ISingboxEngineProcess.Stub.asInterface(binder)
                     engineBinder = binder
-                    val connectedProcessId = runCatching { proxy?.processId() ?: -1 }.getOrDefault(-1)
+                    val connectedProcessId = runCatching { proxy?.processId() ?: -1 }.getOrElse {
+                        logIpcFailure("processId", it, connectionId, -1)
+                        -1
+                    }
                     engineProcessId = connectedProcessId
                     val recipient = IBinder.DeathRecipient {
                         synchronized(bindLock) {
@@ -1123,13 +1137,18 @@ class SingboxEngine @Inject constructor(
                             engineProcessId = -1
                             val ref = serviceConn
                             serviceConn = null
-                            if (ref != null) runCatching { context.unbindService(ref) }
+                            if (ref != null) unbindService(ref, "binderDeath", connectionId, connectedProcessId)
                             PersistentLoggers.warn(TAG, "SingboxEngineService binder died — :engine_singbox crash")
-                            runCatching { onProcessDied() }
+                            runCatching { onProcessDied() }.onFailure {
+                                logIpcFailure("onProcessDied", it, connectionId, connectedProcessId)
+                            }
                         }
                     }
                     deathRecipient = recipient
-                    if (runCatching { binder.linkToDeath(recipient, 0) }.isFailure) {
+                    if (runCatching { binder.linkToDeath(recipient, 0) }.onFailure {
+                            logIpcFailure("linkToDeath", it, connectionId, connectedProcessId)
+                        }.isFailure
+                    ) {
                         recipient.binderDied()
                         latch.countDown()
                         return
@@ -1150,9 +1169,11 @@ class SingboxEngine @Inject constructor(
                         unlinkDeath()
                         val ref = serviceConn
                         serviceConn = null
-                        if (ref != null) runCatching { context.unbindService(ref) }
+                        if (ref != null) unbindService(ref, "serviceDisconnected", connectionId)
                         PersistentLoggers.warn(TAG, "SingboxEngineService disconnected — system unbind")
-                        runCatching { onProcessDied() }
+                        runCatching { onProcessDied() }.onFailure {
+                            logIpcFailure("onProcessDied", it, connectionId)
+                        }
                     }
                 }
 
@@ -1168,9 +1189,11 @@ class SingboxEngine @Inject constructor(
                         unlinkDeath()
                         val ref = serviceConn
                         serviceConn = null
-                        if (ref != null) runCatching { context.unbindService(ref) }
+                        if (ref != null) unbindService(ref, "bindingDied", connectionId)
                         PersistentLoggers.warn(TAG, "SingboxEngineService binding died")
-                        runCatching { onProcessDied() }
+                        runCatching { onProcessDied() }.onFailure {
+                            logIpcFailure("onProcessDied", it, connectionId)
+                        }
                     }
                 }
             }
@@ -1179,12 +1202,12 @@ class SingboxEngine @Inject constructor(
             val intent = Intent().apply { this.component = component }
             val bound = context.bindService(intent, conn, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
             if (!bound) {
-                runCatching { context.unbindService(conn) }
+                unbindService(conn, "bindRejected", connectionId)
                 if (isCurrentConnection(connectionId, conn)) serviceConn = null
                 return StartResult.Failure("bindService failed for SingboxEngineService — registered in manifest?")
             }
             if (!latch.await(CONNECT_TIMEOUT_S, TimeUnit.SECONDS)) {
-                runCatching { context.unbindService(conn) }
+                unbindService(conn, "bindTimeout", connectionId)
                 if (isCurrentConnection(connectionId, conn)) {
                     connectionGeneration.incrementAndGet()
                     serviceConn = null
@@ -1192,7 +1215,7 @@ class SingboxEngine @Inject constructor(
                 return StartResult.Failure("SingboxEngineService bind timeout after ${CONNECT_TIMEOUT_S}s")
             }
             return if (proxy == null) {
-                runCatching { context.unbindService(conn) }
+                unbindService(conn, "proxyNull", connectionId)
                 if (isCurrentConnection(connectionId, conn)) serviceConn = null
                 StartResult.Failure("SingboxEngineService proxy null after bind")
             } else {
@@ -1212,6 +1235,7 @@ class SingboxEngine @Inject constructor(
         activeAutoSelect = false
         activeTunAutoSelect = false
         activeSocksPort = 0
+        activeProfileId = null
     }
 
     private fun isCurrentLifecycle(generation: Long): Boolean = lifecycleGeneration.get() == generation
@@ -1224,7 +1248,7 @@ class SingboxEngine @Inject constructor(
             connectionGeneration.incrementAndGet()
             unlinkDeath()
             proxy = null
-            serviceConn?.let { runCatching { context.unbindService(it) } }
+            serviceConn?.let { unbindService(it, "close") }
             serviceConn = null
         }
     }
@@ -1233,7 +1257,9 @@ class SingboxEngine @Inject constructor(
         val b = engineBinder
         val r = deathRecipient
         if (b != null && r != null) {
-            runCatching { b.unlinkToDeath(r, 0) }
+            runCatching { b.unlinkToDeath(r, 0) }.onFailure {
+                logIpcFailure("unlinkToDeath", it, connectionGeneration.get(), engineProcessId)
+            }
         }
         engineBinder = null
         deathRecipient = null
@@ -1269,24 +1295,35 @@ class SingboxEngine @Inject constructor(
                 "engine process exit pid=$processId reason=${resolvedExit.reason} status=${resolvedExit.status} " +
                     "importance=${resolvedExit.importance} pss=${resolvedExit.pss} rss=${resolvedExit.rss} " +
                     "timestamp=${resolvedExit.timestamp} " +
-                    "description=${sanitizeExitDetail(resolvedExit.description.orEmpty())} " +
-                    "trace=${sanitizeExitDetail(trace)} checkpoints=${checkpoints.joinToString(" || ")}",
+                    "description=${LogSanitizer.sanitize(resolvedExit.description.orEmpty())} " +
+                    "trace=${LogSanitizer.sanitize(trace)} checkpoints=${checkpoints.joinToString(" || ")}",
             )
         }
     }
 
-    private fun sanitizeExitDetail(detail: String): String = detail
-        .replace(Regex("https?://[^\\s]+"), "<url>")
-        .replace(Regex("(?i)(token|key|password)=?[^\\s,;]+"), "${'$'}1=<redacted>")
-        .replace(Regex("\\s+"), " ")
-        .take(2_000)
-
-    private fun logIpcFailure(operation: String, failure: Throwable) {
+    private fun logIpcFailure(
+        operation: String,
+        failure: Throwable,
+        generation: Long = lifecycleGeneration.get(),
+        processId: Int = engineProcessId,
+    ) {
         PersistentLoggers.warn(
             TAG,
             "operation=$operation stableCategory=ipc exceptionClass=${failure::class.java.simpleName} " +
-                "sanitizedMessage=${sanitizeExitDetail(failure.message.orEmpty())}",
+                "sanitizedMessage=${LogSanitizer.sanitize(failure.message.orEmpty())} generation=$generation " +
+                "processId=$processId profileId=${activeProfileId ?: "unknown"}",
         )
+    }
+
+    private fun unbindService(
+        connection: ServiceConnection,
+        operation: String,
+        generation: Long = connectionGeneration.get(),
+        processId: Int = engineProcessId,
+    ) {
+        runCatching { context.unbindService(connection) }.onFailure {
+            logIpcFailure("unbindService.$operation", it, generation, processId)
+        }
     }
 
     private fun allocateChainPort(): Int {
@@ -1304,6 +1341,7 @@ class SingboxEngine @Inject constructor(
         private const val ENGINE_STOP_TIMEOUT_MS = 4_000L
         private const val EXIT_INFO_ATTEMPTS = 8
         private const val EXIT_INFO_RETRY_MS = 250L
+        private const val STORAGE_SNAPSHOT_MAX_ATTEMPTS = 8
         private const val LOCAL_SOCKS_HOST = "127.0.0.1"
         private const val LOCAL_SOCKS_CONNECT_TIMEOUT_MS = 400
         private const val LOCAL_SOCKS_IO_TIMEOUT_MS = 400
