@@ -17,42 +17,6 @@ class SingboxRuntimeDiagnosticsTest {
     }
 
     @Test
-    fun `old diagnostic session cannot mutate replacement client`() {
-        val guard = NativeDiagnosticsSessionGuard()
-        val oldClient = Any()
-        val oldGeneration = guard.begin()
-        val newClient = Any()
-        val newGeneration = guard.begin()
-
-        assertFalse(guard.isCurrent(oldGeneration, oldClient, newClient))
-        assertTrue(guard.isCurrent(newGeneration, newClient, newClient))
-        assertFalse(guard.claimReconnect(oldGeneration))
-    }
-
-    @Test
-    fun `diagnostic reconnect can be claimed only once per generation`() {
-        val guard = NativeDiagnosticsSessionGuard()
-        val generation = guard.begin()
-
-        assertTrue(guard.claimReconnect(generation))
-        assertFalse(guard.claimReconnect(generation))
-        assertFalse(guard.claimReconnect(guard.begin() - 1))
-    }
-
-    @Test
-    fun `invalidating diagnostic session rejects delayed callbacks`() {
-        val guard = NativeDiagnosticsSessionGuard()
-        val client = Any()
-        val generation = guard.begin()
-
-        guard.invalidate()
-
-        assertFalse(guard.isActive(generation))
-        assertFalse(guard.isCurrent(generation, client, client))
-        assertFalse(guard.claimReconnect(generation))
-    }
-
-    @Test
     fun `missing ConnectivityManager fails with process specific error`() {
         val context = mockk<Context>()
         every { context.getSystemService(ConnectivityManager::class.java) } returns null
@@ -147,21 +111,10 @@ class SingboxRuntimeDiagnosticsTest {
     }
 
     @Test
-    fun `native command client diagnostics are not started with runtime`() {
-        val serviceStart = runtimeSource.indexOf("server.startOrReloadService")
-        val serverClaim = runtimeSource.indexOf("commandServer = server", serviceStart)
-        val diagnosticsLaunch = runtimeSource.indexOf("launchNativeLogSubscription(failureDiagnostics)", serverClaim)
-
-        assertTrue(serviceStart in 0..<serverClaim)
-        assertEquals(-1, diagnosticsLaunch)
-    }
-
-    @Test
-    fun `diagnostic connect is supervised and time bounded`() {
-        assertContains(runtimeSource, "CoroutineScope(SupervisorJob() + Dispatchers.IO)")
-        assertContains(runtimeSource, "withTimeout(NATIVE_LOG_CONNECT_TIMEOUT_MS)")
-        assertContains(runtimeSource, "runInterruptible { client.connect() }")
-        assertContains(runtimeSource, "native diagnostics unavailable exceptionClass=")
+    fun `inactive command client state machine is absent`() {
+        assertFalse(runtimeSource.contains("CommandClient"))
+        assertFalse(runtimeSource.contains("NativeDiagnosticsSessionGuard"))
+        assertFalse(runtimeSource.contains("launchNativeLogSubscription"))
     }
 
     @Test

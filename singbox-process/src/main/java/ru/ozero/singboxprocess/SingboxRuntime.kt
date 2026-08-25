@@ -3,55 +3,36 @@ package ru.ozero.singboxprocess
 import android.content.Context
 import android.net.ConnectivityManager
 import android.util.Base64
-import io.nekohasekai.libbox.CommandClient
-import io.nekohasekai.libbox.CommandClientHandler
-import io.nekohasekai.libbox.CommandClientOptions
 import io.nekohasekai.libbox.CommandServer
 import io.nekohasekai.libbox.CommandServerHandler
-import io.nekohasekai.libbox.ConnectionEvents
 import io.nekohasekai.libbox.ConnectionOwner
 import io.nekohasekai.libbox.InterfaceUpdateListener
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.LocalDNSTransport
-import io.nekohasekai.libbox.LogIterator
 import io.nekohasekai.libbox.NetworkInterfaceIterator
 import io.nekohasekai.libbox.Notification
-import io.nekohasekai.libbox.OutboundGroupIterator
 import io.nekohasekai.libbox.OverrideOptions
 import io.nekohasekai.libbox.PlatformInterface
 import io.nekohasekai.libbox.SetupOptions
-import io.nekohasekai.libbox.StatusMessage
 import io.nekohasekai.libbox.StringIterator
 import io.nekohasekai.libbox.SystemProxyStatus
 import io.nekohasekai.libbox.TunOptions
 import io.nekohasekai.libbox.WIFIState
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginesingbox.SingboxRuntimeCheckpointStore
 import java.io.File
 import java.security.KeyStore
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.ssl.TrustManagerFactory
 
 @Suppress("TooManyFunctions")
 internal object SingboxRuntime {
     private const val TAG = "SingboxRuntime"
-    private const val MAX_NATIVE_LOG_BATCH = 100
-    private const val STATUS_INTERVAL_NANOS = 1_000_000_000L
-    private const val NATIVE_LOG_CONNECT_TIMEOUT_MS = 2_500L
     private val mutex = Mutex()
-    private val nativeLogScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
     private var commandServer: CommandServer? = null
@@ -61,25 +42,6 @@ internal object SingboxRuntime {
 
     @Volatile
     private var commandServerHandler: OzeroCommandServerHandler? = null
-
-    @Volatile
-    private var nativeLogConnection: NativeLogConnection? = null
-
-    private val retainedFailedLogConnections = ConcurrentHashMap.newKeySet<NativeLogConnection>()
-
-    @Volatile
-    private var nativeLogJob: Job? = null
-
-    @Volatile
-    private var nativeLogSessionActive = false
-
-    private val nativeLogSessions = NativeDiagnosticsSessionGuard()
-
-    @Volatile
-    private var nativeFailureDiagnostics: NativeFailureDiagnostics? = null
-
-    @Volatile
-    private var lastStatus: StatusMessage? = null
 
     @Volatile
     private var setupDone = false
@@ -113,15 +75,12 @@ internal object SingboxRuntime {
                 val oldServer = commandServer
                 if (oldServer != null) {
                     PersistentLoggers.warn(TAG, "start: already running — graceful restart")
-                    val diagnosticsStopped = stopNativeLogSubscription()
                     val closeFailure = closeCommandServer(oldServer, closeService = true)
-                    if (!diagnosticsStopped || closeFailure != null) {
+                    if (closeFailure != null) {
                         throw IllegalStateException("previous sing-box runtime teardown failed", closeFailure)
                     }
                     commandServer = null
                     releaseServerCallbacks()
-                    retainedFailedLogConnections.clear()
-                    lastStatus = null
                 }
                 startLocked(context, tunFd, singboxJsonConfig, protectorBridge, detachedTunFd)
             }
@@ -158,7 +117,6 @@ internal object SingboxRuntime {
         }
 
         val failureDiagnostics = NativeFailureDiagnostics()
-        nativeFailureDiagnostics = failureDiagnostics
         val platform = OzeroPlatformInterface(
             context.applicationContext,
             tunFd,
@@ -211,17 +169,13 @@ internal object SingboxRuntime {
 
     suspend fun stop() = withContext(Dispatchers.Main.immediate) {
         mutex.withLock {
-            val diagnosticsStopped = stopNativeLogSubscription()
             val server = commandServer
             val closeFailure = server?.let { closeCommandServer(it, closeService = true) }
-            if (!diagnosticsStopped || closeFailure != null) {
+            if (closeFailure != null) {
                 throw IllegalStateException("sing-box native teardown failed", closeFailure)
             }
             commandServer = null
             releaseServerCallbacks()
-            retainedFailedLogConnections.clear()
-            lastStatus = null
-            nativeFailureDiagnostics = null
             persistCheckpoint("runtime-stopped")
             PersistentLoggers.info(TAG, "runtime stopped")
         }
@@ -229,8 +183,6 @@ internal object SingboxRuntime {
 
     fun isRunning(): Boolean =
         commandServer != null && platformInterface != null && commandServerHandler != null
-
-    fun getLastStatus(): StatusMessage? = lastStatus
 
     private fun releaseServerCallbacks() {
         platformInterface?.closeTunFd()
@@ -274,149 +226,6 @@ internal object SingboxRuntime {
         PersistentLoggers.error(TAG, "command server creation failed exceptionClass=${e::class.java.simpleName}")
         releaseServerCallbacks()
         throw e
-    }
-
-    // Keep detached from runtime startup: gomobile CommandClient callbacks can abort the isolated process.
-    private fun launchNativeLogSubscription(
-        failureDiagnostics: NativeFailureDiagnostics = checkNotNull(nativeFailureDiagnostics),
-        reconnect: Boolean = false,
-    ) {
-        val generation = if (reconnect) nativeLogSessions.activeGeneration() else nativeLogSessions.begin()
-        if (!reconnect) {
-            nativeLogSessionActive = true
-        }
-        nativeLogJob = nativeLogScope.launch {
-            connectNativeLogSubscription(generation, failureDiagnostics)
-        }
-    }
-
-    private suspend fun connectNativeLogSubscription(
-        generation: Long,
-        failureDiagnostics: NativeFailureDiagnostics,
-    ) {
-        var expectedConnection: NativeLogConnection? = null
-        runCatching {
-            val options = CommandClientOptions()
-            options.addCommand(Libbox.CommandLog)
-            options.addCommand(Libbox.CommandStatus)
-            options.statusInterval = STATUS_INTERVAL_NANOS
-            lateinit var client: CommandClient
-            val handler = NativeLogHandler(
-                failureDiagnostics = failureDiagnostics,
-                isCurrent = { nativeLogSessions.isCurrent(generation, client, nativeLogConnection?.client) },
-                onDisconnected = { handleNativeLogDisconnected(generation, client) },
-            )
-            client = CommandClient(
-                handler,
-                options,
-            )
-            val connection = NativeLogConnection(client, handler)
-            expectedConnection = connection
-            if (!nativeLogSessions.isActive(generation)) {
-                disconnectNativeLogClient(connection)
-                return@runCatching
-            }
-            nativeLogConnection = connection
-            withTimeout(NATIVE_LOG_CONNECT_TIMEOUT_MS) {
-                runInterruptible { client.connect() }
-            }
-            if (!nativeLogSessions.isCurrent(generation, client, nativeLogConnection?.client)) {
-                disconnectNativeLogClient(connection)
-                return
-            }
-            PersistentLoggers.debug(TAG, "native log subscription connected")
-        }.onFailure {
-            expectedConnection?.let(::disconnectNativeLogClient)
-            if (nativeLogSessions.isActive(generation) && nativeLogSessionActive) {
-                PersistentLoggers.warn(
-                    TAG,
-                    "native diagnostics unavailable exceptionClass=${it::class.java.simpleName}",
-                )
-            }
-        }
-    }
-
-    private suspend fun stopNativeLogSubscription(): Boolean {
-        nativeLogSessions.invalidate()
-        nativeLogSessionActive = false
-        nativeLogJob?.cancelAndJoin()
-        nativeLogJob = null
-        val connection = nativeLogConnection
-        val disconnected = connection == null || withContext(Dispatchers.IO) { disconnectNativeLogClient(connection) }
-        lastStatus = null
-        return disconnected && retainedFailedLogConnections.isEmpty()
-    }
-
-    private fun disconnectNativeLogClient(connection: NativeLogConnection): Boolean {
-        val disconnected = runCatching { connection.client.disconnect() }
-            .onFailure { failure ->
-                retainedFailedLogConnections.add(connection)
-                PersistentLoggers.warn(
-                    TAG,
-                    "native diagnostics disconnect failed exceptionClass=${failure::class.java.simpleName}",
-                )
-            }
-            .isSuccess
-        synchronized(connection.handler) { Unit }
-        if (disconnected) {
-            if (nativeLogConnection === connection) nativeLogConnection = null
-            retainedFailedLogConnections.remove(connection)
-        }
-        return disconnected
-    }
-
-    private fun handleNativeLogDisconnected(generation: Long, client: CommandClient) {
-        if (!nativeLogSessions.isCurrent(generation, client, nativeLogConnection?.client)) return
-        lastStatus = null
-        nativeLogConnection = null
-        if (nativeLogSessionActive && nativeLogSessions.claimReconnect(generation)) {
-            launchNativeLogSubscription(reconnect = true)
-        }
-    }
-
-    private class NativeLogConnection(
-        val client: CommandClient,
-        val handler: NativeLogHandler,
-    )
-
-    private class NativeLogHandler(
-        private val failureDiagnostics: NativeFailureDiagnostics,
-        private val isCurrent: () -> Boolean,
-        private val onDisconnected: () -> Unit,
-    ) : CommandClientHandler {
-        override fun connected() {}
-
-        override fun disconnected(message: String?) {
-            onDisconnected()
-        }
-
-        override fun setDefaultLogLevel(level: Int) {}
-
-        override fun clearLogs() {}
-
-        override fun writeLogs(messageList: LogIterator?) {
-            if (messageList == null || !isCurrent()) return
-            var inspected = 0
-            while (messageList.hasNext() && inspected < MAX_NATIVE_LOG_BATCH) {
-                if (!isCurrent()) return
-                val entry = messageList.next()
-                inspected++
-                failureDiagnostics.recordNative(entry.message)
-                persistCheckpoint("native ${redactSingboxMessage(entry.message)}")
-            }
-        }
-
-        override fun writeStatus(message: StatusMessage) {
-            if (isCurrent()) lastStatus = message
-        }
-
-        override fun writeGroups(message: OutboundGroupIterator?) {}
-
-        override fun initializeClashMode(modeList: StringIterator, currentMode: String) {}
-
-        override fun updateClashMode(newMode: String) {}
-
-        override fun writeConnectionEvents(events: ConnectionEvents?) {}
     }
 
     private class OzeroCommandServerHandler : CommandServerHandler {
@@ -547,41 +356,6 @@ internal object SingboxRuntime {
     }
 
     private const val NO_TUN_FD = -1
-}
-
-internal class NativeDiagnosticsSessionGuard {
-    private var generation = 0L
-    private var reconnectClaimed = false
-
-    @Synchronized
-    fun begin(): Long {
-        generation += 1
-        reconnectClaimed = false
-        return generation
-    }
-
-    @Synchronized
-    fun invalidate() {
-        generation += 1
-        reconnectClaimed = true
-    }
-
-    @Synchronized
-    fun activeGeneration(): Long = generation
-
-    @Synchronized
-    fun isActive(expectedGeneration: Long): Boolean = expectedGeneration == generation
-
-    @Synchronized
-    fun isCurrent(expectedGeneration: Long, expectedClient: Any, currentClient: Any?): Boolean =
-        expectedGeneration == generation && expectedClient === currentClient
-
-    @Synchronized
-    fun claimReconnect(expectedGeneration: Long): Boolean {
-        if (expectedGeneration != generation || reconnectClaimed) return false
-        reconnectClaimed = true
-        return true
-    }
 }
 
 internal fun requireConnectivityManager(context: Context): ConnectivityManager =

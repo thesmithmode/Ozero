@@ -2,6 +2,8 @@ package ru.ozero.enginesingbox
 
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class SingboxStatsTest {
 
@@ -9,6 +11,7 @@ class SingboxStatsTest {
     fun `defaults are zeroed for idle runtime`() {
         val stats = SingboxStats()
 
+        assertFalse(stats.available)
         assertEquals(0L, stats.txRateProxy)
         assertEquals(0L, stats.rxRateProxy)
         assertEquals(0L, stats.txTotal)
@@ -19,6 +22,7 @@ class SingboxStatsTest {
     @Test
     fun `copy and equality preserve all counters`() {
         val stats = SingboxStats(
+            available = true,
             txRateProxy = 11L,
             rxRateProxy = 22L,
             txTotal = 33L,
@@ -28,6 +32,7 @@ class SingboxStatsTest {
         val copied = stats.copy()
 
         assertEquals(stats, copied)
+        assertTrue(copied.available)
         assertEquals(11L, copied.txRateProxy)
         assertEquals(22L, copied.rxRateProxy)
         assertEquals(33L, copied.txTotal)

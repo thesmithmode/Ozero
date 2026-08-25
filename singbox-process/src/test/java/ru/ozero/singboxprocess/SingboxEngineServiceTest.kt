@@ -92,7 +92,7 @@ class SingboxEngineServiceTest {
     fun `stats do not fake active connections from runtime flag`() {
         val statsBlock = source.substringAfter("override fun getStats()")
             .substringBefore("override fun onCreate()")
-        assertTrue(statsBlock.contains("SingboxStats()"))
+        assertTrue(statsBlock.contains("SingboxStats(available = false)"))
         assertFalse(statsBlock.contains("activeConnections = if"))
         assertFalse(statsBlock.contains("SingboxRuntime.isRunning()) 1"))
     }
@@ -102,7 +102,7 @@ class SingboxEngineServiceTest {
         val destroyBlock = source.substringAfter("override fun onDestroy()")
             .substringBefore("companion object")
         assertTrue(destroyBlock.contains("binder.stopAndWait(DEFAULT_STOP_TIMEOUT_MS)"))
-        assertTrue(destroyBlock.contains("serviceScope.cancel()"))
+        assertFalse(destroyBlock.contains("serviceScope"))
     }
 
     @Test
@@ -164,9 +164,9 @@ class SingboxEngineServiceTest {
         val startBlock = runtimeSource.substringAfter("suspend fun start(")
             .substringBefore("suspend fun stop()")
         val releaseBlock = runtimeSource.substringAfter("private fun releaseServerCallbacks()")
-            .substringBefore("private fun launchNativeLogSubscription")
+            .substringBefore("private class OzeroCommandServerHandler")
         val createBlock = runtimeSource.substringAfter("private fun createCommandServer")
-            .substringBefore("private fun launchNativeLogSubscription")
+            .substringBefore("private class OzeroCommandServerHandler")
 
         assertTrue(startBlock.contains("cleanupFailedServerStart(server, e)"))
         assertTrue(startBlock.contains("closeCommandServer(oldServer, closeService = true)"))
@@ -178,26 +178,11 @@ class SingboxEngineServiceTest {
     @Test
     fun `runtime health requires live gomobile callbacks`() {
         val runningBlock = runtimeSource.substringAfter("fun isRunning(): Boolean")
-            .substringBefore("fun getLastStatus()")
+            .substringBefore("private fun releaseServerCallbacks()")
 
         assertTrue(runningBlock.contains("commandServer != null"))
         assertTrue(runningBlock.contains("platformInterface != null"))
         assertTrue(runningBlock.contains("commandServerHandler != null"))
-    }
-
-    @Test
-    fun `native diagnostics retains gomobile callback while client is connected`() {
-        val connectBlock = runtimeSource.substringAfter("private suspend fun connectNativeLogSubscription")
-            .substringBefore("private suspend fun stopNativeLogSubscription")
-        val disconnectBlock = runtimeSource.substringAfter("private fun disconnectNativeLogClient")
-            .substringBefore("private fun handleNativeLogDisconnected")
-
-        assertTrue(runtimeSource.contains("private var nativeLogConnection: NativeLogConnection? = null"))
-        assertTrue(connectBlock.contains("NativeLogConnection(client, handler)"))
-        assertTrue(connectBlock.contains("nativeLogConnection = connection"))
-        assertTrue(disconnectBlock.contains("connection.client.disconnect()"))
-        assertTrue(disconnectBlock.contains("synchronized(connection.handler) { Unit }"))
-        assertTrue(disconnectBlock.contains("retainedFailedLogConnections.add(connection)"))
     }
 
     private class FakeTrustManager(
