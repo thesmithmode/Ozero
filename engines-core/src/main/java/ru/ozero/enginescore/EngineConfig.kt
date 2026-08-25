@@ -58,6 +58,7 @@ sealed class EngineConfig {
         val proxyMode: Boolean = false,
         val dnsServers: List<String> = DEFAULT_DNS_SERVERS,
         val ipv6Enabled: Boolean = false,
+        val profileId: Long? = null,
     ) : EngineConfig() {
         override val engineId = EngineId.SINGBOX
         override fun toString(): String =
@@ -69,6 +70,7 @@ sealed class EngineConfig {
             if (this === other) return true
             if (other !is Singbox) return false
             return protocolType == other.protocolType &&
+                profileId == other.profileId &&
                 beanBlob.contentEquals(other.beanBlob) &&
                 autoSelectBeanBlobs.size == other.autoSelectBeanBlobs.size &&
                 autoSelectBeanBlobs.zip(other.autoSelectBeanBlobs).all { (a, b) -> a.contentEquals(b) } &&
@@ -85,6 +87,7 @@ sealed class EngineConfig {
 
         override fun hashCode(): Int {
             var result = 31 * protocolType + beanBlob.contentHashCode()
+            result = 31 * result + (profileId?.hashCode() ?: 0)
             for (blob in autoSelectBeanBlobs) result = 31 * result + blob.contentHashCode()
             result = 31 * result + autoSelectProfileIds.hashCode()
             for (blob in chainBeanBlobs) result = 31 * result + blob.contentHashCode()

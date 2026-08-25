@@ -29,11 +29,13 @@ class SingboxEngineBuildManualConfigSentinelTest {
     fun `should manual config use one fresh storage snapshot`() {
         val content = engineFile().readText()
         val block = content.substringAfter("override suspend fun buildManualConfigAwaitingStorage")
-            .substringBefore("private fun ensurePreferencesCacheInitialized")
+            .substringBefore("override fun buildProxyConfig")
 
         assertTrue(block.contains("loadStorageSnapshot()"))
         assertTrue(content.contains("private data class SingboxStorageSnapshot"))
-        assertTrue(content.contains("profileDao.getAllFlow().first()"))
+        assertTrue(content.contains("profileDao.getById(it)"))
+        assertTrue(content.contains("selectedProfileId == SELECTED_AUTO"))
+        assertTrue(!content.contains("profileDao.getAllFlow().first()"))
         assertTrue(content.contains("proxyChainDao.getAll()"))
     }
 
