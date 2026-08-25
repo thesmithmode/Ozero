@@ -60,6 +60,7 @@ class SingboxSoakContractTest {
         assertTrue(soak.contains("markerMatch"))
         assertFalse(soak.contains("fun doHttpRequest"))
         assertTrue(manifest.contains("SoakExternalProbeService"))
+        assertTrue(manifest.contains("android:exported=\"true\""))
         assertTrue(manifest.contains("android:process=\":soak_probe\""))
     }
 
