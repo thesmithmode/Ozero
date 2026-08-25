@@ -53,6 +53,7 @@ class SingboxSoakContractTest {
         assertTrue(runner.contains("successful_cycles"))
         assertTrue(runner.contains("inbound connection"))
         assertTrue(soak.contains("OzeroVpnService.ACTION_START"))
+        assertTrue(soak.contains("VpnService.prepare(targetContext)"))
         assertTrue(soak.contains("TunnelState.Connected"))
         assertTrue(soak.contains("probeFromExternalUid"))
         assertTrue(soak.contains("vpnTransport"))

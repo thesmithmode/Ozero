@@ -2,6 +2,7 @@ package ru.ozero.app.soak
 
 import android.content.Context
 import android.content.Intent
+import android.net.VpnService
 import android.os.Bundle
 import android.os.Debug
 import android.os.Handler
@@ -78,6 +79,9 @@ class SoakTest {
         }
         val targetContext = instrumentation.targetContext
         val testContext = instrumentation.context
+        check(VpnService.prepare(targetContext) == null) {
+            "VPN consent was not granted to the soak APK"
+        }
         val dependencies = EntryPointAccessors.fromApplication(
             targetContext.applicationContext,
             SoakTestEntryPoint::class.java,
