@@ -366,7 +366,8 @@ internal fun requireConnectivityManager(context: Context): ConnectivityManager =
         "ConnectivityManager unavailable in :engine_singbox process"
     }
 
-internal fun redactSingboxMessage(message: String): String = LogSanitizer.sanitize(message)
+internal fun redactSingboxMessage(message: String): String =
+    LogSanitizer.sanitize(message.replace(Regex("\\{.*}"), "<redacted-json>"))
 
 internal fun String.shouldPromoteSingboxMessage(): Boolean =
     contains("error", ignoreCase = true) ||

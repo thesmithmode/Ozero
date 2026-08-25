@@ -44,7 +44,18 @@ class SingboxRuntimeDiagnosticsTest {
         assertFalse(redacted.contains("server.example"))
         assertFalse(redacted.contains("json-server.example"))
         assertContains(redacted, "<redacted-uuid>")
-        assertContains(redacted, "<redacted>")
+        assertContains(redacted, "<redacted-json>")
+    }
+
+    @Test
+    fun `redaction removes arbitrary custom headers inside native json diagnostics`() {
+        val redacted = redactSingboxMessage(
+            "config rejected: {\"headers\":{\"X-Private-Session\":\"secret-session-value\"}}",
+        )
+
+        assertFalse(redacted.contains("secret-session-value"))
+        assertFalse(redacted.contains("X-Private-Session"))
+        assertContains(redacted, "<redacted-json>")
     }
 
     @Test
