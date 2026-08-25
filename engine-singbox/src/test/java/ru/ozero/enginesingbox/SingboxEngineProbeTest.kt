@@ -144,7 +144,7 @@ class SingboxEngineProbeTest {
             beanBlob = makeVlessBlob("selected.example"),
             protocolType = SingboxEngine.PROTOCOL_VLESS,
             chainProfileIds = listOf(99L),
-            missingChainProfileIds = listOf(99L),
+            missingChainProfileIds = setOf(99L),
         )
         val result = assertIs<BuildConfigResult.Failure>(engine.buildPendingConfigForTest(config))
 
@@ -161,7 +161,7 @@ class SingboxEngineProbeTest {
             beanBlob = makeVlessBlob("selected.example"),
             protocolType = SingboxEngine.PROTOCOL_VLESS,
             chainProfileIds = wrapperIds,
-            missingChainProfileIds = wrapperIds,
+            missingChainProfileIds = wrapperIds.toSet(),
         )
         val result = assertIs<BuildConfigResult.Failure>(engine.buildPendingConfigForTest(config))
 

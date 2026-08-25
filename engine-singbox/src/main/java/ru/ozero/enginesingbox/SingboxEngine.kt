@@ -802,7 +802,7 @@ class SingboxEngine @Inject constructor(
     }
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? = runBlocking(Dispatchers.IO) {
-        buildManualConfigFromSnapshot(settings, loadStorageSnapshot())
+        loadStorageSnapshot()?.let { buildManualConfigFromSnapshot(settings, it) }
     }
 
     private fun buildManualConfigFromSnapshot(
@@ -860,10 +860,10 @@ class SingboxEngine @Inject constructor(
     }
 
     override suspend fun buildManualConfigAwaitingStorage(settings: SettingsModel?): EngineConfig? {
-        return buildManualConfigFromSnapshot(settings, loadStorageSnapshot())
+        return loadStorageSnapshot()?.let { buildManualConfigFromSnapshot(settings, it) }
     }
 
-    private suspend fun loadStorageSnapshot(): SingboxStorageSnapshot {
+    private suspend fun loadStorageSnapshot(): SingboxStorageSnapshot? {
         for (attempt in 0 until STORAGE_SNAPSHOT_MAX_ATTEMPTS) {
             val initialPrefs = dataStore.data.first()
             val selectedProfileId = initialPrefs[SELECTED_PROFILE_KEY]
@@ -904,6 +904,7 @@ class SingboxEngine @Inject constructor(
                     TAG,
                     "operation=loadStorageSnapshot stableCategory=convergence attempts=$STORAGE_SNAPSHOT_MAX_ATTEMPTS",
                 )
+                return null
             }
             val migratedProfiles = profiles.map { profile -> migrateProfileBlob(profile) }
             return SingboxStorageSnapshot(
@@ -920,7 +921,7 @@ class SingboxEngine @Inject constructor(
                 chainProfileIds = initialChainIds,
             )
         }
-        error("Storage snapshot convergence exhausted")
+        return null
     }
 
     private fun List<ProxyProfile>.sameRuntimeInputs(other: List<ProxyProfile>): Boolean =

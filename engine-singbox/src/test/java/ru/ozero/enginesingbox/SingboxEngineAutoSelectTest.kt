@@ -244,6 +244,69 @@ class SingboxEngineAutoSelectTest {
     }
 
     @Test
+    fun `manual storage config preserves declared chain beyond auto limit in order`() = kotlinx.coroutines.test.runTest {
+        val selected = makeProfile(1L, 1L, "selected.example.com", 443)
+        val wrappers = (2L..52L).map { id -> makeProfile(id, 1L, "wrapper-$id.example.com", 443) }
+        val engine = buildEngine(
+            prefs = mutablePreferencesOf(selectedProfileKey to selected.id),
+            profilesByGroup = mapOf(1L to listOf(selected) + wrappers),
+            chainProfileIds = wrappers.map { it.id },
+        )
+
+        val result = assertIs<EngineConfig.Singbox>(engine.buildManualConfigAwaitingStorage(null))
+
+        assertEquals(wrappers.map { it.id }, result.chainProfileIds)
+        assertEquals(wrappers.size, result.chainBeanBlobs.size)
+        assertTrue(result.missingChainProfileIds.isEmpty())
+    }
+
+    @Test
+    fun `manual storage config retains missing declared chain profile`() = kotlinx.coroutines.test.runTest {
+        val selected = makeProfile(1L, 1L, "selected.example.com", 443)
+        val present = makeProfile(2L, 1L, "present.example.com", 443)
+        val engine = buildEngine(
+            prefs = mutablePreferencesOf(selectedProfileKey to selected.id),
+            profilesByGroup = mapOf(1L to listOf(selected, present)),
+            chainProfileIds = listOf(present.id, 99L),
+        )
+
+        val result = assertIs<EngineConfig.Singbox>(engine.buildManualConfigAwaitingStorage(null))
+
+        assertEquals(listOf(present.id, 99L), result.chainProfileIds)
+        assertEquals(setOf(99L), result.missingChainProfileIds)
+        assertTrue(result.chainBeanBlobs[0].contentEquals(present.beanBlob))
+        assertTrue(result.chainBeanBlobs[1].isEmpty())
+    }
+
+    @Test
+    fun `manual config rejects snapshot mutated on every convergence attempt`() = kotlinx.coroutines.test.runTest {
+        val first = makeProfile(1L, 1L, "first.example.com", 443)
+        val second = makeProfile(2L, 1L, "second.example.com", 443)
+        var readCount = 0
+        val dataStore = object : DataStore<Preferences> {
+            override val data: Flow<Preferences>
+                get() = flow {
+                    val selectedId = if (readCount++ % 2 == 0) first.id else second.id
+                    emit(mutablePreferencesOf(selectedProfileKey to selectedId))
+                }
+
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
+                transform(mutablePreferencesOf(selectedProfileKey to first.id))
+        }
+        val engine = SingboxEngine(
+            context = mockk(relaxed = true),
+            dataStore = dataStore,
+            profileDao = fakeProfileDao(mapOf(1L to listOf(first, second))),
+            proxyChainDao = fakeProxyChainDao(),
+        )
+
+        val result = engine.buildManualConfigAwaitingStorage(null)
+
+        assertNull(result)
+        assertEquals(12, readCount)
+    }
+
+    @Test
     fun `buildManualConfig passes singbox DNS settings`() {
         val selected = makeProfile(42L, 1L, "proxy.example.com", 443)
         val prefs = mutablePreferencesOf(
