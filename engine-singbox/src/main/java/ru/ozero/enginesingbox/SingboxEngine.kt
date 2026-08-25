@@ -264,7 +264,9 @@ class SingboxEngine @Inject constructor(
             }
             PersistentLoggers.debug(
                 TAG,
-                "start TUN config built probePort=$probePort fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
+                "config built profileId=${config.profileId ?: "unknown"} " +
+                    "autoSelect=${config.autoSelectBeanBlobs.isNotEmpty()} probePort=$probePort " +
+                    "fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
             )
 
             bindOrFail()?.let {
@@ -594,8 +596,8 @@ class SingboxEngine @Inject constructor(
                     }
                     PersistentLoggers.debug(
                         TAG,
-                        "startWithConfig sent generation=$generation activePort=$activeSocksPort " +
-                            "autoSelect=$activeTunAutoSelect",
+                        "runtime connected profileId=${activeProfileId ?: "unknown"} generation=$generation " +
+                            "activePort=$activeSocksPort autoSelect=$activeTunAutoSelect",
                     )
                     TunAttachResult.Success
                 }.getOrElse {

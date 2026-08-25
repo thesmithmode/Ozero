@@ -365,6 +365,7 @@ private class SingboxServiceProfileProbe(
                 ipv6Enabled = settings.ipv6Enabled,
             )
         }.getOrElse {
+            it.rethrowCancellation()
             logProbeFailure("buildConfig", it)
             return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_FAILED))
         }
@@ -378,6 +379,7 @@ private class SingboxServiceProfileProbe(
             }
             coroutineContext.ensureActive()
             val started = runCatching { process.startProxyModeIfIdle(config, localProtector) }.getOrElse {
+                it.rethrowCancellation()
                 logProbeFailure("startProxyModeIfIdle", it)
                 if (binding.processDied.get()) {
                     return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
@@ -398,6 +400,7 @@ private class SingboxServiceProfileProbe(
                 return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
             }
             val running = runCatching { process.runtimeRunning() }.getOrElse {
+                it.rethrowCancellation()
                 logProbeFailure("runtimeRunning", it)
                 false
             }
@@ -512,8 +515,10 @@ private class SingboxServiceProfileProbe(
         val processDied = AtomicBoolean(false)
         val processDeath = CompletableDeferred<Unit>()
         val probeCancellation = RoutedProbeCancellation()
-        val markProcessDied = {
-            processDied.set(true)
+        val markProcessDied = { operation: String ->
+            if (processDied.compareAndSet(false, true)) {
+                logProbeStateFailure(operation, "binder_death")
+            }
             processDeath.complete(Unit)
             probeCancellation.cancel()
         }
@@ -526,39 +531,48 @@ private class SingboxServiceProfileProbe(
 
             override fun onServiceDisconnected(name: ComponentName) {
                 process = null
-                markProcessDied()
+                markProcessDied("onServiceDisconnected")
             }
 
             override fun onBindingDied(name: ComponentName?) {
                 process = null
-                markProcessDied()
+                markProcessDied("onBindingDied")
             }
         }
         val component = ComponentName(context, "ru.ozero.singboxprocess.SingboxEngineService")
         val intent = Intent().apply { this.component = component }
-        val bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
+        val bound = runCatching {
+            context.bindService(intent, connection, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
+        }.getOrElse {
+            logProbeFailure("bindService", it)
+            return null
+        }
         if (!bound) {
+            logProbeStateFailure("bindService", "bind_rejected")
             unbindProbeService(connection, "bindRejected")
             return null
         }
         if (!latch.await(BIND_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+            logProbeStateFailure("bindService", "bind_timeout")
             unbindProbeService(connection, "bindTimeout")
             return null
         }
         val connectedProcess = process ?: run {
+            logProbeStateFailure("bindService", "process_null")
             unbindProbeService(connection, "processNull")
             return null
         }
         val connectedBinder = binder ?: run {
+            logProbeStateFailure("bindService", "binder_null")
             unbindProbeService(connection, "binderNull")
             return null
         }
-        val recipient = IBinder.DeathRecipient { markProcessDied() }
+        val recipient = IBinder.DeathRecipient { markProcessDied("deathRecipient") }
         if (runCatching { connectedBinder.linkToDeath(recipient, 0) }.onFailure {
                 logProbeFailure("linkToDeath", it)
             }.isFailure
         ) {
-            markProcessDied()
+            markProcessDied("linkToDeath")
         }
         return Binding(
             connectedProcess,
@@ -678,6 +692,18 @@ private fun logProbeFailure(operation: String, failure: Throwable, profileId: Lo
             "sanitizedMessage=${LogSanitizer.sanitize(failure.message.orEmpty())} " +
             "generation=probe processId=unknown profileId=${profileId ?: "unknown"}",
     )
+}
+
+private fun logProbeStateFailure(operation: String, stableCategory: String) {
+    PersistentLoggers.warn(
+        "SingboxProbeService",
+        "operation=$operation stableCategory=$stableCategory exceptionClass=none " +
+            "sanitizedMessage=$stableCategory generation=probe processId=unknown profileId=unknown",
+    )
+}
+
+private fun Throwable.rethrowCancellation() {
+    if (this is CancellationException) throw this
 }
 
 private fun logRejectedProfiles(rejectedProfiles: List<RejectedProfile>) {

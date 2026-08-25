@@ -108,7 +108,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
             is TunnelState.Probing -> current.engineId ?: return false
             else -> return false
         }
-        AppLogger.i(TAG, reason)
+        AppLogger.i(TAG, "restart requested $reason")
         val pendingTarget = tunnelController.switching.value?.to
         tunnelController.onSwitchingStarted(from = fromEngine, to = pendingTarget)
         try {
