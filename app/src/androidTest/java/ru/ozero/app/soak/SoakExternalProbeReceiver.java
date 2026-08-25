@@ -5,8 +5,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
-import android.os.Bundle;
-import android.os.ResultReceiver;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -16,7 +14,9 @@ import java.net.URL;
 public final class SoakExternalProbeReceiver extends BroadcastReceiver {
     public static final String EXTRA_URL = "url";
     public static final String EXTRA_EXPECTED_MARKER = "expected_marker";
-    public static final String EXTRA_RECEIVER = "receiver";
+    public static final String EXTRA_RESULT_ACTION = "result_action";
+    public static final String EXTRA_RESULT_PACKAGE = "result_package";
+    public static final String RESULT_HTTP_CODE = "http_code";
     public static final String RESULT_VPN_TRANSPORT = "vpn_transport";
     public static final String RESULT_MARKER_MATCH = "marker_match";
     private static final int HTTP_TIMEOUT_MS = 10_000;
@@ -27,16 +27,18 @@ public final class SoakExternalProbeReceiver extends BroadcastReceiver {
         PendingResult pendingResult = goAsync();
         new Thread(() -> {
             try {
-                ResultReceiver receiver = intent.getParcelableExtra(EXTRA_RECEIVER);
-                if (receiver == null) return;
                 ProbeResponse response = request(
                     intent.getStringExtra(EXTRA_URL),
                     intent.getStringExtra(EXTRA_EXPECTED_MARKER)
                 );
-                Bundle result = new Bundle();
-                result.putBoolean(RESULT_VPN_TRANSPORT, hasVpnTransport(context));
-                result.putBoolean(RESULT_MARKER_MATCH, response.markerMatch);
-                receiver.send(response.httpCode, result);
+                String resultAction = intent.getStringExtra(EXTRA_RESULT_ACTION);
+                String resultPackage = intent.getStringExtra(EXTRA_RESULT_PACKAGE);
+                if (resultAction == null || resultPackage == null) return;
+                Intent result = new Intent(resultAction).setPackage(resultPackage);
+                result.putExtra(RESULT_HTTP_CODE, response.httpCode);
+                result.putExtra(RESULT_VPN_TRANSPORT, hasVpnTransport(context));
+                result.putExtra(RESULT_MARKER_MATCH, response.markerMatch);
+                context.sendBroadcast(result);
             } finally {
                 pendingResult.finish();
             }

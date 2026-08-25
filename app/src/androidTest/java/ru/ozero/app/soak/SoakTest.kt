@@ -1,13 +1,11 @@
 package ru.ozero.app.soak
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.VpnService
-import android.os.Bundle
 import android.os.Debug
-import android.os.Handler
-import android.os.Looper
-import android.os.ResultReceiver
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.datastore.core.DataStore
@@ -314,24 +312,42 @@ class SoakTest {
         expectedMarker: String,
     ): ExternalProbeResult {
         val result = CompletableDeferred<ExternalProbeResult>()
-        val receiver = object : ResultReceiver(Handler(Looper.getMainLooper())) {
-            override fun onReceiveResult(resultCode: Int, resultData: Bundle) {
+        val resultAction = "$EXTERNAL_PROBE_RESULT_ACTION.${System.nanoTime()}"
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
                 result.complete(
                     ExternalProbeResult(
-                        httpCode = resultCode,
-                        vpnTransport = resultData.getBoolean(SoakExternalProbeReceiver.RESULT_VPN_TRANSPORT),
-                        markerMatch = resultData.getBoolean(SoakExternalProbeReceiver.RESULT_MARKER_MATCH),
+                        httpCode = intent.getIntExtra(SoakExternalProbeReceiver.RESULT_HTTP_CODE, -1),
+                        vpnTransport = intent.getBooleanExtra(
+                            SoakExternalProbeReceiver.RESULT_VPN_TRANSPORT,
+                            false,
+                        ),
+                        markerMatch = intent.getBooleanExtra(
+                            SoakExternalProbeReceiver.RESULT_MARKER_MATCH,
+                            false,
+                        ),
                     ),
                 )
             }
         }
-        context.sendBroadcast(
-            Intent(context, SoakExternalProbeReceiver::class.java)
-                .putExtra(SoakExternalProbeReceiver.EXTRA_URL, targetUrl)
-                .putExtra(SoakExternalProbeReceiver.EXTRA_EXPECTED_MARKER, expectedMarker)
-                .putExtra(SoakExternalProbeReceiver.EXTRA_RECEIVER, receiver),
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(resultAction),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
         )
-        return withTimeout(PROBE_TIMEOUT_MS) { result.await() }
+        try {
+            context.sendBroadcast(
+                Intent(context, SoakExternalProbeReceiver::class.java)
+                    .putExtra(SoakExternalProbeReceiver.EXTRA_URL, targetUrl)
+                    .putExtra(SoakExternalProbeReceiver.EXTRA_EXPECTED_MARKER, expectedMarker)
+                    .putExtra(SoakExternalProbeReceiver.EXTRA_RESULT_ACTION, resultAction)
+                    .putExtra(SoakExternalProbeReceiver.EXTRA_RESULT_PACKAGE, context.packageName),
+            )
+            return withTimeout(PROBE_TIMEOUT_MS) { result.await() }
+        } finally {
+            context.unregisterReceiver(receiver)
+        }
     }
 
     private fun currentMemoryKb(): Long {
@@ -403,6 +419,7 @@ class SoakTest {
         private const val PROBE_TIMEOUT_MS = 15_000L
         private const val RUNTIME_REFRESH_OBSERVATION_MS = 2_000L
         private const val METRICS_FILE = "soak-metrics.json"
+        private const val EXTERNAL_PROBE_RESULT_ACTION = "ru.ozero.app.soak.EXTERNAL_PROBE_RESULT"
         private const val TAG = "SingboxSoak"
     }
 }

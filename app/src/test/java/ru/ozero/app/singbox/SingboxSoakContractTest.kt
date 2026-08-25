@@ -60,6 +60,7 @@ class SingboxSoakContractTest {
         assertTrue(soak.contains("VpnService.prepare(targetContext)"))
         assertTrue(soak.contains("TunnelState.Connected"))
         assertTrue(soak.contains("probeFromExternalUid"))
+        assertTrue(soak.contains("ContextCompat.registerReceiver"))
         assertTrue(soak.contains("context.sendBroadcast"))
         assertTrue(soak.contains("vpnTransport"))
         assertTrue(soak.contains("markerMatch"))
