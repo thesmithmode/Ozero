@@ -17,6 +17,10 @@ class SingboxSoakContractTest {
             "app/src/androidTest/java/ru/ozero/app/soak/SoakTest.kt",
         ).readText()
         val manifest = File(root, "app/src/androidTest/AndroidManifest.xml").readText()
+        val externalProbe = File(
+            root,
+            "app/src/androidTest/java/ru/ozero/app/soak/SoakExternalProbeReceiver.java",
+        ).readText()
         val debugManifest = File(root, "app/src/debug/AndroidManifest.xml").readText()
         val debugNetworkSecurity = File(
             root,
@@ -63,6 +67,8 @@ class SingboxSoakContractTest {
         assertTrue(manifest.contains("SoakExternalProbeReceiver"))
         assertTrue(manifest.contains("android:exported=\"true\""))
         assertTrue(manifest.contains("android:process=\":soak_probe\""))
+        assertTrue(externalProbe.contains("class SoakExternalProbeReceiver"))
+        assertFalse(externalProbe.contains("kotlin."))
     }
 
     private fun locateRepoRoot(): File {
