@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.ozero.enginewarp.DnsPresets
 import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.enginesingbox.prioritizeSingboxAutoProfiles
 import ru.ozero.singboxconfig.BeanSupportDecision
@@ -163,6 +164,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                 prefs[SingboxProbeService.SELECTED_PROFILE_KEY] = profile.id
                 prefs[SingboxProbeService.BEAN_KEY] = profile.beanBlob
             }
+            PersistentLoggers.info(TAG, "manual selection persisted profileId=${profile.id}")
         }
     }
 
@@ -573,6 +575,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     }
 
     companion object {
+        private const val TAG = "SingboxEngineSettings"
         private val SORT_ORDER_KEY = intPreferencesKey("singbox_sort_order")
         private val SINGBOX_DNS_SERVERS_KEY = stringSetPreferencesKey("singbox_dns_servers")
         private const val MAX_IMPORT_PROFILES = 2_000

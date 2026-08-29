@@ -13,11 +13,11 @@ class SingboxStatsParcelableFieldsSentinelTest {
         assertTrue(statsFile.isFile, "SingboxStats.kt must exist")
         val content = statsFile.readText()
 
-        val required = listOf("txRateProxy", "rxRateProxy", "txTotal", "rxTotal", "activeConnections")
+        val required = listOf("available", "txRateProxy", "rxRateProxy", "txTotal", "rxTotal", "activeConnections")
         val missing = required.filter { !content.contains(it) }
         assertTrue(
             missing.isEmpty(),
-            "SingboxStats missing fields: $missing — all 5 fields required for EnginePlugin.stats() integration",
+            "SingboxStats missing fields: $missing — availability and all counters are required for EnginePlugin.stats() integration",
         )
     }
 

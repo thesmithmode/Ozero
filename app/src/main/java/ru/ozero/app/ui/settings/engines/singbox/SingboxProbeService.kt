@@ -4,9 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import android.os.Binder
 import android.os.ParcelFileDescriptor
-import android.os.Process
 import android.os.IBinder
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -31,6 +29,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.EngineConfig
+import ru.ozero.enginescore.LogSanitizer
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.VpnSocketProtectorHolder
 import ru.ozero.enginescore.settings.SettingsModel
@@ -188,7 +187,8 @@ class SingboxProbeService internal constructor(
             )
         } catch (error: CancellationException) {
             throw error
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            logProbeFailure("probeBatch", error)
             candidates.associate { candidate ->
                 candidate.profile.id to SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
             }
@@ -213,7 +213,8 @@ class SingboxProbeService internal constructor(
                         candidate.profile.id to latency.toProbeOutcome()
                     } catch (error: CancellationException) {
                         throw error
-                    } catch (_: Exception) {
+                    } catch (error: Exception) {
+                        logProbeFailure("probeLatency", error, candidate.profile.id)
                         candidate.profile.id to SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
                     }
                 } finally {
@@ -364,6 +365,8 @@ private class SingboxServiceProfileProbe(
                 ipv6Enabled = settings.ipv6Enabled,
             )
         }.getOrElse {
+            it.rethrowCancellation()
+            logProbeFailure("buildConfig", it)
             return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_FAILED))
         }
         val binding = bindProcess()
@@ -376,6 +379,8 @@ private class SingboxServiceProfileProbe(
             }
             coroutineContext.ensureActive()
             val started = runCatching { process.startProxyModeIfIdle(config, localProtector) }.getOrElse {
+                it.rethrowCancellation()
+                logProbeFailure("startProxyModeIfIdle", it)
                 if (binding.processDied.get()) {
                     return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
                 }
@@ -394,7 +399,11 @@ private class SingboxServiceProfileProbe(
             if (binding.processDied.get()) {
                 return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
             }
-            val running = runCatching { process.runtimeRunning() }.getOrDefault(false)
+            val running = runCatching { process.runtimeRunning() }.getOrElse {
+                it.rethrowCancellation()
+                logProbeFailure("runtimeRunning", it)
+                false
+            }
             if (binding.processDied.get()) {
                 return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
             }
@@ -425,11 +434,17 @@ private class SingboxServiceProfileProbe(
         } finally {
             if (shouldStop) {
                 withContext(NonCancellable) {
-                    runCatching { binding.process.stopAndWait(REMOTE_STOP_TIMEOUT_MS) }
+                    runCatching { binding.process.stopAndWait(REMOTE_STOP_TIMEOUT_MS) }.onFailure {
+                        logProbeFailure("stopAndWait", it)
+                    }
                 }
             }
-            runCatching { binding.binder.unlinkToDeath(binding.deathRecipient, 0) }
-            runCatching { context.unbindService(binding.connection) }
+            runCatching { binding.binder.unlinkToDeath(binding.deathRecipient, 0) }.onFailure {
+                logProbeFailure("unlinkToDeath", it)
+            }
+            runCatching { context.unbindService(binding.connection) }.onFailure {
+                logProbeFailure("unbindService", it)
+            }
         }
     }
 
@@ -500,8 +515,10 @@ private class SingboxServiceProfileProbe(
         val processDied = AtomicBoolean(false)
         val processDeath = CompletableDeferred<Unit>()
         val probeCancellation = RoutedProbeCancellation()
-        val markProcessDied = {
-            processDied.set(true)
+        val markProcessDied = { operation: String ->
+            if (processDied.compareAndSet(false, true)) {
+                logProbeStateFailure(operation, "binder_death")
+            }
             processDeath.complete(Unit)
             probeCancellation.cancel()
         }
@@ -514,36 +531,48 @@ private class SingboxServiceProfileProbe(
 
             override fun onServiceDisconnected(name: ComponentName) {
                 process = null
-                markProcessDied()
+                markProcessDied("onServiceDisconnected")
             }
 
             override fun onBindingDied(name: ComponentName?) {
                 process = null
-                markProcessDied()
+                markProcessDied("onBindingDied")
             }
         }
         val component = ComponentName(context, "ru.ozero.singboxprocess.SingboxEngineService")
         val intent = Intent().apply { this.component = component }
-        val bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
+        val bound = runCatching {
+            context.bindService(intent, connection, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
+        }.getOrElse {
+            logProbeFailure("bindService", it)
+            return null
+        }
         if (!bound) {
-            runCatching { context.unbindService(connection) }
+            logProbeStateFailure("bindService", "bind_rejected")
+            unbindProbeService(connection, "bindRejected")
             return null
         }
         if (!latch.await(BIND_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-            runCatching { context.unbindService(connection) }
+            logProbeStateFailure("bindService", "bind_timeout")
+            unbindProbeService(connection, "bindTimeout")
             return null
         }
         val connectedProcess = process ?: run {
-            runCatching { context.unbindService(connection) }
+            logProbeStateFailure("bindService", "process_null")
+            unbindProbeService(connection, "processNull")
             return null
         }
         val connectedBinder = binder ?: run {
-            runCatching { context.unbindService(connection) }
+            logProbeStateFailure("bindService", "binder_null")
+            unbindProbeService(connection, "binderNull")
             return null
         }
-        val recipient = IBinder.DeathRecipient { markProcessDied() }
-        if (runCatching { connectedBinder.linkToDeath(recipient, 0) }.isFailure) {
-            markProcessDied()
+        val recipient = IBinder.DeathRecipient { markProcessDied("deathRecipient") }
+        if (runCatching { connectedBinder.linkToDeath(recipient, 0) }.onFailure {
+                logProbeFailure("linkToDeath", it)
+            }.isFailure
+        ) {
+            markProcessDied("linkToDeath")
         }
         return Binding(
             connectedProcess,
@@ -554,6 +583,12 @@ private class SingboxServiceProfileProbe(
             processDeath,
             probeCancellation,
         )
+    }
+
+    private fun unbindProbeService(connection: ServiceConnection, operation: String) {
+        runCatching { context.unbindService(connection) }.onFailure {
+            logProbeFailure("unbindService.$operation", it)
+        }
     }
 
     private suspend fun waitWhileProcessAlive(binding: Binding, delayMs: Long): Boolean {
@@ -639,11 +674,6 @@ internal class ProfileProbeProtector : ISingboxProtector.Stub() {
                 false
             }
         }
-        PersistentLoggers.debug(
-            "SingboxProbeService",
-            "protect request sourcePid=${Binder.getCallingPid()} targetPid=${Process.myPid()} " +
-                "targetReceivedFd=${it.fd} result=$result",
-        )
         result
     }
 
@@ -654,6 +684,27 @@ internal class ProfileProbeProtector : ISingboxProtector.Stub() {
     }
 }
 private data class RejectedProfile(val protocol: String, val schema: String, val reason: String)
+
+private fun logProbeFailure(operation: String, failure: Throwable, profileId: Long? = null) {
+    PersistentLoggers.warn(
+        "SingboxProbeService",
+        "operation=$operation stableCategory=probe exceptionClass=${failure::class.java.simpleName} " +
+            "sanitizedMessage=${LogSanitizer.sanitize(failure.message.orEmpty())} " +
+            "generation=probe processId=unknown profileId=${profileId ?: "unknown"}",
+    )
+}
+
+private fun logProbeStateFailure(operation: String, stableCategory: String) {
+    PersistentLoggers.warn(
+        "SingboxProbeService",
+        "operation=$operation stableCategory=$stableCategory exceptionClass=none " +
+            "sanitizedMessage=$stableCategory generation=probe processId=unknown profileId=unknown",
+    )
+}
+
+private fun Throwable.rethrowCancellation() {
+    if (this is CancellationException) throw this
+}
 
 private fun logRejectedProfiles(rejectedProfiles: List<RejectedProfile>) {
     if (rejectedProfiles.isEmpty()) return

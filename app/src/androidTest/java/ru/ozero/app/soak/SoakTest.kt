@@ -129,7 +129,11 @@ class SoakTest {
                         soakProfile.expectedMarker,
                     )
                     check(probe.vpnTransport) { "external probe did not use Android VPN transport" }
-                    check(probe.httpCode in 200..299) { "external routed HTTP failed code=${probe.httpCode}" }
+                    check(probe.httpCode in 200..299) {
+                        "external routed HTTP failed code=${probe.httpCode} stage=${probe.stage} " +
+                            "exceptionClass=${probe.exceptionClass} sanitizedMessage=${probe.sanitizedMessage} " +
+                            "elapsedMs=${probe.elapsedMs}"
+                    }
                     check(probe.markerMatch) { "external routed HTTP returned an unexpected marker" }
                     successfulCycles[soakProfile.protocol] =
                         successfulCycles.getValue(soakProfile.protocol) + 1
@@ -333,6 +337,14 @@ class SoakTest {
                             SoakExternalProbeReceiver.RESULT_MARKER_MATCH,
                             false,
                         ),
+                        stage = intent.getStringExtra(SoakExternalProbeReceiver.RESULT_STAGE) ?: "unknown",
+                        exceptionClass = intent.getStringExtra(
+                            SoakExternalProbeReceiver.RESULT_EXCEPTION_CLASS,
+                        ) ?: "unknown",
+                        sanitizedMessage = intent.getStringExtra(
+                            SoakExternalProbeReceiver.RESULT_SANITIZED_MESSAGE,
+                        ) ?: "none",
+                        elapsedMs = intent.getLongExtra(SoakExternalProbeReceiver.RESULT_ELAPSED_MS, -1L),
                     ),
                 )
             }
@@ -396,6 +408,10 @@ class SoakTest {
         val httpCode: Int,
         val vpnTransport: Boolean,
         val markerMatch: Boolean,
+        val stage: String,
+        val exceptionClass: String,
+        val sanitizedMessage: String,
+        val elapsedMs: Long,
     )
 
     private data class SoakProfile(

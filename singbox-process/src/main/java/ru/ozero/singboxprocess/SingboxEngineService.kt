@@ -4,10 +4,6 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
@@ -19,7 +15,6 @@ import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.singboxcore.Libsingboxgojni
 
 class SingboxEngineService : Service() {
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val stopLock = Any()
 
     private val binder = object : ISingboxEngineProcess.Stub() {
@@ -209,20 +204,7 @@ class SingboxEngineService : Service() {
             return finished
         }
 
-        override fun getStats(): SingboxStats {
-            val status = SingboxRuntime.getLastStatus()
-            return if (status != null) {
-                SingboxStats(
-                    txRateProxy = status.uplink,
-                    rxRateProxy = status.downlink,
-                    txTotal = status.uplinkTotal,
-                    rxTotal = status.downlinkTotal,
-                    activeConnections = status.connectionsIn + status.connectionsOut,
-                )
-            } else {
-                SingboxStats()
-            }
-        }
+        override fun getStats(): SingboxStats = SingboxStats(available = false)
     }
 
     override fun onCreate() {
@@ -243,7 +225,6 @@ class SingboxEngineService : Service() {
 
     override fun onDestroy() {
         binder.stopAndWait(DEFAULT_STOP_TIMEOUT_MS)
-        serviceScope.cancel()
         super.onDestroy()
     }
 

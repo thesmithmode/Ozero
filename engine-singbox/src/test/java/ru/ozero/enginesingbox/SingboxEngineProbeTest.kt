@@ -139,20 +139,13 @@ class SingboxEngineProbeTest {
 
     @Test
     fun `missing declared chain profile is retained as typed failure`() {
-        val selected = ProxyProfile(
-            id = 1L,
-            groupId = 1L,
-            name = "Selected",
+        val engine = buildEngine()
+        val config = EngineConfig.Singbox(
             beanBlob = makeVlessBlob("selected.example"),
             protocolType = SingboxEngine.PROTOCOL_VLESS,
+            chainProfileIds = listOf(99L),
+            missingChainProfileIds = setOf(99L),
         )
-        val engine = buildEngine(chainProfileIds = listOf(1L, 99L))
-        Thread.sleep(100)
-        engine.setPrivateField("cachedSelectedProfileId", 1L)
-        engine.setPrivateField("cachedBlob", selected.beanBlob)
-        engine.setPrivateField("cachedProfilesById", mapOf(selected.id to selected))
-
-        val config = assertIs<EngineConfig.Singbox>(engine.buildManualConfig(null))
         val result = assertIs<BuildConfigResult.Failure>(engine.buildPendingConfigForTest(config))
 
         assertEquals(listOf(99L), config.chainProfileIds)
@@ -163,20 +156,13 @@ class SingboxEngineProbeTest {
     @Test
     fun `declared chain longer than auto limit is not silently truncated`() {
         val wrapperIds = (2L..52L).toList()
-        val selected = ProxyProfile(
-            id = 1L,
-            groupId = 1L,
-            name = "Selected",
+        val engine = buildEngine()
+        val config = EngineConfig.Singbox(
             beanBlob = makeVlessBlob("selected.example"),
             protocolType = SingboxEngine.PROTOCOL_VLESS,
+            chainProfileIds = wrapperIds,
+            missingChainProfileIds = wrapperIds.toSet(),
         )
-        val engine = buildEngine(chainProfileIds = listOf(1L) + wrapperIds)
-        Thread.sleep(100)
-        engine.setPrivateField("cachedSelectedProfileId", 1L)
-        engine.setPrivateField("cachedBlob", selected.beanBlob)
-        engine.setPrivateField("cachedProfilesById", mapOf(selected.id to selected))
-
-        val config = assertIs<EngineConfig.Singbox>(engine.buildManualConfig(null))
         val result = assertIs<BuildConfigResult.Failure>(engine.buildPendingConfigForTest(config))
 
         assertEquals(wrapperIds, config.chainProfileIds)
@@ -663,6 +649,7 @@ class SingboxEngineProbeTest {
         val engine = buildEngine()
         val process = mockk<ISingboxEngineProcess>()
         every { process.stats } returns SingboxStats(
+            available = true,
             txTotal = 123L,
             rxTotal = 456L,
             activeConnections = 7,

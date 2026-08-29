@@ -17,42 +17,6 @@ class SingboxRuntimeDiagnosticsTest {
     }
 
     @Test
-    fun `old diagnostic session cannot mutate replacement client`() {
-        val guard = NativeDiagnosticsSessionGuard()
-        val oldClient = Any()
-        val oldGeneration = guard.begin()
-        val newClient = Any()
-        val newGeneration = guard.begin()
-
-        assertFalse(guard.isCurrent(oldGeneration, oldClient, newClient))
-        assertTrue(guard.isCurrent(newGeneration, newClient, newClient))
-        assertFalse(guard.claimReconnect(oldGeneration))
-    }
-
-    @Test
-    fun `diagnostic reconnect can be claimed only once per generation`() {
-        val guard = NativeDiagnosticsSessionGuard()
-        val generation = guard.begin()
-
-        assertTrue(guard.claimReconnect(generation))
-        assertFalse(guard.claimReconnect(generation))
-        assertFalse(guard.claimReconnect(guard.begin() - 1))
-    }
-
-    @Test
-    fun `invalidating diagnostic session rejects delayed callbacks`() {
-        val guard = NativeDiagnosticsSessionGuard()
-        val client = Any()
-        val generation = guard.begin()
-
-        guard.invalidate()
-
-        assertFalse(guard.isActive(generation))
-        assertFalse(guard.isCurrent(generation, client, client))
-        assertFalse(guard.claimReconnect(generation))
-    }
-
-    @Test
     fun `missing ConnectivityManager fails with process specific error`() {
         val context = mockk<Context>()
         every { context.getSystemService(ConnectivityManager::class.java) } returns null
@@ -79,8 +43,33 @@ class SingboxRuntimeDiagnosticsTest {
         assertFalse(redacted.contains("server-address.example"))
         assertFalse(redacted.contains("server.example"))
         assertFalse(redacted.contains("json-server.example"))
-        assertContains(redacted, "<redacted-uuid>")
         assertContains(redacted, "<redacted-json>")
+    }
+
+    @Test
+    fun `redaction removes arbitrary custom headers inside native json diagnostics`() {
+        val redacted = redactSingboxMessage(
+            "config rejected: {\"headers\":{\"X-Private-Session\":\"secret-session-value\"}}",
+        )
+
+        assertFalse(redacted.contains("secret-session-value"))
+        assertFalse(redacted.contains("X-Private-Session"))
+        assertContains(redacted, "<redacted-json>")
+    }
+
+    @Test
+    fun `redaction preserves context between separate balanced json fragments`() {
+        val redacted = redactSingboxMessage(
+            "request {\"headers\":{\"X-Secret\":\"first-secret\"}} failed before " +
+                "retry {\"value\":\"second-secret with } and \\\"quoted\\\" text\"} completed",
+        )
+
+        assertEquals(
+            "request <redacted-json> failed before retry <redacted-json> completed",
+            redacted,
+        )
+        assertFalse(redacted.contains("first-secret"))
+        assertFalse(redacted.contains("second-secret"))
     }
 
     @Test
@@ -147,21 +136,10 @@ class SingboxRuntimeDiagnosticsTest {
     }
 
     @Test
-    fun `native command client diagnostics are not started with runtime`() {
-        val serviceStart = runtimeSource.indexOf("server.startOrReloadService")
-        val serverClaim = runtimeSource.indexOf("commandServer = server", serviceStart)
-        val diagnosticsLaunch = runtimeSource.indexOf("launchNativeLogSubscription(failureDiagnostics)", serverClaim)
-
-        assertTrue(serviceStart in 0..<serverClaim)
-        assertEquals(-1, diagnosticsLaunch)
-    }
-
-    @Test
-    fun `diagnostic connect is supervised and time bounded`() {
-        assertContains(runtimeSource, "CoroutineScope(SupervisorJob() + Dispatchers.IO)")
-        assertContains(runtimeSource, "withTimeout(NATIVE_LOG_CONNECT_TIMEOUT_MS)")
-        assertContains(runtimeSource, "runInterruptible { client.connect() }")
-        assertContains(runtimeSource, "native diagnostics unavailable exceptionClass=")
+    fun `inactive command client state machine is absent`() {
+        assertFalse(runtimeSource.contains("CommandClient"))
+        assertFalse(runtimeSource.contains("NativeDiagnosticsSessionGuard"))
+        assertFalse(runtimeSource.contains("launchNativeLogSubscription"))
     }
 
     @Test
@@ -211,13 +189,16 @@ class SingboxRuntimeDiagnosticsTest {
     }
 
     @Test
-    fun `restart and stop close diagnostics`() {
+    fun `restart and stop close runtime resources`() {
         val restart = runtimeSource.substringAfter("if (oldServer != null)").substringBefore("val socketFile")
         val stop = runtimeSource.substringAfter("suspend fun stop()").substringBefore("fun isRunning()")
+        val close = runtimeSource
+            .substringAfter("private fun closeCommandServer")
+            .substringBefore("private fun createCommandServer")
 
-        assertContains(restart, "stopNativeLogSubscription()")
-        assertContains(stop, "stopNativeLogSubscription()")
-        assertContains(runtimeSource, "nativeLogJob?.cancelAndJoin()")
-        assertContains(runtimeSource, "client.disconnect()")
+        assertContains(restart, "closeCommandServer(oldServer, closeService = true)")
+        assertContains(stop, "closeCommandServer(it, closeService = true)")
+        assertContains(close, "server.closeService()")
+        assertContains(close, "server.close()")
     }
 }

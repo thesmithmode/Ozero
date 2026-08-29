@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EngineRuntimeConfigProvider
+import ru.ozero.enginescore.PersistentLoggers
 import javax.inject.Inject
 
 class EngineRuntimeConfigRestartObserver @Inject constructor(
@@ -95,7 +96,11 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
                     true
                 }
                 connectedEngine(tunnelState) == engineId && current == pending.fingerprint -> {
-                    pendingRestart = if (restart(pending.reason)) {
+                    val diagnosticReason = pending.reason.withProfileId(current)
+                    if (engineId == EngineId.SINGBOX) {
+                        PersistentLoggers.info(TAG, "runtime change detected ${current.profileIdDiagnostic()}")
+                    }
+                    pendingRestart = if (restart(diagnosticReason)) {
                         baseline = current
                         null
                     } else {
@@ -127,7 +132,11 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
                 return
             }
             if (activeEngine(tunnelState, includeStarting) == engineId) {
-                if (restart(reason)) baseline = current
+                val diagnosticReason = reason.withProfileId(current)
+                if (engineId == EngineId.SINGBOX) {
+                    PersistentLoggers.info(TAG, "runtime change detected ${current.profileIdDiagnostic()}")
+                }
+                if (restart(diagnosticReason)) baseline = current
             } else if (shouldReplay(replayAfterStarting, includeStarting, tunnelState, engineId)) {
                 pendingRestart = PendingRestart(
                     reason = reason,
@@ -161,9 +170,16 @@ class EngineRuntimeConfigRestartObserver @Inject constructor(
     )
 
     private companion object {
+        private const val TAG = "RuntimeConfigRestartObserver"
         private val UNSET = Any()
     }
 }
+
+private fun String.withProfileId(value: Any?): String =
+    if (value is SingboxRuntimeFingerprint) "$this ${value.profileIdDiagnostic()}" else this
+
+private fun Any?.profileIdDiagnostic(): String =
+    "profileId=${(this as? SingboxRuntimeFingerprint)?.selectedProfileId ?: "unknown"}"
 
 private fun activeEngine(state: TunnelState, includeStarting: Boolean): EngineId? = when (state) {
     is TunnelState.Connected -> state.engineId

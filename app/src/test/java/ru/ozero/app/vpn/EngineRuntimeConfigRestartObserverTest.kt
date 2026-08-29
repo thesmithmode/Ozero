@@ -907,7 +907,79 @@ class EngineRuntimeConfigRestartObserverTest {
         profiles.value = listOf(proxyProfile(id = 1, blob = validSingboxBlob(2)))
         runCurrent()
 
-        assertEquals(listOf(provider.restartReason), restarts)
+        assertEquals(listOf("${provider.restartReason} profileId=1"), restarts)
+    }
+
+    @Test
+    fun `connected manual profile A switches through restart to config B`() = runTest(dispatcher) {
+        val prefs = MutableStateFlow<Preferences>(mutablePreferencesOf(singboxSelectedProfileKey to 1L))
+        val profiles = MutableStateFlow(
+            listOf(
+                proxyProfile(id = 1, blob = validSingboxBlob(1)),
+                proxyProfile(id = 2, blob = validSingboxBlob(2)),
+            ),
+        )
+        val provider = SingboxModule.provideSingboxRuntimeConfigProvider(
+            dataStore = flowDataStore(prefs),
+            profileDao = fakeProfileDao(profiles),
+            proxyChainDao = fakeProxyChainDao(MutableStateFlow(emptyList())),
+            settingsRepository = staticSettingsRepository(),
+        )
+        val state = MutableStateFlow<TunnelState>(TunnelState.Connected(EngineId.SINGBOX, 1080))
+        val connectedProfileIds = mutableListOf(1L)
+        EngineRuntimeConfigRestartObserver(setOf(provider)).start(
+            scope = observerScope(),
+            exceptionHandler = CoroutineExceptionHandler { _, _ -> },
+            state = state,
+            restart = {
+                val config = provider.changes.first() as SingboxRuntimeFingerprint
+                connectedProfileIds += requireNotNull(config.selectedProfileId)
+                true
+            },
+        )
+        runCurrent()
+
+        prefs.value = mutablePreferencesOf(singboxSelectedProfileKey to 2L)
+        runCurrent()
+
+        assertEquals(listOf(1L, 2L), connectedProfileIds)
+    }
+
+    @Test
+    fun `connected manual profile rapid B then C converges on config C`() = runTest(dispatcher) {
+        val prefs = MutableStateFlow<Preferences>(mutablePreferencesOf(singboxSelectedProfileKey to 1L))
+        val profiles = MutableStateFlow(
+            listOf(
+                proxyProfile(id = 1, blob = validSingboxBlob(1)),
+                proxyProfile(id = 2, blob = validSingboxBlob(2)),
+                proxyProfile(id = 3, blob = validSingboxBlob(3)),
+            ),
+        )
+        val provider = SingboxModule.provideSingboxRuntimeConfigProvider(
+            dataStore = flowDataStore(prefs),
+            profileDao = fakeProfileDao(profiles),
+            proxyChainDao = fakeProxyChainDao(MutableStateFlow(emptyList())),
+            settingsRepository = staticSettingsRepository(),
+        )
+        val state = MutableStateFlow<TunnelState>(TunnelState.Connected(EngineId.SINGBOX, 1080))
+        val connectedProfileIds = mutableListOf(1L)
+        EngineRuntimeConfigRestartObserver(setOf(provider)).start(
+            scope = observerScope(),
+            exceptionHandler = CoroutineExceptionHandler { _, _ -> },
+            state = state,
+            restart = {
+                val config = provider.changes.first() as SingboxRuntimeFingerprint
+                connectedProfileIds += requireNotNull(config.selectedProfileId)
+                true
+            },
+        )
+        runCurrent()
+
+        prefs.value = mutablePreferencesOf(singboxSelectedProfileKey to 2L)
+        prefs.value = mutablePreferencesOf(singboxSelectedProfileKey to 3L)
+        runCurrent()
+
+        assertEquals(3L, connectedProfileIds.last())
     }
 
     @Test
@@ -937,7 +1009,7 @@ class EngineRuntimeConfigRestartObserverTest {
             prefs.value = mutablePreferencesOf()
             runCurrent()
 
-            assertEquals(listOf(provider.restartReason), restarts)
+            assertEquals(listOf("${provider.restartReason} profileId=unknown"), restarts)
         }
 
     @Test
