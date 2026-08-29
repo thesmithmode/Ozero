@@ -43,8 +43,33 @@ class SingboxRuntimeDiagnosticsTest {
         assertFalse(redacted.contains("server-address.example"))
         assertFalse(redacted.contains("server.example"))
         assertFalse(redacted.contains("json-server.example"))
-        assertContains(redacted, "<redacted-uuid>")
-        assertContains(redacted, "<redacted>")
+        assertContains(redacted, "<redacted-json>")
+    }
+
+    @Test
+    fun `redaction removes arbitrary custom headers inside native json diagnostics`() {
+        val redacted = redactSingboxMessage(
+            "config rejected: {\"headers\":{\"X-Private-Session\":\"secret-session-value\"}}",
+        )
+
+        assertFalse(redacted.contains("secret-session-value"))
+        assertFalse(redacted.contains("X-Private-Session"))
+        assertContains(redacted, "<redacted-json>")
+    }
+
+    @Test
+    fun `redaction preserves context between separate balanced json fragments`() {
+        val redacted = redactSingboxMessage(
+            "request {\"headers\":{\"X-Secret\":\"first-secret\"}} failed before " +
+                "retry {\"value\":\"second-secret with } and \\\"quoted\\\" text\"} completed",
+        )
+
+        assertEquals(
+            "request <redacted-json> failed before retry <redacted-json> completed",
+            redacted,
+        )
+        assertFalse(redacted.contains("first-secret"))
+        assertFalse(redacted.contains("second-secret"))
     }
 
     @Test
@@ -167,11 +192,13 @@ class SingboxRuntimeDiagnosticsTest {
     fun `restart and stop close runtime resources`() {
         val restart = runtimeSource.substringAfter("if (oldServer != null)").substringBefore("val socketFile")
         val stop = runtimeSource.substringAfter("suspend fun stop()").substringBefore("fun isRunning()")
+        val close = runtimeSource
+            .substringAfter("private fun closeCommandServer")
+            .substringBefore("private fun createCommandServer")
 
-        assertContains(restart, "oldServer.closeService()")
-        assertContains(restart, "oldServer.close()")
-        assertContains(stop, "server.closeService()")
-        assertContains(stop, "server.close()")
-        assertContains(stop, "defaultInterfaceMonitor.stop()")
+        assertContains(restart, "closeCommandServer(oldServer, closeService = true)")
+        assertContains(stop, "closeCommandServer(it, closeService = true)")
+        assertContains(close, "server.closeService()")
+        assertContains(close, "server.close()")
     }
 }

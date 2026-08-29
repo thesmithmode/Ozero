@@ -896,8 +896,8 @@ class SingboxEngine @Inject constructor(
             }
             val changedDuringRead =
                 initialPrefs != finalPrefs ||
-                initialChainIds != finalChainIds ||
-                !profiles.sameRuntimeInputs(confirmedProfiles)
+                    initialChainIds != finalChainIds ||
+                    !profiles.sameRuntimeInputs(confirmedProfiles)
             if (changedDuringRead && attempt < STORAGE_SNAPSHOT_MAX_ATTEMPTS - 1) {
                 continue
             }
@@ -949,6 +949,11 @@ class SingboxEngine @Inject constructor(
     ): DecodedProfiles {
         val beans = mutableListOf<AbstractBean>()
         val failures = mutableListOf<ProfileInputFailure>()
+        profileIds.forEachIndexed { index, profileId ->
+            if (profileId in missingProfileIds && index >= blobs.size) {
+                failures += ProfileInputFailure(index, ProfileInputStage.MISSING_PROFILE, profileId)
+            }
+        }
         blobs.forEachIndexed { index, blob ->
             val profileId = profileIds.getOrNull(index)
             if (profileId in missingProfileIds) {

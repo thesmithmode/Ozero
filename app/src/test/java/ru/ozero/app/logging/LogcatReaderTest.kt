@@ -80,17 +80,18 @@ class LogcatReaderTest {
 
         val buffer = LogBuffer()
         val reader = LogcatReader(buffer)
+        val sanitizedRawLine = "LOGCAT 04-27 10:32:18.421 1234 5678 I OzeroVpn: startVpn"
 
         reader.start()
         waitFor { buffer.entries.value.any { it.tag == "OzeroVpn" && it.message == "startVpn" } }
-        waitFor { BootFileLogger.read().contains("LOGCAT 04-27 10:32:18.421  1234  5678 I OzeroVpn: startVpn") }
+        waitFor { BootFileLogger.read().contains(sanitizedRawLine) }
         reader.stop()
         reader.shutdown()
 
         val entries = buffer.entries.value
         assertTrue(entries.any { it.tag == "LogcatReader" && it.message.startsWith("LogcatReader started pid=") })
         assertTrue(entries.any { it.tag == "OzeroVpn" && it.message == "startVpn" && it.level == LogLevel.INFO })
-        assertTrue(BootFileLogger.read().contains("LOGCAT 04-27 10:32:18.421  1234  5678 I OzeroVpn: startVpn"))
+        assertTrue(BootFileLogger.read().contains(sanitizedRawLine))
     }
 
     @Test
