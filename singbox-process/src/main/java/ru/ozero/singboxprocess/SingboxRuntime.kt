@@ -367,7 +367,52 @@ internal fun requireConnectivityManager(context: Context): ConnectivityManager =
     }
 
 internal fun redactSingboxMessage(message: String): String =
-    LogSanitizer.sanitize(message.replace(Regex("\\{.*}"), "<redacted-json>"))
+    LogSanitizer.sanitize(redactJsonFragments(message))
+
+private fun redactJsonFragments(message: String): String = buildString(message.length) {
+    var cursor = 0
+    while (cursor < message.length) {
+        val start = message.indexOf('{', cursor)
+        if (start < 0) {
+            append(message, cursor, message.length)
+            break
+        }
+        append(message, cursor, start)
+        val end = message.balancedJsonEnd(start)
+        if (end == null) {
+            append(message, start, message.length)
+            break
+        }
+        append("<redacted-json>")
+        cursor = end
+    }
+}
+
+private fun String.balancedJsonEnd(start: Int): Int? {
+    var depth = 0
+    var insideString = false
+    var escaped = false
+    for (index in start until length) {
+        val character = this[index]
+        if (insideString) {
+            when {
+                escaped -> escaped = false
+                character == '\\' -> escaped = true
+                character == '"' -> insideString = false
+            }
+        } else {
+            when (character) {
+                '"' -> insideString = true
+                '{' -> depth += 1
+                '}' -> {
+                    depth -= 1
+                    if (depth == 0) return index + 1
+                }
+            }
+        }
+    }
+    return null
+}
 
 internal fun String.shouldPromoteSingboxMessage(): Boolean =
     contains("error", ignoreCase = true) ||

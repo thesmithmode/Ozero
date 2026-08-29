@@ -58,6 +58,21 @@ class SingboxRuntimeDiagnosticsTest {
     }
 
     @Test
+    fun `redaction preserves context between separate balanced json fragments`() {
+        val redacted = redactSingboxMessage(
+            "request {\"headers\":{\"X-Secret\":\"first-secret\"}} failed before " +
+                "retry {\"value\":\"second-secret with } and \\\"quoted\\\" text\"} completed",
+        )
+
+        assertEquals(
+            "request <redacted-json> failed before retry <redacted-json> completed",
+            redacted,
+        )
+        assertFalse(redacted.contains("first-secret"))
+        assertFalse(redacted.contains("second-secret"))
+    }
+
+    @Test
     fun `redaction removes every supported secret shape`() {
         val secrets = listOf(
             "username=user-value",
