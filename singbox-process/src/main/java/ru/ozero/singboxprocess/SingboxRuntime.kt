@@ -400,14 +400,14 @@ private fun String.balancedJsonEnd(start: Int): Int? {
                 character == '\\' -> escaped = true
                 character == '"' -> insideString = false
             }
-        } else {
-            when (character) {
-                '"' -> insideString = true
-                '{' -> depth += 1
-                '}' -> {
-                    depth -= 1
-                    if (depth == 0) return index + 1
-                }
+            continue
+        }
+        when (character) {
+            '"' -> insideString = true
+            '{' -> depth += 1
+            '}' -> {
+                depth -= 1
+                if (depth == 0) return index + 1
             }
         }
     }
