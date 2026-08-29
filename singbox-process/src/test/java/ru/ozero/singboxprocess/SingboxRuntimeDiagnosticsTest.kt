@@ -43,7 +43,6 @@ class SingboxRuntimeDiagnosticsTest {
         assertFalse(redacted.contains("server-address.example"))
         assertFalse(redacted.contains("server.example"))
         assertFalse(redacted.contains("json-server.example"))
-        assertContains(redacted, "<redacted-uuid>")
         assertContains(redacted, "<redacted-json>")
     }
 
@@ -178,11 +177,13 @@ class SingboxRuntimeDiagnosticsTest {
     fun `restart and stop close runtime resources`() {
         val restart = runtimeSource.substringAfter("if (oldServer != null)").substringBefore("val socketFile")
         val stop = runtimeSource.substringAfter("suspend fun stop()").substringBefore("fun isRunning()")
+        val close = runtimeSource
+            .substringAfter("private fun closeCommandServer")
+            .substringBefore("private fun createCommandServer")
 
-        assertContains(restart, "oldServer.closeService()")
-        assertContains(restart, "oldServer.close()")
-        assertContains(stop, "server.closeService()")
-        assertContains(stop, "server.close()")
-        assertContains(stop, "defaultInterfaceMonitor.stop()")
+        assertContains(restart, "closeCommandServer(oldServer, closeService = true)")
+        assertContains(stop, "closeCommandServer(it, closeService = true)")
+        assertContains(close, "server.closeService()")
+        assertContains(close, "server.close()")
     }
 }

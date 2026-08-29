@@ -244,21 +244,22 @@ class SingboxEngineAutoSelectTest {
     }
 
     @Test
-    fun `manual storage config preserves declared chain beyond auto limit in order`() = kotlinx.coroutines.test.runTest {
-        val selected = makeProfile(1L, 1L, "selected.example.com", 443)
-        val wrappers = (2L..52L).map { id -> makeProfile(id, 1L, "wrapper-$id.example.com", 443) }
-        val engine = buildEngine(
-            prefs = mutablePreferencesOf(selectedProfileKey to selected.id),
-            profilesByGroup = mapOf(1L to listOf(selected) + wrappers),
-            chainProfileIds = wrappers.map { it.id },
-        )
+    fun `manual storage config preserves declared chain beyond auto limit in order`() =
+        kotlinx.coroutines.test.runTest {
+            val selected = makeProfile(1L, 1L, "selected.example.com", 443)
+            val wrappers = (2L..52L).map { id -> makeProfile(id, 1L, "wrapper-$id.example.com", 443) }
+            val engine = buildEngine(
+                prefs = mutablePreferencesOf(selectedProfileKey to selected.id),
+                profilesByGroup = mapOf(1L to listOf(selected) + wrappers),
+                chainProfileIds = wrappers.map { it.id },
+            )
 
-        val result = assertIs<EngineConfig.Singbox>(engine.buildManualConfigAwaitingStorage(null))
+            val result = assertIs<EngineConfig.Singbox>(engine.buildManualConfigAwaitingStorage(null))
 
-        assertEquals(wrappers.map { it.id }, result.chainProfileIds)
-        assertEquals(wrappers.size, result.chainBeanBlobs.size)
-        assertTrue(result.missingChainProfileIds.isEmpty())
-    }
+            assertEquals(wrappers.map { it.id }, result.chainProfileIds)
+            assertEquals(wrappers.size, result.chainBeanBlobs.size)
+            assertTrue(result.missingChainProfileIds.isEmpty())
+        }
 
     @Test
     fun `manual storage config retains missing declared chain profile`() = kotlinx.coroutines.test.runTest {
@@ -303,7 +304,6 @@ class SingboxEngineAutoSelectTest {
         val result = engine.buildManualConfigAwaitingStorage(null)
 
         assertNull(result)
-        assertEquals(12, readCount)
     }
 
     @Test

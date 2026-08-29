@@ -38,7 +38,9 @@ object LogSanitizer {
     private val UUID = Regex("(?i)\\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b")
 
     private val SENSITIVE_FIELD = Regex(
-        "(?i)\\b(authorization|auth|cookie|credential|token|password|username|uuid|private[_-]?key|public[_-]?key|short[_-]?id|reality[_-]?key|key|headers|proxy[_-]?(?:user|password|credential)s?)\\s*[:=]\\s*[^\\s,;]+",
+        "(?i)\\b(authorization|auth|cookie|credential|token|password|username|uuid|private[_-]?key|" +
+            "public[_-]?key|short[_-]?id|reality[_-]?key|key|headers|" +
+            "proxy[_-]?(?:user|password|credential)s?)\\s*[:=]\\s*[^\\s,;]+",
     )
 
     private val HOST_FIELD = Regex(
