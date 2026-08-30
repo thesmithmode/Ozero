@@ -326,7 +326,7 @@ class SingboxEngineProbeTest {
     fun `stop clears runtime state when remote stop times out`() = runTest {
         val engine = buildEngine()
         val process = mockk<ISingboxEngineProcess>()
-        every { process.stopAndWait(3_000L) } returns false
+        every { process.stopAndWait(any(), 3_000L) } returns false
         engine.setPrivateField("proxy", process)
         engine.setPrivateField("pendingConfig", "{}")
         engine.setPrivateField("pendingSocksPort", 49408)
@@ -348,7 +348,7 @@ class SingboxEngineProbeTest {
     fun `stop clears runtime state when remote stop throws`() = runTest {
         val engine = buildEngine()
         val process = mockk<ISingboxEngineProcess>()
-        every { process.stopAndWait(3_000L) } throws IllegalStateException("binder died")
+        every { process.stopAndWait(any(), 3_000L) } throws IllegalStateException("binder died")
         engine.setPrivateField("proxy", process)
         engine.setPrivateField("pendingConfig", "{}")
         engine.setPrivateField("pendingSocksPort", 49408)
@@ -416,9 +416,9 @@ class SingboxEngineProbeTest {
             val rawOwner = mockk<ParcelFileDescriptor>(relaxed = true)
             every { ParcelFileDescriptor.fromFd(42) } returns transportPfd
             every { ParcelFileDescriptor.adoptFd(42) } returns rawOwner
-            every { process.startWithConfig(transportPfd, any(), any()) } returns Unit
+            every { process.startWithConfig(any(), transportPfd, any(), any()) } returns Unit
             every { process.runtimeRunning() } returns true
-            every { process.stopAndWait(3_000L) } returns true
+            every { process.stopAndWait(any(), 3_000L) } returns true
             engine.setPrivateField("proxy", process)
             engine.setPrivateField("pendingConfig", "{}")
             engine.setPrivateField("pendingSocksPort", 49408)
@@ -428,7 +428,7 @@ class SingboxEngineProbeTest {
 
             assertIs<TunAttachResult.Success>(result)
             assertEquals(0, calls)
-            verify(exactly = 0) { process.stopAndWait(3_000L) }
+            verify(exactly = 0) { process.stopAndWait(any(), 3_000L) }
             assertEquals(null, engine.privateField("pendingConfig"))
             assertEquals(0, engine.privateIntField("pendingSocksPort"))
             assertEquals(49408, engine.privateIntField("activeSocksPort"))
@@ -448,9 +448,9 @@ class SingboxEngineProbeTest {
             val process = mockk<ISingboxEngineProcess>()
             val transportPfd = mockk<ParcelFileDescriptor>(relaxed = true)
             every { ParcelFileDescriptor.fromFd(42) } returns transportPfd
-            every { process.startWithConfig(transportPfd, any(), any()) } returns Unit
+            every { process.startWithConfig(any(), transportPfd, any(), any()) } returns Unit
             every { process.runtimeRunning() } returns false
-            every { process.stopAndWait(3_000L) } returns true
+            every { process.stopAndWait(any(), 3_000L) } returns true
             engine.setPrivateField("proxy", process)
             engine.setPrivateField("pendingConfig", "{}")
             engine.setPrivateField("pendingSocksPort", 49408)
@@ -476,7 +476,7 @@ class SingboxEngineProbeTest {
             every { ParcelFileDescriptor.fromFd(42) } returns transportPfd
             every { ParcelFileDescriptor.adoptFd(42) } returns rawOwner
             every { rawOwner.close() } throws IllegalStateException("close failed")
-            every { process.startWithConfig(transportPfd, any(), any()) } returns Unit
+            every { process.startWithConfig(any(), transportPfd, any(), any()) } returns Unit
             every { process.runtimeRunning() } returns true
             engine.setPrivateField("proxy", process)
             engine.setPrivateField("pendingConfig", "{}")
@@ -503,9 +503,9 @@ class SingboxEngineProbeTest {
             val rawOwner = mockk<ParcelFileDescriptor>(relaxed = true)
             every { ParcelFileDescriptor.fromFd(42) } returns transportPfd
             every { ParcelFileDescriptor.adoptFd(42) } returns rawOwner
-            every { process.startWithConfig(transportPfd, any(), any()) } returns Unit
+            every { process.startWithConfig(any(), transportPfd, any(), any()) } returns Unit
             every { process.runtimeRunning() } returns true
-            every { process.stopAndWait(3_000L) } returns true
+            every { process.stopAndWait(any(), 3_000L) } returns true
             engine.setPrivateField("proxy", process)
             engine.setPrivateField("pendingConfig", "{}")
             engine.setPrivateField("pendingSocksPort", 49408)
@@ -514,7 +514,7 @@ class SingboxEngineProbeTest {
             val result = engine.attachTun(42)
 
             assertIs<TunAttachResult.Success>(result)
-            verify(exactly = 0) { process.stopAndWait(3_000L) }
+            verify(exactly = 0) { process.stopAndWait(any(), 3_000L) }
             assertEquals(null, engine.privateField("pendingConfig"))
             assertEquals(0, engine.privateIntField("pendingSocksPort"))
             assertEquals(49408, engine.privateIntField("activeSocksPort"))
@@ -539,7 +539,7 @@ class SingboxEngineProbeTest {
             val rawOwner = mockk<ParcelFileDescriptor>(relaxed = true)
             every { ParcelFileDescriptor.fromFd(42) } returns transportPfd
             every { ParcelFileDescriptor.adoptFd(42) } returns rawOwner
-            every { process.startWithConfig(transportPfd, any(), any()) } returns Unit
+            every { process.startWithConfig(any(), transportPfd, any(), any()) } returns Unit
             every { process.runtimeRunning() } returns true
             engine.setPrivateField("proxy", process)
             engine.setPrivateField("pendingConfig", "{}")
@@ -561,7 +561,7 @@ class SingboxEngineProbeTest {
             assertEquals(null, engine.privateField("pendingConfig"))
             assertEquals(0, engine.privateIntField("pendingSocksPort"))
             assertEquals(true, engine.privateBooleanField("activeTunAutoSelect"))
-            verify(exactly = 0) { process.stopAndWait(any()) }
+            verify(exactly = 0) { process.stopAndWait(any(), any()) }
         } finally {
             unmockkStatic(ParcelFileDescriptor::class)
         }
@@ -576,7 +576,7 @@ class SingboxEngineProbeTest {
             SingboxHttp204RoutedProbe.LATENCY_FAILED
         }
         val process = mockk<ISingboxEngineProcess>()
-        every { process.startProxyMode(any(), any()) } returns Unit
+        every { process.startProxyMode(any(), any(), any()) } returns Unit
         every { process.runtimeRunning() } returns true
         engine.setPrivateField("proxy", process)
 
@@ -600,9 +600,9 @@ class SingboxEngineProbeTest {
         val engine = buildEngine()
         engine.routedProbe = SingboxRoutedProbe { SingboxHttp204RoutedProbe.LATENCY_FAILED }
         val process = mockk<ISingboxEngineProcess>()
-        every { process.startProxyMode(any(), any()) } returns Unit
+        every { process.startProxyMode(any(), any(), any()) } returns Unit
         every { process.runtimeRunning() } returns true
-        every { process.stopAndWait(3_000L) } returns true
+        every { process.stopAndWait(any(), 3_000L) } returns true
         engine.setPrivateField("proxy", process)
 
         val result = engine.start(
@@ -616,7 +616,7 @@ class SingboxEngineProbeTest {
 
         val success = assertIs<StartResult.Success>(result)
         assertTrue(success.socksPort > 0)
-        verify(exactly = 0) { process.stopAndWait(3_000L) }
+        verify(exactly = 0) { process.stopAndWait(any(), 3_000L) }
         assertEquals(success.socksPort, engine.privateIntField("activeSocksPort"))
     }
 
@@ -625,7 +625,7 @@ class SingboxEngineProbeTest {
         val engine = buildEngine()
         engine.routedProbe = SingboxRoutedProbe { 9L }
         val process = mockk<ISingboxEngineProcess>()
-        every { process.startProxyMode(any(), any()) } returns Unit
+        every { process.startProxyMode(any(), any(), any()) } returns Unit
         every { process.runtimeRunning() } returns true
         engine.setPrivateField("proxy", process)
 
@@ -641,7 +641,7 @@ class SingboxEngineProbeTest {
         val success = assertIs<StartResult.Success>(result)
         assertTrue(success.socksPort > 0)
         assertEquals(success.socksPort, engine.privateIntField("activeSocksPort"))
-        verify(exactly = 0) { process.stopAndWait(any()) }
+        verify(exactly = 0) { process.stopAndWait(any(), any()) }
     }
 
     @Test

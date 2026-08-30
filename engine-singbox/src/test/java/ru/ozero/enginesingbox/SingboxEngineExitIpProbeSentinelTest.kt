@@ -117,7 +117,7 @@ class SingboxEngineExitIpProbeSentinelTest {
 
         val startProxyBlock = source.substringAfter("private suspend fun startProxyMode")
             .substringBefore("override suspend fun attachTun")
-        val startIdx = startProxyBlock.indexOf("p.startProxyMode(json, localProtector)")
+        val startIdx = startProxyBlock.indexOf("p.startProxyMode(runtimeOwnerId, json, localProtector)")
         val cleanupIdx = startProxyBlock.indexOf("if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)")
         val cancelIdx = startProxyBlock.indexOf("if (it is CancellationException) throw it")
         assertTrue(
@@ -135,7 +135,7 @@ class SingboxEngineExitIpProbeSentinelTest {
 
         val stopBlock = source.substringAfter("override suspend fun stop()")
             .substringBefore("override fun stopTimeoutMs()")
-        val stopIdx = stopBlock.indexOf("stopAndWait(REMOTE_STOP_TIMEOUT_MS)")
+        val stopIdx = stopBlock.indexOf("stopAndWait(runtimeOwnerId, REMOTE_STOP_TIMEOUT_MS)")
         val closeIdx = stopBlock.indexOf("close()")
         assertTrue(
             stopIdx >= 0 && closeIdx > stopIdx,
@@ -166,7 +166,7 @@ class SingboxEngineExitIpProbeSentinelTest {
 
         assertTrue(attachBlock.contains("lifecycleMutex.withLock"))
         assertTrue(stopBlock.contains("lifecycleMutex.withLock"))
-        assertTrue(stopBlock.contains("p.stopAndWait(REMOTE_STOP_TIMEOUT_MS)"))
+        assertTrue(stopBlock.contains("p.stopAndWait(runtimeOwnerId, REMOTE_STOP_TIMEOUT_MS)"))
     }
 }
 

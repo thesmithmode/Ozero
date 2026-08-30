@@ -58,7 +58,7 @@ class SingboxEngineWarmReadinessTest {
             42L
         }
         val process = mockk<ISingboxEngineProcess>()
-        every { process.startProxyMode(any(), any()) } returns Unit
+        every { process.startProxyMode(any(), any(), any()) } returns Unit
         every { process.runtimeRunning() } returns true
         engine.setPrivateField("proxy", process)
 
@@ -86,7 +86,7 @@ class SingboxEngineWarmReadinessTest {
             assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
             assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
         }
-        verify(exactly = 0) { process.stopAndWait(any()) }
+        verify(exactly = 0) { process.stopAndWait(any(), any()) }
     }
 
     private fun openLocalSocksListener(): ServerSocket {
