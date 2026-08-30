@@ -180,11 +180,21 @@ class SingboxEngineServiceTest {
         val createBlock = runtimeSource.substringAfter("private fun createCommandServer")
             .substringBefore("private class OzeroCommandServerHandler")
 
-        assertTrue(startBlock.contains("cleanupFailedServerStart(server, e)"))
+        assertTrue(startBlock.contains("cleanupFailedServerStart(server, ownerId, e)"))
         assertTrue(startBlock.contains("closeCommandServer(oldServer, closeService = true)"))
         assertTrue(createBlock.contains("releaseServerCallbacks()"))
         assertTrue(releaseBlock.contains("platformInterface = null"))
         assertTrue(releaseBlock.contains("commandServerHandler = null"))
+    }
+
+    @Test
+    fun `failed startup retained for cleanup belongs to the attempted owner`() {
+        val cleanupBlock = runtimeSource.substringAfter("private fun cleanupFailedServerStart")
+            .substringBefore("private fun closeCommandServer")
+
+        assertTrue(cleanupBlock.contains("ownerId: Long"))
+        assertTrue(cleanupBlock.contains("commandServer = server"))
+        assertTrue(cleanupBlock.contains("activeOwnerId = ownerId"))
     }
 
     @Test

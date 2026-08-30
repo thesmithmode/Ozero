@@ -142,7 +142,7 @@ internal object SingboxRuntime {
             server.start()
         } catch (e: Exception) {
             PersistentLoggers.error(TAG, "command server start failed exceptionClass=${e::class.java.simpleName}")
-            cleanupFailedServerStart(server, e)
+            cleanupFailedServerStart(server, ownerId, e)
             throw e
         }
         recordCheckpoint("post-start socket-ready")
@@ -152,7 +152,7 @@ internal object SingboxRuntime {
             recordCheckpoint("checkConfig-passed")
         } catch (e: Exception) {
             PersistentLoggers.error(TAG, "checkConfig failed exceptionClass=${e::class.java.simpleName}")
-            cleanupFailedServerStart(server, e)
+            cleanupFailedServerStart(server, ownerId, e)
             throw e
         }
 
@@ -165,7 +165,7 @@ internal object SingboxRuntime {
                 TAG,
                 "startOrReloadService failed exceptionClass=${e::class.java.simpleName}",
             )
-            cleanupFailedServerStart(server, e)
+            cleanupFailedServerStart(server, ownerId, e)
             throw e
         }
 
@@ -203,12 +203,13 @@ internal object SingboxRuntime {
         commandServerHandler = null
     }
 
-    private fun cleanupFailedServerStart(server: CommandServer, startFailure: Exception) {
+    private fun cleanupFailedServerStart(server: CommandServer, ownerId: Long, startFailure: Exception) {
         val closeFailure = closeCommandServer(server, closeService = false)
         if (closeFailure == null) {
             releaseServerCallbacks()
         } else {
             commandServer = server
+            activeOwnerId = ownerId
             startFailure.addSuppressed(closeFailure)
         }
     }
