@@ -27,14 +27,14 @@ class SingboxEngineServiceTest {
 
     @Test
     fun `stop waits for runtime shutdown before returning`() {
-        val stopBlock = source.substringAfter("override fun stop()")
+        val stopBlock = source.substringAfter("override fun stop(ownerId: Long)")
             .substringBefore("override fun stopAndWait")
-        assertTrue(stopBlock.contains("stopAndWait(DEFAULT_STOP_TIMEOUT_MS)"))
+        assertTrue(stopBlock.contains("stopAndWait(ownerId, DEFAULT_STOP_TIMEOUT_MS)"))
 
         val stopAndWaitBlock = source.substringAfter("private fun stopRuntimeAndWait")
             .substringBefore("override fun getStats()")
         assertTrue(stopAndWaitBlock.contains("withTimeoutOrNull"))
-        assertTrue(stopAndWaitBlock.contains("SingboxRuntime.stop()"))
+        assertTrue(stopAndWaitBlock.contains("SingboxRuntime.stop(ownerId)"))
         assertTrue(stopAndWaitBlock.contains("getOrDefault(false)"))
         assertTrue(stopAndWaitBlock.contains("Process.killProcess"))
         assertTrue(stopAndWaitBlock.contains("launchHardWatchdog"))
@@ -45,7 +45,7 @@ class SingboxEngineServiceTest {
     fun `remote stop calls share one serialized lifecycle gate`() {
         assertTrue(source.contains("private val stopLock = Any()"))
         assertTrue(source.contains("synchronized(stopLock)"))
-        assertTrue(source.contains("stopRuntimeAndWait(timeoutMs)"))
+        assertTrue(source.contains("stopRuntimeAndWait(ownerId, timeoutMs)"))
     }
 
     @Test
@@ -57,7 +57,7 @@ class SingboxEngineServiceTest {
         val startProxyMode = source.substringAfter("override fun startProxyMode(")
             .substringBefore("override fun startProxyModeIfIdle(")
         val startProxyModeIfIdle = source.substringAfter("override fun startProxyModeIfIdle(")
-            .substringBefore("override fun stop()")
+            .substringBefore("override fun stop(ownerId: Long)")
         val watchdog = source.substringAfter("private fun <T> startRuntimeWithWatchdog")
             .substringBefore("private fun stopRuntimeAndWait")
 
@@ -101,7 +101,7 @@ class SingboxEngineServiceTest {
     fun `destroy path uses acknowledged stop`() {
         val destroyBlock = source.substringAfter("override fun onDestroy()")
             .substringBefore("companion object")
-        assertTrue(destroyBlock.contains("binder.stopAndWait(DEFAULT_STOP_TIMEOUT_MS)"))
+        assertTrue(destroyBlock.contains("binder.stopRuntimeAndWait(null, DEFAULT_STOP_TIMEOUT_MS)"))
         assertFalse(destroyBlock.contains("serviceScope"))
     }
 
@@ -148,10 +148,22 @@ class SingboxEngineServiceTest {
     }
 
     @Test
+    fun `runtime teardown is scoped to the owner that started it`() {
+        val stopBlock = runtimeSource.substringAfter("suspend fun stop(ownerId: Long? = null)")
+            .substringBefore("fun isRunning")
+
+        assertTrue(runtimeSource.contains("private var activeOwnerId: Long? = null"))
+        assertTrue(runtimeSource.contains("activeOwnerId = ownerId"))
+        assertTrue(stopBlock.contains("activeOwnerId != ownerId"))
+        assertTrue(stopBlock.contains("return@withLock"))
+        assertTrue(stopBlock.contains("activeOwnerId = null"))
+    }
+
+    @Test
     fun `runtime retains gomobile callbacks until native service stops`() {
         val startBlock = runtimeSource.substringAfter("private fun startLocked")
-            .substringBefore("suspend fun stop()")
-        val stopBlock = runtimeSource.substringAfter("suspend fun stop()")
+            .substringBefore("suspend fun stop(ownerId: Long? = null)")
+        val stopBlock = runtimeSource.substringAfter("suspend fun stop(ownerId: Long? = null)")
             .substringBefore("fun isRunning()")
 
         assertTrue(startBlock.contains("platformInterface = platform"))
@@ -162,17 +174,27 @@ class SingboxEngineServiceTest {
     @Test
     fun `runtime releases gomobile callbacks on restart and failed start`() {
         val startBlock = runtimeSource.substringAfter("suspend fun start(")
-            .substringBefore("suspend fun stop()")
+            .substringBefore("suspend fun stop(ownerId: Long? = null)")
         val releaseBlock = runtimeSource.substringAfter("private fun releaseServerCallbacks()")
             .substringBefore("private class OzeroCommandServerHandler")
         val createBlock = runtimeSource.substringAfter("private fun createCommandServer")
             .substringBefore("private class OzeroCommandServerHandler")
 
-        assertTrue(startBlock.contains("cleanupFailedServerStart(server, e)"))
+        assertTrue(startBlock.contains("cleanupFailedServerStart(server, ownerId, e)"))
         assertTrue(startBlock.contains("closeCommandServer(oldServer, closeService = true)"))
         assertTrue(createBlock.contains("releaseServerCallbacks()"))
         assertTrue(releaseBlock.contains("platformInterface = null"))
         assertTrue(releaseBlock.contains("commandServerHandler = null"))
+    }
+
+    @Test
+    fun `failed startup retained for cleanup belongs to the attempted owner`() {
+        val cleanupBlock = runtimeSource.substringAfter("private fun cleanupFailedServerStart")
+            .substringBefore("private fun closeCommandServer")
+
+        assertTrue(cleanupBlock.contains("ownerId: Long"))
+        assertTrue(cleanupBlock.contains("commandServer = server"))
+        assertTrue(cleanupBlock.contains("activeOwnerId = ownerId"))
     }
 
     @Test

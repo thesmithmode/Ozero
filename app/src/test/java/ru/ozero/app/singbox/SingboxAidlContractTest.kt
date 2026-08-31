@@ -29,15 +29,15 @@ class SingboxAidlContractTest {
     @Test
     fun `should ISingboxEngineProcess define stop`() {
         val content = aidlFile("ISingboxEngineProcess.aidl")
-        assertTrue(content.contains("void stop()"), "ISingboxEngineProcess must have stop() method")
+        assertTrue(content.contains("void stop(long ownerId)"), "ISingboxEngineProcess must have owner-scoped stop method")
     }
 
     @Test
     fun `should ISingboxEngineProcess define acknowledged stop and runtime health`() {
         val content = aidlFile("ISingboxEngineProcess.aidl")
         assertTrue(
-            content.contains("boolean stopAndWait(long timeoutMs)"),
-            "ISingboxEngineProcess must expose stopAndWait(timeoutMs) so caller waits before unbind or restart",
+            content.contains("boolean stopAndWait(long ownerId, long timeoutMs)"),
+            "ISingboxEngineProcess must expose stopAndWait(ownerId, timeoutMs) so caller waits before unbind or restart",
         )
         assertTrue(
             content.contains("boolean runtimeRunning()"),

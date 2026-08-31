@@ -63,6 +63,7 @@ import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -209,6 +210,9 @@ class SingboxEngine @Inject constructor(
     private val connectionGeneration = AtomicLong(0)
 
     @Volatile
+    private var runtimeOwnerId: Long = 0
+
+    @Volatile
     private var activeProfileId: Long? = null
 
     private val localProtector = object : ISingboxProtector.Stub() {
@@ -223,6 +227,7 @@ class SingboxEngine @Inject constructor(
         require(config is EngineConfig.Singbox) { "SingboxEngine requires EngineConfig.Singbox" }
         return lifecycleMutex.withLock {
             val generation = lifecycleGeneration.incrementAndGet()
+            runtimeOwnerId = newRuntimeOwnerId()
             activeProfileId = config.profileId
 
             chainMode = upstream !is Upstream.None || config.proxyMode
@@ -508,7 +513,7 @@ class SingboxEngine @Inject constructor(
         val p = proxy ?: return StartResult.Failure("SingboxEngineService not connected for chain mode")
         var runtimeStarted = false
         return runCatching {
-            p.startProxyMode(json, localProtector)
+            p.startProxyMode(runtimeOwnerId, json, localProtector)
             runtimeStarted = true
             val runtimeRunning = runCatching { p.runtimeRunning() }
                 .onFailure { logIpcFailure("startProxyMode.runtimeRunning", it) }
@@ -556,14 +561,14 @@ class SingboxEngine @Inject constructor(
                         "attachTun start generation=$generation rawFd=$tunFd pendingPort=$pendingSocksPort " +
                             "fingerprint=${json.singboxConfigFingerprint()} len=${json.length}",
                     )
-                    p.startWithConfig(transportPfd, json, localProtector)
+                    p.startWithConfig(runtimeOwnerId, transportPfd, json, localProtector)
                     runtimeStarted = true
                     delay(150)
                     val runtimeRunning = runCatching { p.runtimeRunning() }
                         .onFailure { logIpcFailure("attachTun.runtimeRunning", it) }
                         .getOrDefault(false)
                     if (!isCurrentLifecycle(generation)) {
-                        stopRuntimeAfterFailedReadiness(p)
+                        stopRuntimeAfterFailedReadiness(p, runtimeOwnerId)
                         clearPendingStart()
                         return@runCatching TunAttachResult.Failure("stale sing-box attach")
                     }
@@ -573,7 +578,7 @@ class SingboxEngine @Inject constructor(
                             "runtimeRunning=$runtimeRunning",
                     )
                     if (!runtimeRunning) {
-                        stopRuntimeAfterFailedReadiness(p)
+                        stopRuntimeAfterFailedReadiness(p, runtimeOwnerId)
                         clearPendingStart()
                         return@runCatching TunAttachResult.Failure("sing-box runtime failed to start")
                     }
@@ -590,7 +595,7 @@ class SingboxEngine @Inject constructor(
                         }
                     }
                     if (!published) {
-                        stopRuntimeAfterFailedReadiness(p)
+                        stopRuntimeAfterFailedReadiness(p, runtimeOwnerId)
                         clearPendingStart()
                         return@runCatching TunAttachResult.Failure("stale sing-box attach")
                     }
@@ -601,7 +606,7 @@ class SingboxEngine @Inject constructor(
                     )
                     TunAttachResult.Success
                 }.getOrElse {
-                    if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)
+                    if (runtimeStarted) stopRuntimeAfterFailedReadiness(p, runtimeOwnerId)
                     clearPendingStart()
                     if (it is CancellationException) throw it
                     PersistentLoggers.error(
@@ -621,12 +626,14 @@ class SingboxEngine @Inject constructor(
         }
     }
 
-    private fun stopRuntimeAfterFailedReadiness(p: ISingboxEngineProcess) {
+    private fun stopRuntimeAfterFailedReadiness(p: ISingboxEngineProcess, ownerId: Long = runtimeOwnerId) {
         runCatching {
-            val stopped = p.stopAndWait(REMOTE_STOP_TIMEOUT_MS)
+            val stopped = p.stopAndWait(ownerId, REMOTE_STOP_TIMEOUT_MS)
             if (!stopped) PersistentLoggers.warn(TAG, "stop after routed probe failure timed out")
         }.onFailure { logConfigException("stop after routed probe failure", it) }
     }
+
+    private fun newRuntimeOwnerId(): Long = UUID.randomUUID().mostSignificantBits
 
     override suspend fun stop() {
         lifecycleMutex.withLock {
@@ -641,7 +648,7 @@ class SingboxEngine @Inject constructor(
             val p = proxy
             if (p != null) {
                 runCatching {
-                    val stopped = p.stopAndWait(REMOTE_STOP_TIMEOUT_MS)
+                    val stopped = p.stopAndWait(runtimeOwnerId, REMOTE_STOP_TIMEOUT_MS)
                     if (!stopped) PersistentLoggers.warn(TAG, "proxy.stopAndWait() timed out")
                 }.onFailure { logConfigException("proxy stop", it) }
             }

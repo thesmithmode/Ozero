@@ -45,6 +45,9 @@ internal object SingboxRuntime {
     private var commandServerHandler: OzeroCommandServerHandler? = null
 
     @Volatile
+    private var activeOwnerId: Long? = null
+
+    @Volatile
     private var setupDone = false
 
     @Volatile
@@ -66,6 +69,7 @@ internal object SingboxRuntime {
 
     suspend fun start(
         context: Context,
+        ownerId: Long,
         tunFd: Int,
         singboxJsonConfig: String,
         protectorBridge: SingboxProtectorBridge,
@@ -83,24 +87,26 @@ internal object SingboxRuntime {
                     commandServer = null
                     releaseServerCallbacks()
                 }
-                startLocked(context, tunFd, singboxJsonConfig, protectorBridge, detachedTunFd)
+                startLocked(context, ownerId, tunFd, singboxJsonConfig, protectorBridge, detachedTunFd)
             }
         }
 
     suspend fun startIfIdle(
         context: Context,
+        ownerId: Long,
         singboxJsonConfig: String,
         protectorBridge: SingboxProtectorBridge,
     ): Boolean = withContext(Dispatchers.Main.immediate) {
         mutex.withLock {
             if (commandServer != null) return@withLock false
-            startLocked(context, NO_TUN_FD, singboxJsonConfig, protectorBridge, null)
+            startLocked(context, ownerId, NO_TUN_FD, singboxJsonConfig, protectorBridge, null)
             true
         }
     }
 
     private fun startLocked(
         context: Context,
+        ownerId: Long,
         tunFd: Int,
         singboxJsonConfig: String,
         protectorBridge: SingboxProtectorBridge,
@@ -136,7 +142,7 @@ internal object SingboxRuntime {
             server.start()
         } catch (e: Exception) {
             PersistentLoggers.error(TAG, "command server start failed exceptionClass=${e::class.java.simpleName}")
-            cleanupFailedServerStart(server, e)
+            cleanupFailedServerStart(server, ownerId, e)
             throw e
         }
         recordCheckpoint("post-start socket-ready")
@@ -146,7 +152,7 @@ internal object SingboxRuntime {
             recordCheckpoint("checkConfig-passed")
         } catch (e: Exception) {
             PersistentLoggers.error(TAG, "checkConfig failed exceptionClass=${e::class.java.simpleName}")
-            cleanupFailedServerStart(server, e)
+            cleanupFailedServerStart(server, ownerId, e)
             throw e
         }
 
@@ -159,23 +165,29 @@ internal object SingboxRuntime {
                 TAG,
                 "startOrReloadService failed exceptionClass=${e::class.java.simpleName}",
             )
-            cleanupFailedServerStart(server, e)
+            cleanupFailedServerStart(server, ownerId, e)
             throw e
         }
 
         commandServer = server
+        activeOwnerId = ownerId
         persistCheckpoint("runtime-started fd=$tunFd")
         PersistentLoggers.info(TAG, "runtime started fd=$tunFd")
     }
 
-    suspend fun stop() = withContext(Dispatchers.Main.immediate) {
+    suspend fun stop(ownerId: Long? = null) = withContext(Dispatchers.Main.immediate) {
         mutex.withLock {
+            if (ownerId != null && activeOwnerId != ownerId) {
+                PersistentLoggers.debug(TAG, "stale stop ignored owner=$ownerId activeOwner=${activeOwnerId ?: "none"}")
+                return@withLock
+            }
             val server = commandServer
             val closeFailure = server?.let { closeCommandServer(it, closeService = true) }
             if (closeFailure != null) {
                 throw IllegalStateException("sing-box native teardown failed", closeFailure)
             }
             commandServer = null
+            activeOwnerId = null
             releaseServerCallbacks()
             persistCheckpoint("runtime-stopped")
             PersistentLoggers.info(TAG, "runtime stopped")
@@ -191,12 +203,13 @@ internal object SingboxRuntime {
         commandServerHandler = null
     }
 
-    private fun cleanupFailedServerStart(server: CommandServer, startFailure: Exception) {
+    private fun cleanupFailedServerStart(server: CommandServer, ownerId: Long, startFailure: Exception) {
         val closeFailure = closeCommandServer(server, closeService = false)
         if (closeFailure == null) {
             releaseServerCallbacks()
         } else {
             commandServer = server
+            activeOwnerId = ownerId
             startFailure.addSuppressed(closeFailure)
         }
     }

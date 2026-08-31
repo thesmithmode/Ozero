@@ -48,6 +48,7 @@ import ru.ozero.singboxroom.dao.ProxyProfileDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import java.net.InetAddress
 import java.net.ServerSocket
+import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -371,6 +372,7 @@ private class SingboxServiceProfileProbe(
         }
         val binding = bindProcess()
             ?: return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_FAILED))
+        val ownerId = UUID.randomUUID().mostSignificantBits
         var shouldStop = false
         try {
             val process = binding.process
@@ -378,7 +380,7 @@ private class SingboxServiceProfileProbe(
                 return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
             }
             coroutineContext.ensureActive()
-            val started = runCatching { process.startProxyModeIfIdle(config, localProtector) }.getOrElse {
+            val started = runCatching { process.startProxyModeIfIdle(ownerId, config, localProtector) }.getOrElse {
                 it.rethrowCancellation()
                 logProbeFailure("startProxyModeIfIdle", it)
                 if (binding.processDied.get()) {
@@ -434,7 +436,7 @@ private class SingboxServiceProfileProbe(
         } finally {
             if (shouldStop) {
                 withContext(NonCancellable) {
-                    runCatching { binding.process.stopAndWait(REMOTE_STOP_TIMEOUT_MS) }.onFailure {
+                    runCatching { binding.process.stopAndWait(ownerId, REMOTE_STOP_TIMEOUT_MS) }.onFailure {
                         logProbeFailure("stopAndWait", it)
                     }
                 }

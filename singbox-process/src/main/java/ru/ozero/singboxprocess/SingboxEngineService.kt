@@ -20,6 +20,7 @@ class SingboxEngineService : Service() {
     private val binder = object : ISingboxEngineProcess.Stub() {
 
         override fun startWithConfig(
+            ownerId: Long,
             tunFd: ParcelFileDescriptor,
             singboxJsonConfig: String,
             protector: ISingboxProtector,
@@ -36,6 +37,7 @@ class SingboxEngineService : Service() {
                     runBlocking {
                         SingboxRuntime.start(
                             this@SingboxEngineService,
+                            ownerId,
                             rawFd,
                             singboxJsonConfig,
                             SingboxProtectorBridge(protector),
@@ -52,6 +54,7 @@ class SingboxEngineService : Service() {
         }
 
         override fun startWithConfigFile(
+            ownerId: Long,
             tunFd: ParcelFileDescriptor,
             configFilePath: String,
             protector: ISingboxProtector,
@@ -69,6 +72,7 @@ class SingboxEngineService : Service() {
                     runBlocking {
                         SingboxRuntime.start(
                             this@SingboxEngineService,
+                            ownerId,
                             rawFd,
                             json,
                             SingboxProtectorBridge(protector),
@@ -85,6 +89,7 @@ class SingboxEngineService : Service() {
         }
 
         override fun startProxyMode(
+            ownerId: Long,
             singboxJsonConfig: String,
             protector: ISingboxProtector,
         ) {
@@ -98,6 +103,7 @@ class SingboxEngineService : Service() {
                     runBlocking {
                         SingboxRuntime.start(
                             this@SingboxEngineService,
+                            ownerId,
                             NO_TUN_FD,
                             singboxJsonConfig,
                             SingboxProtectorBridge(protector),
@@ -115,24 +121,26 @@ class SingboxEngineService : Service() {
         }
 
         override fun startProxyModeIfIdle(
+            ownerId: Long,
             singboxJsonConfig: String,
             protector: ISingboxProtector,
         ): Boolean = startRuntimeWithWatchdog {
             runBlocking {
                 SingboxRuntime.startIfIdle(
                     this@SingboxEngineService,
+                    ownerId,
                     singboxJsonConfig,
                     SingboxProtectorBridge(protector),
                 )
             }
         }
 
-        override fun stop() {
-            stopAndWait(DEFAULT_STOP_TIMEOUT_MS)
+        override fun stop(ownerId: Long) {
+            stopAndWait(ownerId, DEFAULT_STOP_TIMEOUT_MS)
         }
 
-        override fun stopAndWait(timeoutMs: Long): Boolean = synchronized(stopLock) {
-            stopRuntimeAndWait(timeoutMs)
+        override fun stopAndWait(ownerId: Long, timeoutMs: Long): Boolean = synchronized(stopLock) {
+            stopRuntimeAndWait(ownerId, timeoutMs)
         }
 
         override fun runtimeRunning(): Boolean = SingboxRuntime.isRunning()
@@ -155,7 +163,7 @@ class SingboxEngineService : Service() {
             }
         }
 
-        private fun stopRuntimeAndWait(timeoutMs: Long): Boolean {
+        private fun stopRuntimeAndWait(ownerId: Long?, timeoutMs: Long): Boolean {
             val boundedTimeoutMs = timeoutMs.coerceAtLeast(1L)
             val finished = launchHardWatchdog(
                 boundedTimeoutMs,
@@ -165,7 +173,7 @@ class SingboxEngineService : Service() {
             val stopped = runCatching {
                 runBlocking {
                     withTimeoutOrNull(boundedTimeoutMs) {
-                        SingboxRuntime.stop()
+                        SingboxRuntime.stop(ownerId)
                         true
                     } == true
                 }
@@ -224,7 +232,7 @@ class SingboxEngineService : Service() {
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onDestroy() {
-        binder.stopAndWait(DEFAULT_STOP_TIMEOUT_MS)
+        synchronized(stopLock) { binder.stopRuntimeAndWait(null, DEFAULT_STOP_TIMEOUT_MS) }
         super.onDestroy()
     }
 
