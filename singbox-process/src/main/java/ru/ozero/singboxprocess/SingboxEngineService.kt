@@ -49,6 +49,7 @@ class SingboxEngineService : Service() {
             } catch (t: Throwable) {
                 detachedTunFd.closeIfDetached()
                 PersistentLoggers.error(TAG, "startWithConfig failed exceptionClass=${t::class.java.simpleName}")
+                stopAndWait(ownerId, DEFAULT_STOP_TIMEOUT_MS)
                 throw t
             }
         }
@@ -84,6 +85,7 @@ class SingboxEngineService : Service() {
             } catch (t: Throwable) {
                 detachedTunFd.closeIfDetached()
                 PersistentLoggers.error(TAG, "startWithConfigFile failed exceptionClass=${t::class.java.simpleName}")
+                stopAndWait(ownerId, DEFAULT_STOP_TIMEOUT_MS)
                 throw t
             }
         }
@@ -116,6 +118,7 @@ class SingboxEngineService : Service() {
                     "startProxyMode failed exceptionClass=${t::class.java.simpleName} stableCategory=runtime-start " +
                         "sanitizedMessage=${redactSingboxMessage(t.message.orEmpty())}",
                 )
+                stopAndWait(ownerId, DEFAULT_STOP_TIMEOUT_MS)
                 throw t
             }
         }
@@ -124,15 +127,20 @@ class SingboxEngineService : Service() {
             ownerId: Long,
             singboxJsonConfig: String,
             protector: ISingboxProtector,
-        ): Boolean = startRuntimeWithWatchdog {
-            runBlocking {
-                SingboxRuntime.startIfIdle(
-                    this@SingboxEngineService,
-                    ownerId,
-                    singboxJsonConfig,
-                    SingboxProtectorBridge(protector),
-                )
+        ): Boolean = try {
+            startRuntimeWithWatchdog {
+                runBlocking {
+                    SingboxRuntime.startIfIdle(
+                        this@SingboxEngineService,
+                        ownerId,
+                        singboxJsonConfig,
+                        SingboxProtectorBridge(protector),
+                    )
+                }
             }
+        } catch (t: Throwable) {
+            stopAndWait(ownerId, DEFAULT_STOP_TIMEOUT_MS)
+            throw t
         }
 
         override fun stop(ownerId: Long) {
@@ -163,7 +171,7 @@ class SingboxEngineService : Service() {
             }
         }
 
-        private fun stopRuntimeAndWait(ownerId: Long?, timeoutMs: Long): Boolean {
+        fun stopRuntimeAndWait(ownerId: Long?, timeoutMs: Long): Boolean {
             val boundedTimeoutMs = timeoutMs.coerceAtLeast(1L)
             val finished = launchHardWatchdog(
                 boundedTimeoutMs,

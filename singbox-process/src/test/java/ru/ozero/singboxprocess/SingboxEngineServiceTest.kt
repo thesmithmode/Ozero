@@ -31,7 +31,7 @@ class SingboxEngineServiceTest {
             .substringBefore("override fun stopAndWait")
         assertTrue(stopBlock.contains("stopAndWait(ownerId, DEFAULT_STOP_TIMEOUT_MS)"))
 
-        val stopAndWaitBlock = source.substringAfter("private fun stopRuntimeAndWait")
+        val stopAndWaitBlock = source.substringAfter("fun stopRuntimeAndWait")
             .substringBefore("override fun getStats()")
         assertTrue(stopAndWaitBlock.contains("withTimeoutOrNull"))
         assertTrue(stopAndWaitBlock.contains("SingboxRuntime.stop(ownerId)"))
@@ -49,7 +49,16 @@ class SingboxEngineServiceTest {
     }
 
     @Test
-    fun `all native start entry points use hard process watchdog`() {
+    fun `failed probe owned start performs owner cleanup`() {
+        val startIfIdleBlock = source.substringAfter("override fun startProxyModeIfIdle(")
+            .substringBefore("override fun stop(ownerId: Long)")
+
+        assertTrue(startIfIdleBlock.contains("catch (t: Throwable)"))
+        assertTrue(startIfIdleBlock.contains("stopAndWait(ownerId, DEFAULT_STOP_TIMEOUT_MS)"))
+    }
+
+    @Test
+    fun `all native start entry points use watchdog and serialized owner cleanup`() {
         val startWithConfig = source.substringAfter("override fun startWithConfig(")
             .substringBefore("override fun startWithConfigFile(")
         val startWithConfigFile = source.substringAfter("override fun startWithConfigFile(")
@@ -59,11 +68,17 @@ class SingboxEngineServiceTest {
         val startProxyModeIfIdle = source.substringAfter("override fun startProxyModeIfIdle(")
             .substringBefore("override fun stop(ownerId: Long)")
         val watchdog = source.substringAfter("private fun <T> startRuntimeWithWatchdog")
-            .substringBefore("private fun stopRuntimeAndWait")
+            .substringBefore("fun stopRuntimeAndWait")
 
         listOf(startWithConfig, startWithConfigFile, startProxyMode, startProxyModeIfIdle).forEach { block ->
             assertTrue(block.contains("startRuntimeWithWatchdog"))
+            assertTrue(block.contains("stopAndWait(ownerId, DEFAULT_STOP_TIMEOUT_MS)"))
         }
+        assertTrue(
+            source.contains(
+                "override fun stopAndWait(ownerId: Long, timeoutMs: Long): Boolean = synchronized(stopLock)",
+            ),
+        )
         assertTrue(watchdog.contains("launchHardWatchdog"))
         assertTrue(watchdog.contains("DEFAULT_START_TIMEOUT_MS"))
         assertTrue(watchdog.contains("compareAndSet(false, true)"))
@@ -144,7 +159,18 @@ class SingboxEngineServiceTest {
 
         assertTrue(guardedStart.contains("mutex.withLock"))
         assertTrue(guardedStart.contains("if (commandServer != null) return@withLock false"))
+        assertTrue(guardedStart.contains("SingboxRuntimeRole.PROBE"))
         assertTrue(guardedStart.contains("startLocked"))
+    }
+
+    @Test
+    fun `stale probe stop cannot target newer vpn owner`() {
+        val probeOwner = 101L
+        val vpnOwner = 202L
+
+        assertTrue(shouldIgnoreRuntimeStop(probeOwner, vpnOwner))
+        assertFalse(shouldIgnoreRuntimeStop(vpnOwner, vpnOwner))
+        assertFalse(shouldIgnoreRuntimeStop(null, vpnOwner))
     }
 
     @Test
@@ -154,7 +180,7 @@ class SingboxEngineServiceTest {
 
         assertTrue(runtimeSource.contains("private var activeOwnerId: Long? = null"))
         assertTrue(runtimeSource.contains("activeOwnerId = ownerId"))
-        assertTrue(stopBlock.contains("activeOwnerId != ownerId"))
+        assertTrue(stopBlock.contains("shouldIgnoreRuntimeStop(ownerId, activeOwnerId)"))
         assertTrue(stopBlock.contains("return@withLock"))
         assertTrue(stopBlock.contains("activeOwnerId = null"))
     }
@@ -176,11 +202,13 @@ class SingboxEngineServiceTest {
         val startBlock = runtimeSource.substringAfter("suspend fun start(")
             .substringBefore("suspend fun stop(ownerId: Long? = null)")
         val releaseBlock = runtimeSource.substringAfter("private fun releaseServerCallbacks()")
-            .substringBefore("private class OzeroCommandServerHandler")
+            .substringBefore("private fun cleanupFailedServerStart")
         val createBlock = runtimeSource.substringAfter("private fun createCommandServer")
             .substringBefore("private class OzeroCommandServerHandler")
 
-        assertTrue(startBlock.contains("cleanupFailedServerStart(server, ownerId, e)"))
+        assertTrue(startBlock.contains("cleanupFailedServerStart("))
+        assertTrue(startBlock.contains("closeService = false"))
+        assertTrue(startBlock.contains("closeService = true"))
         assertTrue(startBlock.contains("closeCommandServer(oldServer, closeService = true)"))
         assertTrue(createBlock.contains("releaseServerCallbacks()"))
         assertTrue(releaseBlock.contains("platformInterface = null"))
@@ -188,13 +216,18 @@ class SingboxEngineServiceTest {
     }
 
     @Test
-    fun `failed startup retained for cleanup belongs to the attempted owner`() {
+    fun `failed native service start is retained for owner cleanup`() {
+        val startFailureBlock = runtimeSource.substringAfter("startOrReloadService failed")
+            .substringBefore("commandServer = server")
         val cleanupBlock = runtimeSource.substringAfter("private fun cleanupFailedServerStart")
             .substringBefore("private fun closeCommandServer")
 
-        assertTrue(cleanupBlock.contains("ownerId: Long"))
+        assertTrue(startFailureBlock.contains("closeService = true"))
+        assertTrue(cleanupBlock.contains("closeService: Boolean"))
+        assertTrue(cleanupBlock.contains("closeCommandServer(server, closeService = closeService)"))
         assertTrue(cleanupBlock.contains("commandServer = server"))
         assertTrue(cleanupBlock.contains("activeOwnerId = ownerId"))
+        assertTrue(cleanupBlock.contains("activeRuntimeRole = runtimeRole"))
     }
 
     @Test
@@ -205,6 +238,38 @@ class SingboxEngineServiceTest {
         assertTrue(runningBlock.contains("commandServer != null"))
         assertTrue(runningBlock.contains("platformInterface != null"))
         assertTrue(runningBlock.contains("commandServerHandler != null"))
+        assertFalse(runtimeSource.contains("nativeServiceRunning"))
+    }
+
+    @Test
+    fun `managed service stop request is not treated as native runtime death`() {
+        val handlerBlock = runtimeSource.substringAfter("private class OzeroCommandServerHandler")
+            .substringBefore("private class OzeroPlatformInterface")
+
+        assertTrue(handlerBlock.contains("override fun serviceStop()"))
+        assertTrue(handlerBlock.contains("serviceStop requested by libbox"))
+        assertFalse(handlerBlock.contains("onServiceStopped"))
+        assertFalse(handlerBlock.contains("serviceStopRequested"))
+    }
+
+    @Test
+    fun `libbox messages feed bounded native failure diagnostics`() {
+        val handlerBlock = runtimeSource.substringAfter("private class OzeroCommandServerHandler")
+            .substringBefore("private class OzeroPlatformInterface")
+
+        assertTrue(handlerBlock.contains("failureDiagnostics.recordNative(message)"))
+        assertTrue(handlerBlock.contains("redactSingboxMessage(message)"))
+    }
+
+    @Test
+    fun `runtime logs distinguish probe vpn proxy and vpn tun roles`() {
+        val startBlock = runtimeSource.substringAfter("suspend fun start(")
+            .substringBefore("private fun startLocked")
+
+        assertTrue(startBlock.contains("SingboxRuntimeRole.VPN_PROXY"))
+        assertTrue(startBlock.contains("SingboxRuntimeRole.VPN_TUN"))
+        assertTrue(startBlock.contains("SingboxRuntimeRole.PROBE"))
+        assertTrue(runtimeSource.contains("runtime started role=\$runtimeRole"))
     }
 
     private class FakeTrustManager(
