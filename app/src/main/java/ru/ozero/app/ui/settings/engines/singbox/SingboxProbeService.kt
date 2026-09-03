@@ -815,10 +815,6 @@ private fun logProbeStateFailure(operation: String, stableCategory: String) {
     )
 }
 
-private fun Throwable.rethrowCancellation() {
-    if (this is CancellationException) throw this
-}
-
 private fun logRejectedProfiles(rejectedProfiles: List<RejectedProfile>) {
     if (rejectedProfiles.isEmpty()) return
     val protocols = rejectedProfiles.groupingBy { it.protocol }.eachCount().toStableDiagnosticString()
