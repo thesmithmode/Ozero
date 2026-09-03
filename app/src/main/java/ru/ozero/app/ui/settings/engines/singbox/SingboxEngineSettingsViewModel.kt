@@ -44,6 +44,7 @@ import ru.ozero.singboxsubscription.GroupSeeder
 import ru.ozero.singboxsubscription.RawUpdater
 import ru.ozero.singboxsubscription.isSupportedSubscriptionUrl
 import ru.ozero.singboxsubscription.parser.RawShareLinksParser
+import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -105,6 +106,8 @@ class SingboxEngineSettingsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(SingboxSettingsUiState())
     private val testingProfileCounts = ConcurrentHashMap<Long, AtomicInteger>()
+    private val pendingInsecureRefreshGroupIds = ArrayDeque<Long>()
+    private val pendingInsecureRefreshLock = Any()
     private val probeGeneration = AtomicLong()
     private var pingJob: Job? = null
     private var refreshJob: Job? = null
@@ -233,8 +236,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     }
 
     fun onConfirmInsecureRefresh(confirmed: Boolean) {
-        val groupId = _uiState.value.pendingInsecureRefreshGroupId ?: return
-        _uiState.update { it.copy(pendingInsecureRefreshGroupId = null) }
+        val groupId = consumePendingInsecureRefreshGroup() ?: return
         if (!confirmed) return
         refreshJob = viewModelScope.launch { refreshGroupInternal(groupId, allowInsecureRetry = true) }
     }
@@ -345,7 +347,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                 if (code == ru.ozero.singboxsubscription.SubscriptionRefreshErrorCode.TLS_CERTIFICATE &&
                     !allowInsecureRetry
                 ) {
-                    _uiState.update { it.copy(pendingInsecureRefreshGroupId = groupId) }
+                    enqueuePendingInsecureRefreshGroup(groupId)
                 }
                 code
             }
@@ -367,6 +369,28 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private fun enqueuePendingInsecureRefreshGroup(groupId: Long) {
+        synchronized(pendingInsecureRefreshLock) {
+            if (!pendingInsecureRefreshGroupIds.contains(groupId)) {
+                pendingInsecureRefreshGroupIds.addLast(groupId)
+            }
+            if (_uiState.value.pendingInsecureRefreshGroupId == null) {
+                _uiState.update {
+                    it.copy(pendingInsecureRefreshGroupId = pendingInsecureRefreshGroupIds.peekFirst())
+                }
+            }
+        }
+    }
+
+    private fun consumePendingInsecureRefreshGroup(): Long? = synchronized(pendingInsecureRefreshLock) {
+        val current = _uiState.value.pendingInsecureRefreshGroupId ?: return@synchronized null
+        pendingInsecureRefreshGroupIds.removeFirstOccurrence(current)
+        _uiState.update {
+            it.copy(pendingInsecureRefreshGroupId = pendingInsecureRefreshGroupIds.peekFirst())
+        }
+        current
     }
 
     fun onAddGroupDialog(show: Boolean) = _uiState.update {
