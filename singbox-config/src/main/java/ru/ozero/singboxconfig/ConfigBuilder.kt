@@ -64,7 +64,6 @@ object ConfigBuilder {
     private const val MIN_PORT = 1
     private const val MAX_PORT = 65_535
     private const val MAX_AUTO_OUTBOUNDS = 50
-    private const val MAX_PROBE_OUTBOUNDS = 50
     private const val MAX_AUTO_CONFIG_BYTES = 512 * 1024
 
     fun buildSingboxConfig(
@@ -240,9 +239,6 @@ object ConfigBuilder {
         ipv6Enabled: Boolean = true,
     ): String {
         require(targets.isNotEmpty()) { "probe targets must not be empty" }
-        require(targets.size <= MAX_PROBE_OUTBOUNDS) {
-            "probe config supports at most $MAX_PROBE_OUTBOUNDS outbounds"
-        }
         require(targets.map { it.socksPort }.distinct().size == targets.size) {
             "probe socks ports must be unique"
         }
