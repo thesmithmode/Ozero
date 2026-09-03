@@ -36,8 +36,13 @@ class GroupSeeder(
                         userOrder = index,
                     ),
                 )
-            } else if (existing.isBuiltin && !existing.autoUpdate) {
-                dao.update(existing.copy(autoUpdate = true))
+            } else if (existing.isBuiltin) {
+                val synced = existing.copy(
+                    name = preset.name,
+                    autoUpdate = true,
+                    userOrder = index,
+                )
+                if (synced != existing) dao.update(synced)
             }
         }
     }
