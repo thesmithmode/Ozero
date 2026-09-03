@@ -67,4 +67,7 @@
     <string name="singbox_probe_all_privacy_title">Проверить все серверы?</string>
     <string name="singbox_probe_all_privacy_message">Проверка задержки подключается ко всем проверяемым серверам. Адреса из подписок могут увидеть ваш сетевой IP и факт проверки.</string>
     <string name="singbox_probe_all_privacy_confirm">Проверить</string>
+    <string name="singbox_insecure_retry_title">Недействительный сертификат</string>
+    <string name="singbox_insecure_retry_message">Сертификат сервера не прошёл проверку. Загрузить подписку без проверки сертификата только сейчас?</string>
+    <string name="singbox_insecure_retry_confirm">Загрузить всё равно</string>
 </resources>

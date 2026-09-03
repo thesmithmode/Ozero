@@ -275,7 +275,7 @@ class SingboxProbeServiceTest {
     }
 
     @Test
-    fun `probeAndAutoSelect starts and stops one runtime per bounded batch`() = runTest {
+    fun `probeAndAutoSelect reuses one runtime for a large bounded batch`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
@@ -284,10 +284,10 @@ class SingboxProbeServiceTest {
 
         SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(profiles)
 
-        assertEquals(listOf(10, 10, 5), probe.batchSizes)
-        assertEquals(3, probe.startCount.get())
-        assertEquals(3, probe.stopCount.get())
-        assertEquals(10, probe.maxConcurrentTargets.get())
+        assertEquals(listOf(25), probe.batchSizes)
+        assertEquals(1, probe.startCount.get())
+        assertEquals(1, probe.stopCount.get())
+        assertEquals(25, probe.maxConcurrentTargets.get())
         assertEquals(0, probe.legacyCalls.get())
         assertEquals(profiles.map { it.id }.toSet(), dao.latencies.keys)
     }
@@ -558,7 +558,8 @@ class SingboxProbeServiceTest {
         )
 
         assertEquals(listOf(5L to true, 5L to false), events)
-        assertNull(dao.latencies[5L])
+        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[5L])
+        assertEquals(SingboxProbeService.PROBE_ERROR_RUNTIME_BUSY, dao.errors[5L])
     }
 
     @Test
@@ -578,7 +579,20 @@ class SingboxProbeServiceTest {
         job.join()
 
         assertTrue(probe.calls.get() in 1..2)
-        assertTrue(dao.latencies.isEmpty())
+        assertEquals(
+            mapOf(
+                first.id to SingboxProbeService.LATENCY_FAILED,
+                second.id to SingboxProbeService.LATENCY_FAILED,
+            ),
+            dao.latencies,
+        )
+        assertEquals(
+            mapOf(
+                first.id to SingboxProbeService.PROBE_ERROR_CANCELLED,
+                second.id to SingboxProbeService.PROBE_ERROR_CANCELLED,
+            ),
+            dao.errors,
+        )
         assertNull(prefsFlow.value[selectedProfileKey])
     }
 

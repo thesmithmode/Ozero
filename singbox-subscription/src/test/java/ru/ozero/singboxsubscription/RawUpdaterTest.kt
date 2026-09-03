@@ -415,7 +415,10 @@ class RawUpdaterTest {
         )
         server.enqueue(MockResponse().setBody(vless1))
 
-        val result = rawUpdater.refresh(group().copy(isBuiltin = false, allowInsecureTls = true))
+        val result = rawUpdater.refresh(
+            group().copy(isBuiltin = false, allowInsecureTls = true),
+            allowInsecureRetry = true,
+        )
 
         assertTrue(result.isSuccess)
         assertEquals(1, insecureCalls.get())

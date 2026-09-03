@@ -58,11 +58,16 @@ class RawUpdater(
 ) {
     private val refreshLocks = ConcurrentHashMap<Long, Mutex>()
 
-    suspend fun refresh(group: SubscriptionGroup): Result<Int> =
-        refreshLocks.computeIfAbsent(group.id) { Mutex() }.withLock { refreshLocked(group) }
+    suspend fun refresh(group: SubscriptionGroup, allowInsecureRetry: Boolean = false): Result<Int> =
+        refreshLocks.computeIfAbsent(group.id) { Mutex() }.withLock {
+            refreshLocked(group, allowInsecureRetry)
+        }
 
     @Suppress("LongMethod", "CyclomaticComplexMethod", "CognitiveComplexMethod")
-    private suspend fun refreshLocked(group: SubscriptionGroup): Result<Int> = withContext(Dispatchers.IO) {
+    private suspend fun refreshLocked(
+        group: SubscriptionGroup,
+        allowInsecureRetry: Boolean,
+    ): Result<Int> = withContext(Dispatchers.IO) {
         val lastAttemptAt = System.currentTimeMillis()
         val refreshGeneration = beginRefresh(group.id, lastAttemptAt)
             ?: return@withContext Result.failure(SubscriptionRefreshStaleException())
@@ -77,7 +82,7 @@ class RawUpdater(
                 .header("User-Agent", USER_AGENT)
                 .header("Accept", "text/plain, application/json, application/yaml, text/yaml, */*")
                 .build()
-            executeRequest(group, request).use { response ->
+            executeRequest(group, request, allowInsecureRetry).use { response ->
                 if (!response.isSuccessful) {
                     throw SubscriptionHttpException(response.code)
                 }
@@ -267,15 +272,19 @@ class RawUpdater(
         )
     }
 
-    private fun httpClientFor(group: SubscriptionGroup): OkHttpClient = when {
+    private fun httpClientFor(group: SubscriptionGroup, allowInsecureRetry: Boolean): OkHttpClient = when {
+        allowInsecureRetry -> insecureOkHttpClient
         group.isBuiltin -> okHttpClient
-        group.allowInsecureTls -> insecureOkHttpClient
         else -> userCaOkHttpClient
     }
 
-    private suspend fun executeRequest(group: SubscriptionGroup, request: Request): Response =
+    private suspend fun executeRequest(
+        group: SubscriptionGroup,
+        request: Request,
+        allowInsecureRetry: Boolean,
+    ): Response =
         suspendCancellableCoroutine { continuation ->
-            val call = httpClientFor(group).newCall(request)
+            val call = httpClientFor(group, allowInsecureRetry).newCall(request)
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
                 override fun onFailure(call: Call, error: IOException) {

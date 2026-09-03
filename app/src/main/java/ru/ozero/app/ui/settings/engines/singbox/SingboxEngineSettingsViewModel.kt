@@ -86,6 +86,7 @@ data class SingboxSettingsUiState(
     val manualLinksInput: String = "",
     val manualLinksGroupName: String = "",
     val manualLinksError: String? = null,
+    val pendingInsecureRefreshGroupId: Long? = null,
     val probeTimeoutSeconds: Int = SingboxProbeService.DEFAULT_PROBE_TIMEOUT_MS / 1_000,
 )
 
@@ -231,6 +232,13 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
+    fun onConfirmInsecureRefresh(confirmed: Boolean) {
+        val groupId = _uiState.value.pendingInsecureRefreshGroupId ?: return
+        _uiState.update { it.copy(pendingInsecureRefreshGroupId = null) }
+        if (!confirmed) return
+        refreshJob = viewModelScope.launch { refreshGroupInternal(groupId, allowInsecureRetry = true) }
+    }
+
     fun onCancel(ping: Boolean = false, refresh: Boolean = false) {
         if (ping) {
             probeGeneration.incrementAndGet()
@@ -321,7 +329,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    private suspend fun refreshGroupInternal(groupId: Long) {
+    private suspend fun refreshGroupInternal(groupId: Long, allowInsecureRetry: Boolean = false) {
         val group = groupDao.getById(groupId) ?: return
         _uiState.update {
             it.copy(
@@ -331,9 +339,15 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
         var errorMsg: String? = null
         try {
-            val result = rawUpdater.refresh(group)
+            val result = rawUpdater.refresh(group, allowInsecureRetry)
             errorMsg = result.exceptionOrNull()?.let { failure ->
-                groupDao.getById(groupId)?.lastRefreshErrorCode ?: failure.message
+                val code = groupDao.getById(groupId)?.lastRefreshErrorCode ?: failure.message
+                if (code == ru.ozero.singboxsubscription.SubscriptionRefreshErrorCode.TLS_CERTIFICATE &&
+                    !allowInsecureRetry
+                ) {
+                    _uiState.update { it.copy(pendingInsecureRefreshGroupId = groupId) }
+                }
+                code
             }
         } catch (ce: CancellationException) {
             throw ce

@@ -67,4 +67,7 @@
     <string name="singbox_probe_all_privacy_title">Test all servers?</string>
     <string name="singbox_probe_all_privacy_message">Latency testing connects to every tested server. Subscription endpoints may see your network IP address and that the test happened.</string>
     <string name="singbox_probe_all_privacy_confirm">Test</string>
+    <string name="singbox_insecure_retry_title">Invalid certificate</string>
+    <string name="singbox_insecure_retry_message">The server certificate could not be verified. Download this subscription without certificate verification this time only?</string>
+    <string name="singbox_insecure_retry_confirm">Download anyway</string>
 </resources>

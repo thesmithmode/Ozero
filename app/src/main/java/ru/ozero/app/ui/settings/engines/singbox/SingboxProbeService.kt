@@ -115,43 +115,50 @@ class SingboxProbeService internal constructor(
         logRejectedProfiles(rejectedProfiles)
         val results = ConcurrentLinkedQueue<ProbeResult>()
         val batchProbe = profileProbe as? SingboxBatchProfileProbe
-        for ((batchIndex, batch) in probeCandidates.chunked(MAX_CONCURRENT_PROFILE_PROBES).withIndex()) {
-            val indexedBatch = batch.mapIndexed { index, candidate ->
-                IndexedProbeCandidate(
-                    index = batchIndex * MAX_CONCURRENT_PROFILE_PROBES + index,
-                    profile = candidate.first,
-                    bean = candidate.second,
-                )
-            }
-            val outcomes = if (batchProbe != null) {
-                probeBatch(indexedBatch, probeSettings, batchProbe, onProfileTestingChanged)
-            } else {
-                probeLegacyBatch(indexedBatch, probeSettings, onProfileTestingChanged)
-            }
-            if (outcomes.values.any { it is SingboxProbeOutcome.Failure && it.error == PROBE_ERROR_PROCESS_DIED }) {
-                PersistentLoggers.warn(
-                    "SingboxProbeService",
-                    "profile probe batch aborted category=$PROBE_ERROR_PROCESS_DIED batch=$batchIndex",
-                )
-                return
-            }
-            indexedBatch.forEach { candidate ->
-                when (val outcome = outcomes[candidate.profile.id] ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)) {
-                    is SingboxProbeOutcome.Success -> {
-                        profileDao.updateProbeResultIfCurrent(candidate.profile, outcome.latencyMs, null)
-                        results.add(ProbeResult(candidate.index, candidate.profile, outcome.latencyMs))
+        val pending = probeCandidates.associate { it.first.id to it.first }.toMutableMap()
+        try {
+            for ((batchIndex, batch) in probeCandidates.chunked(MAX_CONCURRENT_PROFILE_PROBES).withIndex()) {
+                val indexedBatch = batch.mapIndexed { index, candidate ->
+                    IndexedProbeCandidate(
+                        index = batchIndex * MAX_CONCURRENT_PROFILE_PROBES + index,
+                        profile = candidate.first,
+                        bean = candidate.second,
+                    )
+                }
+                val outcomes = if (batchProbe != null) {
+                    probeBatch(indexedBatch, probeSettings, batchProbe, onProfileTestingChanged)
+                } else {
+                    probeLegacyBatch(indexedBatch, probeSettings, onProfileTestingChanged)
+                }
+                indexedBatch.forEach { candidate ->
+                    when (val outcome = outcomes[candidate.profile.id] ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)) {
+                        is SingboxProbeOutcome.Success -> {
+                            profileDao.updateProbeResultIfCurrent(candidate.profile, outcome.latencyMs, null)
+                            results.add(ProbeResult(candidate.index, candidate.profile, outcome.latencyMs))
+                        }
+                        is SingboxProbeOutcome.Failure -> {
+                            profileDao.updateProbeResultIfCurrent(candidate.profile, LATENCY_FAILED, outcome.error)
+                            results.add(ProbeResult(candidate.index, candidate.profile, LATENCY_FAILED))
+                        }
+                        SingboxProbeOutcome.SkippedActiveRuntime -> {
+                            profileDao.updateProbeResultIfCurrent(
+                                candidate.profile,
+                                LATENCY_FAILED,
+                                PROBE_ERROR_RUNTIME_BUSY,
+                            )
+                        }
                     }
-                    is SingboxProbeOutcome.Failure -> {
-                        profileDao.updateProbeResultIfCurrent(
-                            candidate.profile,
-                            LATENCY_FAILED,
-                            outcome.error,
-                        )
-                        results.add(ProbeResult(candidate.index, candidate.profile, LATENCY_FAILED))
-                    }
-                    SingboxProbeOutcome.SkippedActiveRuntime -> Unit
+                    pending.remove(candidate.profile.id)
                 }
             }
+        } catch (error: CancellationException) {
+            withContext(NonCancellable) {
+                pending.values.forEach { profile ->
+                    profileDao.updateProbeResultIfCurrent(profile, LATENCY_FAILED, PROBE_ERROR_CANCELLED)
+                    onProfileTestingChanged(profile.id, false)
+                }
+            }
+            throw error
         }
         val best = results
             .filter { it.latency >= 0 }
@@ -258,11 +265,13 @@ class SingboxProbeService internal constructor(
         const val LATENCY_UNTESTED = -1
         const val LATENCY_FAILED = -2
         private const val SELECTED_AUTO = -1L
-        const val MAX_CONCURRENT_PROFILE_PROBES = 10
+        const val MAX_CONCURRENT_PROFILE_PROBES = 50
         const val PROBE_ERROR_UNSUPPORTED = "unsupported"
         const val PROBE_ERROR_FAILED = "probe failed"
         const val PROBE_ERROR_PROCESS_DIED = "PROCESS_DIED"
         const val PROBE_ERROR_TIMEOUT = "timeout"
+        const val PROBE_ERROR_CANCELLED = "cancelled"
+        const val PROBE_ERROR_RUNTIME_BUSY = "runtime busy"
         const val DEFAULT_PROBE_TIMEOUT_MS = 3_000
         const val MIN_PROBE_TIMEOUT_MS = 1_000
         const val MAX_PROBE_TIMEOUT_MS = 10_000

@@ -64,7 +64,7 @@ object ConfigBuilder {
     private const val MIN_PORT = 1
     private const val MAX_PORT = 65_535
     private const val MAX_AUTO_OUTBOUNDS = 50
-    private const val MAX_PROBE_OUTBOUNDS = 10
+    private const val MAX_PROBE_OUTBOUNDS = 50
     private const val MAX_AUTO_CONFIG_BYTES = 512 * 1024
 
     fun buildSingboxConfig(

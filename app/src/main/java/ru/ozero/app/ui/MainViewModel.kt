@@ -282,18 +282,18 @@ class MainViewModel @Inject constructor(
     init {
         restoreSpeedHistory()
         viewModelScope.launch {
-            tunnelController.stats.collect { s ->
-                if (s != null) {
-                    val now = System.currentTimeMillis()
-                    appendSpeedSample(now, s.bpsIn.toFloat(), s.bpsOut.toFloat())
-                } else {
-                    val switchingNow = tunnelController.switching.value != null
-                    if (!switchingNow && _speedHistory.value.isNotEmpty()) {
-                        _speedHistory.value = emptyList()
-                        cacheSpeedHistory(0L, emptyList())
+            combine(tunnelController.state, tunnelController.stats) { state, stats -> state to stats }
+                .collect { (state, stats) ->
+                    if (state is TunnelState.Connected && stats != null) {
+                        val now = System.currentTimeMillis()
+                        appendSpeedSample(now, stats.bpsIn.toFloat(), stats.bpsOut.toFloat())
+                    } else {
+                        if (_speedHistory.value.isNotEmpty()) {
+                            _speedHistory.value = emptyList()
+                            cacheSpeedHistory(0L, emptyList())
+                        }
                     }
                 }
-            }
         }
         viewModelScope.launch {
             var lastSessionKey: String? = null
