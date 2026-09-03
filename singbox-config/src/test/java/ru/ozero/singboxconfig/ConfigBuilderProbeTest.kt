@@ -31,13 +31,20 @@ class ConfigBuilderProbeTest {
     }
 
     @Test
-    fun `probe config rejects empty oversized and duplicate port batches`() {
+    fun `probe config accepts max batch and rejects empty oversized and duplicate ports`() {
         assertFailsWith<IllegalArgumentException> {
             ConfigBuilder.buildProbeConfig(emptyList())
         }
+
+        ConfigBuilder.buildProbeConfig(
+            (0 until 50).map { index ->
+                ConfigBuilder.ProbeTarget(bean("server-$index.example"), 21_000 + index)
+            },
+        )
+
         assertFailsWith<IllegalArgumentException> {
             ConfigBuilder.buildProbeConfig(
-                (0..10).map { index ->
+                (0..50).map { index ->
                     ConfigBuilder.ProbeTarget(bean("server-$index.example"), 21_000 + index)
                 },
             )
