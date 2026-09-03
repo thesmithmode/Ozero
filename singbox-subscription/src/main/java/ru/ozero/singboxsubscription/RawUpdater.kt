@@ -74,7 +74,7 @@ class RawUpdater(
         Log.i(
             TAG,
             "refresh started groupId=${group.id} generation=$refreshGeneration " +
-                "tlsMode=${group.subscriptionTlsMode()}",
+                "tlsMode=${group.subscriptionTlsMode(allowInsecureRetry)}",
         )
         val result = runCatching<Int> {
             val request = Request.Builder()
@@ -509,9 +509,9 @@ fun isTransientSubscriptionRefreshFailure(error: Throwable): Boolean {
     return causes.any { it is SocketTimeoutException || it is UnknownHostException || it is IOException }
 }
 
-private fun SubscriptionGroup.subscriptionTlsMode(): String = when {
+private fun SubscriptionGroup.subscriptionTlsMode(allowInsecureRetry: Boolean): String = when {
+    allowInsecureRetry -> "insecure-retry"
     isBuiltin -> "system"
-    allowInsecureTls -> "insecure"
     else -> "user-ca"
 }
 
