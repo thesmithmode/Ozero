@@ -30,6 +30,15 @@ import java.security.KeyStore
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.ssl.TrustManagerFactory
 
+internal enum class SingboxRuntimeRole {
+    VPN_TUN,
+    VPN_PROXY,
+    PROBE,
+}
+
+internal fun shouldIgnoreRuntimeStop(requestedOwnerId: Long?, activeOwnerId: Long?): Boolean =
+    requestedOwnerId != null && activeOwnerId != requestedOwnerId
+
 @Suppress("TooManyFunctions")
 internal object SingboxRuntime {
     private const val TAG = "SingboxRuntime"
@@ -46,6 +55,9 @@ internal object SingboxRuntime {
 
     @Volatile
     private var activeOwnerId: Long? = null
+
+    @Volatile
+    private var activeRuntimeRole: SingboxRuntimeRole? = null
 
     @Volatile
     private var setupDone = false
@@ -79,15 +91,34 @@ internal object SingboxRuntime {
             mutex.withLock {
                 val oldServer = commandServer
                 if (oldServer != null) {
-                    PersistentLoggers.warn(TAG, "start: already running — graceful restart")
+                    PersistentLoggers.warn(
+                        TAG,
+                        "start: already running — graceful restart role=${activeRuntimeRole ?: "unknown"} " +
+                            "owner=${activeOwnerId ?: "none"}",
+                    )
                     val closeFailure = closeCommandServer(oldServer, closeService = true)
                     if (closeFailure != null) {
                         throw IllegalStateException("previous sing-box runtime teardown failed", closeFailure)
                     }
                     commandServer = null
+                    activeOwnerId = null
+                    activeRuntimeRole = null
                     releaseServerCallbacks()
                 }
-                startLocked(context, ownerId, tunFd, singboxJsonConfig, protectorBridge, detachedTunFd)
+                val runtimeRole = if (tunFd == NO_TUN_FD) {
+                    SingboxRuntimeRole.VPN_PROXY
+                } else {
+                    SingboxRuntimeRole.VPN_TUN
+                }
+                startLocked(
+                    context,
+                    ownerId,
+                    tunFd,
+                    singboxJsonConfig,
+                    protectorBridge,
+                    detachedTunFd,
+                    runtimeRole,
+                )
             }
         }
 
@@ -99,7 +130,15 @@ internal object SingboxRuntime {
     ): Boolean = withContext(Dispatchers.Main.immediate) {
         mutex.withLock {
             if (commandServer != null) return@withLock false
-            startLocked(context, ownerId, NO_TUN_FD, singboxJsonConfig, protectorBridge, null)
+            startLocked(
+                context,
+                ownerId,
+                NO_TUN_FD,
+                singboxJsonConfig,
+                protectorBridge,
+                null,
+                SingboxRuntimeRole.PROBE,
+            )
             true
         }
     }
@@ -111,11 +150,15 @@ internal object SingboxRuntime {
         singboxJsonConfig: String,
         protectorBridge: SingboxProtectorBridge,
         detachedTunFd: DetachedTunFd?,
+        runtimeRole: SingboxRuntimeRole,
     ) {
         check(detachedTunFd == null || detachedTunFd.fd == tunFd) {
             "detached TUN fd does not match runtime fd"
         }
-        PersistentLoggers.debug(TAG, "start configLen=${singboxJsonConfig.length} fd=$tunFd")
+        PersistentLoggers.debug(
+            TAG,
+            "start role=$runtimeRole owner=$ownerId configLen=${singboxJsonConfig.length} fd=$tunFd",
+        )
 
         val socketFile = File(basePath, "command.sock")
         if (socketFile.exists()) {
@@ -131,7 +174,11 @@ internal object SingboxRuntime {
             detachedTunFd,
             failureDiagnostics,
         )
-        val handler = OzeroCommandServerHandler()
+        val handler = OzeroCommandServerHandler(
+            ownerId = ownerId,
+            runtimeRole = runtimeRole,
+            failureDiagnostics = failureDiagnostics,
+        )
         platformInterface = platform
         commandServerHandler = handler
 
@@ -142,7 +189,7 @@ internal object SingboxRuntime {
             server.start()
         } catch (e: Exception) {
             PersistentLoggers.error(TAG, "command server start failed exceptionClass=${e::class.java.simpleName}")
-            cleanupFailedServerStart(server, ownerId, e)
+            cleanupFailedServerStart(server, ownerId, runtimeRole, e, closeService = false)
             throw e
         }
         recordCheckpoint("post-start socket-ready")
@@ -152,7 +199,7 @@ internal object SingboxRuntime {
             recordCheckpoint("checkConfig-passed")
         } catch (e: Exception) {
             PersistentLoggers.error(TAG, "checkConfig failed exceptionClass=${e::class.java.simpleName}")
-            cleanupFailedServerStart(server, ownerId, e)
+            cleanupFailedServerStart(server, ownerId, runtimeRole, e, closeService = false)
             throw e
         }
 
@@ -165,22 +212,29 @@ internal object SingboxRuntime {
                 TAG,
                 "startOrReloadService failed exceptionClass=${e::class.java.simpleName}",
             )
-            cleanupFailedServerStart(server, ownerId, e)
+            cleanupFailedServerStart(server, ownerId, runtimeRole, e, closeService = true)
             throw e
         }
 
         commandServer = server
         activeOwnerId = ownerId
-        persistCheckpoint("runtime-started fd=$tunFd")
-        PersistentLoggers.info(TAG, "runtime started fd=$tunFd")
+        activeRuntimeRole = runtimeRole
+        persistCheckpoint("runtime-started role=$runtimeRole owner=$ownerId fd=$tunFd")
+        PersistentLoggers.info(TAG, "runtime started role=$runtimeRole owner=$ownerId fd=$tunFd")
     }
 
     suspend fun stop(ownerId: Long? = null) = withContext(Dispatchers.Main.immediate) {
         mutex.withLock {
-            if (ownerId != null && activeOwnerId != ownerId) {
-                PersistentLoggers.debug(TAG, "stale stop ignored owner=$ownerId activeOwner=${activeOwnerId ?: "none"}")
+            if (shouldIgnoreRuntimeStop(ownerId, activeOwnerId)) {
+                PersistentLoggers.debug(
+                    TAG,
+                    "stale stop ignored owner=$ownerId activeOwner=${activeOwnerId ?: "none"} " +
+                        "role=${activeRuntimeRole ?: "unknown"}",
+                )
                 return@withLock
             }
+            val stoppedRole = activeRuntimeRole
+            val stoppedOwner = activeOwnerId
             val server = commandServer
             val closeFailure = server?.let { closeCommandServer(it, closeService = true) }
             if (closeFailure != null) {
@@ -188,9 +242,13 @@ internal object SingboxRuntime {
             }
             commandServer = null
             activeOwnerId = null
+            activeRuntimeRole = null
             releaseServerCallbacks()
-            persistCheckpoint("runtime-stopped")
-            PersistentLoggers.info(TAG, "runtime stopped")
+            persistCheckpoint("runtime-stopped role=${stoppedRole ?: "unknown"} owner=${stoppedOwner ?: "none"}")
+            PersistentLoggers.info(
+                TAG,
+                "runtime stopped role=${stoppedRole ?: "unknown"} owner=${stoppedOwner ?: "none"}",
+            )
         }
     }
 
@@ -203,13 +261,20 @@ internal object SingboxRuntime {
         commandServerHandler = null
     }
 
-    private fun cleanupFailedServerStart(server: CommandServer, ownerId: Long, startFailure: Exception) {
-        val closeFailure = closeCommandServer(server, closeService = false)
+    private fun cleanupFailedServerStart(
+        server: CommandServer,
+        ownerId: Long,
+        runtimeRole: SingboxRuntimeRole,
+        startFailure: Exception,
+        closeService: Boolean,
+    ) {
+        val closeFailure = closeCommandServer(server, closeService = closeService)
         if (closeFailure == null) {
             releaseServerCallbacks()
         } else {
             commandServer = server
             activeOwnerId = ownerId
+            activeRuntimeRole = runtimeRole
             startFailure.addSuppressed(closeFailure)
         }
     }
@@ -223,11 +288,13 @@ internal object SingboxRuntime {
                     PersistentLoggers.warn(TAG, "closeService failed exceptionClass=${it::class.java.simpleName}")
                 }
         }
-        runCatching { server.close() }
-            .onFailure {
-                if (failure == null) failure = it else failure?.addSuppressed(it)
-                PersistentLoggers.warn(TAG, "close failed exceptionClass=${it::class.java.simpleName}")
-            }
+        if (!closeService || failure == null) {
+            runCatching { server.close() }
+                .onFailure {
+                    if (failure == null) failure = it else failure?.addSuppressed(it)
+                    PersistentLoggers.warn(TAG, "close failed exceptionClass=${it::class.java.simpleName}")
+                }
+        }
         return failure
     }
 
@@ -242,13 +309,17 @@ internal object SingboxRuntime {
         throw e
     }
 
-    private class OzeroCommandServerHandler : CommandServerHandler {
+    private class OzeroCommandServerHandler(
+        private val ownerId: Long,
+        private val runtimeRole: SingboxRuntimeRole,
+        private val failureDiagnostics: NativeFailureDiagnostics,
+    ) : CommandServerHandler {
         override fun serviceStop() {
-            PersistentLoggers.debug(TAG, "serviceStop requested by libbox")
+            PersistentLoggers.debug(TAG, "serviceStop requested by libbox role=$runtimeRole owner=$ownerId")
         }
 
         override fun serviceReload() {
-            PersistentLoggers.debug(TAG, "serviceReload requested by libbox")
+            PersistentLoggers.debug(TAG, "serviceReload requested by libbox role=$runtimeRole owner=$ownerId")
         }
 
         override fun getSystemProxyStatus(): SystemProxyStatus {
@@ -261,11 +332,12 @@ internal object SingboxRuntime {
         override fun setSystemProxyEnabled(enabled: Boolean) {}
 
         override fun writeDebugMessage(message: String) {
+            failureDiagnostics.recordNative(message)
             val safe = redactSingboxMessage(message)
             if (safe.shouldPromoteSingboxMessage()) {
-                PersistentLoggers.warn(TAG, "libbox: $safe")
+                PersistentLoggers.warn(TAG, "libbox role=$runtimeRole owner=$ownerId: $safe")
             } else {
-                PersistentLoggers.trace(TAG, "libbox: $safe")
+                PersistentLoggers.trace(TAG, "libbox role=$runtimeRole owner=$ownerId: $safe")
             }
         }
     }

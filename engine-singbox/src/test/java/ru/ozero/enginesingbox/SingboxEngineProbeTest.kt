@@ -78,6 +78,24 @@ class SingboxEngineProbeTest {
     }
 
     @Test
+    fun `failed replacement before native start preserves active runtime owner`() = runTest {
+        val engine = buildEngine()
+        val process = mockk<ISingboxEngineProcess>()
+        every { process.stopAndWait(42L, 3_000L) } returns true
+        engine.setPrivateField("proxy", process)
+        engine.setPrivateField("runtimeOwnerId", 42L)
+
+        val result = engine.start(
+            EngineConfig.Singbox(beanBlob = byteArrayOf(1, 2, 3), protocolType = SingboxEngine.PROTOCOL_VLESS),
+            Upstream.None,
+        )
+        engine.stop()
+
+        assertIs<StartResult.Failure>(result)
+        verify(exactly = 1) { process.stopAndWait(42L, 3_000L) }
+    }
+
+    @Test
     fun `start fails before binding when auto select blobs are invalid`() = runTest {
         val engine = buildEngine()
 

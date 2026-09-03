@@ -29,7 +29,10 @@ class SingboxAidlContractTest {
     @Test
     fun `should ISingboxEngineProcess define stop`() {
         val content = aidlFile("ISingboxEngineProcess.aidl")
-        assertTrue(content.contains("void stop(long ownerId)"), "ISingboxEngineProcess must have owner-scoped stop method")
+        assertTrue(
+            content.contains("void stop(long ownerId)"),
+            "ISingboxEngineProcess must have owner-scoped stop method",
+        )
     }
 
     @Test

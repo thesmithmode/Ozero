@@ -75,6 +75,10 @@ class SingboxRuntimeReleaseSentinelTest {
             closeServicePos >= 0 && closePos >= 0 && closeServicePos < closePos,
             "closeService must be called before close — stop TUN traffic before shutting down core",
         )
+        assertTrue(
+            closeBlock.contains("if (!closeService || failure == null)"),
+            "CommandServer must remain intact when closeService fails so owner cleanup can retry before hard kill",
+        )
     }
 
     @Test
