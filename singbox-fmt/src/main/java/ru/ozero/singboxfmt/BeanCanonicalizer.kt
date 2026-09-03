@@ -36,6 +36,7 @@ fun AbstractBean.applyCanonicalDefaults(): AbstractBean {
 
 fun normalizeSingboxTransport(raw: String): String = when (val normalized = raw.trim().lowercase()) {
     "", "raw" -> "tcp"
+    "websocket" -> "ws"
     "h2" -> "http"
     "xhttp" -> "splithttp"
     else -> normalized
