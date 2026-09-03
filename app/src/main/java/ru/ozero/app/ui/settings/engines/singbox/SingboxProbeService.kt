@@ -25,9 +25,11 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.LogSanitizer
 import ru.ozero.enginescore.PersistentLoggers
@@ -116,27 +118,25 @@ class SingboxProbeService internal constructor(
         val results = ConcurrentLinkedQueue<ProbeResult>()
         val batchProbe = profileProbe as? SingboxBatchProfileProbe
         val pending = probeCandidates.associate { it.first.id to it.first }.toMutableMap()
+        val indexedCandidates = probeCandidates.mapIndexed { index, candidate ->
+            IndexedProbeCandidate(
+                index = index,
+                profile = candidate.first,
+                bean = candidate.second,
+            )
+        }
         var pendingTerminalError = PROBE_ERROR_FAILED
         try {
-            for ((batchIndex, batch) in probeCandidates.chunked(MAX_CONCURRENT_PROFILE_PROBES).withIndex()) {
-                val indexedBatch = batch.mapIndexed { index, candidate ->
-                    IndexedProbeCandidate(
-                        index = batchIndex * MAX_CONCURRENT_PROFILE_PROBES + index,
-                        profile = candidate.first,
-                        bean = candidate.second,
-                    )
-                }
-                val outcomes = if (batchProbe != null) {
-                    probeBatch(indexedBatch, probeSettings, batchProbe, onProfileTestingChanged)
-                } else {
-                    probeLegacyBatch(indexedBatch, probeSettings, onProfileTestingChanged)
-                }
-                indexedBatch.forEach { candidate ->
-                    val outcome = outcomes[candidate.profile.id]
-                        ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
-                    if (persistProbeOutcome(candidate, outcome, results)) {
-                        pending.remove(candidate.profile.id)
-                    }
+            val outcomes = if (batchProbe != null) {
+                probeBatch(indexedCandidates, probeSettings, batchProbe, onProfileTestingChanged)
+            } else {
+                probeLegacyBatch(indexedCandidates, probeSettings, onProfileTestingChanged)
+            }
+            indexedCandidates.forEach { candidate ->
+                val outcome = outcomes[candidate.profile.id]
+                    ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
+                if (persistProbeOutcome(candidate, outcome, results)) {
+                    pending.remove(candidate.profile.id)
                 }
             }
         } catch (error: CancellationException) {
@@ -246,23 +246,26 @@ class SingboxProbeService internal constructor(
         settings: SingboxProfileProbeSettings,
         onProfileTestingChanged: (Long, Boolean) -> Unit,
     ): Map<Long, SingboxProbeOutcome> = coroutineScope {
+        val limiter = Semaphore(MAX_PARALLEL_HTTP_PROBES)
         candidates.map { candidate ->
             async(probeDispatcher) {
-                onProfileTestingChanged(candidate.profile.id, true)
-                try {
+                limiter.withPermit {
+                    onProfileTestingChanged(candidate.profile.id, true)
                     try {
-                        val latency = withTimeoutOrNull(settings.timeoutMs.toLong()) {
-                            profileProbe.probeLatencyMs(candidate.bean, settings)
-                        } ?: LATENCY_TIMED_OUT
-                        candidate.profile.id to latency.toProbeOutcome()
-                    } catch (error: CancellationException) {
-                        throw error
-                    } catch (error: Exception) {
-                        logProbeFailure("probeLatency", error, candidate.profile.id)
-                        candidate.profile.id to SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
+                        try {
+                            val latency = withTimeoutOrNull(settings.timeoutMs.toLong()) {
+                                profileProbe.probeLatencyMs(candidate.bean, settings)
+                            } ?: LATENCY_TIMED_OUT
+                            candidate.profile.id to latency.toProbeOutcome()
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (error: Exception) {
+                            logProbeFailure("probeLatency", error, candidate.profile.id)
+                            candidate.profile.id to SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
+                        }
+                    } finally {
+                        onProfileTestingChanged(candidate.profile.id, false)
                     }
-                } finally {
-                    onProfileTestingChanged(candidate.profile.id, false)
                 }
             }
         }.awaitAll().toMap()
@@ -301,7 +304,8 @@ class SingboxProbeService internal constructor(
         const val LATENCY_UNTESTED = -1
         const val LATENCY_FAILED = -2
         private const val SELECTED_AUTO = -1L
-        const val MAX_CONCURRENT_PROFILE_PROBES = 50
+        const val MAX_PARALLEL_HTTP_PROBES = 10
+        const val MAX_CONCURRENT_PROFILE_PROBES = MAX_PARALLEL_HTTP_PROBES
         const val PROBE_ERROR_UNSUPPORTED = "unsupported"
         const val PROBE_ERROR_FAILED = "probe failed"
         const val PROBE_ERROR_PROCESS_DIED = "PROCESS_DIED"
@@ -393,75 +397,118 @@ private class SingboxServiceProfileProbe(
         }
     }
 
-    @Suppress("ReturnCount")
     private suspend fun probeBatchLocked(
         targets: List<SingboxProfileProbeTarget>,
         settings: SingboxProfileProbeSettings,
     ): Map<Long, SingboxProbeOutcome> {
         if (targets.isEmpty()) return emptyMap()
-        val localProtector = ProfileProbeProtector()
         coroutineContext.ensureActive()
         val ports = allocateProbePorts(targets.size)
-        val config = runCatching {
-            ConfigBuilder.buildProbeConfig(
-                targets.zip(ports).map { (target, port) ->
-                    ConfigBuilder.ProbeTarget(target.bean, port)
-                },
-                dnsServers = settings.dnsServers,
-                ipv6Enabled = settings.ipv6Enabled,
-            )
-        }.getOrElse {
-            it.rethrowCancellation()
-            logProbeFailure("buildConfig", it)
-            return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_FAILED))
-        }
+        val config = buildProbeConfig(targets, ports, settings)
+            ?: return failedOutcomes(targets)
         val binding = bindProcess()
-            ?: return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_FAILED))
+            ?: return failedOutcomes(targets)
+        return runProbeRuntime(targets, ports, settings, config, binding)
+    }
+
+    private fun buildProbeConfig(
+        targets: List<SingboxProfileProbeTarget>,
+        ports: List<Int>,
+        settings: SingboxProfileProbeSettings,
+    ): String? = try {
+        ConfigBuilder.buildProbeConfig(
+            targets.zip(ports).map { (target, port) ->
+                ConfigBuilder.ProbeTarget(target.bean, port)
+            },
+            dnsServers = settings.dnsServers,
+            ipv6Enabled = settings.ipv6Enabled,
+        )
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        logProbeFailure("buildConfig", error)
+        null
+    }
+
+    private suspend fun runProbeRuntime(
+        targets: List<SingboxProfileProbeTarget>,
+        ports: List<Int>,
+        settings: SingboxProfileProbeSettings,
+        config: String,
+        binding: Binding,
+    ): Map<Long, SingboxProbeOutcome> {
         val ownerId = UUID.randomUUID().mostSignificantBits
+        val localProtector = ProfileProbeProtector()
         var shouldStop = false
-        try {
-            val process = binding.process
-            if (binding.processDied.get()) {
-                return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
-            }
-            coroutineContext.ensureActive()
-            val started = runCatching { process.startProxyModeIfIdle(ownerId, config, localProtector) }.getOrElse {
-                it.rethrowCancellation()
-                logProbeFailure("startProxyModeIfIdle", it)
-                if (binding.processDied.get()) {
-                    return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
+        return try {
+            when (startProbeRuntime(binding, ownerId, config, localProtector)) {
+                ProbeRuntimeStart.STARTED -> {
+                    shouldStop = true
+                    if (isProbeRuntimeReady(binding)) {
+                        probeTargets(targets, ports, settings, binding)
+                    } else {
+                        failedOutcomes(targets, processDied = binding.processDied.get())
+                    }
                 }
-                return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_FAILED))
+                ProbeRuntimeStart.BUSY -> outcomes(targets, SingboxProbeOutcome.SkippedActiveRuntime)
+                ProbeRuntimeStart.PROCESS_DIED -> failedOutcomes(targets, processDied = true)
+                ProbeRuntimeStart.FAILED -> failedOutcomes(targets)
             }
-            if (!started) return outcomes(targets, SingboxProbeOutcome.SkippedActiveRuntime)
-            shouldStop = true
-            coroutineContext.ensureActive()
-            if (!waitWhileProcessAlive(
-                    binding,
-                    PROBE_START_DELAY_MS,
-                )
-            ) {
-                return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
-            }
-            if (binding.processDied.get()) {
-                return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
-            }
-            val running = runCatching { process.runtimeRunning() }.getOrElse {
-                it.rethrowCancellation()
-                logProbeFailure("runtimeRunning", it)
-                false
-            }
-            if (binding.processDied.get()) {
-                return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
-            }
-            if (!running) {
-                return outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_FAILED))
-            }
-            coroutineContext.ensureActive()
-            val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(settings.timeoutMs.toLong())
-            val results = coroutineScope {
-                targets.zip(ports).map { (target, port) ->
-                    async(Dispatchers.IO) {
+        } finally {
+            cleanupProbeRuntime(binding, ownerId, shouldStop)
+        }
+    }
+
+    private suspend fun startProbeRuntime(
+        binding: Binding,
+        ownerId: Long,
+        config: String,
+        protector: ProfileProbeProtector,
+    ): ProbeRuntimeStart {
+        if (binding.processDied.get()) return ProbeRuntimeStart.PROCESS_DIED
+        coroutineContext.ensureActive()
+        val started = try {
+            binding.process.startProxyModeIfIdle(ownerId, config, protector)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            logProbeFailure("startProxyModeIfIdle", error)
+            return if (binding.processDied.get()) ProbeRuntimeStart.PROCESS_DIED else ProbeRuntimeStart.FAILED
+        }
+        return when {
+            binding.processDied.get() -> ProbeRuntimeStart.PROCESS_DIED
+            started -> ProbeRuntimeStart.STARTED
+            else -> ProbeRuntimeStart.BUSY
+        }
+    }
+
+    private suspend fun isProbeRuntimeReady(binding: Binding): Boolean {
+        coroutineContext.ensureActive()
+        if (!waitWhileProcessAlive(binding, PROBE_START_DELAY_MS) || binding.processDied.get()) return false
+        val running = try {
+            binding.process.runtimeRunning()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            logProbeFailure("runtimeRunning", error)
+            false
+        }
+        return running && !binding.processDied.get()
+    }
+
+    private suspend fun probeTargets(
+        targets: List<SingboxProfileProbeTarget>,
+        ports: List<Int>,
+        settings: SingboxProfileProbeSettings,
+        binding: Binding,
+    ): Map<Long, SingboxProbeOutcome> {
+        val limiter = Semaphore(SingboxProbeService.MAX_PARALLEL_HTTP_PROBES)
+        val results = coroutineScope {
+            targets.zip(ports).map { (target, port) ->
+                async(Dispatchers.IO) {
+                    limiter.withPermit {
+                        val deadlineNanos = System.nanoTime() +
+                            TimeUnit.MILLISECONDS.toNanos(settings.timeoutMs.toLong())
                         target.profileId to probeRoutedWithRetry(
                             port,
                             settings.timeoutMs,
@@ -471,27 +518,29 @@ private class SingboxServiceProfileProbe(
                             binding.probeCancellation,
                         )
                     }
-                }.awaitAll().toMap()
-            }
-            return if (binding.processDied.get()) {
-                outcomes(targets, SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED))
-            } else {
-                results
-            }
-        } finally {
-            if (shouldStop) {
-                withContext(NonCancellable) {
-                    runCatching { binding.process.stopAndWait(ownerId, REMOTE_STOP_TIMEOUT_MS) }.onFailure {
-                        logProbeFailure("stopAndWait", it)
-                    }
+                }
+            }.awaitAll().toMap()
+        }
+        return if (binding.processDied.get()) {
+            failedOutcomes(targets, processDied = true)
+        } else {
+            results
+        }
+    }
+
+    private suspend fun cleanupProbeRuntime(binding: Binding, ownerId: Long, shouldStop: Boolean) {
+        if (shouldStop) {
+            withContext(NonCancellable) {
+                runCatching { binding.process.stopAndWait(ownerId, REMOTE_STOP_TIMEOUT_MS) }.onFailure {
+                    logProbeFailure("stopAndWait", it)
                 }
             }
-            runCatching { binding.binder.unlinkToDeath(binding.deathRecipient, 0) }.onFailure {
-                logProbeFailure("unlinkToDeath", it)
-            }
-            runCatching { context.unbindService(binding.connection) }.onFailure {
-                logProbeFailure("unbindService", it)
-            }
+        }
+        runCatching { binding.binder.unlinkToDeath(binding.deathRecipient, 0) }.onFailure {
+            logProbeFailure("unlinkToDeath", it)
+        }
+        runCatching { context.unbindService(binding.connection) }.onFailure {
+            logProbeFailure("unbindService", it)
         }
     }
 
@@ -522,10 +571,6 @@ private class SingboxServiceProfileProbe(
                     if (processDied.get()) {
                         return SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED)
                     }
-                    PersistentLoggers.debug(
-                        "SingboxProbeService",
-                        "profile probe outbound failed ${result.safeDetail ?: "category=${result.reason.name.lowercase()}"}",
-                    )
                     if (attempt == PROBE_ATTEMPTS - 1) {
                         return SingboxProbeOutcome.Failure(result.reason.profileProbeStatus())
                     }
@@ -549,6 +594,20 @@ private class SingboxServiceProfileProbe(
             SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_FAILED)
         }
     }
+
+    private fun failedOutcomes(
+        targets: List<SingboxProfileProbeTarget>,
+        processDied: Boolean = false,
+    ): Map<Long, SingboxProbeOutcome> = outcomes(
+        targets,
+        SingboxProbeOutcome.Failure(
+            if (processDied) {
+                SingboxProbeService.PROBE_ERROR_PROCESS_DIED
+            } else {
+                SingboxProbeService.PROBE_ERROR_FAILED
+            },
+        ),
+    )
 
     private fun outcomes(
         targets: List<SingboxProfileProbeTarget>,
@@ -672,6 +731,13 @@ private class SingboxServiceProfileProbe(
         val processDeath: CompletableDeferred<Unit>,
         val probeCancellation: RoutedProbeCancellation,
     )
+
+    private enum class ProbeRuntimeStart {
+        STARTED,
+        BUSY,
+        PROCESS_DIED,
+        FAILED,
+    }
 
     private companion object {
         const val PROBE_START_DELAY_MS = 150L
