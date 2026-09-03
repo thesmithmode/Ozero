@@ -116,6 +116,7 @@ class SingboxProbeService internal constructor(
         val results = ConcurrentLinkedQueue<ProbeResult>()
         val batchProbe = profileProbe as? SingboxBatchProfileProbe
         val pending = probeCandidates.associate { it.first.id to it.first }.toMutableMap()
+        var pendingTerminalError = PROBE_ERROR_FAILED
         try {
             for ((batchIndex, batch) in probeCandidates.chunked(MAX_CONCURRENT_PROFILE_PROBES).withIndex()) {
                 val indexedBatch = batch.mapIndexed { index, candidate ->
@@ -131,34 +132,18 @@ class SingboxProbeService internal constructor(
                     probeLegacyBatch(indexedBatch, probeSettings, onProfileTestingChanged)
                 }
                 indexedBatch.forEach { candidate ->
-                    when (val outcome = outcomes[candidate.profile.id] ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)) {
-                        is SingboxProbeOutcome.Success -> {
-                            profileDao.updateProbeResultIfCurrent(candidate.profile, outcome.latencyMs, null)
-                            results.add(ProbeResult(candidate.index, candidate.profile, outcome.latencyMs))
-                        }
-                        is SingboxProbeOutcome.Failure -> {
-                            profileDao.updateProbeResultIfCurrent(candidate.profile, LATENCY_FAILED, outcome.error)
-                            results.add(ProbeResult(candidate.index, candidate.profile, LATENCY_FAILED))
-                        }
-                        SingboxProbeOutcome.SkippedActiveRuntime -> {
-                            profileDao.updateProbeResultIfCurrent(
-                                candidate.profile,
-                                LATENCY_FAILED,
-                                PROBE_ERROR_RUNTIME_BUSY,
-                            )
-                        }
+                    val outcome = outcomes[candidate.profile.id]
+                        ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
+                    if (persistProbeOutcome(candidate, outcome, results)) {
+                        pending.remove(candidate.profile.id)
                     }
-                    pending.remove(candidate.profile.id)
                 }
             }
         } catch (error: CancellationException) {
-            withContext(NonCancellable) {
-                pending.values.forEach { profile ->
-                    profileDao.updateProbeResultIfCurrent(profile, LATENCY_FAILED, PROBE_ERROR_CANCELLED)
-                    onProfileTestingChanged(profile.id, false)
-                }
-            }
+            pendingTerminalError = PROBE_ERROR_CANCELLED
             throw error
+        } finally {
+            persistPendingTerminalResults(pending, pendingTerminalError, onProfileTestingChanged)
         }
         val best = results
             .filter { it.latency >= 0 }
@@ -178,6 +163,57 @@ class SingboxProbeService internal constructor(
             }
             prefs[SELECTED_PROFILE_KEY] = currentBest.id
             prefs[BEAN_KEY] = currentBest.beanBlob
+        }
+    }
+
+    private suspend fun persistProbeOutcome(
+        candidate: IndexedProbeCandidate,
+        outcome: SingboxProbeOutcome,
+        results: ConcurrentLinkedQueue<ProbeResult>,
+    ): Boolean = try {
+        when (outcome) {
+            is SingboxProbeOutcome.Success -> {
+                profileDao.updateProbeResultIfCurrent(candidate.profile, outcome.latencyMs, null)
+                results.add(ProbeResult(candidate.index, candidate.profile, outcome.latencyMs))
+            }
+            is SingboxProbeOutcome.Failure -> {
+                profileDao.updateProbeResultIfCurrent(candidate.profile, LATENCY_FAILED, outcome.error)
+                results.add(ProbeResult(candidate.index, candidate.profile, LATENCY_FAILED))
+            }
+            SingboxProbeOutcome.SkippedActiveRuntime -> {
+                profileDao.updateProbeResultIfCurrent(
+                    candidate.profile,
+                    LATENCY_FAILED,
+                    PROBE_ERROR_RUNTIME_BUSY,
+                )
+            }
+        }
+        true
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        logProbeFailure("persistProbeResult", error, candidate.profile.id)
+        false
+    }
+
+    private suspend fun persistPendingTerminalResults(
+        pending: Map<Long, ProxyProfile>,
+        terminalError: String,
+        onProfileTestingChanged: (Long, Boolean) -> Unit,
+    ) {
+        if (pending.isEmpty()) return
+        withContext(NonCancellable) {
+            pending.values.toList().forEach { profile ->
+                try {
+                    profileDao.updateProbeResultIfCurrent(profile, LATENCY_FAILED, terminalError)
+                } catch (error: Exception) {
+                    logProbeFailure("persistPendingTerminalResult", error, profile.id)
+                } finally {
+                    runCatching { onProfileTestingChanged(profile.id, false) }.onFailure { callbackError ->
+                        logProbeFailure("clearProfileTestingState", callbackError, profile.id)
+                    }
+                }
+            }
         }
     }
 
