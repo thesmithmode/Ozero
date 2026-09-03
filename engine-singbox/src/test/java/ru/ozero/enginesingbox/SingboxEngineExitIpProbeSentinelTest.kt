@@ -117,12 +117,46 @@ class SingboxEngineExitIpProbeSentinelTest {
 
         val startProxyBlock = source.substringAfter("private suspend fun startProxyMode")
             .substringBefore("override suspend fun attachTun")
-        val startIdx = startProxyBlock.indexOf("p.startProxyMode(json, localProtector)")
-        val cleanupIdx = startProxyBlock.indexOf("if (runtimeStarted) stopRuntimeAfterFailedReadiness(p)")
+        val startIdx = startProxyBlock.indexOf("p.startProxyMode(attemptedOwnerId, json, localProtector)")
+        val cleanupIdx = startProxyBlock.indexOf(
+            "if (runtimeStartAttempted) stopRuntimeAfterFailedReadiness(p, attemptedOwnerId)",
+        )
         val cancelIdx = startProxyBlock.indexOf("if (it is CancellationException) throw it")
         assertTrue(
             startIdx >= 0 && cleanupIdx > startIdx && cancelIdx > cleanupIdx,
             "proxy mode must stop remote runtime on readiness cancellation before propagating cancellation",
+        )
+    }
+
+    @Test
+    fun `failed remote start does not publish attempted owner before binder returns`() {
+        val startProxyBlock = source.substringAfter("private suspend fun startProxyMode")
+            .substringBefore("override suspend fun attachTun")
+        val proxyCallIdx = startProxyBlock.indexOf("p.startProxyMode(attemptedOwnerId, json, localProtector)")
+        val proxyOwnerIdx = startProxyBlock.indexOf("runtimeOwnerId = attemptedOwnerId")
+        val proxyCleanupIdx = startProxyBlock.indexOf(
+            "if (runtimeStartAttempted) stopRuntimeAfterFailedReadiness(p, attemptedOwnerId)",
+        )
+
+        val attachBlock = source.substringAfter("override suspend fun attachTun")
+            .substringBefore("private fun stopRuntimeAfterFailedReadiness")
+        val attachCallIdx = attachBlock.indexOf(
+            "p.startWithConfig(attemptedOwnerId, transportPfd, json, localProtector)",
+        )
+        val attachOwnerIdx = attachBlock.indexOf("runtimeOwnerId = attemptedOwnerId")
+        val attachCleanupIdx = attachBlock.indexOf(
+            "if (runtimeStartAttempted) stopRuntimeAfterFailedReadiness(p, attemptedOwnerId)",
+        )
+
+        assertTrue(
+            proxyCallIdx >= 0 && proxyOwnerIdx > proxyCallIdx && proxyCleanupIdx > proxyCallIdx,
+            "proxy start must preserve the active owner until Binder returns, " +
+                "while failed-attempt cleanup uses attemptedOwnerId",
+        )
+        assertTrue(
+            attachCallIdx >= 0 && attachOwnerIdx > attachCallIdx && attachCleanupIdx > attachCallIdx,
+            "TUN attach must preserve the active owner until Binder returns, " +
+                "while failed-attempt cleanup uses attemptedOwnerId",
         )
     }
 
@@ -135,7 +169,7 @@ class SingboxEngineExitIpProbeSentinelTest {
 
         val stopBlock = source.substringAfter("override suspend fun stop()")
             .substringBefore("override fun stopTimeoutMs()")
-        val stopIdx = stopBlock.indexOf("stopAndWait(REMOTE_STOP_TIMEOUT_MS)")
+        val stopIdx = stopBlock.indexOf("stopAndWait(runtimeOwnerId, REMOTE_STOP_TIMEOUT_MS)")
         val closeIdx = stopBlock.indexOf("close()")
         assertTrue(
             stopIdx >= 0 && closeIdx > stopIdx,
@@ -166,7 +200,7 @@ class SingboxEngineExitIpProbeSentinelTest {
 
         assertTrue(attachBlock.contains("lifecycleMutex.withLock"))
         assertTrue(stopBlock.contains("lifecycleMutex.withLock"))
-        assertTrue(stopBlock.contains("p.stopAndWait(REMOTE_STOP_TIMEOUT_MS)"))
+        assertTrue(stopBlock.contains("p.stopAndWait(runtimeOwnerId, REMOTE_STOP_TIMEOUT_MS)"))
     }
 }
 

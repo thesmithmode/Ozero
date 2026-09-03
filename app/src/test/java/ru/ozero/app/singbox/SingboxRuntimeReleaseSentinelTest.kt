@@ -39,7 +39,7 @@ class SingboxRuntimeReleaseSentinelTest {
         assertTrue(runtime.isFile, "SingboxRuntime.kt must exist")
         val content = runtime.readText()
 
-        val stopBlock = content.substringAfter("fun stop()")
+        val stopBlock = content.substringAfter("fun stop(ownerId: Long? = null)")
             .substringBefore("fun ")
 
         assertTrue(
@@ -60,7 +60,7 @@ class SingboxRuntimeReleaseSentinelTest {
             "singbox-process/src/main/java/ru/ozero/singboxprocess/SingboxRuntime.kt",
         ).readText()
 
-        val stopBlock = content.substringAfter("fun stop()")
+        val stopBlock = content.substringAfter("fun stop(ownerId: Long? = null)")
             .substringBefore("fun ")
         val closeBlock = content.substringAfter("private fun closeCommandServer")
             .substringBefore("private fun createCommandServer")
@@ -74,6 +74,10 @@ class SingboxRuntimeReleaseSentinelTest {
         assertTrue(
             closeServicePos >= 0 && closePos >= 0 && closeServicePos < closePos,
             "closeService must be called before close — stop TUN traffic before shutting down core",
+        )
+        assertTrue(
+            closeBlock.contains("if (!closeService || failure == null)"),
+            "CommandServer must remain intact when closeService fails so owner cleanup can retry before hard kill",
         )
     }
 
@@ -116,12 +120,12 @@ class SingboxRuntimeReleaseSentinelTest {
             "singbox-process/src/main/java/ru/ozero/singboxprocess/SingboxEngineService.kt",
         ).readText()
 
-        val stopBlock = content.substringAfter("override fun stop()")
+        val stopBlock = content.substringAfter("override fun stop(ownerId: Long)")
             .substringBefore("override fun getStats()")
         assertTrue(
-            stopBlock.contains("stopAndWait(DEFAULT_STOP_TIMEOUT_MS)") &&
+            stopBlock.contains("stopAndWait(ownerId, DEFAULT_STOP_TIMEOUT_MS)") &&
                 stopBlock.contains("withTimeoutOrNull") &&
-                stopBlock.contains("SingboxRuntime.stop()"),
+                stopBlock.contains("SingboxRuntime.stop(ownerId)"),
             "SingboxEngineService.stop must synchronously wait for SingboxRuntime.stop before the engine unbinds",
         )
 

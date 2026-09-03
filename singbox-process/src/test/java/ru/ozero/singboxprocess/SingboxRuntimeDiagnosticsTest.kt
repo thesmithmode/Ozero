@@ -191,7 +191,9 @@ class SingboxRuntimeDiagnosticsTest {
     @Test
     fun `restart and stop close runtime resources`() {
         val restart = runtimeSource.substringAfter("if (oldServer != null)").substringBefore("val socketFile")
-        val stop = runtimeSource.substringAfter("suspend fun stop()").substringBefore("fun isRunning()")
+        val stop = runtimeSource
+            .substringAfter("suspend fun stop(ownerId: Long? = null)")
+            .substringBefore("fun isRunning()")
         val close = runtimeSource
             .substringAfter("private fun closeCommandServer")
             .substringBefore("private fun createCommandServer")
