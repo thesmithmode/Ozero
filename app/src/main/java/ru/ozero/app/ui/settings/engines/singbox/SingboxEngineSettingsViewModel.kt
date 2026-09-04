@@ -107,6 +107,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(SingboxSettingsUiState())
     private val testingProfileCounts = ConcurrentHashMap<Long, AtomicInteger>()
     private val pendingInsecureRefreshGroupIds = ArrayDeque<Long>()
+    private val confirmedInsecureRefreshGroupIds = ArrayDeque<Long>()
     private val pendingInsecureRefreshLock = Any()
     private val probeGeneration = AtomicLong()
     private var pingJob: Job? = null
@@ -239,11 +240,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     fun onConfirmInsecureRefresh(confirmed: Boolean) {
         val groupId = consumePendingInsecureRefreshGroup() ?: return
         if (!confirmed) return
-        val previousJob = insecureRetryJob
-        insecureRetryJob = viewModelScope.launch {
-            previousJob?.cancelAndJoin()
-            refreshGroupInternal(groupId, allowInsecureRetry = true)
-        }
+        enqueueConfirmedInsecureRefreshGroup(groupId)
     }
 
     fun onCancel(ping: Boolean = false, refresh: Boolean = false) {
@@ -258,7 +255,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         if (refresh) {
             refreshJob?.cancel()
             insecureRetryJob?.cancel()
-            clearPendingInsecureRefreshGroups()
+            clearInsecureRefreshQueues()
             _uiState.update { it.copy(isRefreshing = emptySet()) }
         }
     }
@@ -400,9 +397,29 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         current
     }
 
-    private fun clearPendingInsecureRefreshGroups() {
+    private fun enqueueConfirmedInsecureRefreshGroup(groupId: Long) {
+        synchronized(pendingInsecureRefreshLock) {
+            if (!confirmedInsecureRefreshGroupIds.contains(groupId)) {
+                confirmedInsecureRefreshGroupIds.addLast(groupId)
+            }
+            if (insecureRetryJob?.isActive == true) return
+            insecureRetryJob = viewModelScope.launch {
+                while (true) {
+                    val nextGroupId = synchronized(pendingInsecureRefreshLock) {
+                        confirmedInsecureRefreshGroupIds.pollFirst().also { next ->
+                            if (next == null) insecureRetryJob = null
+                        }
+                    } ?: return@launch
+                    refreshGroupInternal(nextGroupId, allowInsecureRetry = true)
+                }
+            }
+        }
+    }
+
+    private fun clearInsecureRefreshQueues() {
         synchronized(pendingInsecureRefreshLock) {
             pendingInsecureRefreshGroupIds.clear()
+            confirmedInsecureRefreshGroupIds.clear()
             _uiState.update { it.copy(pendingInsecureRefreshGroupId = null) }
         }
     }
