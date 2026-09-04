@@ -166,11 +166,17 @@ class SingboxProbeService internal constructor(
             schema = recovered.detectedSchemas.joinToString("+") { it.name }.ifEmpty { "none" },
             reason = recovered.category.name,
         )
-        profileDao.updateProbeResultIfCurrent(
-            expected = profile,
-            latency = LATENCY_FAILED,
-            error = PROBE_ERROR_UNSUPPORTED,
-        )
+        try {
+            profileDao.updateProbeResultIfCurrent(
+                expected = profile,
+                latency = LATENCY_FAILED,
+                error = PROBE_ERROR_UNSUPPORTED,
+            )
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            logProbeFailure("persistUnsupportedProbeResult", error, profile.id)
+        }
     }
 
     private suspend fun probeCandidateBatches(
