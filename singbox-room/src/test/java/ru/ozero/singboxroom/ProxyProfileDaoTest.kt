@@ -110,7 +110,7 @@ class ProxyProfileDaoTest {
     }
 
     @Test
-    fun `auto candidate queries should prefer measured healthy profiles`() = runBlocking {
+    fun `auto candidate queries must ignore manual ping latency`() = runBlocking {
         val groupId = insertGroup()
         val dao = db.proxyProfileDao()
         val blob = byteArrayOf(0)
@@ -148,8 +148,8 @@ class ProxyProfileDaoTest {
         val globalCandidates = dao.getAutoCandidatesFlow(2).first()
         val groupCandidates = dao.getAutoCandidatesByGroupId(groupId, 2)
 
-        assertEquals(listOf("Healthy", "Untested"), globalCandidates.map { it.name })
-        assertEquals(listOf("Healthy", "Untested"), groupCandidates.map { it.name })
+        assertEquals(listOf("Untested", "Failed"), globalCandidates.map { it.name })
+        assertEquals(listOf("Untested", "Failed"), groupCandidates.map { it.name })
     }
 
     @Test

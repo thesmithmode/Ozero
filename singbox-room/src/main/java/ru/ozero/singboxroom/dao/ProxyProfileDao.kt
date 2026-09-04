@@ -34,18 +34,7 @@ interface ProxyProfileDao {
     @Query("SELECT * FROM proxy_profiles ORDER BY groupId ASC, userOrder ASC, id ASC LIMIT :limit")
     fun getAllLimitedFlow(limit: Int): Flow<List<ProxyProfile>>
 
-    @Query(
-        """
-        SELECT * FROM proxy_profiles
-        ORDER BY
-            CASE WHEN latencyMs >= 0 THEN 0 WHEN latencyMs = -1 THEN 1 ELSE 2 END ASC,
-            CASE WHEN latencyMs >= 0 THEN latencyMs ELSE userOrder END ASC,
-            groupId ASC,
-            userOrder ASC,
-            id ASC
-        LIMIT :limit
-        """,
-    )
+    @Query("SELECT * FROM proxy_profiles ORDER BY groupId ASC, userOrder ASC, id ASC LIMIT :limit")
     fun getAutoCandidatesFlow(limit: Int): Flow<List<ProxyProfile>>
 
     @Query("SELECT * FROM proxy_profiles WHERE groupId = :groupId ORDER BY userOrder ASC, id ASC")
@@ -57,18 +46,7 @@ interface ProxyProfileDao {
     @Query("SELECT * FROM proxy_profiles WHERE groupId = :groupId ORDER BY userOrder ASC, id ASC LIMIT :limit")
     suspend fun getByGroupIdLimited(groupId: Long, limit: Int): List<ProxyProfile>
 
-    @Query(
-        """
-        SELECT * FROM proxy_profiles
-        WHERE groupId = :groupId
-        ORDER BY
-            CASE WHEN latencyMs >= 0 THEN 0 WHEN latencyMs = -1 THEN 1 ELSE 2 END ASC,
-            CASE WHEN latencyMs >= 0 THEN latencyMs ELSE userOrder END ASC,
-            userOrder ASC,
-            id ASC
-        LIMIT :limit
-        """,
-    )
+    @Query("SELECT * FROM proxy_profiles WHERE groupId = :groupId ORDER BY userOrder ASC, id ASC LIMIT :limit")
     suspend fun getAutoCandidatesByGroupId(groupId: Long, limit: Int): List<ProxyProfile>
 
     @Query("DELETE FROM proxy_profiles WHERE groupId = :groupId")

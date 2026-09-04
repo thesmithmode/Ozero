@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -145,6 +144,23 @@ private fun SingboxSettingsContent(
     modifier: Modifier = Modifier,
 ) {
     var pendingDeleteGroup by remember { mutableStateOf<SubscriptionGroup?>(null) }
+    if (state.pendingInsecureRefreshGroupId != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.onConfirmInsecureRefresh(false) },
+            title = { Text(stringResource(R.string.singbox_insecure_retry_title)) },
+            text = { Text(stringResource(R.string.singbox_insecure_retry_message)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.onConfirmInsecureRefresh(true) }) {
+                    Text(stringResource(R.string.singbox_insecure_retry_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.onConfirmInsecureRefresh(false) }) {
+                    Text(stringResource(R.string.singbox_cancel))
+                }
+            },
+        )
+    }
     pendingDeleteGroup?.let { group ->
         AlertDialog(
             onDismissRequest = { pendingDeleteGroup = null },
@@ -498,27 +514,6 @@ private fun SubscriptionGroupItem(
         }
 
         if (state.isExpanded) {
-            if (!group.isBuiltin && group.subscriptionUrl.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { actions.onAllowInsecureTls(!group.allowInsecureTls) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Checkbox(
-                        checked = group.allowInsecureTls,
-                        onCheckedChange = actions.onAllowInsecureTls,
-                    )
-                    Column {
-                        Text(stringResource(R.string.singbox_subscription_allow_insecure_tls))
-                        Text(
-                            text = stringResource(R.string.singbox_subscription_allow_insecure_tls_warning),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-            }
             val refreshError = state.refreshError ?: group.lastRefreshErrorCode
             if (refreshError != null) {
                 Text(

@@ -67,4 +67,7 @@
     <string name="singbox_probe_all_privacy_title">Testar todos os servidores?</string>
     <string name="singbox_probe_all_privacy_message">O teste de latência se conecta a cada servidor testado. Endpoints da assinatura podem ver seu endereço IP de rede e que o teste ocorreu.</string>
     <string name="singbox_probe_all_privacy_confirm">Testar</string>
+    <string name="singbox_insecure_retry_title">Certificado inválido</string>
+    <string name="singbox_insecure_retry_message">Não foi possível verificar o certificado do servidor. Baixar esta assinatura sem verificá-lo somente desta vez?</string>
+    <string name="singbox_insecure_retry_confirm">Baixar mesmo assim</string>
 </resources>

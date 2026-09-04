@@ -67,4 +67,7 @@
     <string name="singbox_probe_all_privacy_title">¿Probar todos los servidores?</string>
     <string name="singbox_probe_all_privacy_message">La prueba de latencia se conecta a cada servidor probado. Los endpoints de la suscripción pueden ver tu dirección IP de red y que se realizó la prueba.</string>
     <string name="singbox_probe_all_privacy_confirm">Probar</string>
+    <string name="singbox_insecure_retry_title">Certificado no válido</string>
+    <string name="singbox_insecure_retry_message">No se pudo verificar el certificado del servidor. ¿Descargar esta suscripción sin verificarlo solo esta vez?</string>
+    <string name="singbox_insecure_retry_confirm">Descargar de todos modos</string>
 </resources>

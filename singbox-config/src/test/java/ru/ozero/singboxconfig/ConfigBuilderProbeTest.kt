@@ -25,23 +25,33 @@ class ConfigBuilderProbeTest {
         assertContains(json, "\"tag\":\"probe-out-1\"")
         assertContains(json, "\"inbound\":[\"probe-in-0\"],\"outbound\":\"probe-out-0\"")
         assertContains(json, "\"inbound\":[\"probe-in-1\"],\"outbound\":\"probe-out-1\"")
-        assertContains(json, "\"final\":\"block\"")
-        assertContains(json, "\"log\":{\"level\":\"debug\"")
+        assertContains(json, "\"final\":\"direct\"")
+        assertContains(json, "{\"action\":\"reject\"}")
+        assertContains(json, "\"log\":{\"level\":\"warn\"")
+        assertFalse(json.contains("\"type\":\"block\""))
         assertFalse(json.contains("\"type\":\"tun\""))
     }
 
     @Test
-    fun `probe config rejects empty oversized and duplicate port batches`() {
+    fun `probe config supports bounded large batch and rejects empty oversized and duplicate ports`() {
         assertFailsWith<IllegalArgumentException> {
             ConfigBuilder.buildProbeConfig(emptyList())
         }
+
+        ConfigBuilder.buildProbeConfig(
+            (0 until 50).map { index ->
+                ConfigBuilder.ProbeTarget(bean("server-$index.example"), 21_000 + index)
+            },
+        )
+
         assertFailsWith<IllegalArgumentException> {
             ConfigBuilder.buildProbeConfig(
-                (0..10).map { index ->
-                    ConfigBuilder.ProbeTarget(bean("server-$index.example"), 21_000 + index)
+                (0 until 51).map { index ->
+                    ConfigBuilder.ProbeTarget(bean("oversized-$index.example"), 22_000 + index)
                 },
             )
         }
+
         assertFailsWith<IllegalArgumentException> {
             ConfigBuilder.buildProbeConfig(
                 listOf(
