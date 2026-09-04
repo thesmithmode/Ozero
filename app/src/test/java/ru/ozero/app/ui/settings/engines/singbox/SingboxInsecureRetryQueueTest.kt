@@ -7,7 +7,6 @@ import androidx.datastore.preferences.core.mutablePreferencesOf
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.firstArg
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -106,7 +105,7 @@ class SingboxInsecureRetryQueueTest {
         val groupDao = mockk<SubscriptionGroupDao>()
         every { groupDao.getAllFlow() } returns groupsFlow
         coEvery { groupDao.getById(any()) } answers {
-            val id = firstArg<Long>()
+            val id = arg<Long>(0)
             groupsFlow.value.find { it.id == id }
         }
 
