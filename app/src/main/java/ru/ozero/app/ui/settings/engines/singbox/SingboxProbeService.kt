@@ -95,28 +95,8 @@ class SingboxProbeService internal constructor(
                 ?: EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
             ipv6Enabled = settings.ipv6Enabled,
         )
-        val rejectedProfiles = mutableListOf<RejectedProfile>()
-        val probeCandidates = profiles.mapNotNull { profile ->
-            when (val recovered = PersistedProfileRecovery.recover(profile.beanBlob, profile.protocolType)) {
-                is RecoveryResult.Failure -> {
-                    rejectedProfiles += RejectedProfile(
-                        protocol = PersistedProtocol.fromId(profile.protocolType)?.label ?: "unknown",
-                        schema = recovered.detectedSchemas.joinToString("+") { it.name }.ifEmpty { "none" },
-                        reason = recovered.category.name,
-                    )
-                    profileDao.updateProbeResultIfCurrent(
-                        expected = profile,
-                        latency = LATENCY_FAILED,
-                        error = PROBE_ERROR_UNSUPPORTED,
-                    )
-                    null
-                }
-                is RecoveryResult.Success -> profile to recovered.bean
-            }
-        }
-        logRejectedProfiles(rejectedProfiles)
+        val probeCandidates = recoverProbeCandidates(profiles)
         val results = ConcurrentLinkedQueue<ProbeResult>()
-        val batchProbe = profileProbe as? SingboxBatchProfileProbe
         val pending = probeCandidates.associate { it.first.id to it.first }.toMutableMap()
         val indexedCandidates = probeCandidates.mapIndexed { index, candidate ->
             IndexedProbeCandidate(
@@ -127,20 +107,13 @@ class SingboxProbeService internal constructor(
         }
         var pendingTerminalError = PROBE_ERROR_FAILED
         try {
-            indexedCandidates.chunked(MAX_PROBE_RUNTIME_TARGETS).forEach { batch ->
-                val outcomes = if (batchProbe != null) {
-                    probeBatch(batch, probeSettings, batchProbe, onProfileTestingChanged)
-                } else {
-                    probeLegacyBatch(batch, probeSettings, onProfileTestingChanged)
-                }
-                batch.forEach { candidate ->
-                    val outcome = outcomes[candidate.profile.id]
-                        ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
-                    if (persistProbeOutcome(candidate, outcome, results)) {
-                        pending.remove(candidate.profile.id)
-                    }
-                }
-            }
+            probeCandidateBatches(
+                indexedCandidates = indexedCandidates,
+                settings = probeSettings,
+                onProfileTestingChanged = onProfileTestingChanged,
+                results = results,
+                pending = pending,
+            )
         } catch (error: CancellationException) {
             pendingTerminalError = PROBE_ERROR_CANCELLED
             throw error
@@ -165,6 +138,62 @@ class SingboxProbeService internal constructor(
             }
             prefs[SELECTED_PROFILE_KEY] = currentBest.id
             prefs[BEAN_KEY] = currentBest.beanBlob
+        }
+    }
+
+    private suspend fun recoverProbeCandidates(
+        profiles: List<ProxyProfile>,
+    ): List<Pair<ProxyProfile, AbstractBean>> {
+        val rejectedProfiles = mutableListOf<RejectedProfile>()
+        val candidates = mutableListOf<Pair<ProxyProfile, AbstractBean>>()
+        profiles.forEach { profile ->
+            when (val recovered = PersistedProfileRecovery.recover(profile.beanBlob, profile.protocolType)) {
+                is RecoveryResult.Failure -> recordRejectedProfile(profile, recovered, rejectedProfiles)
+                is RecoveryResult.Success -> candidates += profile to recovered.bean
+            }
+        }
+        logRejectedProfiles(rejectedProfiles)
+        return candidates
+    }
+
+    private suspend fun recordRejectedProfile(
+        profile: ProxyProfile,
+        recovered: RecoveryResult.Failure,
+        rejectedProfiles: MutableList<RejectedProfile>,
+    ) {
+        rejectedProfiles += RejectedProfile(
+            protocol = PersistedProtocol.fromId(profile.protocolType)?.label ?: "unknown",
+            schema = recovered.detectedSchemas.joinToString("+") { it.name }.ifEmpty { "none" },
+            reason = recovered.category.name,
+        )
+        profileDao.updateProbeResultIfCurrent(
+            expected = profile,
+            latency = LATENCY_FAILED,
+            error = PROBE_ERROR_UNSUPPORTED,
+        )
+    }
+
+    private suspend fun probeCandidateBatches(
+        indexedCandidates: List<IndexedProbeCandidate>,
+        settings: SingboxProfileProbeSettings,
+        onProfileTestingChanged: (Long, Boolean) -> Unit,
+        results: ConcurrentLinkedQueue<ProbeResult>,
+        pending: MutableMap<Long, ProxyProfile>,
+    ) {
+        val batchProbe = profileProbe as? SingboxBatchProfileProbe
+        indexedCandidates.chunked(MAX_PROBE_RUNTIME_TARGETS).forEach { batch ->
+            val outcomes = if (batchProbe != null) {
+                probeBatch(batch, settings, batchProbe, onProfileTestingChanged)
+            } else {
+                probeLegacyBatch(batch, settings, onProfileTestingChanged)
+            }
+            batch.forEach { candidate ->
+                val outcome = outcomes[candidate.profile.id]
+                    ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
+                if (persistProbeOutcome(candidate, outcome, results)) {
+                    pending.remove(candidate.profile.id)
+                }
+            }
         }
     }
 
