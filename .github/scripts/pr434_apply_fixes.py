@@ -1,0 +1,310 @@
+from pathlib import Path
+
+
+def replace(path: str, old: str, new: str, count: int = 1) -> None:
+    p = Path(path)
+    text = p.read_text()
+    actual = text.count(old)
+    if actual < count:
+        raise SystemExit(f"missing expected pattern in {path}: need {count}, got {actual}")
+    p.write_text(text.replace(old, new, count))
+
+
+probe = "app/src/main/java/ru/ozero/app/ui/settings/engines/singbox/SingboxProbeService.kt"
+replace(
+    probe,
+    """        try {
+            val outcomes = if (batchProbe != null) {
+                probeBatch(indexedCandidates, probeSettings, batchProbe, onProfileTestingChanged)
+            } else {
+                probeLegacyBatch(indexedCandidates, probeSettings, onProfileTestingChanged)
+            }
+            indexedCandidates.forEach { candidate ->
+                val outcome = outcomes[candidate.profile.id]
+                    ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
+                if (persistProbeOutcome(candidate, outcome, results)) {
+                    pending.remove(candidate.profile.id)
+                }
+            }
+        } catch (error: CancellationException) {""",
+    """        try {
+            indexedCandidates.chunked(MAX_PROBE_RUNTIME_TARGETS).forEach { batch ->
+                val outcomes = if (batchProbe != null) {
+                    probeBatch(batch, probeSettings, batchProbe, onProfileTestingChanged)
+                } else {
+                    probeLegacyBatch(batch, probeSettings, onProfileTestingChanged)
+                }
+                batch.forEach { candidate ->
+                    val outcome = outcomes[candidate.profile.id]
+                        ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
+                    if (persistProbeOutcome(candidate, outcome, results)) {
+                        pending.remove(candidate.profile.id)
+                    }
+                }
+            }
+        } catch (error: CancellationException) {""",
+)
+replace(
+    probe,
+    """        const val MAX_PARALLEL_HTTP_PROBES = 10
+        const val MAX_CONCURRENT_PROFILE_PROBES = MAX_PARALLEL_HTTP_PROBES""",
+    """        const val MAX_PARALLEL_HTTP_PROBES = 10
+        const val MAX_PROBE_RUNTIME_TARGETS = 50
+        const val MAX_CONCURRENT_PROFILE_PROBES = MAX_PARALLEL_HTTP_PROBES""",
+)
+
+config = "singbox-config/src/main/java/ru/ozero/singboxconfig/ConfigBuilder.kt"
+replace(
+    config,
+    """    private const val MAX_AUTO_OUTBOUNDS = 50
+    private const val MAX_AUTO_CONFIG_BYTES = 512 * 1024""",
+    """    private const val MAX_AUTO_OUTBOUNDS = 50
+    private const val MAX_PROBE_OUTBOUNDS = 50
+    private const val MAX_AUTO_CONFIG_BYTES = 512 * 1024""",
+)
+replace(
+    config,
+    """        require(targets.isNotEmpty()) { "probe targets must not be empty" }
+        require(targets.map { it.socksPort }.distinct().size == targets.size) {""",
+    """        require(targets.isNotEmpty()) { "probe targets must not be empty" }
+        require(targets.size <= MAX_PROBE_OUTBOUNDS) {
+            "probe config supports at most $MAX_PROBE_OUTBOUNDS outbounds"
+        }
+        require(targets.map { it.socksPort }.distinct().size == targets.size) {""",
+)
+
+updater = "singbox-subscription/src/main/java/ru/ozero/singboxsubscription/RawUpdater.kt"
+replace(
+    updater,
+    """    private fun httpClientFor(group: SubscriptionGroup, allowInsecureRetry: Boolean): OkHttpClient = when {
+        allowInsecureRetry -> insecureOkHttpClient
+        group.isBuiltin -> okHttpClient
+        else -> userCaOkHttpClient
+    }""",
+    """    private fun httpClientFor(group: SubscriptionGroup, allowInsecureRetry: Boolean): OkHttpClient = when {
+        group.isBuiltin -> okHttpClient
+        allowInsecureRetry -> insecureOkHttpClient
+        else -> userCaOkHttpClient
+    }""",
+)
+replace(
+    updater,
+    """private fun SubscriptionGroup.subscriptionTlsMode(allowInsecureRetry: Boolean): String = when {
+    allowInsecureRetry -> "insecure-retry"
+    isBuiltin -> "system"
+    else -> "user-ca"
+}""",
+    """private fun SubscriptionGroup.subscriptionTlsMode(allowInsecureRetry: Boolean): String = when {
+    isBuiltin -> "system"
+    allowInsecureRetry -> "insecure-retry"
+    else -> "user-ca"
+}""",
+)
+
+vm = "app/src/main/java/ru/ozero/app/ui/settings/engines/singbox/SingboxEngineSettingsViewModel.kt"
+replace(
+    vm,
+    """    private var pingJob: Job? = null
+    private var refreshJob: Job? = null""",
+    """    private var pingJob: Job? = null
+    private var refreshJob: Job? = null
+    private var insecureRetryJob: Job? = null""",
+)
+replace(
+    vm,
+    """    fun onConfirmInsecureRefresh(confirmed: Boolean) {
+        val groupId = consumePendingInsecureRefreshGroup() ?: return
+        if (!confirmed) return
+        refreshJob = viewModelScope.launch { refreshGroupInternal(groupId, allowInsecureRetry = true) }
+    }""",
+    """    fun onConfirmInsecureRefresh(confirmed: Boolean) {
+        val groupId = consumePendingInsecureRefreshGroup() ?: return
+        if (!confirmed) return
+        val previousJob = insecureRetryJob
+        insecureRetryJob = viewModelScope.launch {
+            previousJob?.cancelAndJoin()
+            refreshGroupInternal(groupId, allowInsecureRetry = true)
+        }
+    }""",
+)
+replace(
+    vm,
+    """        if (refresh) {
+            refreshJob?.cancel()
+            _uiState.update { it.copy(isRefreshing = emptySet()) }
+        }""",
+    """        if (refresh) {
+            refreshJob?.cancel()
+            insecureRetryJob?.cancel()
+            clearPendingInsecureRefreshGroups()
+            _uiState.update { it.copy(isRefreshing = emptySet()) }
+        }""",
+)
+replace(
+    vm,
+    """    private fun consumePendingInsecureRefreshGroup(): Long? = synchronized(pendingInsecureRefreshLock) {
+        val current = _uiState.value.pendingInsecureRefreshGroupId ?: return@synchronized null
+        pendingInsecureRefreshGroupIds.removeFirstOccurrence(current)
+        _uiState.update {
+            it.copy(pendingInsecureRefreshGroupId = pendingInsecureRefreshGroupIds.peekFirst())
+        }
+        current
+    }
+
+    fun onAddGroupDialog""",
+    """    private fun consumePendingInsecureRefreshGroup(): Long? = synchronized(pendingInsecureRefreshLock) {
+        val current = _uiState.value.pendingInsecureRefreshGroupId ?: return@synchronized null
+        pendingInsecureRefreshGroupIds.removeFirstOccurrence(current)
+        _uiState.update {
+            it.copy(pendingInsecureRefreshGroupId = pendingInsecureRefreshGroupIds.peekFirst())
+        }
+        current
+    }
+
+    private fun clearPendingInsecureRefreshGroups() {
+        synchronized(pendingInsecureRefreshLock) {
+            pendingInsecureRefreshGroupIds.clear()
+            _uiState.update { it.copy(pendingInsecureRefreshGroupId = null) }
+        }
+    }
+
+    fun onAddGroupDialog""",
+)
+
+probe_test = "app/src/test/java/ru/ozero/app/ui/settings/engines/singbox/SingboxProbeServiceTest.kt"
+replace(
+    probe_test,
+    "fun `probeAndAutoSelect reuses one runtime for a large bounded batch`() = runTest {",
+    "fun `probeAndAutoSelect bounds each runtime batch to fifty targets`() = runTest {",
+)
+replace(
+    probe_test,
+    "val profiles = (1L..25L).map { id -> validProfile(id, latency = (100 + id).toInt()) }",
+    "val profiles = (1L..125L).map { id -> validProfile(id, latency = (100 + id).toInt()) }",
+)
+replace(
+    probe_test,
+    """        assertEquals(listOf(25), probe.batchSizes)
+        assertEquals(1, probe.startCount.get())
+        assertEquals(1, probe.stopCount.get())
+        assertEquals(25, probe.maxConcurrentTargets.get())""",
+    """        assertEquals(listOf(50, 50, 25), probe.batchSizes)
+        assertEquals(3, probe.startCount.get())
+        assertEquals(3, probe.stopCount.get())
+        assertEquals(50, probe.maxConcurrentTargets.get())""",
+)
+
+config_test = "singbox-config/src/test/java/ru/ozero/singboxconfig/ConfigBuilderProbeTest.kt"
+replace(
+    config_test,
+    "fun `probe config supports large batch and rejects empty and duplicate ports`() {",
+    "fun `probe config supports bounded large batch and rejects empty oversized and duplicate ports`() {",
+)
+replace(
+    config_test,
+    """        ConfigBuilder.buildProbeConfig(
+            (0 until 200).map { index ->
+                ConfigBuilder.ProbeTarget(bean("server-$index.example"), 21_000 + index)
+            },
+        )
+
+        assertFailsWith<IllegalArgumentException> {""",
+    """        ConfigBuilder.buildProbeConfig(
+            (0 until 50).map { index ->
+                ConfigBuilder.ProbeTarget(bean("server-$index.example"), 21_000 + index)
+            },
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            ConfigBuilder.buildProbeConfig(
+                (0 until 51).map { index ->
+                    ConfigBuilder.ProbeTarget(bean("oversized-$index.example"), 22_000 + index)
+                },
+            )
+        }
+
+        assertFailsWith<IllegalArgumentException> {""",
+)
+
+updater_test = "singbox-subscription/src/test/java/ru/ozero/singboxsubscription/RawUpdaterTest.kt"
+insert_after = """    @Test
+    fun `should use isolated insecure client only when user enables it`() = runBlocking {
+        val insecureCalls = AtomicInteger(0)
+        rawUpdater = RawUpdater(
+            okHttpClient = OkHttpClient(),
+            groupDao = groupDao,
+            profileDao = profileDao,
+            userCaOkHttpClient = OkHttpClient.Builder()
+                .addInterceptor { throw SSLHandshakeException("certificate path") }
+                .build(),
+            insecureOkHttpClient = OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    insecureCalls.incrementAndGet()
+                    chain.proceed(chain.request())
+                }
+                .build(),
+        )
+        server.enqueue(MockResponse().setBody(vless1))
+
+        val result = rawUpdater.refresh(
+            group().copy(isBuiltin = false, allowInsecureTls = true),
+            allowInsecureRetry = true,
+        )
+
+        assertTrue(result.isSuccess)
+        assertEquals(1, insecureCalls.get())
+    }
+"""
+builtin_test = insert_after + """
+    @Test
+    fun `builtin subscription never uses insecure retry client`() = runBlocking {
+        val systemCalls = AtomicInteger(0)
+        val insecureCalls = AtomicInteger(0)
+        rawUpdater = RawUpdater(
+            okHttpClient = OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    systemCalls.incrementAndGet()
+                    chain.proceed(chain.request())
+                }
+                .build(),
+            groupDao = groupDao,
+            profileDao = profileDao,
+            userCaOkHttpClient = OkHttpClient.Builder()
+                .addInterceptor { throw SSLHandshakeException("certificate path") }
+                .build(),
+            insecureOkHttpClient = OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    insecureCalls.incrementAndGet()
+                    chain.proceed(chain.request())
+                }
+                .build(),
+        )
+        server.enqueue(MockResponse().setBody(vless1))
+
+        val result = rawUpdater.refresh(group().copy(isBuiltin = true), allowInsecureRetry = true)
+
+        assertTrue(result.isSuccess)
+        assertEquals(1, systemCalls.get())
+        assertEquals(0, insecureCalls.get())
+    }
+"""
+replace(updater_test, insert_after, builtin_test)
+
+marker = "override suspend fun attachTun(tunFd: Int): TunAttachResult"
+attach_files = []
+for p in Path(".").rglob("*.kt"):
+    text = p.read_text(errors="ignore")
+    if marker in text:
+        attach_files.append(p)
+if len(attach_files) != 1:
+    raise SystemExit(f"expected one attachTun implementation, found {attach_files}")
+p = attach_files[0]
+text = p.read_text()
+marker_pos = text.index(marker)
+old = 'TunAttachResult.Failure("AIDL failed")'
+failure_pos = text.find(old, marker_pos)
+if failure_pos < 0:
+    raise SystemExit(f"missing attachTun generic AIDL failure in {p}")
+new = 'TunAttachResult.Failure("AIDL failed (${it::class.java.simpleName})")'
+p.write_text(text[:failure_pos] + new + text[failure_pos + len(old):])
+print(f"updated attachTun diagnostics in {p}")
