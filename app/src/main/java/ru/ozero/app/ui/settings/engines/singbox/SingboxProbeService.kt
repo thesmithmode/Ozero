@@ -426,33 +426,33 @@ private class SingboxServiceProfileProbe(
         settings: SingboxProfileProbeSettings,
     ): Map<Long, SingboxProbeOutcome> = mutex.withLock {
         withContext(Dispatchers.IO) {
-            probeBatchLocked(targets, settings)
+            isolateProbeBatchFailures(targets, MAX_RUNTIME_START_SPLITS) { batch ->
+                probeBatchAttempt(batch, settings)
+            }
         }
     }
 
-    private suspend fun probeBatchLocked(
+    private suspend fun probeBatchAttempt(
         targets: List<SingboxProfileProbeTarget>,
         settings: SingboxProfileProbeSettings,
-    ): Map<Long, SingboxProbeOutcome> {
-        if (targets.isEmpty()) return emptyMap()
+    ): ProbeBatchAttempt {
+        if (targets.isEmpty()) return ProbeBatchAttempt(emptyMap())
         coroutineContext.ensureActive()
         val ports = allocateProbePorts(targets.size)
         val config = buildProbeConfig(targets, ports, settings)
-            ?: return failedOutcomes(targets)
+            ?: return ProbeBatchAttempt(failedOutcomes(targets))
         if (config.toByteArray(Charsets.UTF_8).size > MAX_PROBE_CONFIG_BYTES) {
             logProbeStateFailure("buildConfig", "config_too_large")
-            if (targets.size == 1) {
-                return outcomes(
+            return ProbeBatchAttempt(
+                outcomes = outcomes(
                     targets,
                     SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_CONFIG_TOO_LARGE),
-                )
-            }
-            val midpoint = targets.size / 2
-            return probeBatchLocked(targets.subList(0, midpoint), settings) +
-                probeBatchLocked(targets.subList(midpoint, targets.size), settings)
+                ),
+                splitReason = ProbeBatchSplitReason.CONFIG_SIZE,
+            )
         }
         val binding = bindProcess()
-            ?: return failedOutcomes(targets)
+            ?: return ProbeBatchAttempt(failedOutcomes(targets))
         return runProbeRuntime(targets, ports, settings, config, binding)
     }
 
@@ -481,7 +481,7 @@ private class SingboxServiceProfileProbe(
         settings: SingboxProfileProbeSettings,
         config: String,
         binding: Binding,
-    ): Map<Long, SingboxProbeOutcome> {
+    ): ProbeBatchAttempt {
         val ownerId = UUID.randomUUID().mostSignificantBits
         val localProtector = ProfileProbeProtector()
         var shouldStop = false
@@ -489,15 +489,21 @@ private class SingboxServiceProfileProbe(
             when (startProbeRuntime(binding, ownerId, config, localProtector)) {
                 ProbeRuntimeStart.STARTED -> {
                     shouldStop = true
-                    if (isProbeRuntimeReady(binding)) {
+                    val outcomes = if (isProbeRuntimeReady(binding)) {
                         probeTargets(targets, ports, settings, binding)
                     } else {
                         failedOutcomes(targets, processDied = binding.processDied.get())
                     }
+                    ProbeBatchAttempt(outcomes)
                 }
-                ProbeRuntimeStart.BUSY -> outcomes(targets, SingboxProbeOutcome.SkippedActiveRuntime)
-                ProbeRuntimeStart.PROCESS_DIED -> failedOutcomes(targets, processDied = true)
-                ProbeRuntimeStart.FAILED -> failedOutcomes(targets)
+                ProbeRuntimeStart.BUSY -> ProbeBatchAttempt(
+                    outcomes(targets, SingboxProbeOutcome.SkippedActiveRuntime),
+                )
+                ProbeRuntimeStart.PROCESS_DIED -> ProbeBatchAttempt(failedOutcomes(targets, processDied = true))
+                ProbeRuntimeStart.FAILED -> ProbeBatchAttempt(
+                    outcomes = failedOutcomes(targets),
+                    splitReason = ProbeBatchSplitReason.RUNTIME_START,
+                )
             }
         } finally {
             cleanupProbeRuntime(binding, ownerId, shouldStop)
@@ -792,6 +798,7 @@ private class SingboxServiceProfileProbe(
         const val BIND_TIMEOUT_MS = 5_000L
         const val SINGLE_PROFILE_ID = 0L
         const val MAX_PROBE_CONFIG_BYTES = 256 * 1024
+        const val MAX_RUNTIME_START_SPLITS = 12
     }
 }
 
