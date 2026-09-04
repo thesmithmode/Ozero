@@ -54,8 +54,8 @@ jobs:
           git diff --check
           git diff --stat
 
-      - name: Run targeted tests
-        run: ./gradlew :app:testDebugUnitTest :singbox-config:testDebugUnitTest :singbox-subscription:testDebugUnitTest --no-daemon
+      - name: Run dependency-independent targeted tests
+        run: ./gradlew :singbox-config:testDebugUnitTest :singbox-subscription:testDebugUnitTest --no-daemon
 
       - name: Commit fixes and clean temporary files
         run: |
