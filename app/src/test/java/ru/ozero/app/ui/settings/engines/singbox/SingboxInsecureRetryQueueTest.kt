@@ -104,9 +104,8 @@ class SingboxInsecureRetryQueueTest {
     ): SingboxEngineSettingsViewModel {
         val groupDao = mockk<SubscriptionGroupDao>()
         every { groupDao.getAllFlow() } returns groupsFlow
-        coEvery { groupDao.getById(any()) } answers {
-            val id = arg<Long>(0)
-            groupsFlow.value.find { it.id == id }
+        groupsFlow.value.forEach { group ->
+            coEvery { groupDao.getById(group.id) } returns group
         }
 
         val profilesFlow = MutableStateFlow<List<ProxyProfile>>(emptyList())
