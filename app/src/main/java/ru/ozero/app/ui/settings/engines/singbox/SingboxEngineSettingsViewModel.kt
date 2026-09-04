@@ -42,8 +42,10 @@ import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 import ru.ozero.singboxsubscription.GroupSeeder
 import ru.ozero.singboxsubscription.RawUpdater
+import ru.ozero.singboxsubscription.SubscriptionRefreshErrorCode
 import ru.ozero.singboxsubscription.isSupportedSubscriptionUrl
 import ru.ozero.singboxsubscription.parser.RawShareLinksParser
+import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -86,6 +88,7 @@ data class SingboxSettingsUiState(
     val manualLinksInput: String = "",
     val manualLinksGroupName: String = "",
     val manualLinksError: String? = null,
+    val pendingInsecureRefreshGroupId: Long? = null,
     val probeTimeoutSeconds: Int = SingboxProbeService.DEFAULT_PROBE_TIMEOUT_MS / 1_000,
 )
 
@@ -104,9 +107,14 @@ class SingboxEngineSettingsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(SingboxSettingsUiState())
     private val testingProfileCounts = ConcurrentHashMap<Long, AtomicInteger>()
+    private val pendingInsecureRefreshes = ArrayDeque<InsecureRefreshConsent>()
+    private val confirmedInsecureRefreshes = ArrayDeque<InsecureRefreshConsent>()
+    private val pendingInsecureRefreshLock = Any()
+    private val secureRefreshGenerations = mutableMapOf<Long, Long>()
     private val probeGeneration = AtomicLong()
     private var pingJob: Job? = null
     private var refreshJob: Job? = null
+    private var insecureRetryJob: Job? = null
 
     val state: StateFlow<SingboxSettingsUiState> = combine(
         groupDao.getAllFlow(),
@@ -231,6 +239,12 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
+    fun onConfirmInsecureRefresh(confirmed: Boolean) {
+        val consent = consumePendingInsecureRefresh() ?: return
+        if (!confirmed) return
+        enqueueConfirmedInsecureRefresh(consent)
+    }
+
     fun onCancel(ping: Boolean = false, refresh: Boolean = false) {
         if (ping) {
             probeGeneration.incrementAndGet()
@@ -242,6 +256,8 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
         if (refresh) {
             refreshJob?.cancel()
+            insecureRetryJob?.cancel()
+            clearInsecureRefreshQueues()
             _uiState.update { it.copy(isRefreshing = emptySet()) }
         }
     }
@@ -321,8 +337,9 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
     }
 
-    private suspend fun refreshGroupInternal(groupId: Long) {
+    private suspend fun refreshGroupInternal(groupId: Long, allowInsecureRetry: Boolean = false) {
         val group = groupDao.getById(groupId) ?: return
+        val secureRefreshGeneration = if (allowInsecureRetry) null else beginSecureRefresh(groupId)
         _uiState.update {
             it.copy(
                 isRefreshing = it.isRefreshing + groupId,
@@ -331,13 +348,20 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
         var errorMsg: String? = null
         try {
-            val result = rawUpdater.refresh(group)
-            errorMsg = result.exceptionOrNull()?.let { failure ->
+            val result = rawUpdater.refresh(group, allowInsecureRetry)
+            val code = result.exceptionOrNull()?.let { failure ->
                 groupDao.getById(groupId)?.lastRefreshErrorCode ?: failure.message
             }
+            if (secureRefreshGeneration != null) {
+                updateInsecureRefreshEligibility(group, code, secureRefreshGeneration)
+            }
+            errorMsg = code
         } catch (ce: CancellationException) {
             throw ce
         } catch (t: Throwable) {
+            if (secureRefreshGeneration != null) {
+                removeInsecureRefreshIfCurrent(groupId, secureRefreshGeneration)
+            }
             errorMsg = t.message ?: "refresh failed"
         } finally {
             val visibleProfiles = profileDao.getByGroupIdLimited(groupId, MAX_VISIBLE_PROFILES)
@@ -352,6 +376,109 @@ class SingboxEngineSettingsViewModel @Inject constructor(
                     },
                 )
             }
+        }
+    }
+
+    private fun beginSecureRefresh(groupId: Long): Long = synchronized(pendingInsecureRefreshLock) {
+        val generation = (secureRefreshGenerations[groupId] ?: 0L) + 1L
+        secureRefreshGenerations[groupId] = generation
+        removeInsecureRefreshGroupLocked(groupId)
+        generation
+    }
+
+    private fun updateInsecureRefreshEligibility(
+        group: SubscriptionGroup,
+        errorCode: String?,
+        generation: Long,
+    ) = synchronized(pendingInsecureRefreshLock) {
+        if (secureRefreshGenerations[group.id] != generation) return@synchronized
+        if (!group.isBuiltin && errorCode == SubscriptionRefreshErrorCode.TLS_CERTIFICATE) {
+            enqueuePendingInsecureRefreshLocked(InsecureRefreshConsent(group.id, generation))
+        } else {
+            removeInsecureRefreshGroupLocked(group.id)
+        }
+    }
+
+    private fun removeInsecureRefreshIfCurrent(groupId: Long, generation: Long) {
+        synchronized(pendingInsecureRefreshLock) {
+            if (secureRefreshGenerations[groupId] == generation) {
+                removeInsecureRefreshGroupLocked(groupId)
+            }
+        }
+    }
+
+    private fun enqueuePendingInsecureRefreshLocked(consent: InsecureRefreshConsent) {
+        if (pendingInsecureRefreshes.none { it.groupId == consent.groupId }) {
+            pendingInsecureRefreshes.addLast(consent)
+        }
+        if (_uiState.value.pendingInsecureRefreshGroupId == null) {
+            _uiState.update {
+                it.copy(pendingInsecureRefreshGroupId = pendingInsecureRefreshes.peekFirst()?.groupId)
+            }
+        }
+    }
+
+    private fun consumePendingInsecureRefresh(): InsecureRefreshConsent? = synchronized(pendingInsecureRefreshLock) {
+        val current = _uiState.value.pendingInsecureRefreshGroupId ?: return@synchronized null
+        val consent = pendingInsecureRefreshes.firstOrNull { it.groupId == current }
+            ?: return@synchronized null
+        pendingInsecureRefreshes.removeFirstOccurrence(consent)
+        _uiState.update {
+            it.copy(pendingInsecureRefreshGroupId = pendingInsecureRefreshes.peekFirst()?.groupId)
+        }
+        consent
+    }
+
+    private fun enqueueConfirmedInsecureRefresh(consent: InsecureRefreshConsent) {
+        synchronized(pendingInsecureRefreshLock) {
+            if (secureRefreshGenerations[consent.groupId] != consent.secureGeneration) return
+            if (confirmedInsecureRefreshes.none { it.groupId == consent.groupId }) {
+                confirmedInsecureRefreshes.addLast(consent)
+            }
+            if (insecureRetryJob?.isActive == true) return
+            insecureRetryJob = viewModelScope.launch {
+                while (true) {
+                    val nextConsent = pollConfirmedInsecureRefresh() ?: return@launch
+                    refreshGroupInternal(nextConsent.groupId, allowInsecureRetry = true)
+                }
+            }
+        }
+    }
+
+    private fun pollConfirmedInsecureRefresh(): InsecureRefreshConsent? = synchronized(pendingInsecureRefreshLock) {
+        while (true) {
+            val next = confirmedInsecureRefreshes.pollFirst()
+            if (next == null) {
+                insecureRetryJob = null
+                return@synchronized null
+            }
+            if (secureRefreshGenerations[next.groupId] == next.secureGeneration) {
+                return@synchronized next
+            }
+        }
+        @Suppress("UNREACHABLE_CODE")
+        null
+    }
+
+    private fun removeInsecureRefreshGroupLocked(groupId: Long) {
+        pendingInsecureRefreshes.firstOrNull { it.groupId == groupId }?.let {
+            pendingInsecureRefreshes.removeFirstOccurrence(it)
+        }
+        confirmedInsecureRefreshes.firstOrNull { it.groupId == groupId }?.let {
+            confirmedInsecureRefreshes.removeFirstOccurrence(it)
+        }
+        if (_uiState.value.pendingInsecureRefreshGroupId == groupId) {
+            _uiState.update {
+                it.copy(pendingInsecureRefreshGroupId = pendingInsecureRefreshes.peekFirst()?.groupId)
+            }
+        }
+    }
+
+    private fun clearInsecureRefreshQueues() {
+        synchronized(pendingInsecureRefreshLock) {
+            pendingInsecureRefreshes.clear()
+            confirmedInsecureRefreshes.clear()
+            _uiState.update { it.copy(pendingInsecureRefreshGroupId = null) }
         }
     }
 
@@ -610,6 +737,11 @@ class SingboxEngineSettingsViewModel @Inject constructor(
 
     private suspend fun nextGroupOrder(): Int =
         (groupDao.getAll().maxOfOrNull { it.userOrder } ?: -1) + 1
+
+    private data class InsecureRefreshConsent(
+        val groupId: Long,
+        val secureGeneration: Long,
+    )
 }
 
 private fun protocolTypeOf(bean: AbstractBean): Int = when (bean) {

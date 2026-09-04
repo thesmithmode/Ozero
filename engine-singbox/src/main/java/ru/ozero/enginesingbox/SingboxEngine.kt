@@ -617,11 +617,8 @@ class SingboxEngine @Inject constructor(
                     if (runtimeStartAttempted) stopRuntimeAfterFailedReadiness(p, attemptedOwnerId)
                     clearPendingStart()
                     if (it is CancellationException) throw it
-                    PersistentLoggers.error(
-                        TAG,
-                        "startWithConfig failed exceptionClass=${it::class.java.simpleName} stableCategory=aidl",
-                    )
-                    TunAttachResult.Failure("AIDL failed")
+                    logIpcFailure("attachTun.startWithConfig", it, generation)
+                    TunAttachResult.Failure("AIDL failed (${it.safeFailureReason()})")
                 }
             } finally {
                 runCatching { transportPfd.close() }
@@ -1393,6 +1390,12 @@ class SingboxEngine @Inject constructor(
 }
 
 private fun Throwable.safeExceptionClass(): String = this::class.simpleName ?: "Throwable"
+
+private fun Throwable.safeFailureReason(): String {
+    val exceptionClass = safeExceptionClass()
+    val sanitizedMessage = LogSanitizer.sanitize(message.orEmpty()).take(256)
+    return if (sanitizedMessage.isBlank()) exceptionClass else "$exceptionClass: $sanitizedMessage"
+}
 
 private fun List<ProfileInputFailure>.failureCounts(): String =
     groupingBy { failure -> failure.reason?.name ?: failure.stage.name }

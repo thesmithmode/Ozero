@@ -47,11 +47,27 @@ class ConfigBuilderSingbox13SentinelTest {
     }
 
     @Test
-    fun `auto-select config must not contain deprecated sniff fields`() {
+    fun `regular config must not contain legacy block outbound`() {
+        val json = ConfigBuilder.buildSingboxConfig(makeBean())
+        assertFalse(json.contains(""""type":"block""""), "legacy block outbound was removed in sing-box 1.13")
+    }
+
+    @Test
+    fun `auto-select config must not contain deprecated sniff fields or legacy block outbound`() {
         val beans = listOf(makeBean(), makeBean().apply { serverAddress = "test2.example.com" })
         val json = ConfigBuilder.buildSingboxAutoConfig(beans)
         assertFalse(json.contains(""""sniff":true"""))
         assertFalse(json.contains("sniff_override_destination"))
+        assertFalse(json.contains(""""type":"block""""), "legacy block outbound was removed in sing-box 1.13")
         assertContains(json, """"action":"sniff"""")
+    }
+
+    @Test
+    fun `probe config must not contain legacy block outbound`() {
+        val json = ConfigBuilder.buildProbeConfig(
+            listOf(ConfigBuilder.ProbeTarget(makeBean(), 24_001)),
+        )
+        assertFalse(json.contains(""""type":"block""""), "legacy block outbound was removed in sing-box 1.13")
+        assertContains(json, """"action":"reject"""")
     }
 }

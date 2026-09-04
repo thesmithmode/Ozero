@@ -64,7 +64,7 @@ object ConfigBuilder {
     private const val MIN_PORT = 1
     private const val MAX_PORT = 65_535
     private const val MAX_AUTO_OUTBOUNDS = 50
-    private const val MAX_PROBE_OUTBOUNDS = 10
+    private const val MAX_PROBE_OUTBOUNDS = 50
     private const val MAX_AUTO_CONFIG_BYTES = 512 * 1024
 
     fun buildSingboxConfig(
@@ -392,7 +392,6 @@ object ConfigBuilder {
             sb.append(outbound)
         }
         sb.append(""",{"type":"direct","tag":"direct"}""")
-        sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
         sb.append(dnsConfig(dnsServers, detour = "proxy", ipv6Enabled = ipv6Enabled))
         sb.append("\"route\":{")
@@ -428,7 +427,6 @@ object ConfigBuilder {
             sb.append(socksOutbound("upstream", upstream.host, upstream.port))
         }
         sb.append(""",{"type":"direct","tag":"direct"}""")
-        sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
         sb.append(dnsConfig(dnsServers, detour = "proxy", ipv6Enabled = ipv6Enabled))
         sb.append("\"route\":{")
@@ -450,25 +448,24 @@ object ConfigBuilder {
     ): String {
         val sb = StringBuilder()
         sb.append('{')
-        sb.append(""""log":{"level":"debug","timestamp":true},""")
+        sb.append(""""log":{"level":"warn","timestamp":true},""")
         sb.append(""""inbounds":[""")
         sb.append(inbounds.joinToString(","))
         sb.append("""],""")
         sb.append(""""outbounds":[""")
         sb.append(proxyOutbounds.joinToString(","))
         sb.append(""",{"type":"direct","tag":"direct"}""")
-        sb.append(""",{"type":"block","tag":"block"}""")
         sb.append("""],""")
         sb.append(dnsConfig(dnsServers, detour = null, ipv6Enabled = ipv6Enabled))
         sb.append("\"route\":{")
         sb.append(defaultDomainResolver(ipv6Enabled))
-        sb.append(""""final":"block","auto_detect_interface":true,"rules":[""")
+        sb.append(""""final":"direct","auto_detect_interface":true,"rules":[""")
         sb.append("""{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}""")
         routeRules.forEach { rule ->
             sb.append(',')
             sb.append(rule)
         }
-        sb.append("]}}")
+        sb.append(""",{"action":"reject"}]}}""")
         return sb.toString()
     }
 

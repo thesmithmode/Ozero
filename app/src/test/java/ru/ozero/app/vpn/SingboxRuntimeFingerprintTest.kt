@@ -17,7 +17,7 @@ import kotlin.test.assertNotEquals
 class SingboxRuntimeFingerprintTest {
 
     @Test
-    fun `selected auto fingerprints bounded prioritized runtime candidate payloads`() {
+    fun `selected auto fingerprints bounded stable runtime candidate payloads`() {
         val prefs = prefs(selected = SingboxEngine.SELECTED_AUTO)
         val profiles = (1L..80L).map { id ->
             profile(id, validBlob(id)).copy(
@@ -28,7 +28,7 @@ class SingboxRuntimeFingerprintTest {
 
         val fingerprint = singboxRuntimeFingerprint(prefs, profiles, emptyList(), ipv6Enabled = true)
 
-        val expectedIds = listOf(70L) + (1L..49L)
+        val expectedIds = (1L..50L).toList()
         assertEquals(
             SingboxRuntimeFingerprint(
                 selectedProfileId = SingboxEngine.SELECTED_AUTO,

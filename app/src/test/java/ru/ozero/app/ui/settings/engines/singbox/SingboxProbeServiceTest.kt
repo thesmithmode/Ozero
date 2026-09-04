@@ -193,7 +193,7 @@ class SingboxProbeServiceTest {
     }
 
     @Test
-    fun `probeAndAutoSelect preserves latency when singbox runtime is busy`() = runTest {
+    fun `probeAndAutoSelect marks runtime busy as failed`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
@@ -207,12 +207,13 @@ class SingboxProbeServiceTest {
         )
             .probeAndAutoSelect(listOf(profile))
 
-        assertEquals(31, dao.latencies[7L])
+        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[7L])
+        assertEquals(SingboxProbeService.PROBE_ERROR_RUNTIME_BUSY, dao.errors[7L])
         assertNull(prefsFlow.value[selectedProfileKey])
     }
 
     @Test
-    fun `probeAndAutoSelect skips entire batch without stopping active runtime`() = runTest {
+    fun `probeAndAutoSelect records busy result without stopping active runtime`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
@@ -227,7 +228,8 @@ class SingboxProbeServiceTest {
         assertEquals(1, probe.batchCalls.get())
         assertEquals(0, probe.startCount.get())
         assertEquals(0, probe.stopCount.get())
-        assertTrue(dao.latencies.isEmpty())
+        assertEquals(profiles.associate { it.id to SingboxProbeService.LATENCY_FAILED }, dao.latencies)
+        assertEquals(profiles.associate { it.id to SingboxProbeService.PROBE_ERROR_RUNTIME_BUSY }, dao.errors)
         assertNull(prefsFlow.value[selectedProfileKey])
     }
 
@@ -275,19 +277,19 @@ class SingboxProbeServiceTest {
     }
 
     @Test
-    fun `probeAndAutoSelect starts and stops one runtime per bounded batch`() = runTest {
+    fun `probeAndAutoSelect bounds each runtime batch to fifty targets`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
-        val profiles = (1L..25L).map { id -> makeProfile(id, "batch-$id.example", 443) }
+        val profiles = (1L..125L).map { id -> makeProfile(id, "batch-$id.example", 443) }
         val probe = TrackingBatchProfileProbe()
 
         SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(profiles)
 
-        assertEquals(listOf(10, 10, 5), probe.batchSizes)
+        assertEquals(listOf(50, 50, 25), probe.batchSizes)
         assertEquals(3, probe.startCount.get())
         assertEquals(3, probe.stopCount.get())
-        assertEquals(10, probe.maxConcurrentTargets.get())
+        assertEquals(50, probe.maxConcurrentTargets.get())
         assertEquals(0, probe.legacyCalls.get())
         assertEquals(profiles.map { it.id }.toSet(), dao.latencies.keys)
     }
@@ -558,7 +560,8 @@ class SingboxProbeServiceTest {
         )
 
         assertEquals(listOf(5L to true, 5L to false), events)
-        assertNull(dao.latencies[5L])
+        assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[5L])
+        assertEquals(SingboxProbeService.PROBE_ERROR_RUNTIME_BUSY, dao.errors[5L])
     }
 
     @Test
@@ -578,7 +581,20 @@ class SingboxProbeServiceTest {
         job.join()
 
         assertTrue(probe.calls.get() in 1..2)
-        assertTrue(dao.latencies.isEmpty())
+        assertEquals(
+            mapOf(
+                first.id to SingboxProbeService.LATENCY_FAILED,
+                second.id to SingboxProbeService.LATENCY_FAILED,
+            ),
+            dao.latencies,
+        )
+        assertEquals(
+            mapOf(
+                first.id to SingboxProbeService.PROBE_ERROR_CANCELLED,
+                second.id to SingboxProbeService.PROBE_ERROR_CANCELLED,
+            ),
+            dao.errors,
+        )
         assertNull(prefsFlow.value[selectedProfileKey])
     }
 

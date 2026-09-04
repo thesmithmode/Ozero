@@ -25,6 +25,7 @@ import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.LogSanitizer
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginesingbox.SingboxRuntimeCheckpointStore
+import ru.ozero.enginesingbox.singboxConfigFingerprint
 import java.io.File
 import java.security.KeyStore
 import java.util.concurrent.atomic.AtomicBoolean
@@ -198,7 +199,12 @@ internal object SingboxRuntime {
             server.checkConfig(singboxJsonConfig)
             recordCheckpoint("checkConfig-passed")
         } catch (e: Exception) {
-            PersistentLoggers.error(TAG, "checkConfig failed exceptionClass=${e::class.java.simpleName}")
+            PersistentLoggers.error(
+                TAG,
+                "checkConfig failed exceptionClass=${e::class.java.simpleName} " +
+                    "reason=${redactSingboxMessage(e.message.orEmpty())} " +
+                    "fingerprint=${singboxJsonConfig.singboxConfigFingerprint()}",
+            )
             cleanupFailedServerStart(server, ownerId, runtimeRole, e, closeService = false)
             throw e
         }
@@ -210,7 +216,8 @@ internal object SingboxRuntime {
         } catch (e: Exception) {
             PersistentLoggers.error(
                 TAG,
-                "startOrReloadService failed exceptionClass=${e::class.java.simpleName}",
+                "startOrReloadService failed exceptionClass=${e::class.java.simpleName} " +
+                    "reason=${redactSingboxMessage(e.message.orEmpty())}",
             )
             cleanupFailedServerStart(server, ownerId, runtimeRole, e, closeService = true)
             throw e

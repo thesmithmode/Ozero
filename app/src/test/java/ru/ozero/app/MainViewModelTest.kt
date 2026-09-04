@@ -311,26 +311,19 @@ class MainViewModelTest {
     }
 
     @Test
-    fun speedHistoryRetainedDuringSwitching() = runTest {
+    fun speedHistoryClearedDuringSwitching() = runTest {
         val sample = TunnelStats(txPackets = 1, txBytes = 100, rxPackets = 2, rxBytes = 200, timestampMs = 1)
         tunnelController.onProbing()
         tunnelController.onConnecting(EngineId.BYEDPI)
         tunnelController.onEngineStarted(EngineId.BYEDPI, 1080)
         tunnelController.updateStats(sample)
         advanceUntilIdle()
-        val historyDuringConnected = viewModel.speedHistory.value
-        assertTrue(historyDuringConnected.isNotEmpty())
+        assertTrue(viewModel.speedHistory.value.isNotEmpty())
 
         tunnelController.onSwitchingStarted(EngineId.BYEDPI, EngineId.WARP)
-        tunnelController.onDisconnecting()
-        tunnelController.reset()
         advanceUntilIdle()
 
-        assertEquals(
-            historyDuringConnected,
-            viewModel.speedHistory.value,
-            "speedHistory НЕ должна сбрасываться когда switching активен — это причина прыжков графика",
-        )
+        assertEquals(emptyList(), viewModel.speedHistory.value)
     }
 
     @Test

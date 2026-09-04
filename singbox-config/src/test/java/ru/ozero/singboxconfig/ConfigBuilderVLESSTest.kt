@@ -109,13 +109,13 @@ class ConfigBuilderVLESSTest {
     }
 
     @Test
-    fun `should include direct and block outbounds`() {
+    fun `should include direct without legacy block outbound`() {
         val json = ConfigBuilder.buildSingboxConfig(makeBean())
 
         assertContains(json, "\"type\":\"direct\"")
-        assertContains(json, "\"type\":\"block\"")
         assertContains(json, "\"tag\":\"direct\"")
-        assertContains(json, "\"tag\":\"block\"")
+        assertFalse(json.contains("\"type\":\"block\""), "legacy block outbound was removed in sing-box 1.13")
+        assertFalse(json.contains("\"tag\":\"block\""), "legacy block outbound tag must not be emitted")
     }
 
     @Test

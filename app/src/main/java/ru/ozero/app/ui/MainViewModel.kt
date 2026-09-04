@@ -282,18 +282,22 @@ class MainViewModel @Inject constructor(
     init {
         restoreSpeedHistory()
         viewModelScope.launch {
-            tunnelController.stats.collect { s ->
-                if (s != null) {
-                    val now = System.currentTimeMillis()
-                    appendSpeedSample(now, s.bpsIn.toFloat(), s.bpsOut.toFloat())
-                } else {
-                    val switchingNow = tunnelController.switching.value != null
-                    if (!switchingNow && _speedHistory.value.isNotEmpty()) {
-                        _speedHistory.value = emptyList()
-                        cacheSpeedHistory(0L, emptyList())
+            combine(
+                tunnelController.state,
+                tunnelController.stats,
+                tunnelController.switching,
+            ) { state, stats, switching -> Triple(state, stats, switching) }
+                .collect { (state, stats, switching) ->
+                    if (state is TunnelState.Connected && switching == null && stats != null) {
+                        val now = System.currentTimeMillis()
+                        appendSpeedSample(now, stats.bpsIn.toFloat(), stats.bpsOut.toFloat())
+                    } else {
+                        if (_speedHistory.value.isNotEmpty()) {
+                            _speedHistory.value = emptyList()
+                            cacheSpeedHistory(0L, emptyList())
+                        }
                     }
                 }
-            }
         }
         viewModelScope.launch {
             var lastSessionKey: String? = null
@@ -340,6 +344,7 @@ class MainViewModel @Inject constructor(
     }
 
     private fun restoreSpeedHistory() {
+        if (tunnelController.state.value !is TunnelState.Connected || tunnelController.switching.value != null) return
         val stats = tunnelController.stats.value ?: return
         if (stats.sessionStartMs <= 0L) return
         val cached = synchronized(speedHistoryLock) {
