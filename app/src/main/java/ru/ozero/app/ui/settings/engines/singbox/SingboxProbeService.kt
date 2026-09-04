@@ -344,6 +344,7 @@ class SingboxProbeService internal constructor(
         const val PROBE_ERROR_TIMEOUT = "timeout"
         const val PROBE_ERROR_CANCELLED = "cancelled"
         const val PROBE_ERROR_RUNTIME_BUSY = "runtime busy"
+        const val PROBE_ERROR_CONFIG_TOO_LARGE = "config too large"
         const val DEFAULT_PROBE_TIMEOUT_MS = 3_000
         const val MIN_PROBE_TIMEOUT_MS = 1_000
         const val MAX_PROBE_TIMEOUT_MS = 10_000
@@ -438,6 +439,18 @@ private class SingboxServiceProfileProbe(
         val ports = allocateProbePorts(targets.size)
         val config = buildProbeConfig(targets, ports, settings)
             ?: return failedOutcomes(targets)
+        if (config.toByteArray(Charsets.UTF_8).size > MAX_PROBE_CONFIG_BYTES) {
+            logProbeStateFailure("buildConfig", "config_too_large")
+            if (targets.size == 1) {
+                return outcomes(
+                    targets,
+                    SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_CONFIG_TOO_LARGE),
+                )
+            }
+            val midpoint = targets.size / 2
+            return probeBatchLocked(targets.subList(0, midpoint), settings) +
+                probeBatchLocked(targets.subList(midpoint, targets.size), settings)
+        }
         val binding = bindProcess()
             ?: return failedOutcomes(targets)
         return runProbeRuntime(targets, ports, settings, config, binding)
@@ -778,6 +791,7 @@ private class SingboxServiceProfileProbe(
         const val REMOTE_STOP_TIMEOUT_MS = 3_000L
         const val BIND_TIMEOUT_MS = 5_000L
         const val SINGLE_PROFILE_ID = 0L
+        const val MAX_PROBE_CONFIG_BYTES = 256 * 1024
     }
 }
 
