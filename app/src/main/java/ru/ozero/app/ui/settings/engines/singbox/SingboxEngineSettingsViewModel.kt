@@ -92,6 +92,26 @@ data class SingboxSettingsUiState(
     val probeTimeoutSeconds: Int = SingboxProbeService.DEFAULT_PROBE_TIMEOUT_MS / 1_000,
 )
 
+private class GroupProbeCompletionTracker(
+    profiles: List<ProxyProfile>,
+    private val onGroupCompleted: (Long) -> Unit,
+) {
+    private val profileGroupIds = profiles.associate { it.id to it.groupId }
+    private val pendingByGroup = profiles
+        .groupingBy { it.groupId }
+        .eachCount()
+        .mapValues { AtomicInteger(it.value) }
+    private val completedProfiles = ConcurrentHashMap.newKeySet<Long>()
+
+    val groupIds: Set<Long> = pendingByGroup.keys
+
+    fun complete(profileId: Long) {
+        if (!completedProfiles.add(profileId)) return
+        val groupId = profileGroupIds[profileId] ?: return
+        if (pendingByGroup[groupId]?.decrementAndGet() == 0) onGroupCompleted(groupId)
+    }
+}
+
 @Suppress("TooManyFunctions")
 @HiltViewModel
 class SingboxEngineSettingsViewModel @Inject constructor(
@@ -277,31 +297,17 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             var probeProfiles = emptyList<ProxyProfile>()
             try {
                 probeProfiles = groupIds.flatMap { id -> profileDao.getByGroupId(id) }
-                val profileGroupIds = probeProfiles.associate { it.id to it.groupId }
-                val pendingByGroup = probeProfiles
-                    .groupingBy { it.groupId }
-                    .eachCount()
-                    .mapValues { AtomicInteger(it.value) }
-                val completedProfiles = ConcurrentHashMap.newKeySet<Long>()
-                _uiState.update { it.copy(isPinging = it.isPinging + pendingByGroup.keys) }
+                val completionTracker = GroupProbeCompletionTracker(probeProfiles) { completedGroupId ->
+                    _uiState.update { it.copy(isPinging = it.isPinging - completedGroupId) }
+                }
+                _uiState.update { it.copy(isPinging = it.isPinging + completionTracker.groupIds) }
                 if (probeProfiles.isNotEmpty()) {
                     probeService.probeAndAutoSelect(
                         profiles = probeProfiles,
                         onProfileTestingChanged = { profileId, isTesting ->
                             onProfileTestingChanged(generation, profileId, isTesting)
                         },
-                        onProfileCompleted = { profileId ->
-                            if (completedProfiles.add(profileId)) {
-                                profileGroupIds[profileId]?.let { completedGroupId ->
-                                    val remaining = pendingByGroup[completedGroupId]?.decrementAndGet()
-                                    if (remaining == 0) {
-                                        _uiState.update {
-                                            it.copy(isPinging = it.isPinging - completedGroupId)
-                                        }
-                                    }
-                                }
-                            }
-                        },
+                        onProfileCompleted = completionTracker::complete,
                         updateManualSelection = false,
                     )
                 }
