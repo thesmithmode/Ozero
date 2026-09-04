@@ -1008,25 +1008,40 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
-    fun `onPing marks only the group currently being probed`() = runTest {
+    fun `onPing clears a completed group while another group is still running`() = runTest {
+        val secondStarted = CompletableDeferred<Unit>()
+        val releaseSecond = CompletableDeferred<Unit>()
+        val probe = object : SingboxProfileProbe {
+            override suspend fun probeLatencyMs(
+                bean: AbstractBean,
+                settings: SingboxProfileProbeSettings,
+            ): Int {
+                if (bean.serverAddress == "Two.example.com") {
+                    secondStarted.complete(Unit)
+                    releaseSecond.await()
+                }
+                return 1
+            }
+        }
         val harness = Harness(
             initialGroups = listOf(group(id = 1L, userOrder = 0), group(id = 2L, userOrder = 1)),
             initialProfiles = listOf(
                 profile(id = 111L, groupId = 1L, name = "One", userOrder = 0),
                 profile(id = 222L, groupId = 2L, name = "Two", userOrder = 0),
             ),
+            profileProbeOverride = probe,
         )
         harness.startStateCollection(backgroundScope)
         advanceUntilIdle()
-        var secondGroupState = emptySet<Long>()
-        harness.profileDao.beforeGetByGroupId = { id ->
-            if (id == 2L) secondGroupState = harness.viewModel.state.value.isPinging
-        }
 
         harness.viewModel.onPing()
-        advanceUntilIdle()
+        secondStarted.await()
+        runCurrent()
 
-        assertEquals(setOf(2L), secondGroupState)
+        assertEquals(setOf(2L), harness.viewModel.state.value.isPinging)
+        releaseSecond.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(harness.viewModel.state.value.isPinging.isEmpty())
     }
 
     @Test
@@ -1092,6 +1107,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         initialGroups: List<SubscriptionGroup> = emptyList(),
         initialProfiles: List<ProxyProfile> = emptyList(),
         initialChain: List<ProxyChainStep> = emptyList(),
+        profileProbeOverride: SingboxProfileProbe? = null,
     ) {
         val prefsFlow = MutableStateFlow(initialPreferences)
         val groupsFlow = MutableStateFlow(initialGroups)
@@ -1168,7 +1184,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
             val probeService = SingboxProbeService(
                 profileDao = profileDao,
                 dataStore = dataStore(),
-                profileProbe = RecordingProfileProbe(probeCalls),
+                profileProbe = profileProbeOverride ?: RecordingProfileProbe(probeCalls),
                 probeDispatcher = Dispatchers.Main,
             )
             viewModel = SingboxEngineSettingsViewModel(
@@ -1205,7 +1221,6 @@ class SingboxEngineSettingsViewModelCoverageTest {
         private val flow: MutableStateFlow<List<ProxyProfile>>,
     ) : ProxyProfileDao {
         val insertedProfiles = mutableListOf<ProxyProfile>()
-        var beforeGetByGroupId: suspend (Long) -> Unit = {}
         var beforeGetByGroupIdLimited: suspend (Long) -> Unit = {}
 
         override fun getAllFlow(): Flow<List<ProxyProfile>> = flow
@@ -1219,10 +1234,8 @@ class SingboxEngineSettingsViewModelCoverageTest {
         override fun getByGroupIdFlow(groupId: Long): Flow<List<ProxyProfile>> =
             MutableStateFlow(flow.value.filter { it.groupId == groupId })
 
-        override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> {
-            beforeGetByGroupId(groupId)
-            return flow.value.filter { it.groupId == groupId }
-        }
+        override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> =
+            flow.value.filter { it.groupId == groupId }
 
         override suspend fun getByGroupIdLimited(groupId: Long, limit: Int): List<ProxyProfile> {
             beforeGetByGroupIdLimited(groupId)

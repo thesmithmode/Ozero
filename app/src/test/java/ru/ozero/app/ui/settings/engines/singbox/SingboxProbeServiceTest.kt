@@ -177,17 +177,20 @@ class SingboxProbeServiceTest {
         knownProfiles[corrupted.id] = corrupted
         val probe = CountingProfileProbe()
         val events = mutableListOf<Pair<Long, Boolean>>()
+        val completed = mutableListOf<Long>()
 
         SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(
             profiles = listOf(corrupted),
             onProfileTestingChanged = { id, testing ->
                 events += id to testing
             },
+            onProfileCompleted = { completed += it },
         )
 
         assertEquals(SingboxProbeService.LATENCY_FAILED, dao.latencies[17L])
         assertEquals(0, probe.calls.get())
         assertTrue(events.isEmpty())
+        assertEquals(listOf(17L), completed)
         assertNull(prefsFlow.value[selectedProfileKey])
     }
 
@@ -327,6 +330,7 @@ class SingboxProbeServiceTest {
             override suspend fun probeBatch(
                 targets: List<SingboxProfileProbeTarget>,
                 settings: SingboxProfileProbeSettings,
+                onTargetCompleted: (Long) -> Unit,
             ): Map<Long, SingboxProbeOutcome> = error("batch failed")
         }
 
@@ -747,6 +751,7 @@ class SingboxProbeServiceTest {
         override suspend fun probeBatch(
             targets: List<SingboxProfileProbeTarget>,
             settings: SingboxProfileProbeSettings,
+            onTargetCompleted: (Long) -> Unit,
         ): Map<Long, SingboxProbeOutcome> {
             startCount.incrementAndGet()
             batchSizes += targets.size
@@ -754,6 +759,7 @@ class SingboxProbeServiceTest {
             return try {
                 delay(10)
                 targets.associate { target ->
+                    onTargetCompleted(target.profileId)
                     target.profileId to SingboxProbeOutcome.Success(target.profileId.toInt())
                 }
             } finally {
@@ -773,9 +779,11 @@ class SingboxProbeServiceTest {
         override suspend fun probeBatch(
             targets: List<SingboxProfileProbeTarget>,
             settings: SingboxProfileProbeSettings,
+            onTargetCompleted: (Long) -> Unit,
         ): Map<Long, SingboxProbeOutcome> {
             batchCalls.incrementAndGet()
             return targets.associate { target ->
+                onTargetCompleted(target.profileId)
                 target.profileId to SingboxProbeOutcome.SkippedActiveRuntime
             }
         }

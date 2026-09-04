@@ -274,31 +274,49 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             } else {
                 groupDao.getAll().map { it.id }
             }
-            for (id in groupIds) {
-                var probeProfiles = emptyList<ProxyProfile>()
-                try {
-                    _uiState.update { it.copy(isPinging = it.isPinging + id) }
-                    probeProfiles = profileDao.getByGroupId(id)
-                    if (probeProfiles.isNotEmpty()) {
-                        probeService.probeAndAutoSelect(
-                            profiles = probeProfiles,
-                            onProfileTestingChanged = { profileId, isTesting ->
-                                onProfileTestingChanged(generation, profileId, isTesting)
-                            },
-                            updateManualSelection = false,
-                        )
-                    }
-                } finally {
-                    if (generation != probeGeneration.get()) return@launch
-                    val refreshed = profileDao.getByGroupIdLimited(id, MAX_VISIBLE_PROFILES)
-                    _uiState.update {
-                        it.copy(
-                            isPinging = it.isPinging - id,
-                            testingProfileIds = it.testingProfileIds -
-                                probeProfiles.map { profile -> profile.id }.toSet(),
-                            groupProfiles = it.groupProfiles + (id to refreshed),
-                        )
-                    }
+            var probeProfiles = emptyList<ProxyProfile>()
+            try {
+                probeProfiles = groupIds.flatMap { id -> profileDao.getByGroupId(id) }
+                val profileGroupIds = probeProfiles.associate { it.id to it.groupId }
+                val pendingByGroup = probeProfiles
+                    .groupingBy { it.groupId }
+                    .eachCount()
+                    .mapValues { AtomicInteger(it.value) }
+                val completedProfiles = ConcurrentHashMap.newKeySet<Long>()
+                _uiState.update { it.copy(isPinging = it.isPinging + pendingByGroup.keys) }
+                if (probeProfiles.isNotEmpty()) {
+                    probeService.probeAndAutoSelect(
+                        profiles = probeProfiles,
+                        onProfileTestingChanged = { profileId, isTesting ->
+                            onProfileTestingChanged(generation, profileId, isTesting)
+                        },
+                        onProfileCompleted = { profileId ->
+                            if (completedProfiles.add(profileId)) {
+                                profileGroupIds[profileId]?.let { completedGroupId ->
+                                    val remaining = pendingByGroup[completedGroupId]?.decrementAndGet()
+                                    if (remaining == 0) {
+                                        _uiState.update {
+                                            it.copy(isPinging = it.isPinging - completedGroupId)
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        updateManualSelection = false,
+                    )
+                }
+            } finally {
+                if (generation != probeGeneration.get()) return@launch
+                val refreshed = groupIds.associateWith { id ->
+                    profileDao.getByGroupIdLimited(id, MAX_VISIBLE_PROFILES)
+                }
+                _uiState.update {
+                    it.copy(
+                        isPinging = it.isPinging - groupIds.toSet(),
+                        testingProfileIds = it.testingProfileIds -
+                            probeProfiles.map { profile -> profile.id }.toSet(),
+                        groupProfiles = it.groupProfiles + refreshed,
+                    )
                 }
             }
         }

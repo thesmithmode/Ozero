@@ -84,6 +84,7 @@ class SingboxProbeService internal constructor(
     suspend fun probeAndAutoSelect(
         profiles: List<ProxyProfile>,
         onProfileTestingChanged: (Long, Boolean) -> Unit = { _, _ -> },
+        onProfileCompleted: (Long) -> Unit = {},
         updateManualSelection: Boolean = true,
     ) {
         val prefs = dataStore.data.first()
@@ -95,7 +96,11 @@ class SingboxProbeService internal constructor(
                 ?: EngineConfig.Singbox.DEFAULT_DNS_SERVERS,
             ipv6Enabled = settings.ipv6Enabled,
         )
-        val probeCandidates = recoverProbeCandidates(profiles)
+        val completedProfiles = ConcurrentHashMap.newKeySet<Long>()
+        val notifyProfileCompleted: (Long) -> Unit = { profileId ->
+            if (completedProfiles.add(profileId)) onProfileCompleted(profileId)
+        }
+        val probeCandidates = recoverProbeCandidates(profiles, notifyProfileCompleted)
         val results = ConcurrentLinkedQueue<ProbeResult>()
         val pending = probeCandidates.associate { it.first.id to it.first }.toMutableMap()
         val indexedCandidates = probeCandidates.mapIndexed { index, candidate ->
@@ -111,6 +116,7 @@ class SingboxProbeService internal constructor(
                 indexedCandidates = indexedCandidates,
                 settings = probeSettings,
                 onProfileTestingChanged = onProfileTestingChanged,
+                onProfileCompleted = notifyProfileCompleted,
                 results = results,
                 pending = pending,
             )
@@ -118,7 +124,12 @@ class SingboxProbeService internal constructor(
             pendingTerminalError = PROBE_ERROR_CANCELLED
             throw error
         } finally {
-            persistPendingTerminalResults(pending, pendingTerminalError, onProfileTestingChanged)
+            persistPendingTerminalResults(
+                pending,
+                pendingTerminalError,
+                onProfileTestingChanged,
+                notifyProfileCompleted,
+            )
         }
         val best = results
             .filter { it.latency >= 0 }
@@ -143,12 +154,16 @@ class SingboxProbeService internal constructor(
 
     private suspend fun recoverProbeCandidates(
         profiles: List<ProxyProfile>,
+        onProfileCompleted: (Long) -> Unit,
     ): List<Pair<ProxyProfile, AbstractBean>> {
         val rejectedProfiles = mutableListOf<RejectedProfile>()
         val candidates = mutableListOf<Pair<ProxyProfile, AbstractBean>>()
         profiles.forEach { profile ->
             when (val recovered = PersistedProfileRecovery.recover(profile.beanBlob, profile.protocolType)) {
-                is RecoveryResult.Failure -> recordRejectedProfile(profile, recovered, rejectedProfiles)
+                is RecoveryResult.Failure -> {
+                    recordRejectedProfile(profile, recovered, rejectedProfiles)
+                    onProfileCompleted(profile.id)
+                }
                 is RecoveryResult.Success -> candidates += profile to recovered.bean
             }
         }
@@ -183,15 +198,16 @@ class SingboxProbeService internal constructor(
         indexedCandidates: List<IndexedProbeCandidate>,
         settings: SingboxProfileProbeSettings,
         onProfileTestingChanged: (Long, Boolean) -> Unit,
+        onProfileCompleted: (Long) -> Unit,
         results: ConcurrentLinkedQueue<ProbeResult>,
         pending: MutableMap<Long, ProxyProfile>,
     ) {
         val batchProbe = profileProbe as? SingboxBatchProfileProbe
         indexedCandidates.chunked(MAX_PROBE_RUNTIME_TARGETS).forEach { batch ->
             val outcomes = if (batchProbe != null) {
-                probeBatch(batch, settings, batchProbe, onProfileTestingChanged)
+                probeBatch(batch, settings, batchProbe, onProfileTestingChanged, onProfileCompleted)
             } else {
-                probeLegacyBatch(batch, settings, onProfileTestingChanged)
+                probeLegacyBatch(batch, settings, onProfileTestingChanged, onProfileCompleted)
             }
             batch.forEach { candidate ->
                 val outcome = outcomes[candidate.profile.id]
@@ -237,6 +253,7 @@ class SingboxProbeService internal constructor(
         pending: Map<Long, ProxyProfile>,
         terminalError: String,
         onProfileTestingChanged: (Long, Boolean) -> Unit,
+        onProfileCompleted: (Long) -> Unit,
     ) {
         if (pending.isEmpty()) return
         withContext(NonCancellable) {
@@ -249,6 +266,9 @@ class SingboxProbeService internal constructor(
                     runCatching { onProfileTestingChanged(profile.id, false) }.onFailure { callbackError ->
                         logProbeFailure("clearProfileTestingState", callbackError, profile.id)
                     }
+                    runCatching { onProfileCompleted(profile.id) }.onFailure { callbackError ->
+                        logProbeFailure("completeProfileTesting", callbackError, profile.id)
+                    }
                 }
             }
         }
@@ -259,13 +279,20 @@ class SingboxProbeService internal constructor(
         settings: SingboxProfileProbeSettings,
         batchProbe: SingboxBatchProfileProbe,
         onProfileTestingChanged: (Long, Boolean) -> Unit,
+        onProfileCompleted: (Long) -> Unit,
     ): Map<Long, SingboxProbeOutcome> {
         candidates.forEach { onProfileTestingChanged(it.profile.id, true) }
+        val completedProfiles = ConcurrentHashMap.newKeySet<Long>()
         return try {
             batchProbe.probeBatch(
                 candidates.map { SingboxProfileProbeTarget(it.profile.id, it.bean) },
                 settings,
-            )
+            ) { profileId ->
+                if (completedProfiles.add(profileId)) {
+                    onProfileTestingChanged(profileId, false)
+                    onProfileCompleted(profileId)
+                }
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -274,7 +301,12 @@ class SingboxProbeService internal constructor(
                 candidate.profile.id to SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
             }
         } finally {
-            candidates.forEach { onProfileTestingChanged(it.profile.id, false) }
+            candidates.forEach { candidate ->
+                if (completedProfiles.add(candidate.profile.id)) {
+                    onProfileTestingChanged(candidate.profile.id, false)
+                    onProfileCompleted(candidate.profile.id)
+                }
+            }
         }
     }
 
@@ -282,6 +314,7 @@ class SingboxProbeService internal constructor(
         candidates: List<IndexedProbeCandidate>,
         settings: SingboxProfileProbeSettings,
         onProfileTestingChanged: (Long, Boolean) -> Unit,
+        onProfileCompleted: (Long) -> Unit,
     ): Map<Long, SingboxProbeOutcome> = coroutineScope {
         val limiter = Semaphore(MAX_PARALLEL_HTTP_PROBES)
         candidates.map { candidate ->
@@ -289,19 +322,18 @@ class SingboxProbeService internal constructor(
                 limiter.withPermit {
                     onProfileTestingChanged(candidate.profile.id, true)
                     try {
-                        try {
-                            val latency = withTimeoutOrNull(settings.timeoutMs.toLong()) {
-                                profileProbe.probeLatencyMs(candidate.bean, settings)
-                            } ?: LATENCY_TIMED_OUT
-                            candidate.profile.id to latency.toProbeOutcome()
-                        } catch (error: CancellationException) {
-                            throw error
-                        } catch (error: Exception) {
-                            logProbeFailure("probeLatency", error, candidate.profile.id)
-                            candidate.profile.id to SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
-                        }
+                        val latency = withTimeoutOrNull(settings.timeoutMs.toLong()) {
+                            profileProbe.probeLatencyMs(candidate.bean, settings)
+                        } ?: LATENCY_TIMED_OUT
+                        candidate.profile.id to latency.toProbeOutcome()
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        logProbeFailure("probeLatency", error, candidate.profile.id)
+                        candidate.profile.id to SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
                     } finally {
                         onProfileTestingChanged(candidate.profile.id, false)
+                        onProfileCompleted(candidate.profile.id)
                     }
                 }
             }
@@ -371,6 +403,7 @@ internal interface SingboxBatchProfileProbe {
     suspend fun probeBatch(
         targets: List<SingboxProfileProbeTarget>,
         settings: SingboxProfileProbeSettings,
+        onTargetCompleted: (Long) -> Unit,
     ): Map<Long, SingboxProbeOutcome>
 }
 
@@ -420,6 +453,7 @@ private class SingboxServiceProfileProbe(
         val outcome = probeBatch(
             listOf(SingboxProfileProbeTarget(SINGLE_PROFILE_ID, bean)),
             settings,
+            onTargetCompleted = {},
         )[SINGLE_PROFILE_ID]
         return when (outcome) {
             is SingboxProbeOutcome.Success -> outcome.latencyMs
@@ -431,10 +465,11 @@ private class SingboxServiceProfileProbe(
     override suspend fun probeBatch(
         targets: List<SingboxProfileProbeTarget>,
         settings: SingboxProfileProbeSettings,
+        onTargetCompleted: (Long) -> Unit,
     ): Map<Long, SingboxProbeOutcome> = mutex.withLock {
         withContext(Dispatchers.IO) {
             isolateProbeBatchFailures(targets, MAX_RUNTIME_START_SPLITS) { batch ->
-                probeBatchAttempt(batch, settings)
+                probeBatchAttempt(batch, settings, onTargetCompleted)
             }
         }
     }
@@ -442,6 +477,7 @@ private class SingboxServiceProfileProbe(
     private suspend fun probeBatchAttempt(
         targets: List<SingboxProfileProbeTarget>,
         settings: SingboxProfileProbeSettings,
+        onTargetCompleted: (Long) -> Unit,
     ): ProbeBatchAttempt {
         if (targets.isEmpty()) return ProbeBatchAttempt(emptyMap())
         coroutineContext.ensureActive()
@@ -460,7 +496,7 @@ private class SingboxServiceProfileProbe(
         }
         val binding = bindProcess()
             ?: return ProbeBatchAttempt(failedOutcomes(targets))
-        return runProbeRuntime(targets, ports, settings, config, binding)
+        return runProbeRuntime(targets, ports, settings, config, binding, onTargetCompleted)
     }
 
     private fun buildProbeConfig(
@@ -488,6 +524,7 @@ private class SingboxServiceProfileProbe(
         settings: SingboxProfileProbeSettings,
         config: String,
         binding: Binding,
+        onTargetCompleted: (Long) -> Unit,
     ): ProbeBatchAttempt {
         val ownerId = UUID.randomUUID().mostSignificantBits
         val localProtector = ProfileProbeProtector()
@@ -497,7 +534,7 @@ private class SingboxServiceProfileProbe(
                 ProbeRuntimeStart.STARTED -> {
                     shouldStop = true
                     val outcomes = if (isProbeRuntimeReady(binding)) {
-                        probeTargets(targets, ports, settings, binding)
+                        probeTargets(targets, ports, settings, binding, onTargetCompleted)
                     } else {
                         failedOutcomes(targets, processDied = binding.processDied.get())
                     }
@@ -559,21 +596,26 @@ private class SingboxServiceProfileProbe(
         ports: List<Int>,
         settings: SingboxProfileProbeSettings,
         binding: Binding,
+        onTargetCompleted: (Long) -> Unit,
     ): Map<Long, SingboxProbeOutcome> {
         val limiter = Semaphore(SingboxProbeService.MAX_PARALLEL_HTTP_PROBES)
         val results = coroutineScope {
             targets.zip(ports).map { (target, port) ->
                 async(Dispatchers.IO) {
-                    limiter.withPermit {
-                        val deadlineNanos = System.nanoTime() +
-                            TimeUnit.MILLISECONDS.toNanos(settings.timeoutMs.toLong())
-                        target.profileId to probeRouted(
-                            port,
-                            settings.timeoutMs,
-                            deadlineNanos,
-                            binding.processDied,
-                            binding.probeCancellation,
-                        )
+                    try {
+                        limiter.withPermit {
+                            val deadlineNanos = System.nanoTime() +
+                                TimeUnit.MILLISECONDS.toNanos(settings.timeoutMs.toLong())
+                            target.profileId to probeRouted(
+                                port,
+                                settings.timeoutMs,
+                                deadlineNanos,
+                                binding.processDied,
+                                binding.probeCancellation,
+                            )
+                        }
+                    } finally {
+                        onTargetCompleted(target.profileId)
                     }
                 }
             }.awaitAll().toMap()
