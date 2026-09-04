@@ -127,16 +127,18 @@ class SingboxProbeService internal constructor(
         }
         var pendingTerminalError = PROBE_ERROR_FAILED
         try {
-            val outcomes = if (batchProbe != null) {
-                probeBatch(indexedCandidates, probeSettings, batchProbe, onProfileTestingChanged)
-            } else {
-                probeLegacyBatch(indexedCandidates, probeSettings, onProfileTestingChanged)
-            }
-            indexedCandidates.forEach { candidate ->
-                val outcome = outcomes[candidate.profile.id]
-                    ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
-                if (persistProbeOutcome(candidate, outcome, results)) {
-                    pending.remove(candidate.profile.id)
+            indexedCandidates.chunked(MAX_PROBE_RUNTIME_TARGETS).forEach { batch ->
+                val outcomes = if (batchProbe != null) {
+                    probeBatch(batch, probeSettings, batchProbe, onProfileTestingChanged)
+                } else {
+                    probeLegacyBatch(batch, probeSettings, onProfileTestingChanged)
+                }
+                batch.forEach { candidate ->
+                    val outcome = outcomes[candidate.profile.id]
+                        ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
+                    if (persistProbeOutcome(candidate, outcome, results)) {
+                        pending.remove(candidate.profile.id)
+                    }
                 }
             }
         } catch (error: CancellationException) {
@@ -305,6 +307,7 @@ class SingboxProbeService internal constructor(
         const val LATENCY_FAILED = -2
         private const val SELECTED_AUTO = -1L
         const val MAX_PARALLEL_HTTP_PROBES = 10
+        const val MAX_PROBE_RUNTIME_TARGETS = 50
         const val MAX_CONCURRENT_PROFILE_PROBES = MAX_PARALLEL_HTTP_PROBES
         const val PROBE_ERROR_UNSUPPORTED = "unsupported"
         const val PROBE_ERROR_FAILED = "probe failed"

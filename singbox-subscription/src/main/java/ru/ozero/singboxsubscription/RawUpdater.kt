@@ -273,8 +273,8 @@ class RawUpdater(
     }
 
     private fun httpClientFor(group: SubscriptionGroup, allowInsecureRetry: Boolean): OkHttpClient = when {
-        allowInsecureRetry -> insecureOkHttpClient
         group.isBuiltin -> okHttpClient
+        allowInsecureRetry -> insecureOkHttpClient
         else -> userCaOkHttpClient
     }
 
@@ -510,8 +510,8 @@ fun isTransientSubscriptionRefreshFailure(error: Throwable): Boolean {
 }
 
 private fun SubscriptionGroup.subscriptionTlsMode(allowInsecureRetry: Boolean): String = when {
-    allowInsecureRetry -> "insecure-retry"
     isBuiltin -> "system"
+    allowInsecureRetry -> "insecure-retry"
     else -> "user-ca"
 }
 

@@ -621,7 +621,7 @@ class SingboxEngine @Inject constructor(
                         TAG,
                         "startWithConfig failed exceptionClass=${it::class.java.simpleName} stableCategory=aidl",
                     )
-                    TunAttachResult.Failure("AIDL failed")
+                    TunAttachResult.Failure("AIDL failed (${it::class.java.simpleName})")
                 }
             } finally {
                 runCatching { transportPfd.close() }

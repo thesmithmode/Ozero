@@ -111,6 +111,7 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     private val probeGeneration = AtomicLong()
     private var pingJob: Job? = null
     private var refreshJob: Job? = null
+    private var insecureRetryJob: Job? = null
 
     val state: StateFlow<SingboxSettingsUiState> = combine(
         groupDao.getAllFlow(),
@@ -238,7 +239,11 @@ class SingboxEngineSettingsViewModel @Inject constructor(
     fun onConfirmInsecureRefresh(confirmed: Boolean) {
         val groupId = consumePendingInsecureRefreshGroup() ?: return
         if (!confirmed) return
-        refreshJob = viewModelScope.launch { refreshGroupInternal(groupId, allowInsecureRetry = true) }
+        val previousJob = insecureRetryJob
+        insecureRetryJob = viewModelScope.launch {
+            previousJob?.cancelAndJoin()
+            refreshGroupInternal(groupId, allowInsecureRetry = true)
+        }
     }
 
     fun onCancel(ping: Boolean = false, refresh: Boolean = false) {
@@ -252,6 +257,8 @@ class SingboxEngineSettingsViewModel @Inject constructor(
         }
         if (refresh) {
             refreshJob?.cancel()
+            insecureRetryJob?.cancel()
+            clearPendingInsecureRefreshGroups()
             _uiState.update { it.copy(isRefreshing = emptySet()) }
         }
     }
@@ -391,6 +398,13 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             it.copy(pendingInsecureRefreshGroupId = pendingInsecureRefreshGroupIds.peekFirst())
         }
         current
+    }
+
+    private fun clearPendingInsecureRefreshGroups() {
+        synchronized(pendingInsecureRefreshLock) {
+            pendingInsecureRefreshGroupIds.clear()
+            _uiState.update { it.copy(pendingInsecureRefreshGroupId = null) }
+        }
     }
 
     fun onAddGroupDialog(show: Boolean) = _uiState.update {

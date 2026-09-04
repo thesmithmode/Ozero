@@ -277,19 +277,19 @@ class SingboxProbeServiceTest {
     }
 
     @Test
-    fun `probeAndAutoSelect reuses one runtime for a large bounded batch`() = runTest {
+    fun `probeAndAutoSelect bounds each runtime batch to fifty targets`() = runTest {
         val prefsFlow = MutableStateFlow<Preferences>(mutablePreferencesOf())
         val dataStore = flowDataStore(prefsFlow)
         val dao = FakeProxyProfileDao()
-        val profiles = (1L..25L).map { id -> makeProfile(id, "batch-$id.example", 443) }
+        val profiles = (1L..125L).map { id -> makeProfile(id, "batch-$id.example", 443) }
         val probe = TrackingBatchProfileProbe()
 
         SingboxProbeService(dao, dataStore, probe).probeAndAutoSelect(profiles)
 
-        assertEquals(listOf(25), probe.batchSizes)
-        assertEquals(1, probe.startCount.get())
-        assertEquals(1, probe.stopCount.get())
-        assertEquals(25, probe.maxConcurrentTargets.get())
+        assertEquals(listOf(50, 50, 25), probe.batchSizes)
+        assertEquals(3, probe.startCount.get())
+        assertEquals(3, probe.stopCount.get())
+        assertEquals(50, probe.maxConcurrentTargets.get())
         assertEquals(0, probe.legacyCalls.get())
         assertEquals(profiles.map { it.id }.toSet(), dao.latencies.keys)
     }
