@@ -1,6 +1,9 @@
 name: Apply PR 434 review fixes
 
 on:
+  pull_request:
+    branches:
+      - dev
   push:
     branches:
       - codex/-ozero
