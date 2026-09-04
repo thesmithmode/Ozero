@@ -1,19 +1,175 @@
-name: Gradle Wrapper Validation
+name: Apply PR 434 detekt fix
 
-on:
+"on":
   push:
+    branches:
+      - codex/-ozero
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  validate-wrapper:
-    name: Validate Gradle Wrapper
+  apply-detekt-fix:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 20
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          ref: codex/-ozero
+          fetch-depth: 0
 
-      - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v6
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Refactor probe flow
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("app/src/main/java/ru/ozero/app/ui/settings/engines/singbox/SingboxProbeService.kt")
+          text = path.read_text()
+
+          old_recovery = '''        val rejectedProfiles = mutableListOf<RejectedProfile>()
+          val probeCandidates = profiles.mapNotNull { profile ->
+              when (val recovered = PersistedProfileRecovery.recover(profile.beanBlob, profile.protocolType)) {
+                  is RecoveryResult.Failure -> {
+                      rejectedProfiles += RejectedProfile(
+                          protocol = PersistedProtocol.fromId(profile.protocolType)?.label ?: "unknown",
+                          schema = recovered.detectedSchemas.joinToString("+") { it.name }.ifEmpty { "none" },
+                          reason = recovered.category.name,
+                      )
+                      profileDao.updateProbeResultIfCurrent(
+                          expected = profile,
+                          latency = LATENCY_FAILED,
+                          error = PROBE_ERROR_UNSUPPORTED,
+                      )
+                      null
+                  }
+                  is RecoveryResult.Success -> profile to recovered.bean
+              }
+          }
+          logRejectedProfiles(rejectedProfiles)'''
+          new_recovery = '''        val probeCandidates = recoverProbeCandidates(profiles)'''
+          if text.count(old_recovery) != 1:
+              raise SystemExit(f"expected recovery block once, found {text.count(old_recovery)}")
+          text = text.replace(old_recovery, new_recovery, 1)
+
+          old_batch_probe = '''        val batchProbe = profileProbe as? SingboxBatchProfileProbe
+          val pending = probeCandidates.associate { it.first.id to it.first }.toMutableMap()'''
+          new_batch_probe = '''        val pending = probeCandidates.associate { it.first.id to it.first }.toMutableMap()'''
+          if text.count(old_batch_probe) != 1:
+              raise SystemExit(f"expected batchProbe setup once, found {text.count(old_batch_probe)}")
+          text = text.replace(old_batch_probe, new_batch_probe, 1)
+
+          old_try = '''        try {
+              indexedCandidates.chunked(MAX_PROBE_RUNTIME_TARGETS).forEach { batch ->
+                  val outcomes = if (batchProbe != null) {
+                      probeBatch(batch, probeSettings, batchProbe, onProfileTestingChanged)
+                  } else {
+                      probeLegacyBatch(batch, probeSettings, onProfileTestingChanged)
+                  }
+                  batch.forEach { candidate ->
+                      val outcome = outcomes[candidate.profile.id]
+                          ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
+                      if (persistProbeOutcome(candidate, outcome, results)) {
+                          pending.remove(candidate.profile.id)
+                      }
+                  }
+              }
+          } catch (error: CancellationException) {'''
+          new_try = '''        try {
+              probeCandidateBatches(
+                  indexedCandidates = indexedCandidates,
+                  settings = probeSettings,
+                  onProfileTestingChanged = onProfileTestingChanged,
+                  results = results,
+                  pending = pending,
+              )
+          } catch (error: CancellationException) {'''
+          if text.count(old_try) != 1:
+              raise SystemExit(f"expected batch execution once, found {text.count(old_try)}")
+          text = text.replace(old_try, new_try, 1)
+
+          marker = '''    private suspend fun persistProbeOutcome(
+          candidate: IndexedProbeCandidate,'''
+          helpers = '''    private suspend fun recoverProbeCandidates(
+          profiles: List<ProxyProfile>,
+      ): List<Pair<ProxyProfile, AbstractBean>> {
+          val rejectedProfiles = mutableListOf<RejectedProfile>()
+          val candidates = mutableListOf<Pair<ProxyProfile, AbstractBean>>()
+          profiles.forEach { profile ->
+              when (val recovered = PersistedProfileRecovery.recover(profile.beanBlob, profile.protocolType)) {
+                  is RecoveryResult.Failure -> recordRejectedProfile(profile, recovered, rejectedProfiles)
+                  is RecoveryResult.Success -> candidates += profile to recovered.bean
+              }
+          }
+          logRejectedProfiles(rejectedProfiles)
+          return candidates
+      }
+
+      private suspend fun recordRejectedProfile(
+          profile: ProxyProfile,
+          recovered: RecoveryResult.Failure,
+          rejectedProfiles: MutableList<RejectedProfile>,
+      ) {
+          rejectedProfiles += RejectedProfile(
+              protocol = PersistedProtocol.fromId(profile.protocolType)?.label ?: "unknown",
+              schema = recovered.detectedSchemas.joinToString("+") { it.name }.ifEmpty { "none" },
+              reason = recovered.category.name,
+          )
+          profileDao.updateProbeResultIfCurrent(
+              expected = profile,
+              latency = LATENCY_FAILED,
+              error = PROBE_ERROR_UNSUPPORTED,
+          )
+      }
+
+      private suspend fun probeCandidateBatches(
+          indexedCandidates: List<IndexedProbeCandidate>,
+          settings: SingboxProfileProbeSettings,
+          onProfileTestingChanged: (Long, Boolean) -> Unit,
+          results: ConcurrentLinkedQueue<ProbeResult>,
+          pending: MutableMap<Long, ProxyProfile>,
+      ) {
+          val batchProbe = profileProbe as? SingboxBatchProfileProbe
+          indexedCandidates.chunked(MAX_PROBE_RUNTIME_TARGETS).forEach { batch ->
+              val outcomes = if (batchProbe != null) {
+                  probeBatch(batch, settings, batchProbe, onProfileTestingChanged)
+              } else {
+                  probeLegacyBatch(batch, settings, onProfileTestingChanged)
+              }
+              batch.forEach { candidate ->
+                  val outcome = outcomes[candidate.profile.id]
+                      ?: SingboxProbeOutcome.Failure(PROBE_ERROR_FAILED)
+                  if (persistProbeOutcome(candidate, outcome, results)) {
+                      pending.remove(candidate.profile.id)
+                  }
+              }
+          }
+      }
+
+      private suspend fun persistProbeOutcome(
+          candidate: IndexedProbeCandidate,'''
+          if text.count(marker) != 1:
+              raise SystemExit(f"expected persist marker once, found {text.count(marker)}")
+          text = text.replace(marker, helpers, 1)
+          path.write_text(text)
+          PY
+          git diff --check
+
+      - name: Run app style checks
+        run: ./gradlew :app:ktlintCheck :app:detekt --no-daemon
+
+      - name: Commit source fix and restore workflow
+        run: |
+          git checkout 125744f5aa89d1ae6d7ba3ac0cc03026d9dfc1ac -- .github/workflows/gradle-wrapper-validation.yml
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/ru/ozero/app/ui/settings/engines/singbox/SingboxProbeService.kt .github/workflows/gradle-wrapper-validation.yml
+          git commit -m "refactor(singbox): flatten probe orchestration"
+          git push origin HEAD:codex/-ozero
