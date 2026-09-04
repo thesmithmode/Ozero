@@ -348,8 +348,9 @@ class SingboxProbeService internal constructor(
         const val PROBE_ERROR_FAILED = "probe failed"
         const val PROBE_ERROR_PROCESS_DIED = "PROCESS_DIED"
         const val PROBE_ERROR_TIMEOUT = "timeout"
+        const val PROBE_ERROR_TLS = "tls"
         const val PROBE_ERROR_CANCELLED = "cancelled"
-        const val PROBE_ERROR_RUNTIME_BUSY = "runtime busy"
+        const val PROBE_ERROR_RUNTIME_BUSY = "runtime_busy"
         const val PROBE_ERROR_CONFIG_TOO_LARGE = "config too large"
         const val DEFAULT_PROBE_TIMEOUT_MS = 3_000
         const val MIN_PROBE_TIMEOUT_MS = 1_000
@@ -566,12 +567,11 @@ private class SingboxServiceProfileProbe(
                     limiter.withPermit {
                         val deadlineNanos = System.nanoTime() +
                             TimeUnit.MILLISECONDS.toNanos(settings.timeoutMs.toLong())
-                        target.profileId to probeRoutedWithRetry(
+                        target.profileId to probeRouted(
                             port,
                             settings.timeoutMs,
                             deadlineNanos,
                             binding.processDied,
-                            binding.processDeath,
                             binding.probeCancellation,
                         )
                     }
@@ -601,54 +601,36 @@ private class SingboxServiceProfileProbe(
         }
     }
 
-    private suspend fun probeRoutedWithRetry(
+    private suspend fun probeRouted(
         port: Int,
         timeoutMs: Int,
         deadlineNanos: Long,
         processDied: AtomicBoolean,
-        processDeath: CompletableDeferred<Unit>,
         probeCancellation: RoutedProbeCancellation,
     ): SingboxProbeOutcome {
         val probe = SingboxHttp204RoutedProbe(timeoutMs = timeoutMs.normalizedSingboxProbeTimeoutMs())
-        repeat(PROBE_ATTEMPTS) { attempt ->
-            kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            if (processDied.get()) {
-                return SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED)
-            }
-            if (remainingTimeoutMs(deadlineNanos) == null) {
-                return SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_TIMEOUT)
-            }
-            when (val result = probe.probeUntil(port, deadlineNanos, probeCancellation)) {
-                is ru.ozero.enginesingbox.RoutedProbeResult.Success -> {
-                    return SingboxProbeOutcome.Success(
-                        result.latencyMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-                    )
-                }
-                is ru.ozero.enginesingbox.RoutedProbeResult.Failure -> {
-                    if (processDied.get()) {
-                        return SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED)
-                    }
-                    if (attempt == PROBE_ATTEMPTS - 1) {
-                        return SingboxProbeOutcome.Failure(result.reason.profileProbeStatus())
-                    }
-                }
-            }
-            if (attempt < PROBE_ATTEMPTS - 1) {
-                val retryDelay = minOf(
-                    PROBE_RETRY_DELAY_MS,
-                    remainingTimeoutMs(deadlineNanos)?.toLong() ?: 0L,
-                )
-                val died = withTimeoutOrNull(retryDelay) {
-                    processDeath.await()
-                    true
-                } ?: false
-                if (died) return SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED)
-            }
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        if (processDied.get()) {
+            return SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED)
         }
-        return if (remainingTimeoutMs(deadlineNanos) == null) {
-            SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_TIMEOUT)
-        } else {
-            SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_FAILED)
+        if (remainingTimeoutMs(deadlineNanos) == null) {
+            return SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_TIMEOUT)
+        }
+        return when (val result = probe.probeUntil(port, deadlineNanos, probeCancellation)) {
+            is ru.ozero.enginesingbox.RoutedProbeResult.Success -> {
+                SingboxProbeOutcome.Success(
+                    result.latencyMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                )
+            }
+            is ru.ozero.enginesingbox.RoutedProbeResult.Failure -> {
+                if (processDied.get()) {
+                    SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_PROCESS_DIED)
+                } else if (remainingTimeoutMs(deadlineNanos) == null) {
+                    SingboxProbeOutcome.Failure(SingboxProbeService.PROBE_ERROR_TIMEOUT)
+                } else {
+                    SingboxProbeOutcome.Failure(result.reason.profileProbeStatus())
+                }
+            }
         }
     }
 
@@ -798,8 +780,6 @@ private class SingboxServiceProfileProbe(
 
     private companion object {
         const val PROBE_START_DELAY_MS = 150L
-        const val PROBE_RETRY_DELAY_MS = 250L
-        const val PROBE_ATTEMPTS = 3
         const val REMOTE_STOP_TIMEOUT_MS = 3_000L
         const val BIND_TIMEOUT_MS = 5_000L
         const val SINGLE_PROFILE_ID = 0L
@@ -809,19 +789,19 @@ private class SingboxServiceProfileProbe(
 }
 
 internal fun ru.ozero.enginesingbox.RoutedProbeResult.Reason.profileProbeStatus(): String = when (this) {
-    ru.ozero.enginesingbox.RoutedProbeResult.Reason.REMOTE_CLOSED -> "Remote closed"
-    ru.ozero.enginesingbox.RoutedProbeResult.Reason.SOCKS_REPLY -> "SOCKS rejected"
-    ru.ozero.enginesingbox.RoutedProbeResult.Reason.DNS -> "DNS failed"
-    ru.ozero.enginesingbox.RoutedProbeResult.Reason.TLS_CERTIFICATE -> "TLS certificate"
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.TLS_CERTIFICATE,
     ru.ozero.enginesingbox.RoutedProbeResult.Reason.TLS_HANDSHAKE,
     ru.ozero.enginesingbox.RoutedProbeResult.Reason.TLS,
-    -> "TLS handshake"
-    ru.ozero.enginesingbox.RoutedProbeResult.Reason.TIMEOUT -> "Timeout"
-    ru.ozero.enginesingbox.RoutedProbeResult.Reason.UNEXPECTED_RESPONSE -> "Unexpected response"
+    -> SingboxProbeService.PROBE_ERROR_TLS
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.TIMEOUT -> SingboxProbeService.PROBE_ERROR_TIMEOUT
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.REMOTE_CLOSED,
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.SOCKS_REPLY,
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.DNS,
+    ru.ozero.enginesingbox.RoutedProbeResult.Reason.UNEXPECTED_RESPONSE,
     ru.ozero.enginesingbox.RoutedProbeResult.Reason.CONNECT,
     ru.ozero.enginesingbox.RoutedProbeResult.Reason.IO,
     ru.ozero.enginesingbox.RoutedProbeResult.Reason.SOCKS_NOT_READY,
-    -> "Connect failed"
+    -> SingboxProbeService.PROBE_ERROR_FAILED
 }
 
 internal class ProfileProbeProtector : ISingboxProtector.Stub() {

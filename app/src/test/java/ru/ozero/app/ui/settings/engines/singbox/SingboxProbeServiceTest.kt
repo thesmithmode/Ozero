@@ -49,16 +49,13 @@ class SingboxProbeServiceTest {
     }
 
     @Test
-    fun `profile probe returns typed final failure without diagnostic detail`() {
+    fun `profile probe uses one bounded endpoint fallback pass`() {
         val source = java.io.File(
             "src/main/java/ru/ozero/app/ui/settings/engines/singbox/SingboxProbeService.kt",
         ).readText()
-        val failureBranch = source
-            .substringAfter("is ru.ozero.enginesingbox.RoutedProbeResult.Failure ->")
-            .substringBefore("if (attempt < PROBE_ATTEMPTS - 1)")
 
-        assertFalse(failureBranch.contains("result.safeDetail != null"))
-        assertTrue(failureBranch.contains("result.reason.profileProbeStatus()"))
+        assertTrue(source.contains("probe.probeUntil(port, deadlineNanos, probeCancellation)"))
+        assertFalse(source.contains("PROBE_ATTEMPTS"))
     }
 
     private val selectedProfileKey = longPreferencesKey("singbox_selected_profile_id")
@@ -67,13 +64,34 @@ class SingboxProbeServiceTest {
 
     @Test
     fun `profile status stores stable category instead of diagnostic detail`() {
-        assertEquals("Remote closed", RoutedProbeResult.Reason.REMOTE_CLOSED.profileProbeStatus())
-        assertEquals("SOCKS rejected", RoutedProbeResult.Reason.SOCKS_REPLY.profileProbeStatus())
-        assertEquals("DNS failed", RoutedProbeResult.Reason.DNS.profileProbeStatus())
-        assertEquals("TLS certificate", RoutedProbeResult.Reason.TLS_CERTIFICATE.profileProbeStatus())
-        assertEquals("TLS handshake", RoutedProbeResult.Reason.TLS_HANDSHAKE.profileProbeStatus())
-        assertEquals("Timeout", RoutedProbeResult.Reason.TIMEOUT.profileProbeStatus())
-        assertEquals("Unexpected response", RoutedProbeResult.Reason.UNEXPECTED_RESPONSE.profileProbeStatus())
+        assertEquals(
+            SingboxProbeService.PROBE_ERROR_FAILED,
+            RoutedProbeResult.Reason.REMOTE_CLOSED.profileProbeStatus(),
+        )
+        assertEquals(
+            SingboxProbeService.PROBE_ERROR_FAILED,
+            RoutedProbeResult.Reason.SOCKS_REPLY.profileProbeStatus(),
+        )
+        assertEquals(
+            SingboxProbeService.PROBE_ERROR_FAILED,
+            RoutedProbeResult.Reason.DNS.profileProbeStatus(),
+        )
+        assertEquals(
+            SingboxProbeService.PROBE_ERROR_TLS,
+            RoutedProbeResult.Reason.TLS_CERTIFICATE.profileProbeStatus(),
+        )
+        assertEquals(
+            SingboxProbeService.PROBE_ERROR_TLS,
+            RoutedProbeResult.Reason.TLS_HANDSHAKE.profileProbeStatus(),
+        )
+        assertEquals(
+            SingboxProbeService.PROBE_ERROR_TIMEOUT,
+            RoutedProbeResult.Reason.TIMEOUT.profileProbeStatus(),
+        )
+        assertEquals(
+            SingboxProbeService.PROBE_ERROR_FAILED,
+            RoutedProbeResult.Reason.UNEXPECTED_RESPONSE.profileProbeStatus(),
+        )
     }
 
     @Test

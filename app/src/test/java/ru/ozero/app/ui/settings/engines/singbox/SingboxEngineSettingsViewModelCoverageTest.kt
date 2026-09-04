@@ -1008,6 +1008,28 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
+    fun `onPing marks only the group currently being probed`() = runTest {
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0), group(id = 2L, userOrder = 1)),
+            initialProfiles = listOf(
+                profile(id = 111L, groupId = 1L, name = "One", userOrder = 0),
+                profile(id = 222L, groupId = 2L, name = "Two", userOrder = 0),
+            ),
+        )
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+        var secondGroupState = emptySet<Long>()
+        harness.profileDao.beforeGetByGroupId = { id ->
+            if (id == 2L) secondGroupState = harness.viewModel.state.value.isPinging
+        }
+
+        harness.viewModel.onPing()
+        advanceUntilIdle()
+
+        assertEquals(setOf(2L), secondGroupState)
+    }
+
+    @Test
     fun `onPing probes current expanded snapshot and refreshes group profiles`() = runTest {
         val harness = Harness(
             initialGroups = listOf(group(id = 1L, userOrder = 0)),
@@ -1183,6 +1205,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         private val flow: MutableStateFlow<List<ProxyProfile>>,
     ) : ProxyProfileDao {
         val insertedProfiles = mutableListOf<ProxyProfile>()
+        var beforeGetByGroupId: suspend (Long) -> Unit = {}
         var beforeGetByGroupIdLimited: suspend (Long) -> Unit = {}
 
         override fun getAllFlow(): Flow<List<ProxyProfile>> = flow
@@ -1196,8 +1219,10 @@ class SingboxEngineSettingsViewModelCoverageTest {
         override fun getByGroupIdFlow(groupId: Long): Flow<List<ProxyProfile>> =
             MutableStateFlow(flow.value.filter { it.groupId == groupId })
 
-        override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> =
-            flow.value.filter { it.groupId == groupId }
+        override suspend fun getByGroupId(groupId: Long): List<ProxyProfile> {
+            beforeGetByGroupId(groupId)
+            return flow.value.filter { it.groupId == groupId }
+        }
 
         override suspend fun getByGroupIdLimited(groupId: Long, limit: Int): List<ProxyProfile> {
             beforeGetByGroupIdLimited(groupId)

@@ -90,7 +90,7 @@ class FptnEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onTokenSave trims token and clears selected server`() = runTest {
+    fun `onTokenSave trims token and restores auto select`() = runTest {
         val store = InMemoryFptnConfigStore(
             FptnConfig(
                 token = "old",
@@ -105,7 +105,7 @@ class FptnEngineSettingsViewModelTest {
 
         assertEquals("new-token", store.snapshot.token)
         assertNull(store.snapshot.selectedServerName)
-        assertFalse(store.snapshot.autoSelect)
+        assertTrue(store.snapshot.autoSelect)
     }
 
     @Test

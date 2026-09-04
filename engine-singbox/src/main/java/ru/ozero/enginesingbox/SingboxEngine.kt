@@ -719,21 +719,11 @@ class SingboxEngine @Inject constructor(
             PersistentLoggers.warn(TAG, "readiness failed generation=$generation stage=socks-not-ready port=$port")
             return EnginePlugin.ReadyResult.Timeout("sing-box SOCKS5 listener is not ready")
         }
-        return when (val result = routedProbe.probe(port)) {
-            is RoutedProbeResult.Success -> EnginePlugin.ReadyResult.Ready.also {
-                PersistentLoggers.debug(
-                    TAG,
-                    "readiness passed generation=$generation port=$port latencyMs=${result.latencyMs}",
-                )
-            }
-            is RoutedProbeResult.Failure -> {
-                PersistentLoggers.warn(
-                    TAG,
-                    "readiness failed generation=$generation stage=routed-probe " +
-                        "port=$port reason=${result.reason}",
-                )
-                EnginePlugin.ReadyResult.Timeout(result.reason.probeFailureMessage())
-            }
+        return EnginePlugin.ReadyResult.Ready.also {
+            PersistentLoggers.debug(
+                TAG,
+                "readiness passed generation=$generation port=$port",
+            )
         }
     }
 

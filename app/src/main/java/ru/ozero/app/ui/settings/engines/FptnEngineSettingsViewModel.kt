@@ -59,7 +59,9 @@ class FptnEngineSettingsViewModel @Inject constructor(
 
     fun onTokenSave(draft: String) {
         viewModelScope.launch {
-            configStore.update { it.copy(token = draft.trim(), selectedServerName = null) }
+            configStore.update {
+                it.copy(token = draft.trim(), selectedServerName = null, autoSelect = true)
+            }
         }
     }
 
