@@ -15,7 +15,10 @@ class GroupProbeCompletionTrackerTest {
         )
         val constructor = trackerClass.declaredConstructors.single().apply { isAccessible = true }
         val tracker = constructor.newInstance(profiles, state)
-        val complete = trackerClass.getDeclaredMethod("complete", Long::class.javaPrimitiveType).apply {
+        val complete = trackerClass.getDeclaredMethod(
+            "complete",
+            Long::class.javaPrimitiveType!!,
+        ).apply {
             isAccessible = true
         }
 
