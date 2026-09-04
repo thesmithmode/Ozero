@@ -25,8 +25,10 @@ class ConfigBuilderProbeTest {
         assertContains(json, "\"tag\":\"probe-out-1\"")
         assertContains(json, "\"inbound\":[\"probe-in-0\"],\"outbound\":\"probe-out-0\"")
         assertContains(json, "\"inbound\":[\"probe-in-1\"],\"outbound\":\"probe-out-1\"")
-        assertContains(json, "\"final\":\"block\"")
-        assertContains(json, "\"log\":{\"level\":\"debug\"")
+        assertContains(json, "\"final\":\"direct\"")
+        assertContains(json, "{\"action\":\"reject\"}")
+        assertContains(json, "\"log\":{\"level\":\"warn\"")
+        assertFalse(json.contains("\"type\":\"block\""))
         assertFalse(json.contains("\"type\":\"tun\""))
     }
 
