@@ -31,6 +31,25 @@ jobs:
       - name: Apply exact fixes
         run: |
           sed -i 's/validProfile(id, latency = (100 + id).toInt())/makeProfile(id, \\\"batch-$id.example\\\", 443)/g' .github/scripts/pr434_apply_fixes.py
+          python3 - <<'PY'
+          from pathlib import Path
+          script = Path('.github/scripts/pr434_apply_fixes.py')
+          text = script.read_text()
+          start = text.index('marker = "override suspend fun attachTun(tunFd: Int): TunAttachResult"')
+          replacement = '''p = Path("engine-singbox/src/main/java/ru/ozero/enginesingbox/SingboxEngine.kt")
+          text = p.read_text()
+          marker = "override suspend fun attachTun(tunFd: Int): TunAttachResult"
+          marker_pos = text.index(marker)
+          old = 'TunAttachResult.Failure("AIDL failed")'
+          failure_pos = text.find(old, marker_pos)
+          if failure_pos < 0:
+              raise SystemExit(f"missing attachTun generic AIDL failure in {p}")
+          new = 'TunAttachResult.Failure("AIDL failed (${it::class.java.simpleName})")'
+          p.write_text(text[:failure_pos] + new + text[failure_pos + len(old):])
+          print(f"updated attachTun diagnostics in {p}")
+          '''
+          script.write_text(text[:start] + replacement)
+          PY
           python3 .github/scripts/pr434_apply_fixes.py
           git diff --check
           git diff --stat
