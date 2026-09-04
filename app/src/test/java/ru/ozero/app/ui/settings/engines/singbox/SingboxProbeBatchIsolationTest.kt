@@ -4,10 +4,37 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import ru.ozero.singboxfmt.VLESSBean
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SingboxProbeBatchIsolationTest {
+    @Test
+    fun `negative runtime split budget is rejected`() = runTest {
+        assertFailsWith<IllegalArgumentException> {
+            isolateProbeBatchFailures(targets(1), maxRuntimeSplits = -1) { batch ->
+                ProbeBatchAttempt(success(batch))
+            }
+        }
+    }
+
+    @Test
+    fun `singleton runtime rejection is terminal without further splitting`() = runTest {
+        val target = targets(1)
+        var attempts = 0
+
+        val outcomes = isolateProbeBatchFailures(target, maxRuntimeSplits = 1) { batch ->
+            attempts++
+            ProbeBatchAttempt(
+                outcomes = failed(batch),
+                splitReason = ProbeBatchSplitReason.RUNTIME_START,
+            )
+        }
+
+        assertEquals(1, attempts)
+        assertIs<SingboxProbeOutcome.Failure>(outcomes.getValue(target.single().profileId))
+    }
+
     @Test
     fun `runtime start rejection isolates one bad profile without failing good siblings`() = runTest {
         val targets = targets(8)
