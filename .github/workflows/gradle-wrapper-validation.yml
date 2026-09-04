@@ -30,7 +30,7 @@ jobs:
 
       - name: Apply exact fixes
         run: |
-          sed -i 's/validProfile(id, latency = (100 + id).toInt())/makeProfile(id, "batch-$id.example", 443)/g' .github/scripts/pr434_apply_fixes.py
+          sed -i 's/validProfile(id, latency = (100 + id).toInt())/makeProfile(id, \"batch-$id.example\", 443)/g' .github/scripts/pr434_apply_fixes.py
           python3 .github/scripts/pr434_apply_fixes.py
           git diff --check
           git diff --stat
