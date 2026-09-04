@@ -204,7 +204,7 @@ class ConfigBuilderAutoSelectTest {
         val json = ConfigBuilder.buildSingboxAutoConfig(listOf(makeVless()))
 
         assertContains(json, "\"type\":\"direct\"")
-        assertContains(json, "\"type\":\"block\"")
+        assertFalse(json.contains("\"type\":\"block\""), "legacy block outbound was removed in sing-box 1.13")
         assertFalse(json.contains("\"type\":\"dns\""), "dns outbound removed in sing-box 1.13.0")
         assertContains(json, "\"auto_detect_interface\":true")
     }
