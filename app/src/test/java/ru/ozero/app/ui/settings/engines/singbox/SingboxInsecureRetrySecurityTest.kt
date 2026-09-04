@@ -8,6 +8,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
@@ -97,6 +99,60 @@ class SingboxInsecureRetrySecurityTest {
         viewModel.onConfirmInsecureRefresh(true)
         advanceUntilIdle()
         coVerify(exactly = 0) { rawUpdater.refresh(match { it.id == group.id }, true) }
+    }
+
+    @Test
+    fun `queued consent is dropped when newer secure refresh starts`() = runTest {
+        val first = group(3L)
+        val second = group(4L)
+        val groupsFlow = MutableStateFlow(listOf(first, second))
+        val rawUpdater = mockk<RawUpdater>()
+        coEvery { rawUpdater.refresh(match { it.id == first.id }, false) } returns
+            Result.failure(IllegalStateException(SubscriptionRefreshErrorCode.TLS_CERTIFICATE))
+        var secondSecureAttempts = 0
+        coEvery { rawUpdater.refresh(match { it.id == second.id }, false) } answers {
+            secondSecureAttempts++
+            if (secondSecureAttempts == 1) {
+                Result.failure(IllegalStateException(SubscriptionRefreshErrorCode.TLS_CERTIFICATE))
+            } else {
+                Result.success(1)
+            }
+        }
+        val firstRetryStarted = CompletableDeferred<Unit>()
+        val releaseFirstRetry = CompletableDeferred<Unit>()
+        coEvery { rawUpdater.refresh(match { it.id == first.id }, true) } coAnswers {
+            firstRetryStarted.complete(Unit)
+            releaseFirstRetry.await()
+            Result.success(1)
+        }
+        coEvery { rawUpdater.refresh(match { it.id == second.id }, true) } returns Result.success(1)
+
+        val viewModel = viewModel(groupsFlow, rawUpdater)
+        backgroundScope.launch(Dispatchers.Main) { viewModel.state.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onRefresh(first.id)
+        advanceUntilIdle()
+        viewModel.onRefresh(second.id)
+        advanceUntilIdle()
+        assertEquals(first.id, viewModel.state.value.pendingInsecureRefreshGroupId)
+
+        viewModel.onConfirmInsecureRefresh(true)
+        runCurrent()
+        firstRetryStarted.await()
+        assertEquals(second.id, viewModel.state.value.pendingInsecureRefreshGroupId)
+
+        viewModel.onConfirmInsecureRefresh(true)
+        runCurrent()
+        viewModel.onRefresh(second.id)
+        advanceUntilIdle()
+        assertNull(viewModel.state.value.pendingInsecureRefreshGroupId)
+
+        releaseFirstRetry.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(2, secondSecureAttempts)
+        coVerify(exactly = 0) { rawUpdater.refresh(match { it.id == second.id }, true) }
     }
 
     private fun viewModel(
