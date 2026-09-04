@@ -7,7 +7,7 @@ import androidx.datastore.preferences.core.mutablePreferencesOf
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.match
+import io.mockk.firstArg
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
