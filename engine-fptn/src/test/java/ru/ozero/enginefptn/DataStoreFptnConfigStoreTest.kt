@@ -308,6 +308,7 @@ class DataStoreFptnConfigStoreTest {
 
         store.update {
             it.copy(
+                selectedServerName = "Server 1",
                 autoSelect = false,
                 reconnectOnNetworkChange = false,
                 reconnectOnIpChange = false,
@@ -328,6 +329,7 @@ class DataStoreFptnConfigStoreTest {
 
         store.update {
             it.copy(
+                selectedServerName = "Server 1",
                 autoSelect = false,
                 reconnectOnNetworkChange = false,
                 reconnectOnIpChange = false,
@@ -341,6 +343,7 @@ class DataStoreFptnConfigStoreTest {
 
         store.update {
             it.copy(
+                selectedServerName = null,
                 autoSelect = true,
                 reconnectOnNetworkChange = true,
                 reconnectOnIpChange = true,
