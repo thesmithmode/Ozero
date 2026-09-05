@@ -90,7 +90,45 @@ class FptnEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onTokenSave trims token and restores auto select`() = runTest {
+    fun `onTokenSave preserves manual server when it remains in token`() = runTest {
+        val store = InMemoryFptnConfigStore(
+            FptnConfig(
+                token = "old",
+                selectedServerName = "Exit A",
+                autoSelect = false,
+            ),
+        )
+        val viewModel = FptnEngineSettingsViewModel(store)
+
+        viewModel.onTokenSave("  ${validToken()}  ")
+        advanceUntilIdle()
+
+        assertEquals(validToken(), store.snapshot.token)
+        assertEquals("Exit A", store.snapshot.selectedServerName)
+        assertFalse(store.snapshot.autoSelect)
+    }
+
+    @Test
+    fun `onTokenSave restores auto select when manual server is absent from new token`() = runTest {
+        val store = InMemoryFptnConfigStore(
+            FptnConfig(
+                token = "old",
+                selectedServerName = "Removed exit",
+                autoSelect = false,
+            ),
+        )
+        val viewModel = FptnEngineSettingsViewModel(store)
+
+        viewModel.onTokenSave(validToken())
+        advanceUntilIdle()
+
+        assertEquals(validToken(), store.snapshot.token)
+        assertNull(store.snapshot.selectedServerName)
+        assertTrue(store.snapshot.autoSelect)
+    }
+
+    @Test
+    fun `onTokenSave invalid token cannot retain manual selection`() = runTest {
         val store = InMemoryFptnConfigStore(
             FptnConfig(
                 token = "old",
