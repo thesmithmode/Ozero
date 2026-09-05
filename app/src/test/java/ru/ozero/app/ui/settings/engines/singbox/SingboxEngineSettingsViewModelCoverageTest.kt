@@ -1008,6 +1008,43 @@ class SingboxEngineSettingsViewModelCoverageTest {
     }
 
     @Test
+    fun `onPing clears a completed group while another group is still running`() = runTest {
+        val secondStarted = CompletableDeferred<Unit>()
+        val releaseSecond = CompletableDeferred<Unit>()
+        val probe = object : SingboxProfileProbe {
+            override suspend fun probeLatencyMs(
+                bean: AbstractBean,
+                settings: SingboxProfileProbeSettings,
+            ): Int {
+                if (bean.serverAddress == "Two.example.com") {
+                    secondStarted.complete(Unit)
+                    releaseSecond.await()
+                }
+                return 1
+            }
+        }
+        val harness = Harness(
+            initialGroups = listOf(group(id = 1L, userOrder = 0), group(id = 2L, userOrder = 1)),
+            initialProfiles = listOf(
+                profile(id = 111L, groupId = 1L, name = "One", userOrder = 0),
+                profile(id = 222L, groupId = 2L, name = "Two", userOrder = 0),
+            ),
+            profileProbeOverride = probe,
+        )
+        harness.startStateCollection(backgroundScope)
+        advanceUntilIdle()
+
+        harness.viewModel.onPing()
+        secondStarted.await()
+        runCurrent()
+
+        assertEquals(setOf(2L), harness.viewModel.state.value.isPinging)
+        releaseSecond.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(harness.viewModel.state.value.isPinging.isEmpty())
+    }
+
+    @Test
     fun `onPing probes current expanded snapshot and refreshes group profiles`() = runTest {
         val harness = Harness(
             initialGroups = listOf(group(id = 1L, userOrder = 0)),
@@ -1070,6 +1107,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
         initialGroups: List<SubscriptionGroup> = emptyList(),
         initialProfiles: List<ProxyProfile> = emptyList(),
         initialChain: List<ProxyChainStep> = emptyList(),
+        profileProbeOverride: SingboxProfileProbe? = null,
     ) {
         val prefsFlow = MutableStateFlow(initialPreferences)
         val groupsFlow = MutableStateFlow(initialGroups)
@@ -1146,7 +1184,7 @@ class SingboxEngineSettingsViewModelCoverageTest {
             val probeService = SingboxProbeService(
                 profileDao = profileDao,
                 dataStore = dataStore(),
-                profileProbe = RecordingProfileProbe(probeCalls),
+                profileProbe = profileProbeOverride ?: RecordingProfileProbe(probeCalls),
                 probeDispatcher = Dispatchers.Main,
             )
             viewModel = SingboxEngineSettingsViewModel(

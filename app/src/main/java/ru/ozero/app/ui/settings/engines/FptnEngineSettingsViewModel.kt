@@ -58,8 +58,20 @@ class FptnEngineSettingsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FptnSettingsUiState())
 
     fun onTokenSave(draft: String) {
+        val token = draft.trim()
         viewModelScope.launch {
-            configStore.update { it.copy(token = draft.trim(), selectedServerName = null) }
+            configStore.update { current ->
+                val selectedServerName = current.selectedServerName
+                val keepsManualSelection =
+                    !current.autoSelect &&
+                        selectedServerName != null &&
+                        FptnToken.parse(token)?.servers?.any { it.name == selectedServerName } == true
+                current.copy(
+                    token = token,
+                    selectedServerName = selectedServerName.takeIf { keepsManualSelection },
+                    autoSelect = !keepsManualSelection,
+                )
+            }
         }
     }
 
