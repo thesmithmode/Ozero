@@ -1,6 +1,9 @@
 package ru.ozero.app.ui.settings.engines
 
 import android.util.Base64
+import io.mockk.every
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collect
@@ -8,9 +11,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlinx.coroutines.test.resetMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -29,10 +32,15 @@ class FptnEngineSettingsViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
+        mockkStatic(Base64::class)
+        every { Base64.decode(any<String>(), any<Int>()) } answers {
+            java.util.Base64.getDecoder().decode(firstArg<String>().trim())
+        }
     }
 
     @After
     fun tearDown() {
+        unmockkStatic(Base64::class)
         Dispatchers.resetMain()
     }
 
@@ -228,6 +236,6 @@ class FptnEngineSettingsViewModelTest {
                 {"name":"Exit A","host":"a.example","port":443,"country_code":"nl"},
                 {"name":"Exit B","host":"b.example","port":8443,"country_code":"de"}
             ]}"""
-        return "fptn:${Base64.encodeToString(json.toByteArray(), Base64.NO_WRAP)}"
+        return "fptn:${java.util.Base64.getEncoder().encodeToString(json.toByteArray())}"
     }
 }
