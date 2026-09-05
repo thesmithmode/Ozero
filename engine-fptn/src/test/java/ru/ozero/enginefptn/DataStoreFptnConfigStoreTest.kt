@@ -105,6 +105,27 @@ class DataStoreFptnConfigStoreTest {
     }
 
     @Test
+    fun `missing manual server restores auto select`() = runTest {
+        val dataStoreScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
+            produceFile = { File(tmp, "fptn-invalid-manual.preferences_pb") },
+        )
+        try {
+            dataStore.edit { prefs ->
+                prefs[booleanPreferencesKey("fptn_auto_select")] = false
+            }
+
+            val config = DataStoreFptnConfigStore(dataStore).currentConfig()
+
+            assertNull(config.selectedServerName)
+            assertEquals(true, config.autoSelect)
+        } finally {
+            dataStoreScope.cancel()
+        }
+    }
+
+    @Test
     fun `FptnEngine manual config sees persisted preferences before flow collection`() = runTest {
         val dataStoreScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val dataStore = PreferenceDataStoreFactory.create(
@@ -287,6 +308,7 @@ class DataStoreFptnConfigStoreTest {
 
         store.update {
             it.copy(
+                selectedServerName = "Server 1",
                 autoSelect = false,
                 reconnectOnNetworkChange = false,
                 reconnectOnIpChange = false,
@@ -307,6 +329,7 @@ class DataStoreFptnConfigStoreTest {
 
         store.update {
             it.copy(
+                selectedServerName = "Server 1",
                 autoSelect = false,
                 reconnectOnNetworkChange = false,
                 reconnectOnIpChange = false,
@@ -320,6 +343,7 @@ class DataStoreFptnConfigStoreTest {
 
         store.update {
             it.copy(
+                selectedServerName = null,
                 autoSelect = true,
                 reconnectOnNetworkChange = true,
                 reconnectOnIpChange = true,
