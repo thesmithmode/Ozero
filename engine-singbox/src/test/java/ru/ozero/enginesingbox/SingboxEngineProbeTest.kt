@@ -543,7 +543,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `awaitReady rejects external probe failure after local SOCKS is ready`() = runTest {
+    fun `awaitReady accepts local SOCKS when external probe is unavailable`() = runTest {
         mockkStatic(ParcelFileDescriptor::class)
         try {
             val engine = buildEngine()
@@ -570,12 +570,12 @@ class SingboxEngineProbeTest {
 
                 val ready = engine.awaitReady()
 
-                assertIs<EnginePlugin.ReadyResult.Timeout>(ready)
+                assertIs<EnginePlugin.ReadyResult.Ready>(ready)
                 assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
             }
 
             assertIs<TunAttachResult.Success>(result)
-            assertEquals(1, calls)
+            assertEquals(0, calls)
             assertEquals(null, engine.privateField("pendingConfig"))
             assertEquals(0, engine.privateIntField("pendingSocksPort"))
             assertEquals(true, engine.privateBooleanField("activeTunAutoSelect"))
@@ -769,7 +769,7 @@ class SingboxEngineProbeTest {
     }
 
     @Test
-    fun `awaitReady requires routed TLS endpoint after local SOCKS handshake`() = runTest {
+    fun `awaitReady does not depend on routed TLS endpoint after local SOCKS handshake`() = runTest {
         val engine = buildEngine()
         var routedProbeCalls = 0
         engine.routedProbe = object : SingboxRoutedProbe {
@@ -791,8 +791,8 @@ class SingboxEngineProbeTest {
 
             val result = engine.awaitReady()
 
-            assertIs<EnginePlugin.ReadyResult.Timeout>(result)
-            assertEquals(1, routedProbeCalls)
+            assertIs<EnginePlugin.ReadyResult.Ready>(result)
+            assertEquals(0, routedProbeCalls)
             assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
         }
     }

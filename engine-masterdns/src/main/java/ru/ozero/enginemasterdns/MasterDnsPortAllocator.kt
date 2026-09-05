@@ -11,7 +11,7 @@ open class MasterDnsPortAllocator(
         error("no free port in $range")
     }
 
-    private fun isFree(port: Int): Boolean = runCatching {
+    internal open fun isFree(port: Int): Boolean = runCatching {
         ServerSocket(port).use { }
     }.isSuccess
 }

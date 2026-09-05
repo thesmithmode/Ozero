@@ -30,9 +30,32 @@ fun AbstractBean.applyCanonicalDefaults(): AbstractBean {
         headerType = headerType.trim().lowercase().ifBlank { "none" }
         packetEncoding = packetEncoding.trim().lowercase().ifBlank { "none" }
         muxPacketEncoding = muxPacketEncoding.trim().lowercase().ifBlank { "none" }
+        utlsFingerprint = normalizeSingboxUtlsFingerprint(utlsFingerprint)
+        realityFingerprint = normalizeSingboxUtlsFingerprint(realityFingerprint).ifBlank { "chrome" }
     }
     return this
 }
+
+fun normalizeSingboxUtlsFingerprint(raw: String): String =
+    raw.trim().lowercase().takeIf { it in supportedSingboxUtlsFingerprints }.orEmpty()
+
+private val supportedSingboxUtlsFingerprints = setOf(
+    "chrome",
+    "chrome_psk",
+    "chrome_psk_shuffle",
+    "chrome_padding_psk_shuffle",
+    "chrome_pq",
+    "chrome_pq_psk",
+    "firefox",
+    "edge",
+    "safari",
+    "360",
+    "qq",
+    "ios",
+    "android",
+    "random",
+    "randomized",
+)
 
 fun normalizeSingboxTransport(raw: String): String = when (val normalized = raw.trim().lowercase()) {
     "", "raw" -> "tcp"

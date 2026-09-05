@@ -1,6 +1,9 @@
 package ru.ozero.app.ui.settings.engines
 
 import android.util.Base64
+import io.mockk.every
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collect
@@ -8,9 +11,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlinx.coroutines.test.resetMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -29,10 +32,15 @@ class FptnEngineSettingsViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
+        mockkStatic(Base64::class)
+        every { Base64.decode(any<String>(), any<Int>()) } answers {
+            java.util.Base64.getDecoder().decode(firstArg<String>().trim())
+        }
     }
 
     @After
     fun tearDown() {
+        unmockkStatic(Base64::class)
         Dispatchers.resetMain()
     }
 
@@ -90,7 +98,45 @@ class FptnEngineSettingsViewModelTest {
     }
 
     @Test
-    fun `onTokenSave trims token and clears selected server`() = runTest {
+    fun `onTokenSave preserves manual server when it remains in token`() = runTest {
+        val store = InMemoryFptnConfigStore(
+            FptnConfig(
+                token = "old",
+                selectedServerName = "Exit A",
+                autoSelect = false,
+            ),
+        )
+        val viewModel = FptnEngineSettingsViewModel(store)
+
+        viewModel.onTokenSave("  ${validToken()}  ")
+        advanceUntilIdle()
+
+        assertEquals(validToken(), store.snapshot.token)
+        assertEquals("Exit A", store.snapshot.selectedServerName)
+        assertFalse(store.snapshot.autoSelect)
+    }
+
+    @Test
+    fun `onTokenSave restores auto select when manual server is absent from new token`() = runTest {
+        val store = InMemoryFptnConfigStore(
+            FptnConfig(
+                token = "old",
+                selectedServerName = "Removed exit",
+                autoSelect = false,
+            ),
+        )
+        val viewModel = FptnEngineSettingsViewModel(store)
+
+        viewModel.onTokenSave(validToken())
+        advanceUntilIdle()
+
+        assertEquals(validToken(), store.snapshot.token)
+        assertNull(store.snapshot.selectedServerName)
+        assertTrue(store.snapshot.autoSelect)
+    }
+
+    @Test
+    fun `onTokenSave invalid token cannot retain manual selection`() = runTest {
         val store = InMemoryFptnConfigStore(
             FptnConfig(
                 token = "old",
@@ -105,7 +151,7 @@ class FptnEngineSettingsViewModelTest {
 
         assertEquals("new-token", store.snapshot.token)
         assertNull(store.snapshot.selectedServerName)
-        assertFalse(store.snapshot.autoSelect)
+        assertTrue(store.snapshot.autoSelect)
     }
 
     @Test
@@ -190,6 +236,6 @@ class FptnEngineSettingsViewModelTest {
                 {"name":"Exit A","host":"a.example","port":443,"country_code":"nl"},
                 {"name":"Exit B","host":"b.example","port":8443,"country_code":"de"}
             ]}"""
-        return "fptn:${Base64.encodeToString(json.toByteArray(), Base64.NO_WRAP)}"
+        return "fptn:${java.util.Base64.getEncoder().encodeToString(json.toByteArray())}"
     }
 }

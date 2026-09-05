@@ -82,7 +82,7 @@ class SingboxEngineWarmReadinessTest {
             val ready = engine.awaitReady()
 
             assertIs<EnginePlugin.ReadyResult.Ready>(ready)
-            assertEquals(1, routedProbeCalls)
+            assertEquals(0, routedProbeCalls)
             assertEquals(listener.localPort, engine.privateIntField("activeSocksPort"))
             assertEquals(true, engine.privateBooleanField("activeAutoSelect"))
         }

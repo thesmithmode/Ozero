@@ -908,9 +908,9 @@ private fun AddManualLinksDialog(
 internal fun singboxProbeErrorText(probeError: String?): String =
     when (probeError) {
         SingboxProbeService.PROBE_ERROR_UNSUPPORTED -> stringResource(R.string.singbox_latency_unsupported)
-        "timeout" -> stringResource(R.string.singbox_latency_timeout)
-        "runtime_busy" -> stringResource(R.string.singbox_latency_runtime_busy)
-        "tls" -> stringResource(R.string.singbox_latency_tls)
+        SingboxProbeService.PROBE_ERROR_TIMEOUT -> stringResource(R.string.singbox_latency_timeout)
+        SingboxProbeService.PROBE_ERROR_RUNTIME_BUSY -> stringResource(R.string.singbox_latency_runtime_busy)
+        SingboxProbeService.PROBE_ERROR_TLS -> stringResource(R.string.singbox_latency_tls)
         SingboxProbeService.PROBE_ERROR_FAILED -> stringResource(R.string.singbox_latency_failed)
         else -> stringResource(R.string.singbox_latency_failed)
     }

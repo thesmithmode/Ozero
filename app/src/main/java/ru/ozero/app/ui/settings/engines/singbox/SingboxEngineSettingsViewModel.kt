@@ -92,6 +92,28 @@ data class SingboxSettingsUiState(
     val probeTimeoutSeconds: Int = SingboxProbeService.DEFAULT_PROBE_TIMEOUT_MS / 1_000,
 )
 
+private class GroupProbeCompletionTracker(
+    profiles: List<ProxyProfile>,
+    private val uiState: MutableStateFlow<SingboxSettingsUiState>,
+) {
+    private val profileGroupIds = profiles.associate { it.id to it.groupId }
+    private val pendingByGroup = profiles
+        .groupingBy { it.groupId }
+        .eachCount()
+        .mapValues { AtomicInteger(it.value) }
+    private val completedProfiles = ConcurrentHashMap.newKeySet<Long>()
+
+    val groupIds: Set<Long> = pendingByGroup.keys
+
+    fun complete(profileId: Long) {
+        if (!completedProfiles.add(profileId)) return
+        val groupId = profileGroupIds[profileId] ?: return
+        if (pendingByGroup[groupId]?.decrementAndGet() == 0) {
+            uiState.update { it.copy(isPinging = it.isPinging - groupId) }
+        }
+    }
+}
+
 @Suppress("TooManyFunctions")
 @HiltViewModel
 class SingboxEngineSettingsViewModel @Inject constructor(
@@ -276,17 +298,17 @@ class SingboxEngineSettingsViewModel @Inject constructor(
             }
             var probeProfiles = emptyList<ProxyProfile>()
             try {
-                _uiState.update { it.copy(isPinging = it.isPinging + groupIds) }
                 probeProfiles = groupIds.flatMap { id -> profileDao.getByGroupId(id) }
-                if (probeProfiles.isNotEmpty()) {
-                    probeService.probeAndAutoSelect(
-                        profiles = probeProfiles,
-                        onProfileTestingChanged = { profileId, isTesting ->
-                            onProfileTestingChanged(generation, profileId, isTesting)
-                        },
-                        updateManualSelection = false,
-                    )
-                }
+                val completionTracker = GroupProbeCompletionTracker(probeProfiles, _uiState)
+                _uiState.update { it.copy(isPinging = it.isPinging + completionTracker.groupIds) }
+                probeService.probeAndAutoSelect(
+                    profiles = probeProfiles,
+                    onProfileTestingChanged = { profileId, isTesting ->
+                        onProfileTestingChanged(generation, profileId, isTesting)
+                    },
+                    onProfileCompleted = completionTracker::complete,
+                    updateManualSelection = false,
+                )
             } finally {
                 if (generation != probeGeneration.get()) return@launch
                 val refreshed = groupIds.associateWith { id ->

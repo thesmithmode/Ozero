@@ -51,20 +51,23 @@ class DataStoreFptnConfigStore(
         }
     }
 
-    private fun readConfig(prefs: Preferences) = FptnConfig(
-        token = prefs[KEY_TOKEN].orEmpty(),
-        selectedServerName = prefs[KEY_SELECTED_SERVER]?.takeIf { it.isNotBlank() },
-        bypassMethod = prefs[KEY_BYPASS_METHOD]?.takeIf { it.isNotBlank() }
-            ?: FptnBypassMethod.DEFAULT.strategyName,
-        sniDomain = prefs[KEY_SNI_DOMAIN]?.takeIf { it.isNotBlank() }
-            ?: FptnConfig.DEFAULT_SNI_DOMAIN,
-        autoSelect = prefs[KEY_AUTO_SELECT] != false,
-        reconnectOnNetworkChange = prefs[KEY_RECONNECT_NETWORK] != false,
-        reconnectOnIpChange = prefs[KEY_RECONNECT_IP] == true,
-        maxReconnectAttempts = prefs[KEY_MAX_ATTEMPTS] ?: 5,
-        reconnectPauseSeconds = prefs[KEY_PAUSE_SECONDS] ?: 2,
-        resetServerOnDisconnect = prefs[KEY_RESET_SERVER] != false,
-    )
+    private fun readConfig(prefs: Preferences): FptnConfig {
+        val selectedServerName = prefs[KEY_SELECTED_SERVER]?.takeIf { it.isNotBlank() }
+        return FptnConfig(
+            token = prefs[KEY_TOKEN].orEmpty(),
+            selectedServerName = selectedServerName,
+            bypassMethod = prefs[KEY_BYPASS_METHOD]?.takeIf { it.isNotBlank() }
+                ?: FptnBypassMethod.DEFAULT.strategyName,
+            sniDomain = prefs[KEY_SNI_DOMAIN]?.takeIf { it.isNotBlank() }
+                ?: FptnConfig.DEFAULT_SNI_DOMAIN,
+            autoSelect = prefs[KEY_AUTO_SELECT] != false || selectedServerName == null,
+            reconnectOnNetworkChange = prefs[KEY_RECONNECT_NETWORK] != false,
+            reconnectOnIpChange = prefs[KEY_RECONNECT_IP] == true,
+            maxReconnectAttempts = prefs[KEY_MAX_ATTEMPTS] ?: 5,
+            reconnectPauseSeconds = prefs[KEY_PAUSE_SECONDS] ?: 2,
+            resetServerOnDisconnect = prefs[KEY_RESET_SERVER] != false,
+        )
+    }
 
     private fun writeConfig(prefs: MutablePreferences, cfg: FptnConfig) {
         prefs[KEY_TOKEN] = cfg.token

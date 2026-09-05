@@ -53,4 +53,34 @@ class BeanCanonicalizerTest {
 
         assertEquals("ws", bean.type)
     }
+
+    @Test
+    fun `supported uTLS fingerprints are normalized`() {
+        val bean = VLESSBean().apply {
+            utlsFingerprint = " Firefox "
+            realityFingerprint = " CHROME_PQ "
+        }
+
+        val canonical = assertIs<CanonicalizationResult.Canonical>(
+            BeanCanonicalizer.canonicalize(bean),
+        ).bean as VLESSBean
+
+        assertEquals("firefox", canonical.utlsFingerprint)
+        assertEquals("chrome_pq", canonical.realityFingerprint)
+    }
+
+    @Test
+    fun `unsupported uTLS fingerprints cannot reach sing-box config`() {
+        val bean = VLESSBean().apply {
+            utlsFingerprint = "AA:BB:CC"
+            realityFingerprint = "AA:BB:CC"
+        }
+
+        val canonical = assertIs<CanonicalizationResult.Canonical>(
+            BeanCanonicalizer.canonicalize(bean),
+        ).bean as VLESSBean
+
+        assertEquals("", canonical.utlsFingerprint)
+        assertEquals("chrome", canonical.realityFingerprint)
+    }
 }
