@@ -59,4 +59,44 @@ class ShutdownCoordinatorRaceCoverageTest {
         assertTrue(state.stopping.get())
         assertFalse(state.stopSignal.get())
     }
+
+    @Test
+    fun `direct shutdown preserves explicit stop request generation id`() = runTest {
+        val state = ShutdownState(
+            tunFdRef = AtomicReference<ParcelFileDescriptor?>(null),
+            tunIfaceNameRef = AtomicReference<String?>(null),
+            lockdownStartupFdRef = AtomicReference<ParcelFileDescriptor?>(null),
+            sessionStartMsRef = AtomicReference(0L),
+            sessionIdRef = AtomicReference(-1L),
+            startJobRef = AtomicReference<Job?>(null),
+            shutdownJobRef = AtomicReference<Job?>(null),
+            starting = AtomicBoolean(false),
+            stopping = AtomicBoolean(true),
+            stopSignal = AtomicBoolean(true),
+        )
+        val stopSelfRequest = mockk<(Int) -> Unit>(relaxed = true)
+        val coordinator = ShutdownCoordinator(
+            scope = this,
+            deps = ShutdownCollaborators(
+                tunnelController = TunnelController(),
+                healthMonitor = mockk(relaxed = true),
+                chainOrchestrator = mockk(relaxed = true),
+                tunnelGateway = mockk(relaxed = true),
+                statsLogger = mockk(relaxed = true),
+                engineWatchdog = mockk(relaxed = true),
+                sessionStatsRecorder = mockk(relaxed = true),
+            ),
+            state = state,
+            latestStartIdProvider = { 77 },
+            stopForegroundRequest = mockk(relaxed = true),
+            stopSelfRequest = stopSelfRequest,
+        )
+
+        coordinator.performShutdown(callStopSelf = true, stopRequestStartId = 10)
+
+        verify(exactly = 1) { stopSelfRequest.invoke(10) }
+        verify(exactly = 0) { stopSelfRequest.invoke(77) }
+        assertFalse(state.stopping.get())
+        assertFalse(state.stopSignal.get())
+    }
 }
