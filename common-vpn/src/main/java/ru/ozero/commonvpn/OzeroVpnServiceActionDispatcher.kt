@@ -58,7 +58,7 @@ internal class OzeroVpnServiceActionDispatcher(
                         restartVpn()
                     }
                 }
-                OzeroVpnService.ACTION_START, null -> {
+                OzeroVpnService.ACTION_START -> {
                     clearStopping()
                     startVpn()
                 }
