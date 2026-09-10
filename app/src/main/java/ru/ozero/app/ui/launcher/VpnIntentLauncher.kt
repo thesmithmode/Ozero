@@ -46,8 +46,7 @@ class VpnIntentLauncher(
     }
 
     fun stop() {
-        ContextCompat.startForegroundService(
-            activity,
+        activity.startService(
             Intent(activity, OzeroVpnService::class.java).apply {
                 action = OzeroVpnService.ACTION_STOP
             },
