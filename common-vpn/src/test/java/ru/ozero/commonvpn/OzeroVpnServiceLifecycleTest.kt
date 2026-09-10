@@ -298,7 +298,7 @@ class OzeroVpnServiceLifecycleTest {
     @Test
     fun `ACTION_START сбрасывает stopping до вызова startVpn`() {
         val body = actionDispatcherSource.substringAfter("fun dispatch(").substringBefore("private companion object")
-        val startBlock = body.substringAfter("ACTION_START, null ->").substringBefore("}")
+        val startBlock = body.substringAfter("ACTION_START ->").substringBefore("}")
         assertTrue(
             startBlock.contains("clearStopping()"),
             "При ACTION_START обязан сбросить stopping=false до startVpn(), иначе если новый START " +
