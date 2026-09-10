@@ -116,6 +116,20 @@ class ShutdownCoordinatorBehaviorTest {
     }
 
     @Test
+    fun `repeated stop refreshes start id used by in-flight shutdown`() = runTest {
+        var latestStartId = 10
+        val fixture = shutdownFixture(this, latestStartIdProvider = { latestStartId })
+
+        fixture.coordinator.stopVpn()
+        latestStartId = 77
+        fixture.coordinator.stopVpn()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { fixture.chainOrchestrator.stop() }
+        verify(exactly = 1) { fixture.stopSelfRequest.invoke(77) }
+    }
+
+    @Test
     fun `performShutdown resets state and can skip stopSelf for onDestroy path`() = runTest {
         val fixture = shutdownFixture(this)
         fixture.state.starting.set(true)

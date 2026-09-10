@@ -10,6 +10,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.ChainOrchestrator
 import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class ShutdownState(
@@ -43,8 +44,15 @@ class ShutdownCoordinator(
     private val stopForegroundRequest: () -> Unit,
     private val stopSelfRequest: (Int) -> Unit,
 ) {
+    private val latestTerminalStopStartId = AtomicInteger(NO_START_ID)
 
     fun stopVpn(callStopSelf: Boolean = true) {
+        // Refresh before the idempotency guard: a repeated STOP must advance the startId
+        // consumed by the already-running shutdown. A later START does not call stopVpn(),
+        // so it cannot overwrite this terminal id and will survive stopSelf(oldStopId).
+        if (callStopSelf) {
+            latestTerminalStopStartId.set(latestStartIdProvider())
+        }
         if (!state.stopping.compareAndSet(false, true)) return
         state.stopSignal.set(true)
         PersistentLoggers.info(TAG, "stopVpn entry")
@@ -62,7 +70,7 @@ class ShutdownCoordinator(
             SessionStatsRecorder.Status.DISCONNECTED
         }
         recordSessionEnd(endStatus)
-        val stopRequestStartId = latestStartIdProvider()
+        val stopRequestStartId = latestTerminalStopStartId.get()
         val job = scope.launch {
             performShutdown(
                 callStopSelf = callStopSelf,
@@ -119,7 +127,14 @@ class ShutdownCoordinator(
             state.stopSignal.set(false)
             state.tunIfaceNameRef.set(null)
             stopForegroundRequest()
-            if (callStopSelf) stopSelfRequest(stopRequestStartId ?: latestStartIdProvider())
+            if (callStopSelf) {
+                val latestTerminalId = latestTerminalStopStartId.getAndSet(NO_START_ID)
+                if (latestTerminalId != NO_START_ID) {
+                    stopSelfRequest(latestTerminalId)
+                } else {
+                    stopSelfRequest(stopRequestStartId ?: latestStartIdProvider())
+                }
+            }
             PersistentLoggers.info(TAG, "performShutdown end")
         }
     }
@@ -157,6 +172,7 @@ class ShutdownCoordinator(
 
     companion object {
         private const val TAG = "ShutdownCoordinator"
+        private const val NO_START_ID = -1
         const val PARALLEL_STOP_TIMEOUT_MS = 4_000L
     }
 }
