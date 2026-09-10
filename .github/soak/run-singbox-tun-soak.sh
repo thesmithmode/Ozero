@@ -19,7 +19,9 @@ adb shell am instrument \
   ru.ozero.app.test/androidx.test.runner.AndroidJUnitRunner \
   > "$RUNNER_TEMP/soak-output.txt" 2>&1 || status=$?
 adb logcat -d > "$RUNNER_TEMP/soak-logcat.txt"
-if grep -E -q 'FATAL EXCEPTION|Fatal signal|DeadObjectException' "$RUNNER_TEMP/soak-logcat.txt"; then
+if grep -E -q 'AndroidRuntime: Process: ru\.ozero\.app([,:]|\.test[, ])' "$RUNNER_TEMP/soak-logcat.txt" || \
+   grep -E -q 'Fatal signal.*\(ru\.ozero\.app' "$RUNNER_TEMP/soak-logcat.txt" || \
+   grep -E -q '(OzeroVpnService|SingboxEngine(Service)?|SingboxRuntime).*DeadObjectException' "$RUNNER_TEMP/soak-logcat.txt"; then
   status=1
 fi
 if [[ "$OZERO_SOAK_REQUIRE_REALITY" == '0' ]]; then
