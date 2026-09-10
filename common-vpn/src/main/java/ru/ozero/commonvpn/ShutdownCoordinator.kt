@@ -44,20 +44,22 @@ class ShutdownCoordinator(
     private val stopForegroundRequest: () -> Unit,
     private val stopSelfRequest: (Int) -> Unit,
 ) {
-    private val activeTerminalStopStartId = AtomicInteger(NO_START_ID)
+    private val activeStopGenerationRef = AtomicReference<AtomicInteger?>(null)
 
+    @Synchronized
     fun stopVpn(callStopSelf: Boolean = true) {
+        val stopRequestStartId = latestStartIdProvider()
         if (!state.stopping.compareAndSet(false, true)) {
-            if (!callStopSelf) return
-            val repeatedStopStartId = latestStartIdProvider()
-            if (repeatedStopStartId != activeTerminalStopStartId.get()) {
-                // A newer terminal STOP arrived while teardown is already running.
-                // Stop that service-start generation immediately; the in-flight teardown
-                // still owns resource cleanup and its older stopSelf(startId) becomes a no-op.
-                stopSelfRequest(repeatedStopStartId)
+            if (callStopSelf) {
+                // Only STOP-like terminal requests advance the active generation. A newer START
+                // merely changes latestStartIdProvider and therefore remains untouched by teardown.
+                activeStopGenerationRef.get()?.set(stopRequestStartId)
             }
             return
         }
+
+        val stopGeneration = AtomicInteger(if (callStopSelf) stopRequestStartId else NO_START_ID)
+        activeStopGenerationRef.set(stopGeneration)
         state.stopSignal.set(true)
         PersistentLoggers.info(TAG, "stopVpn entry")
         runCatching { deps.tunnelController.onKillswitchReleased() }
@@ -74,13 +76,21 @@ class ShutdownCoordinator(
             SessionStatsRecorder.Status.DISCONNECTED
         }
         recordSessionEnd(endStatus)
-        val stopRequestStartId = latestStartIdProvider()
-        activeTerminalStopStartId.set(if (callStopSelf) stopRequestStartId else NO_START_ID)
         val job = scope.launch {
-            performShutdown(
-                callStopSelf = callStopSelf,
-                stopRequestStartId = stopRequestStartId,
-            )
+            try {
+                // Resource teardown must finish before stopSelf can trigger onDestroy. The terminal
+                // startId is generation-local so a later shutdown cannot be consumed by this one.
+                performShutdown(
+                    callStopSelf = false,
+                    stopRequestStartId = stopRequestStartId,
+                )
+            } finally {
+                val terminalStopStartId = stopGeneration.get()
+                if (terminalStopStartId != NO_START_ID) {
+                    stopSelfRequest(terminalStopStartId)
+                }
+                activeStopGenerationRef.compareAndSet(stopGeneration, null)
+            }
         }
         state.shutdownJobRef.set(job)
     }

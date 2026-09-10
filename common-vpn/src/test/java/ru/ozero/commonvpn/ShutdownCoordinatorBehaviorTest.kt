@@ -116,7 +116,7 @@ class ShutdownCoordinatorBehaviorTest {
     }
 
     @Test
-    fun `repeated newer stop terminates latest service generation during in-flight shutdown`() = runTest {
+    fun `repeated newer stop terminates latest service generation after in-flight shutdown`() = runTest {
         var latestStartId = 10
         val fixture = shutdownFixture(this, latestStartIdProvider = { latestStartId })
 
@@ -128,7 +128,7 @@ class ShutdownCoordinatorBehaviorTest {
         coVerify(exactly = 1) { fixture.chainOrchestrator.stop() }
         verify(exactly = 1) { fixture.tunnelGateway.stop() }
         verify(exactly = 1) { fixture.stopSelfRequest.invoke(77) }
-        verify(exactly = 1) { fixture.stopSelfRequest.invoke(10) }
+        verify(exactly = 0) { fixture.stopSelfRequest.invoke(10) }
     }
 
     @Test
