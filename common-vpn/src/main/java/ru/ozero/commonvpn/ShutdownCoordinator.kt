@@ -44,16 +44,20 @@ class ShutdownCoordinator(
     private val stopForegroundRequest: () -> Unit,
     private val stopSelfRequest: (Int) -> Unit,
 ) {
-    private val latestTerminalStopStartId = AtomicInteger(NO_START_ID)
+    private val activeTerminalStopStartId = AtomicInteger(NO_START_ID)
 
     fun stopVpn(callStopSelf: Boolean = true) {
-        // Refresh before the idempotency guard: a repeated STOP must advance the startId
-        // consumed by the already-running shutdown. A later START does not call stopVpn(),
-        // so it cannot overwrite this terminal id and will survive stopSelf(oldStopId).
-        if (callStopSelf) {
-            latestTerminalStopStartId.set(latestStartIdProvider())
+        if (!state.stopping.compareAndSet(false, true)) {
+            if (!callStopSelf) return
+            val repeatedStopStartId = latestStartIdProvider()
+            if (repeatedStopStartId != activeTerminalStopStartId.get()) {
+                // A newer terminal STOP arrived while teardown is already running.
+                // Stop that service-start generation immediately; the in-flight teardown
+                // still owns resource cleanup and its older stopSelf(startId) becomes a no-op.
+                stopSelfRequest(repeatedStopStartId)
+            }
+            return
         }
-        if (!state.stopping.compareAndSet(false, true)) return
         state.stopSignal.set(true)
         PersistentLoggers.info(TAG, "stopVpn entry")
         runCatching { deps.tunnelController.onKillswitchReleased() }
@@ -70,7 +74,8 @@ class ShutdownCoordinator(
             SessionStatsRecorder.Status.DISCONNECTED
         }
         recordSessionEnd(endStatus)
-        val stopRequestStartId = latestTerminalStopStartId.get()
+        val stopRequestStartId = latestStartIdProvider()
+        activeTerminalStopStartId.set(if (callStopSelf) stopRequestStartId else NO_START_ID)
         val job = scope.launch {
             performShutdown(
                 callStopSelf = callStopSelf,
@@ -127,14 +132,7 @@ class ShutdownCoordinator(
             state.stopSignal.set(false)
             state.tunIfaceNameRef.set(null)
             stopForegroundRequest()
-            if (callStopSelf) {
-                val latestTerminalId = latestTerminalStopStartId.getAndSet(NO_START_ID)
-                if (latestTerminalId != NO_START_ID) {
-                    stopSelfRequest(latestTerminalId)
-                } else {
-                    stopSelfRequest(stopRequestStartId ?: latestStartIdProvider())
-                }
-            }
+            if (callStopSelf) stopSelfRequest(stopRequestStartId ?: latestStartIdProvider())
             PersistentLoggers.info(TAG, "performShutdown end")
         }
     }
