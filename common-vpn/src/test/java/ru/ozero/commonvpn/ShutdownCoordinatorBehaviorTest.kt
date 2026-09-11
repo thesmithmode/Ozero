@@ -116,6 +116,35 @@ class ShutdownCoordinatorBehaviorTest {
     }
 
     @Test
+    fun `repeated newer stop terminates latest service generation after in-flight shutdown`() = runTest {
+        var latestStartId = 10
+        val fixture = shutdownFixture(this, latestStartIdProvider = { latestStartId })
+
+        fixture.coordinator.stopVpn()
+        latestStartId = 77
+        fixture.coordinator.stopVpn()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { fixture.chainOrchestrator.stop() }
+        verify(exactly = 1) { fixture.tunnelGateway.stop() }
+        verify(exactly = 1) { fixture.stopSelfRequest.invoke(77) }
+        verify(exactly = 0) { fixture.stopSelfRequest.invoke(10) }
+    }
+
+    @Test
+    fun `repeated non-terminal shutdown does not stop service`() = runTest {
+        val fixture = shutdownFixture(this)
+
+        fixture.coordinator.stopVpn(callStopSelf = false)
+        fixture.coordinator.stopVpn(callStopSelf = false)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { fixture.chainOrchestrator.stop() }
+        verify(exactly = 1) { fixture.tunnelGateway.stop() }
+        verify(exactly = 0) { fixture.stopSelfRequest.invoke(any()) }
+    }
+
+    @Test
     fun `performShutdown resets state and can skip stopSelf for onDestroy path`() = runTest {
         val fixture = shutdownFixture(this)
         fixture.state.starting.set(true)

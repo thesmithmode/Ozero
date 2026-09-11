@@ -2,7 +2,6 @@ package ru.ozero.commonvpn
 
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class OzeroVpnServiceActionDispatcherTest {
@@ -14,7 +13,9 @@ class OzeroVpnServiceActionDispatcherTest {
         val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_START, 7)
 
         assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
+        assertEquals(listOf(7), calls.latestStartIds)
         assertEquals(listOf(7), calls.stopSelfIds)
+        assertEquals(1, calls.foregroundCalls)
         assertEquals(0, calls.startCalls)
     }
 
@@ -25,17 +26,20 @@ class OzeroVpnServiceActionDispatcherTest {
         val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_START, 8)
 
         assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
+        assertEquals(listOf(8), calls.latestStartIds)
         assertEquals(listOf(8), calls.stopSelfIds)
+        assertEquals(1, calls.foregroundCalls)
         assertEquals(0, calls.startCalls)
     }
 
     @Test
-    fun `start and null action clear stopping and start vpn`() {
+    fun `start is sticky but null restart intent is terminal`() {
         val explicit = Calls()
         val explicitResult = explicit.dispatcher().dispatch(OzeroVpnService.ACTION_START, 1)
 
         assertEquals(OzeroVpnServiceStartResult.STICKY, explicitResult)
         assertEquals(listOf(1), explicit.latestStartIds)
+        assertEquals(1, explicit.foregroundCalls)
         assertEquals(1, explicit.clearStoppingCalls)
         assertEquals(1, explicit.startCalls)
 
@@ -44,8 +48,10 @@ class OzeroVpnServiceActionDispatcherTest {
 
         assertEquals(OzeroVpnServiceStartResult.STICKY, nullResult)
         assertEquals(listOf(2), nullAction.latestStartIds)
-        assertEquals(1, nullAction.clearStoppingCalls)
-        assertEquals(1, nullAction.startCalls)
+        assertEquals(listOf(2), nullAction.stopSelfIds)
+        assertEquals(0, nullAction.foregroundCalls)
+        assertEquals(0, nullAction.clearStoppingCalls)
+        assertEquals(0, nullAction.startCalls)
     }
 
     @Test
@@ -60,7 +66,7 @@ class OzeroVpnServiceActionDispatcherTest {
     }
 
     @Test
-    fun `stop action delegates to stop vpn without clearing start state`() {
+    fun `stop action never promotes foreground and keeps shutdown contract`() {
         val calls = Calls()
 
         val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_STOP, 3)
@@ -68,8 +74,21 @@ class OzeroVpnServiceActionDispatcherTest {
         assertEquals(OzeroVpnServiceStartResult.STICKY, result)
         assertEquals(listOf(3), calls.latestStartIds)
         assertEquals(1, calls.stopCalls)
+        assertEquals(0, calls.foregroundCalls)
         assertEquals(0, calls.clearStoppingCalls)
         assertEquals(0, calls.startCalls)
+    }
+
+    @Test
+    fun `stop without injection stops service without foreground promotion`() {
+        val calls = Calls(injected = false)
+
+        val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_STOP, 18)
+
+        assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
+        assertEquals(listOf(18), calls.stopSelfIds)
+        assertEquals(0, calls.foregroundCalls)
+        assertEquals(0, calls.stopCalls)
     }
 
     @Test
@@ -90,13 +109,15 @@ class OzeroVpnServiceActionDispatcherTest {
     }
 
     @Test
-    fun `unknown action only records latest start id and stays sticky`() {
+    fun `unknown action preserves legacy sticky behavior`() {
         val calls = Calls()
 
         val result = calls.dispatcher().dispatch("unknown", 6)
 
         assertEquals(OzeroVpnServiceStartResult.STICKY, result)
         assertEquals(listOf(6), calls.latestStartIds)
+        assertTrue(calls.stopSelfIds.isEmpty())
+        assertEquals(1, calls.foregroundCalls)
         assertEquals(0, calls.startCalls + calls.stopCalls + calls.restartCalls)
     }
 
@@ -120,11 +141,13 @@ class OzeroVpnServiceActionDispatcherTest {
         }
 
         assertEquals(listOf(20, 21, 22), calls.latestStartIds)
+        assertTrue(calls.stopSelfIds.isEmpty())
+        assertEquals(3, calls.foregroundCalls)
         assertEquals(0, calls.startCalls + calls.stopCalls + calls.restartCalls)
     }
 
     @Test
-    fun `repeated actions update latest start id each time and keep callbacks isolated`() {
+    fun `repeated actions keep callbacks isolated`() {
         val calls = Calls(idle = true)
         val dispatcher = calls.dispatcher()
         dispatcher.dispatch(OzeroVpnService.ACTION_START, 1)
@@ -134,23 +157,23 @@ class OzeroVpnServiceActionDispatcherTest {
         dispatcher.dispatch(null, 5)
 
         assertEquals(listOf(1, 2, 3, 4, 5), calls.latestStartIds)
-        assertEquals(2, calls.startCalls)
+        assertEquals(1, calls.startCalls)
         assertEquals(1, calls.stopCalls)
         assertEquals(0, calls.restartCalls)
-        assertEquals(2, calls.stopSelfIds.size)
-        assertEquals(2, calls.clearStoppingCalls)
-        assertEquals(listOf(2, 4), calls.stopSelfIds)
+        assertEquals(listOf(2, 4, 5), calls.stopSelfIds)
+        assertEquals(1, calls.clearStoppingCalls)
+        assertEquals(3, calls.foregroundCalls)
     }
 
     @Test
-    fun `exception during action maps to not sticky and requests stop`() {
+    fun `exception during action maps to not sticky and requests terminal stop`() {
         val calls = Calls(throwOnStart = true)
 
         val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_START, 9)
 
         assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
         assertEquals(1, calls.stopCalls)
-        assertFalse(calls.stopSelfIds.contains(9))
+        assertEquals(listOf(9), calls.stopSelfIds)
     }
 
     @Test
@@ -161,6 +184,8 @@ class OzeroVpnServiceActionDispatcherTest {
 
         assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
         assertEquals(2, calls.stopCalls)
+        assertEquals(listOf(10), calls.stopSelfIds)
+        assertEquals(0, calls.foregroundCalls)
     }
 
     @Test
@@ -172,6 +197,7 @@ class OzeroVpnServiceActionDispatcherTest {
         assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
         assertEquals(1, calls.restartCalls)
         assertEquals(1, calls.stopCalls)
+        assertEquals(listOf(11), calls.stopSelfIds)
     }
 
     @Test
@@ -183,10 +209,11 @@ class OzeroVpnServiceActionDispatcherTest {
         assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
         assertEquals(1, calls.startCalls)
         assertEquals(1, calls.stopCalls)
+        assertEquals(listOf(13), calls.stopSelfIds)
     }
 
     @Test
-    fun `exception before action dispatch is caught and stop fallback runs`() {
+    fun `exception before action dispatch is caught and service is stopped`() {
         val calls = Calls(throwOnLatestStartId = true)
 
         val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_START, 14)
@@ -195,41 +222,47 @@ class OzeroVpnServiceActionDispatcherTest {
         assertEquals(listOf(14), calls.latestStartIds)
         assertEquals(0, calls.startCalls)
         assertEquals(1, calls.stopCalls)
+        assertEquals(listOf(14), calls.stopSelfIds)
+        assertEquals(0, calls.foregroundCalls)
     }
 
     @Test
-    fun `exception from readiness guard is caught after foreground promotion`() {
+    fun `exception from readiness guard on stop never promotes foreground`() {
         val calls = Calls(throwOnReadyCheck = true)
 
         val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_STOP, 15)
 
         assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
-        assertEquals(0, calls.latestStartIds.size)
+        assertEquals(listOf(15), calls.latestStartIds)
         assertEquals(1, calls.stopCalls)
+        assertEquals(listOf(15), calls.stopSelfIds)
+        assertEquals(0, calls.foregroundCalls)
     }
 
     @Test
-    fun `null action exception from clearStopping is caught before start`() {
+    fun `null action never touches start state`() {
         val calls = Calls(throwOnClearStopping = true)
 
         val result = calls.dispatcher().dispatch(null, 16)
 
-        assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
+        assertEquals(OzeroVpnServiceStartResult.STICKY, result)
         assertEquals(listOf(16), calls.latestStartIds)
-        assertEquals(1, calls.clearStoppingCalls)
+        assertEquals(listOf(16), calls.stopSelfIds)
+        assertEquals(0, calls.clearStoppingCalls)
         assertEquals(0, calls.startCalls)
-        assertEquals(1, calls.stopCalls)
+        assertEquals(0, calls.stopCalls)
+        assertEquals(0, calls.foregroundCalls)
     }
 
     @Test
-    fun `restart idle stopSelf exception is caught and falls back to stop`() {
+    fun `restart idle stopSelf exception is caught and falls back to terminal stop`() {
         val calls = Calls(idle = true, throwOnStopSelf = true)
 
         val result = calls.dispatcher().dispatch(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG, 17)
 
         assertEquals(OzeroVpnServiceStartResult.NOT_STICKY, result)
         assertEquals(listOf(17), calls.latestStartIds)
-        assertEquals(listOf(17), calls.stopSelfIds)
+        assertEquals(listOf(17, 17), calls.stopSelfIds)
         assertEquals(0, calls.restartCalls)
         assertEquals(1, calls.stopCalls)
     }
@@ -250,6 +283,7 @@ class OzeroVpnServiceActionDispatcherTest {
     ) {
         val latestStartIds = mutableListOf<Int>()
         val stopSelfIds = mutableListOf<Int>()
+        var foregroundCalls = 0
         var clearStoppingCalls = 0
         var startCalls = 0
         var stopCalls = 0
@@ -268,7 +302,10 @@ class OzeroVpnServiceActionDispatcherTest {
                 }
                 injected
             },
-            enterForeground = { foreground },
+            enterForeground = {
+                foregroundCalls++
+                foreground
+            },
             isTunnelIdle = { idle },
             clearStopping = {
                 clearStoppingCalls++

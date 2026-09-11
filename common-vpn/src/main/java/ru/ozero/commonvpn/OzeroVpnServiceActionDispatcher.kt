@@ -14,20 +14,42 @@ internal class OzeroVpnServiceActionDispatcher(
     private val restartVpn: () -> Unit,
 ) {
     fun dispatch(action: String?, startId: Int): Int {
-        val foregroundOk = enterForeground()
-        if (!foregroundOk) {
-            stopSelf(startId)
-            return OzeroVpnServiceStartResult.NOT_STICKY
-        }
         return try {
+            latestStartIdSetter(startId)
+
+            // STOP must never promote a service into foreground just to tear it down.
+            // Keep the existing START_STICKY return contract: shutdownCoord.stopVpn()
+            // owns the final stopSelf(startId), while a system null-intent restart below
+            // is terminal and cannot resurrect the VPN or its notification.
+            when (action) {
+                OzeroVpnService.ACTION_STOP -> {
+                    if (!isChainOrchestratorReady()) {
+                        PersistentLoggers.error(TAG, "chainOrchestrator not injected - Hilt graph failure")
+                        stopSelf(startId)
+                        return OzeroVpnServiceStartResult.NOT_STICKY
+                    }
+                    stopVpn()
+                    return OzeroVpnServiceStartResult.STICKY
+                }
+                null -> {
+                    PersistentLoggers.warn(TAG, "Ignoring null service restart intent")
+                    stopSelf(startId)
+                    return OzeroVpnServiceStartResult.STICKY
+                }
+                else -> Unit
+            }
+
+            val foregroundOk = enterForeground()
+            if (!foregroundOk) {
+                stopSelf(startId)
+                return OzeroVpnServiceStartResult.NOT_STICKY
+            }
             if (!isChainOrchestratorReady()) {
                 PersistentLoggers.error(TAG, "chainOrchestrator not injected - Hilt graph failure")
                 stopSelf(startId)
                 return OzeroVpnServiceStartResult.NOT_STICKY
             }
-            latestStartIdSetter(startId)
             when (action) {
-                OzeroVpnService.ACTION_STOP -> stopVpn()
                 OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG -> {
                     if (isTunnelIdle()) {
                         PersistentLoggers.warn(TAG, "runtime config restart ignored because tunnel is idle")
@@ -36,15 +58,17 @@ internal class OzeroVpnServiceActionDispatcher(
                         restartVpn()
                     }
                 }
-                OzeroVpnService.ACTION_START, null -> {
+                OzeroVpnService.ACTION_START -> {
                     clearStopping()
                     startVpn()
                 }
+                else -> Unit
             }
             OzeroVpnServiceStartResult.STICKY
         } catch (t: Throwable) {
             PersistentLoggers.error(TAG, "onStartCommand threw: ${t.message}")
             runCatching { stopVpn() }
+            runCatching { stopSelf(startId) }
             OzeroVpnServiceStartResult.NOT_STICKY
         }
     }
