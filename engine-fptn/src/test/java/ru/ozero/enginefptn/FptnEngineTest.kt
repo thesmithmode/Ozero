@@ -4,6 +4,7 @@ import android.util.Base64
 import io.mockk.every
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -18,6 +19,8 @@ import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.VpnSocketProtector
+import ru.ozero.enginescore.VpnSocketProtectorHolder
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -26,6 +29,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.Locale
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -337,6 +341,83 @@ class FptnEngineTest {
     }
 
     @Test
+    fun `auto scan limits a thirty four server token with mixed timeout responses`() = runTest {
+        val https = FakeHttpsClient(
+            postResponses = ArrayDeque(
+                (1..34).map { index ->
+                    if (index % 2 == 0) {
+                        FptnNativeResponse(608, "", "timeout")
+                    } else {
+                        FptnNativeResponse(600, "", "server error")
+                    }
+                },
+            ),
+        )
+        engine = FptnEngine(store, wsClient = FakeWebSocketClient(), httpsClient = https)
+
+        val result = engine.start(
+            EngineConfig.Fptn(token = "fptn:${manyServerTokenB64(34)}", autoSelect = true),
+            Upstream.None,
+        )
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals("${FptnEngine.FPTN_ALL_CANDIDATES_FAILED}: ${FptnEngine.FPTN_API_ERROR}", failure.reason)
+        assertEquals(FptnEngine.AUTO_AUTH_MAX_CANDIDATES, https.createdHosts.size)
+        assertEquals(
+            setOf("203.0.113.1", "203.0.113.2", "203.0.113.3", "203.0.113.4"),
+            https.createdHosts.toSet(),
+        )
+    }
+
+    @Test
+    fun `manual server retries only the selected server without auto fallback`() = runTest {
+        val https = FakeHttpsClient(
+            postResponses = ArrayDeque(
+                List(FptnEngine.MANUAL_AUTH_MAX_ATTEMPTS) {
+                    FptnNativeResponse(608, "", "timeout")
+                },
+            ),
+        )
+        engine = FptnEngine(store, wsClient = FakeWebSocketClient(), httpsClient = https)
+
+        val result = engine.start(
+            EngineConfig.Fptn(
+                token = "fptn:${manyServerTokenB64(34)}",
+                autoSelect = false,
+                selectedServerName = "S34",
+            ),
+            Upstream.None,
+        )
+
+        val failure = assertIs<StartResult.Failure>(result)
+        assertEquals(FptnEngine.FPTN_AUTH_TIMEOUT, failure.reason)
+        assertEquals(
+            List(FptnEngine.MANUAL_AUTH_MAX_ATTEMPTS) { "203.0.113.34" },
+            https.createdHosts,
+        )
+    }
+
+    @Test
+    fun `manual authentication cancellation does not start a retry or auto fallback`() = runTest {
+        val https = FakeHttpsClient(
+            postFailures = ArrayDeque(listOf(CancellationException("switch cancelled"))),
+        )
+        engine = FptnEngine(store, wsClient = FakeWebSocketClient(), httpsClient = https)
+
+        assertFailsWith<CancellationException> {
+            engine.start(
+                EngineConfig.Fptn(
+                    token = "fptn:${manyServerTokenB64(34)}",
+                    autoSelect = false,
+                    selectedServerName = "S34",
+                ),
+                Upstream.None,
+            )
+        }
+        assertEquals(listOf("203.0.113.34"), https.createdHosts)
+    }
+
+    @Test
     fun `start returns dns failure when authenticated host cannot resolve`() = runTest {
         engine = FptnEngine(
             store,
@@ -440,6 +521,18 @@ class FptnEngineTest {
         assertEquals(listOf("access"), ws.createdAccessTokens)
         assertEquals(listOf(11L), ws.runHandles)
         assertIs<EnginePlugin.ReadyResult.Ready>(engine.awaitReady())
+        val protectedSockets = mutableListOf<Int>()
+        val protector = VpnSocketProtector { socketFd ->
+            protectedSockets += socketFd
+            true
+        }
+        VpnSocketProtectorHolder.bind(protector)
+        try {
+            ws.onSocketOpened(43)
+            assertEquals(listOf(43), protectedSockets)
+        } finally {
+            VpnSocketProtectorHolder.unbind(protector)
+        }
         ws.onOpen()
         assertEquals(1, engine.stats().first().activeConnections)
         ws.onMessage(byteArrayOf(1, 2, 3))
@@ -935,7 +1028,7 @@ class FptnEngineTest {
     }
 
     @Test
-    fun `start runtime path keeps auto fallback inside bounded budget`() {
+    fun `start runtime path separates bounded auto scan from manual retries`() {
         val source = File(
             System.getProperty("user.dir") ?: ".",
             "src/main/java/ru/ozero/enginefptn/FptnEngine.kt",
@@ -945,25 +1038,24 @@ class FptnEngineTest {
 
         assertTrue(
             startBody.contains("selectServerCandidates(fptn, tokenData)"),
-            "FPTN start must preserve the auto candidate list for multi-server fallback.",
+            "FPTN start must select candidates before applying the chosen startup policy.",
         )
         assertTrue(
-            startBody.contains("authenticateFirstAvailable(") &&
-                startBody.contains("candidates = candidates"),
-            "FPTN auto start must try later token servers when earlier authentication fails.",
+            startBody.contains("authenticateAutoSelection(") &&
+                startBody.contains("authenticateManualSelection("),
+            "FPTN must keep automatic scanning separate from explicit server authentication.",
         )
         assertTrue(
-            startBody.contains("STARTUP_AUTH_BUDGET_MS") &&
+            source.contains("AUTO_STARTUP_AUTH_BUDGET_MS") &&
+                source.contains("MANUAL_STARTUP_AUTH_BUDGET_MS") &&
                 source.contains("AUTO_AUTH_CANDIDATE_TIMEOUT_S") &&
-                source.contains("authTimeoutSeconds(") &&
-                source.contains("perCandidateMaxTimeoutS") &&
-                source.contains("deadlineMs"),
-            "FPTN fallback must preserve one bounded startup budget without a health preselect gate.",
+                source.contains("MANUAL_AUTH_MAX_ATTEMPTS"),
+            "Each mode must have a bounded startup policy.",
         )
-        assertFalse(
-            source.contains("AUTO_AUTH_MAX_CANDIDATES") ||
-                source.contains(".take(AUTO_AUTH_MAX_CANDIDATES)"),
-            "FPTN startup auth must not cap auto candidates to a health-preselected top list.",
+        assertTrue(
+            source.contains("AUTO_AUTH_MAX_CANDIDATES") &&
+                source.contains("candidates.take(FptnEngine.AUTO_AUTH_MAX_CANDIDATES)"),
+            "Automatic selection must not authenticate every token server in the critical path.",
         )
         assertFalse(
             source.contains("listOf(selected) + data.servers.filterNot"),
@@ -972,7 +1064,7 @@ class FptnEngineTest {
     }
 
     @Test
-    fun `startup auth preserves selected token order before any health order`() {
+    fun `auto scan preserves token order within its fixed candidate limit`() {
         val candidates = listOf(
             server("France-1"),
             server("France-2"),
@@ -982,30 +1074,30 @@ class FptnEngineTest {
             server("Estonia-1"),
         )
 
-        val ordered = fptnStartupAuthCandidates(candidates)
+        val ordered = fptnAutoAuthCandidates(candidates)
 
         assertEquals(
-            listOf("France-1", "France-2", "France-3", "France-4", "France-5", "Estonia-1"),
+            listOf("France-1", "France-2", "France-3", "France-4"),
             ordered.map { it.name },
         )
     }
 
     @Test
-    fun `startup auth does not cap auto candidates to health top three`() {
-        val candidates = (1..28).map { server("S$it") }
+    fun `auto scan caps a thirty four server token without reordering`() {
+        val candidates = (1..34).map { server("S$it") }
 
-        val ordered = fptnStartupAuthCandidates(candidates)
+        val ordered = fptnAutoAuthCandidates(candidates)
 
-        assertEquals(28, ordered.size)
-        assertEquals(listOf("S1", "S2", "S3", "S4", "S5"), ordered.take(5).map { it.name })
-        assertEquals("S28", ordered.last().name)
+        assertEquals(FptnEngine.AUTO_AUTH_MAX_CANDIDATES, ordered.size)
+        assertEquals(listOf("S1", "S2", "S3", "S4"), ordered.map { it.name })
     }
 
     @Test
-    fun `auto auth candidate timeout stays at baseline five seconds`() {
-        assertEquals(5, fptnStartupAuthPerCandidateTimeoutS(candidateCount = 28))
-        assertEquals(15, fptnStartupAuthPerCandidateTimeoutS(candidateCount = 1))
-        assertFalse(fptnStartupAuthPerCandidateTimeoutS(candidateCount = 28) == 3)
+    fun `startup budgets keep auto scanning below the manual retry budget`() {
+        assertEquals(5_000L, startupAuthBudgetMs(autoSelect = true))
+        assertEquals(20_000L, startupAuthBudgetMs(autoSelect = false))
+        assertEquals(5, FptnEngine.AUTO_AUTH_CANDIDATE_TIMEOUT_S)
+        assertEquals(2, FptnEngine.MANUAL_AUTH_MAX_ATTEMPTS)
     }
 
     @Test
@@ -1108,19 +1200,22 @@ class FptnEngineTest {
     }
 
     @Test
-    fun `authentication fallback is cancellation cooperative`() {
+    fun `authentication policies are cancellation cooperative`() {
         val source = File(
             System.getProperty("user.dir") ?: ".",
             "src/main/java/ru/ozero/enginefptn/FptnEngine.kt",
         ).readText()
-        val fallbackBody = source.substringAfter("private suspend fun authenticateFirstAvailable(")
+        val autoBody = source.substringAfter("private suspend fun authenticateAutoSelection(")
+            .substringBefore("private suspend fun authenticateManualSelection(")
+        val manualBody = source.substringAfter("private suspend fun authenticateManualSelection(")
             .substringBefore("private suspend fun authenticate(")
         val authenticateBody = source.substringAfter("private suspend fun authenticate(")
             .substringBefore("private data class AuthenticatedServer")
 
         assertTrue(
-            fallbackBody.contains("currentCoroutineContext().ensureActive()"),
-            "FPTN fallback loop must stop before trying more servers after lifecycle cancellation.",
+            autoBody.contains("authenticateCandidates(") &&
+                manualBody.contains("currentCoroutineContext().ensureActive()"),
+            "FPTN automatic and manual policies must stop at the lifecycle cancellation boundary.",
         )
         assertTrue(
             authenticateBody.contains("currentCoroutineContext().ensureActive()"),
@@ -1141,7 +1236,7 @@ class FptnEngineTest {
         ).readText()
         val attachBody = source.substringAfter("override suspend fun attachTun(")
             .substringBefore("override suspend fun awaitReady()")
-        val fallbackBody = source.substringAfter("private suspend fun authenticateFirstAvailable(")
+        val fallbackBody = source.substringAfter("private suspend fun authenticateCandidates(")
             .substringBefore("private suspend fun authenticate(")
         val resolverBody = source.substringAfter("private suspend fun resolveServerIp(")
             .substringBefore("private data class AuthenticatedServer")
@@ -1321,28 +1416,18 @@ class FptnEngineTest {
     }
 
     @Test
-    fun `startup auth per candidate timeout keeps auth timeout for single candidate`() {
-        assertEquals(
-            FptnEngine.AUTH_TIMEOUT_S,
-            fptnStartupAuthPerCandidateTimeoutS(1),
-        )
-        assertEquals(FptnEngine.AUTH_TIMEOUT_S, fptnStartupAuthPerCandidateTimeoutS(0))
-        assertEquals(
-            FptnEngine.AUTO_AUTH_CANDIDATE_TIMEOUT_S,
-            fptnStartupAuthPerCandidateTimeoutS(2),
-        )
+    fun `manual and auto policies expose their distinct retry limits`() {
+        assertEquals(2, FptnEngine.MANUAL_AUTH_MAX_ATTEMPTS)
+        assertEquals(4, FptnEngine.AUTO_AUTH_MAX_CANDIDATES)
+        assertEquals(15, FptnEngine.AUTH_TIMEOUT_S)
+        assertEquals(5, FptnEngine.AUTO_AUTH_CANDIDATE_TIMEOUT_S)
     }
 
     @Test
-    fun `startup auth helpers cover single and multi candidate policies`() {
-        val first = server("S1")
-        val second = server("S2")
-        val candidates = listOf(first, second)
+    fun `auto scan helper leaves small candidate lists unchanged`() {
+        val candidates = listOf(server("S1"), server("S2"))
 
-        assertEquals(candidates, fptnStartupAuthCandidates(candidates))
-        assertEquals(FptnEngine.AUTH_TIMEOUT_S, fptnStartupAuthPerCandidateTimeoutS(0))
-        assertEquals(FptnEngine.AUTH_TIMEOUT_S, fptnStartupAuthPerCandidateTimeoutS(1))
-        assertEquals(FptnEngine.AUTO_AUTH_CANDIDATE_TIMEOUT_S, fptnStartupAuthPerCandidateTimeoutS(2))
+        assertEquals(candidates, fptnAutoAuthCandidates(candidates))
     }
 
     @Test
@@ -1576,6 +1661,13 @@ class FptnEngineTest {
         return java.util.Base64.getEncoder().encodeToString(json.toByteArray())
     }
 
+    private fun manyServerTokenB64(count: Int): String {
+        val servers = (1..count).joinToString(",") { index ->
+            """{"name":"S$index","host":"203.0.113.$index","port":443}"""
+        }
+        return tokenFromJson("""{"version":1,"username":"u","password":"p","servers":[$servers]}""")
+    }
+
     private fun tokenData(vararg servers: FptnServer): FptnTokenData =
         FptnTokenData(
             version = 1,
@@ -1661,6 +1753,7 @@ class FptnEngineTest {
         override var onOpen: () -> Unit = {}
         override var onMessage: (ByteArray) -> Unit = {}
         override var onFailure: () -> Unit = {}
+        override var onSocketOpened: (Int) -> Unit = {}
         var loadCalls = 0
         val createdServerIps = mutableListOf<String>()
         val createdAccessTokens = mutableListOf<String>()

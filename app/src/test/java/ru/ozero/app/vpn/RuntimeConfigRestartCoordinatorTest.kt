@@ -248,6 +248,31 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Test
+    fun `FPTN restart waits for the FPTN authentication budget`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        tunnelController.onSwitchingStarted(from = EngineId.WARP, to = EngineId.FPTN)
+        val coordinator = coordinator(
+            context = recordingContext(startServiceActions) {
+                tunnelController.setState(TunnelState.Disconnecting)
+            },
+            tunnelController = tunnelController,
+        )
+
+        val restart = launch {
+            assertFalse(coordinator.restartVpnIfRunning("settings changed"))
+        }
+        runCurrent()
+        advanceTimeBy(15_001)
+        assertTrue(restart.isActive)
+        advanceTimeBy(10_000)
+        restart.join()
+
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
+    }
+
+    @Test
     fun `restart times out waiting for stop and resets queue state`() = runTest {
         val startServiceActions = mutableListOf<String?>()
         val tunnelController = TunnelController()

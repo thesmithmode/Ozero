@@ -16,10 +16,10 @@ API_LEVEL="${ANDROID_API:-24}"
 BUILD_DIR="$REPO_ROOT/build/fptn-$ABI"
 
 FPTN_REPO="https://github.com/fptn-project/FptnClient-Android.git"
-FPTN_SOURCE_COMMIT="d2ca1ff2cd3090d0b191ba320d1bca4a03452dea"
+FPTN_SOURCE_COMMIT="2a38c7e4fc9268ae7d30f8ec0390a97e02e41980"
 FPTN_CLONE_DIR="$REPO_ROOT/build/fptn-android-src"
 CAMTLS_REPO="https://github.com/fptn-project/camouflage-tls.git"
-CAMTLS_COMMIT="52a8e81fa472813c4cc7f8d7ef69b73771758eba"
+CAMTLS_COMMIT="c4b054b741ab1fe8ac5d153c9c024231f8d22449"
 
 if [[ ! -d "$FPTN_CLONE_DIR/.git" ]]; then
     git init "$FPTN_CLONE_DIR"
