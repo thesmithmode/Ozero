@@ -379,6 +379,7 @@ class OzeroVpnService : android.net.VpnService() {
             "onRevoke — VPN permission revoked, will kill own process after " +
                 "${REVOKE_KILL_DELAY_MS}ms to release Android VPN slot for other VPN apps",
         )
+        stopForeground(STOP_FOREGROUND_REMOVE)
         stopVpn()
         super.onRevoke()
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(

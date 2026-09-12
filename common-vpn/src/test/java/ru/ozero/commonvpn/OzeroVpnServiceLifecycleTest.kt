@@ -173,6 +173,15 @@ class OzeroVpnServiceLifecycleTest {
     }
 
     @Test
+    fun `onRevoke снимает foreground notification до асинхронного shutdown`() {
+        val body = source.substringAfter("override fun onRevoke()").substringBefore("override fun onDestroy()")
+        val removeForegroundIndex = body.indexOf("stopForeground(STOP_FOREGROUND_REMOVE)")
+        val stopVpnIndex = body.indexOf("stopVpn()")
+
+        assertTrue(removeForegroundIndex in 0 until stopVpnIndex)
+    }
+
+    @Test
     fun `onRevoke killит процесс с задержкой — освобождает VPN slot для других VPN apps`() {
         val body = source.substringAfter("override fun onRevoke()").substringBefore("override fun onDestroy()")
         assertTrue(
