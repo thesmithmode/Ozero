@@ -30,6 +30,11 @@ fi
 git -C "$FPTN_CLONE_DIR" fetch --depth 1 origin "$FPTN_SOURCE_COMMIT"
 git -C "$FPTN_CLONE_DIR" checkout --detach FETCH_HEAD
 git -C "$FPTN_CLONE_DIR" submodule update --init --recursive --depth 1
+FPTN_COMMIT="$(git -C "$FPTN_CLONE_DIR" rev-parse HEAD)"
+if [[ "$FPTN_COMMIT" != "$FPTN_SOURCE_COMMIT" ]]; then
+    echo "ERROR: expected FPTN commit $FPTN_SOURCE_COMMIT, got $FPTN_COMMIT" >&2
+    exit 1
+fi
 
 FPTN_LIB_DIR="$FPTN_CLONE_DIR/app/src/main/cpp/libs/fptn"
 if [[ ! -d "$FPTN_LIB_DIR" ]] || [[ -z "$(ls -A "$FPTN_LIB_DIR" 2>/dev/null)" ]]; then
@@ -41,9 +46,13 @@ fi
 # 2. Sync fptn submodule into our CPP source tree (symlink-free copy)
 # ---------------------------------------------------------------------------
 LIBS_DIR="$CPP_SRC/libs"
+FPTN_SYNC_MARKER="$LIBS_DIR/.fptn-source-commit"
 mkdir -p "$LIBS_DIR"
-if [[ ! -d "$LIBS_DIR/fptn" ]]; then
+if [[ ! -d "$LIBS_DIR/fptn" ]] || [[ ! -f "$FPTN_SYNC_MARKER" ]] || \
+    [[ "$(<"$FPTN_SYNC_MARKER")" != "$FPTN_COMMIT" ]]; then
+    rm -rf "$LIBS_DIR/fptn"
     cp -r "$FPTN_LIB_DIR" "$LIBS_DIR/fptn"
+    printf '%s\n' "$FPTN_COMMIT" > "$FPTN_SYNC_MARKER"
 fi
 
 # ---------------------------------------------------------------------------
@@ -149,11 +158,6 @@ cp "$BUILD_DIR/cmake-build/libfptn_native_lib.so" "$OUT_DIR/libfptn_native_lib-$
 # ---------------------------------------------------------------------------
 # 7. Manifest
 # ---------------------------------------------------------------------------
-FPTN_COMMIT="$(cd "$FPTN_CLONE_DIR" && git rev-parse HEAD)"
-if [[ "$FPTN_COMMIT" != "$FPTN_SOURCE_COMMIT" ]]; then
-    echo "ERROR: expected FPTN commit $FPTN_SOURCE_COMMIT, got $FPTN_COMMIT" >&2
-    exit 1
-fi
 {
     echo "# build_fptn manifest"
     echo "source_repo=$FPTN_REPO"
