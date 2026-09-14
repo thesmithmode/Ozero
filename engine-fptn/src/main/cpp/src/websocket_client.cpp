@@ -1,7 +1,9 @@
 #include <jni.h>
+#include <cstdint>
 #include <mutex>
 #include <unordered_map>
 
+#include "censorship_strategy.h"
 #include "fptn-protocol-lib/https/obfuscator/methods/tls/tls_obfuscator.h"
 
 #include "wrappers/utils/utils.h"
@@ -50,7 +52,7 @@ std::mutex SafeProxy::mutex_;
 std::unordered_map<jlong, bool> SafeProxy::status_clients_;
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_ru_ozero_enginefptn_FptnNativeWebSocket_nativeCreate(
+Java_ru_ozero_enginefptn_FptnNativeWebSocket_nativeCreateV2(
     JNIEnv* env,
     jobject thiz,
     jstring server_ip_param,
@@ -60,7 +62,9 @@ Java_ru_ozero_enginefptn_FptnNativeWebSocket_nativeCreate(
     jstring sni_param,
     jstring access_token_param,
     jstring expected_md5_fingerprint_param,
-    jstring censorship_strategy_name_param) {
+    jstring client_version_param,
+    jstring censorship_strategy_name_param,
+    jstring connection_strategy_name_param) {
   fptn::wrapper::init_logger();
 
   auto server_ip = fptn::wrapper::ConvertToCString(env, server_ip_param);
@@ -71,37 +75,29 @@ Java_ru_ozero_enginefptn_FptnNativeWebSocket_nativeCreate(
   auto access_token = fptn::wrapper::ConvertToCString(env, access_token_param);
   auto expected_md5_fingerprint =
       fptn::wrapper::ConvertToCString(env, expected_md5_fingerprint_param);
+  auto client_version = fptn::wrapper::ConvertToCString(env, client_version_param);
 
   const auto censorship_strategy_name = fptn::wrapper::ConvertToCString(
       env, censorship_strategy_name_param);
-  fptn::protocol::https::CensorshipStrategy censorship_strategy =
-      fptn::protocol::https::CensorshipStrategy::kSni;
-  if (censorship_strategy_name == "OBFUSCATION") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kTlsObfuscator;
-  } else if (censorship_strategy_name == "SNI-REALITY") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityMode;
-  } else if (censorship_strategy_name == "SNI-REALITY-CHROME-147") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeChrome147;
-  } else if (censorship_strategy_name == "SNI-REALITY-CHROME-146") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeChrome146;
-  } else if (censorship_strategy_name == "SNI-REALITY-CHROME-145") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeChrome145;
-  } else if (censorship_strategy_name == "SNI-REALITY-FIREFOX-149") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeFirefox149;
-  } else if (censorship_strategy_name == "SNI-REALITY-YANDEX-26") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeYandex26;
-  } else if (censorship_strategy_name == "SNI-REALITY-YANDEX-25") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeYandex25;
-  } else if (censorship_strategy_name == "SNI-REALITY-YANDEX-24") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeYandex24;
-  } else if (censorship_strategy_name == "SNI-REALITY-SAFARI-26") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeSafari26;
+  const auto censorship_strategy =
+      fptn::wrapper::ParseCensorshipStrategy(censorship_strategy_name);
+  const auto connection_strategy_name = fptn::wrapper::ConvertToCString(
+      env, connection_strategy_name_param);
+  namespace strategies = fptn::protocol::connection::strategies;
+  auto connection_strategy = strategies::ConnectionStrategy::kSingleRollingTunnel;
+  if (connection_strategy_name == "dual-rolling-tunnel") {
+    connection_strategy = strategies::ConnectionStrategy::kDualRollingTunnel;
+  } else if (connection_strategy_name == "triple-rolling-tunnel") {
+    connection_strategy = strategies::ConnectionStrategy::kTripleRollingTunnel;
+  } else if (connection_strategy_name == "browser-mimicry") {
+    connection_strategy = strategies::ConnectionStrategy::kBrowserMimicry;
   }
 
   jobject global_object_ref = env->NewWeakGlobalRef(thiz);
   auto* websocket_client = new WrapperWebsocketClient(global_object_ref,
       std::move(server_ip), server_port, std::move(tun_ipv4), std::move(tun_ipv6), std::move(sni),
-      std::move(access_token), std::move(expected_md5_fingerprint), censorship_strategy);
+      std::move(access_token), std::move(expected_md5_fingerprint), std::move(client_version),
+      censorship_strategy, connection_strategy);
 
   auto jobj_client = reinterpret_cast<jlong>(websocket_client);
 
@@ -175,7 +171,8 @@ Java_ru_ozero_enginefptn_FptnNativeWebSocket_nativeSend(
   if (websocket_client && env && data) {
     jbyte* buffer = env->GetByteArrayElements(data, nullptr);
     if (buffer != nullptr && length != 0) {
-      std::string packet(reinterpret_cast<const char*>(buffer), length);
+      const auto* packet_buffer = reinterpret_cast<const std::uint8_t*>(buffer);
+      fptn::common::network::IPPacketData packet(packet_buffer, packet_buffer + length);
       status = websocket_client->Send(std::move(packet));
     }
     if (buffer) {

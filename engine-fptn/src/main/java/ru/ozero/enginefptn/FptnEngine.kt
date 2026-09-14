@@ -35,6 +35,7 @@ import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.VpnSocketProtectorHolder
 import ru.ozero.enginescore.settings.SettingsModel
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -159,14 +160,25 @@ class FptnEngine(
         }
 
         val authResult = withContext(Dispatchers.IO) {
-            withTimeoutOrNull(STARTUP_AUTH_BUDGET_MS) {
-                authenticateFirstAvailable(
-                    candidates = candidates,
-                    data = tokenData,
-                    bypassMethod = fptn.bypassMethod,
-                    sniDomain = fptn.sniDomain,
-                    deadlineMs = System.currentTimeMillis() + STARTUP_AUTH_BUDGET_MS,
-                )
+            val deadlineMs = System.currentTimeMillis() + startupAuthBudgetMs(fptn.autoSelect)
+            withTimeoutOrNull(startupAuthBudgetMs(fptn.autoSelect)) {
+                if (fptn.autoSelect) {
+                    authenticateAutoSelection(
+                        candidates = candidates,
+                        data = tokenData,
+                        bypassMethod = fptn.bypassMethod,
+                        sniDomain = fptn.sniDomain,
+                        deadlineMs = deadlineMs,
+                    )
+                } else {
+                    authenticateManualSelection(
+                        server = firstServer,
+                        data = tokenData,
+                        bypassMethod = fptn.bypassMethod,
+                        sniDomain = fptn.sniDomain,
+                        deadlineMs = deadlineMs,
+                    )
+                }
             }
         } ?: FptnAuthResult.Failure(FPTN_AUTH_TIMEOUT)
 
@@ -209,6 +221,12 @@ class FptnEngine(
             PersistentLoggers.error(TAG, "WS failure: all reconnect attempts exhausted")
             _stats.value = _stats.value.copy(activeConnections = 0, connectedSince = 0L)
             onEngineFailed("fptn-ws-reconnect-exhausted")
+        }
+        wsClient.onSocketOpened = { socketFd ->
+            if (VpnSocketProtectorHolder.protectIfBound(socketFd) == false) {
+                PersistentLoggers.error(TAG, "WS socket protection failed")
+                onEngineFailed("fptn-ws-socket-protection-failed")
+            }
         }
 
         Log.d(TAG, "attachTun: creating native handle method=$_bypassMethod")
@@ -308,9 +326,9 @@ class FptnEngine(
             Log.d(TAG, "stop: nativeStop handle=$h")
             wsClient.nativeStop(h)
         }
-        scope?.cancel()
         _pfd?.close()
         _pfd = null
+        scope?.cancel()
 
         scope?.coroutineContext?.get(Job)?.join()
         Log.d(TAG, "stop: TUN loop joined")
@@ -352,26 +370,57 @@ class FptnEngine(
         return listOf(selected)
     }
 
-    private suspend fun authenticateFirstAvailable(
+    private suspend fun authenticateAutoSelection(
         candidates: List<FptnServer>,
         data: FptnTokenData,
         bypassMethod: String,
         sniDomain: String,
         deadlineMs: Long,
     ): FptnAuthResult {
-        val startupCandidates = fptnStartupAuthCandidates(candidates)
+        val startupCandidates = fptnAutoAuthCandidates(candidates)
         val authenticated = authenticateCandidates(
             candidates = startupCandidates,
             data = data,
             bypassMethod = bypassMethod,
             sniDomain = sniDomain,
             deadlineMs = deadlineMs,
-            perCandidateMaxTimeoutS = fptnStartupAuthPerCandidateTimeoutS(startupCandidates.size),
+            perCandidateMaxTimeoutS = AUTO_AUTH_CANDIDATE_TIMEOUT_S,
         )
         if (authenticated is FptnAuthResult.Failure) {
             PersistentLoggers.error(TAG, "authenticate: ${authenticated.reason}")
         }
         return authenticated
+    }
+
+    private suspend fun authenticateManualSelection(
+        server: FptnServer,
+        data: FptnTokenData,
+        bypassMethod: String,
+        sniDomain: String,
+        deadlineMs: Long,
+    ): FptnAuthResult {
+        val failures = mutableListOf<String>()
+        repeat(MANUAL_AUTH_MAX_ATTEMPTS) {
+            currentCoroutineContext().ensureActive()
+            val remainingMs = deadlineMs - System.currentTimeMillis()
+            if (remainingMs <= 0L) return FptnAuthResult.Failure(FPTN_AUTH_TIMEOUT)
+            val result = authenticateCandidate(
+                server = server,
+                data = data,
+                bypassMethod = bypassMethod,
+                sniDomain = sniDomain,
+                timeoutS = authTimeoutSeconds(remainingMs, AUTH_TIMEOUT_S),
+                deadlineMs = deadlineMs,
+            )
+            when (result) {
+                is FptnAuthResult.Success -> return result
+                is FptnAuthResult.Failure -> {
+                    if (result.reason == FPTN_TOKEN_REJECTED) return result
+                    failures += result.reason
+                }
+            }
+        }
+        return FptnAuthResult.Failure(startupFptnFailureReason(failures, candidateCount = 1))
     }
 
     private suspend fun authenticateCandidates(
@@ -548,7 +597,10 @@ class FptnEngine(
         internal const val AUTH_TIMEOUT_S = 15
         internal const val AUTO_AUTH_CANDIDATE_TIMEOUT_S = 5
         internal const val AUTO_AUTH_PARALLELISM = 4
-        private const val STARTUP_AUTH_BUDGET_MS = 20_000L
+        internal const val AUTO_AUTH_MAX_CANDIDATES = 4
+        internal const val MANUAL_AUTH_MAX_ATTEMPTS = 2
+        internal const val MANUAL_STARTUP_AUTH_BUDGET_MS = 20_000L
+        internal const val AUTO_STARTUP_AUTH_BUDGET_MS = 5_000L
         private const val READY_TIMEOUT_MS = 30_000L
         private const val READY_POLL_MS = 300L
         internal const val FPTN_INVALID_TOKEN = "Invalid FPTN token"
@@ -629,10 +681,11 @@ internal fun classifyFptnAuthFailure(
     }
 }
 
-internal fun fptnStartupAuthCandidates(candidates: List<FptnServer>): List<FptnServer> = candidates
+internal fun fptnAutoAuthCandidates(candidates: List<FptnServer>): List<FptnServer> =
+    candidates.take(FptnEngine.AUTO_AUTH_MAX_CANDIDATES)
 
-internal fun fptnStartupAuthPerCandidateTimeoutS(candidateCount: Int): Int =
-    if (candidateCount > 1) FptnEngine.AUTO_AUTH_CANDIDATE_TIMEOUT_S else FptnEngine.AUTH_TIMEOUT_S
+internal fun startupAuthBudgetMs(autoSelect: Boolean): Long =
+    if (autoSelect) FptnEngine.AUTO_STARTUP_AUTH_BUDGET_MS else FptnEngine.MANUAL_STARTUP_AUTH_BUDGET_MS
 
 internal fun fptnStartupAuthParallelism(candidateCount: Int): Int =
     candidateCount.coerceIn(1, FptnEngine.AUTO_AUTH_PARALLELISM)

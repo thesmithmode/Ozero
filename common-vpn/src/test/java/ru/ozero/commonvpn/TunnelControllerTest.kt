@@ -39,6 +39,20 @@ class TunnelControllerStateTest : TunnelControllerTestBase() {
     }
 
     @Test
+    fun `FPTN switching timeout covers bounded authentication`() = runTest {
+        val ctl = TunnelController(watchdogScope = backgroundScope)
+
+        ctl.onSwitchingStarted(from = EngineId.WARP, to = EngineId.FPTN)
+        testScheduler.advanceTimeBy(TunnelController.SWITCHING_TIMEOUT_MS + 1)
+
+        assertNotNull(ctl.switching.value)
+        testScheduler.advanceTimeBy(
+            TunnelController.FPTN_SWITCHING_TIMEOUT_MS - TunnelController.SWITCHING_TIMEOUT_MS,
+        )
+        assertNull(ctl.switching.value)
+    }
+
+    @Test
     fun fullHappyPath_idleProbingConnectingConnectedDisconnectingIdle() {
         controller.onProbing()
         assertIs<TunnelState.Probing>(controller.state.value)

@@ -1,5 +1,6 @@
 #include <jni.h>
 
+#include "censorship_strategy.h"
 #include "wrappers/utils/utils.h"
 #include "wrappers/wrapper_https_client/wrapper_https_client.h"
 #include "wrappers/wrapper_websocket_client/wrapper_websocket_client.h"
@@ -83,29 +84,8 @@ Java_ru_ozero_enginefptn_FptnNativeHttpsClient_nativeCreate(
 
   const auto censorship_strategy_name = fptn::wrapper::ConvertToCString(
       env, censorship_strategy_name_param);
-  fptn::protocol::https::CensorshipStrategy censorship_strategy =
-      fptn::protocol::https::CensorshipStrategy::kSni;
-  if (censorship_strategy_name == "OBFUSCATION") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kTlsObfuscator;
-  } else if (censorship_strategy_name == "SNI-REALITY") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityMode;
-  } else if (censorship_strategy_name == "SNI-REALITY-CHROME-147") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeChrome147;
-  } else if (censorship_strategy_name == "SNI-REALITY-CHROME-146") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeChrome146;
-  } else if (censorship_strategy_name == "SNI-REALITY-CHROME-145") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeChrome145;
-  } else if (censorship_strategy_name == "SNI-REALITY-FIREFOX-149") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeFirefox149;
-  } else if (censorship_strategy_name == "SNI-REALITY-YANDEX-26") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeYandex26;
-  } else if (censorship_strategy_name == "SNI-REALITY-YANDEX-25") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeYandex25;
-  } else if (censorship_strategy_name == "SNI-REALITY-YANDEX-24") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeYandex24;
-  } else if (censorship_strategy_name == "SNI-REALITY-SAFARI-26") {
-    censorship_strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityModeSafari26;
-  }
+  const auto censorship_strategy =
+      fptn::wrapper::ParseCensorshipStrategy(censorship_strategy_name);
 
   auto* https_client = new WrapperHttpsClient(env, nullptr,
       std::move(host), port, std::move(sni), std::move(md5_fingerprint), censorship_strategy);
