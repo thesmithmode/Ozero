@@ -4,6 +4,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
@@ -438,8 +440,9 @@ class FptnEngine(
             val remainingMs = deadlineMs - System.currentTimeMillis()
             if (remainingMs <= 0L) break
             val timeoutS = authTimeoutSeconds(remainingMs, perCandidateMaxTimeoutS)
-            val results = coroutineScope {
-                batch.map { server ->
+            val results = mutableListOf<FptnAuthResult>()
+            val winner = coroutineScope {
+                val pending = batch.map { server ->
                     async {
                         authenticateCandidate(
                             server = server,
@@ -450,10 +453,24 @@ class FptnEngine(
                             deadlineMs = deadlineMs,
                         )
                     }
-                }.map { it.await() }
+                }.toMutableList()
+                while (pending.isNotEmpty()) {
+                    val (completed, result) = select<Pair<Deferred<FptnAuthResult>, FptnAuthResult>> {
+                        pending.forEach { deferred ->
+                            deferred.onAwait { deferred to it }
+                        }
+                    }
+                    pending.remove(completed)
+                    if (result is FptnAuthResult.Success) {
+                        pending.forEach { it.cancel() }
+                        return@coroutineScope result
+                    }
+                    results += result
+                }
+                null
             }
 
-            results.filterIsInstance<FptnAuthResult.Success>().firstOrNull()?.let { return it }
+            if (winner != null) return winner
             val batchFailures = results.filterIsInstance<FptnAuthResult.Failure>().map { it.reason }
             failures += batchFailures
             if (FPTN_TOKEN_REJECTED in batchFailures) {
