@@ -61,6 +61,9 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Google removed the legacy `tools` package; default install would fail CI.
+          packages: 'platform-tools'
 
       - name: Setup Android NDK
         id: ndk
