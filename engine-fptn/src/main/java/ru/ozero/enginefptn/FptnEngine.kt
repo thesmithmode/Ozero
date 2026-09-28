@@ -439,46 +439,68 @@ class FptnEngine(
             val remainingMs = deadlineMs - System.currentTimeMillis()
             if (remainingMs <= 0L) break
             val timeoutS = authTimeoutSeconds(remainingMs, perCandidateMaxTimeoutS)
-            val results = mutableListOf<FptnAuthResult>()
-            // Detached batch job: first success must return under the startup budget even when
-            // peer nativePost calls are still blocked and ignore cooperative cancellation.
-            val batchJob = SupervisorJob(currentCoroutineContext()[Job])
-            try {
-                val batchScope = CoroutineScope(currentCoroutineContext() + batchJob)
-                val pending = batch.map { server ->
-                    batchScope.async {
-                        authenticateCandidate(
-                            server = server,
-                            data = data,
-                            bypassMethod = bypassMethod,
-                            sniDomain = sniDomain,
-                            timeoutS = timeoutS,
-                            deadlineMs = deadlineMs,
-                        )
-                    }
-                }.toMutableList()
-                while (pending.isNotEmpty()) {
-                    val (completed, result) = select<Pair<Deferred<FptnAuthResult>, FptnAuthResult>> {
-                        pending.forEach { deferred ->
-                            deferred.onAwait { deferred to it }
-                        }
-                    }
-                    pending.remove(completed)
-                    if (result is FptnAuthResult.Success) {
-                        return result
-                    }
-                    results += result
-                }
-            } finally {
-                batchJob.cancel()
-            }
-            val batchFailures = results.filterIsInstance<FptnAuthResult.Failure>().map { it.reason }
-            failures += batchFailures
-            if (FPTN_TOKEN_REJECTED in batchFailures) {
+            val winner = raceFirstSuccessfulAuth(
+                batch = batch,
+                data = data,
+                bypassMethod = bypassMethod,
+                sniDomain = sniDomain,
+                timeoutS = timeoutS,
+                deadlineMs = deadlineMs,
+                failures = failures,
+            )
+            if (winner != null) return winner
+            if (FPTN_TOKEN_REJECTED in failures) {
                 return FptnAuthResult.Failure(FPTN_TOKEN_REJECTED)
             }
         }
         return FptnAuthResult.Failure(startupFptnFailureReason(failures, candidates.size))
+    }
+
+    // First success returns without joining cancelled peers (nativePost may ignore cancel).
+    private suspend fun raceFirstSuccessfulAuth(
+        batch: List<FptnServer>,
+        data: FptnTokenData,
+        bypassMethod: String,
+        sniDomain: String,
+        timeoutS: Int,
+        deadlineMs: Long,
+        failures: MutableList<String>,
+    ): FptnAuthResult.Success? {
+        val batchJob = SupervisorJob(currentCoroutineContext()[Job])
+        try {
+            val batchScope = CoroutineScope(currentCoroutineContext() + batchJob)
+            val pending = batch.map { server ->
+                batchScope.async {
+                    authenticateCandidate(
+                        server = server,
+                        data = data,
+                        bypassMethod = bypassMethod,
+                        sniDomain = sniDomain,
+                        timeoutS = timeoutS,
+                        deadlineMs = deadlineMs,
+                    )
+                }
+            }.toMutableList()
+            while (pending.isNotEmpty()) {
+                val (completed, result) = awaitNextAuthResult(pending)
+                pending.remove(completed)
+                when (result) {
+                    is FptnAuthResult.Success -> return result
+                    is FptnAuthResult.Failure -> failures += result.reason
+                }
+            }
+        } finally {
+            batchJob.cancel()
+        }
+        return null
+    }
+
+    private suspend fun awaitNextAuthResult(
+        pending: List<Deferred<FptnAuthResult>>,
+    ): Pair<Deferred<FptnAuthResult>, FptnAuthResult> = select {
+        pending.forEach { deferred ->
+            deferred.onAwait { deferred to it }
+        }
     }
 
     private suspend fun authenticateCandidate(
