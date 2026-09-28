@@ -457,6 +457,7 @@ class FptnEngine(
     }
 
     // First success returns without joining cancelled peers (nativePost may ignore cancel).
+    @Suppress("NestedBlockDepth")
     private suspend fun raceFirstSuccessfulAuth(
         batch: List<FptnServer>,
         data: FptnTokenData,
@@ -482,7 +483,11 @@ class FptnEngine(
                 }
             }.toMutableList()
             while (pending.isNotEmpty()) {
-                val (completed, result) = awaitNextAuthResult(pending)
+                val (completed, result) = select<Pair<Deferred<FptnAuthResult>, FptnAuthResult>> {
+                    pending.forEach { deferred ->
+                        deferred.onAwait { deferred to it }
+                    }
+                }
                 pending.remove(completed)
                 when (result) {
                     is FptnAuthResult.Success -> return result
@@ -493,14 +498,6 @@ class FptnEngine(
             batchJob.cancel()
         }
         return null
-    }
-
-    private suspend fun awaitNextAuthResult(
-        pending: List<Deferred<FptnAuthResult>>,
-    ): Pair<Deferred<FptnAuthResult>, FptnAuthResult> = select {
-        pending.forEach { deferred ->
-            deferred.onAwait { deferred to it }
-        }
     }
 
     private suspend fun authenticateCandidate(
