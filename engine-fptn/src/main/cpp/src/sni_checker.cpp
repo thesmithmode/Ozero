@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "censorship_strategy.h"
 #include "fptn-protocol-lib/https/api_client/api_client.h"
 #include "wrappers/utils/utils.h"
 
@@ -13,14 +14,7 @@ class NativeSniChecker {
       const std::string& md5_fingerprint,
       const std::string& censorship_strategy)
       : host_(host), port_(port), md5_fingerprint_(md5_fingerprint) {
-    fptn::protocol::https::CensorshipStrategy strategy =
-        fptn::protocol::https::CensorshipStrategy::kSni;
-
-    if (censorship_strategy == "OBFUSCATION") {
-      strategy = fptn::protocol::https::CensorshipStrategy::kTlsObfuscator;
-    } else if (censorship_strategy == "SNI-REALITY") {
-      strategy = fptn::protocol::https::CensorshipStrategy::kSniRealityMode;
-    }
+    const auto strategy = fptn::wrapper::ParseCensorshipStrategy(censorship_strategy);
     client_ = std::make_unique<fptn::protocol::https::ApiClient>(
         host_, port_, strategy);
     SPDLOG_INFO("NativeSniChecker created for {}:{}", host, port);

@@ -110,7 +110,8 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         }
         AppLogger.i(TAG, "restart requested $reason")
         val pendingTarget = tunnelController.switching.value?.to
-        tunnelController.onSwitchingStarted(from = fromEngine, to = pendingTarget)
+        val targetEngine = pendingTarget ?: fromEngine
+        tunnelController.onSwitchingStarted(from = fromEngine, to = targetEngine)
         try {
             sendVpnAction(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG)
             val stopped = withTimeoutOrNull(RESTART_STOP_TIMEOUT_MS) {
@@ -125,7 +126,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
                 tunnelController.onSwitchingFinished("runtime config restart stop timeout")
                 return false
             }
-            val restarted = withTimeoutOrNull(RESTART_START_TIMEOUT_MS) {
+            val restarted = withTimeoutOrNull(restartStartTimeoutMs(targetEngine)) {
                 tunnelController.state.first {
                     it is TunnelState.Connected ||
                         it is TunnelState.Failed
@@ -163,6 +164,9 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
     private fun EngineSettingsRestartObserver.Snapshot.targetEngineForRestart(): EngineId? =
         manualEngine ?: engineAutoPriority?.firstOrNull()
 
+    private fun restartStartTimeoutMs(target: EngineId?): Long =
+        if (target == EngineId.FPTN) FPTN_RESTART_START_TIMEOUT_MS else RESTART_START_TIMEOUT_MS
+
     private fun sendVpnAction(action: String) {
         context.startService(
             Intent(action).setClass(context, OzeroVpnService::class.java),
@@ -173,6 +177,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         const val TAG = "RuntimeConfigRestartCoordinator"
         const val RESTART_STOP_TIMEOUT_MS = 11_000L
         const val RESTART_START_TIMEOUT_MS = 15_000L
+        const val FPTN_RESTART_START_TIMEOUT_MS = 25_000L
         const val RESTART_SETTLE_TIMEOUT_MS = 15_000L
     }
 }

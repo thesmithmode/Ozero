@@ -9,11 +9,14 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkObject
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -114,6 +117,33 @@ class FptnEngineBranchCoverageTest {
         assertEquals(null, engine.getPrivate("tunScope"))
         assertEquals(0L, engine.getPrivate("_nativeHandle") as Long)
         assertEquals(true, job.isCancelled)
+    }
+
+    @Test
+    fun `stop closes tun before cancelling and joining its read scope`() = runTest {
+        val calls = mutableListOf<String>()
+        val pfd = mockk<ParcelFileDescriptor>(relaxed = true)
+        every { pfd.close() } answers { calls += "pfd.close" }
+        val ws = FakeFastWsClient(calls)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val started = CompletableDeferred<Unit>()
+        scope.launch {
+            started.complete(Unit)
+            try {
+                awaitCancellation()
+            } finally {
+                calls += "scope.cancel"
+            }
+        }
+        started.await()
+        val engine = FptnEngine(InMemoryFptnConfigStore(), wsClient = ws)
+        engine.setPrivate("_nativeHandle", 11L)
+        engine.setPrivate("_pfd", pfd)
+        engine.setPrivate("tunScope", scope)
+
+        engine.stop()
+
+        assertEquals(listOf("nativeStop", "pfd.close", "scope.cancel", "nativeDestroy"), calls)
     }
 
     @Test
@@ -418,7 +448,7 @@ class FptnEngineBranchCoverageTest {
             body: String,
             timeoutSeconds: Int,
         ): FptnNativeResponse {
-            if (hosts[handle] == "127.0.0.5") {
+            if (hosts[handle] == "127.0.0.4") {
                 return FptnNativeResponse(200, """{"access_token":"access"}""", "")
             }
             Thread.sleep(timeoutSeconds * 1_000L)
@@ -426,10 +456,13 @@ class FptnEngineBranchCoverageTest {
         }
     }
 
-    private class FakeFastWsClient : FptnWebSocketClient {
+    private class FakeFastWsClient(
+        private val calls: MutableList<String>? = null,
+    ) : FptnWebSocketClient {
         override var onOpen: () -> Unit = {}
         override var onMessage: (ByteArray) -> Unit = {}
         override var onFailure: () -> Unit = {}
+        override var onSocketOpened: (Int) -> Unit = {}
         override fun loadOnce() = Unit
         override val libraryLoaded: Boolean = true
         override val loadError: String? = null
@@ -447,11 +480,13 @@ class FptnEngineBranchCoverageTest {
         val destroyedHandles = mutableListOf<Long>()
 
         override fun nativeStop(handle: Long): Boolean {
+            calls?.add("nativeStop")
             stoppedHandles += handle
             return true
         }
 
         override fun nativeDestroy(handle: Long) {
+            calls?.add("nativeDestroy")
             destroyedHandles += handle
         }
 
@@ -476,6 +511,7 @@ class FptnEngineBranchCoverageTest {
         override var onOpen: () -> Unit = {}
         override var onMessage: (ByteArray) -> Unit = {}
         override var onFailure: () -> Unit = {}
+        override var onSocketOpened: (Int) -> Unit = {}
         override fun loadOnce() = Unit
         override val libraryLoaded: Boolean = true
         override val loadError: String? = null

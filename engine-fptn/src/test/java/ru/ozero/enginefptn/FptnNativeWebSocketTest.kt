@@ -14,17 +14,21 @@ class FptnNativeWebSocketTest {
         var opens = 0
         var failures = 0
         var message = byteArrayOf()
+        var socketFd = 0
         socket.onOpen = { opens++ }
         socket.onFailure = { failures++ }
         socket.onMessage = { message = it }
+        socket.onSocketOpened = { socketFd = it }
 
         socket.onOpenImpl()
-        socket.onMessageImpl(byteArrayOf(1, 2, 3))
+        socket.onMessageImpl(arrayOf(byteArrayOf(1, 2, 3)))
         socket.onFailureImpl()
+        socket.onSocketOpenedImpl(42)
 
         assertEquals(1, opens)
         assertEquals(1, failures)
         assertContentEquals(byteArrayOf(1, 2, 3), message)
+        assertEquals(42, socketFd)
     }
 
     @Test

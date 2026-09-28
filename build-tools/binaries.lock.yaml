@@ -1,5 +1,5 @@
-tag: byedpi-e4e9f53e
-generated_at: 2026-05-19T23:07:08Z
+tag: fptn-ec465fed
+generated_at: 2026-09-12T16:27:58Z
 artifacts:
   - name: libxray.aar
     engine: xray
@@ -218,8 +218,8 @@ artifacts:
     abi: arm64-v8a
     destination: jniLibs
     target_filename: libfptn_native_lib.so
-    download_url: https://github.com/thesmithmode/Ozero/releases/download/fptn-322fa498/libfptn_native_lib-arm64-v8a.so
-    sha256: 0d1ea7fc3d5c39e0cd6edf0af70f2ac3d25e2c9a05e089283d71f57feb17e389
-    size_bytes: 18737384
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/fptn-ec465fed/libfptn_native_lib-arm64-v8a.so
+    sha256: 89f8a7633bcdc3ea12045a5a7f53ce8cd38ddff19742800460788b070ead9afc
+    size_bytes: 28228368
     source_repo: https://github.com/fptn-project/FptnClient-Android.git
-    source_commit: d2ca1ff2cd3090d0b191ba320d1bca4a03452dea
+    source_commit: 2a38c7e4fc9268ae7d30f8ec0390a97e02e41980

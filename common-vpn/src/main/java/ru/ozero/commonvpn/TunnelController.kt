@@ -83,15 +83,16 @@ class TunnelController(
 
     fun onSwitchingStarted(from: EngineId?, to: EngineId?) {
         val transition = SwitchingTransition(from, to)
+        val timeoutMs = switchingTimeoutFor(to)
         _switching.value = transition
         PersistentLoggers.info(TAG, "switching started: $from → $to")
         switchingWatchdogJob?.cancel()
         switchingWatchdogJob = watchdogScope?.launch {
-            delay(switchingTimeoutMs)
+            delay(timeoutMs)
             if (_switching.compareAndSet(transition, null)) {
                 PersistentLoggers.warn(
                     TAG,
-                    "switching watchdog cleared after ${switchingTimeoutMs}ms: $from → $to",
+                    "switching watchdog cleared after ${timeoutMs}ms: $from → $to",
                 )
             }
         }
@@ -214,6 +215,12 @@ class TunnelController(
         }
     }
 
+    private fun switchingTimeoutFor(target: EngineId?): Long = when {
+        switchingTimeoutMs != SWITCHING_TIMEOUT_MS -> switchingTimeoutMs
+        target == EngineId.FPTN -> FPTN_SWITCHING_TIMEOUT_MS
+        else -> switchingTimeoutMs
+    }
+
     private fun isAllowed(from: TunnelState, to: TunnelState): Boolean = when (from) {
         is TunnelState.Idle -> to is TunnelState.Probing
         is TunnelState.Probing ->
@@ -249,5 +256,6 @@ class TunnelController(
         const val TAG = "TunnelController"
         const val EWMA_ALPHA = 0.4
         const val SWITCHING_TIMEOUT_MS = 12_000L
+        const val FPTN_SWITCHING_TIMEOUT_MS = 25_000L
     }
 }
