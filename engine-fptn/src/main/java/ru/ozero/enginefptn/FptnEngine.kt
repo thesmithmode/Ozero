@@ -3,6 +3,7 @@ package ru.ozero.enginefptn
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -456,7 +457,9 @@ class FptnEngine(
         return FptnAuthResult.Failure(startupFptnFailureReason(failures, candidates.size))
     }
 
-    // First success returns without joining cancelled peers (nativePost may ignore cancel).
+    // Detached SupervisorJob: nativePost/Thread.sleep ignore cancel, so parent must not
+    // join peer auth jobs. First success returns immediately; parent cancel still tears down
+    // the batch via invokeOnCompletion.
     @Suppress("NestedBlockDepth")
     private suspend fun raceFirstSuccessfulAuth(
         batch: List<FptnServer>,
@@ -467,9 +470,13 @@ class FptnEngine(
         deadlineMs: Long,
         failures: MutableList<String>,
     ): FptnAuthResult.Success? {
-        val batchJob = SupervisorJob(currentCoroutineContext()[Job])
+        val dispatcher = currentCoroutineContext()[CoroutineDispatcher] ?: Dispatchers.IO
+        val batchJob = SupervisorJob() // detached on purpose
+        val cancelOnParentCompletion = currentCoroutineContext()[Job]?.invokeOnCompletion {
+            batchJob.cancel()
+        }
         try {
-            val batchScope = CoroutineScope(currentCoroutineContext() + batchJob)
+            val batchScope = CoroutineScope(dispatcher + batchJob)
             val pending = batch.map { server ->
                 batchScope.async {
                     authenticateCandidate(
@@ -495,6 +502,7 @@ class FptnEngine(
                 }
             }
         } finally {
+            cancelOnParentCompletion?.dispose()
             batchJob.cancel()
         }
         return null
