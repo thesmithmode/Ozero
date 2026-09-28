@@ -10,7 +10,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -441,9 +440,13 @@ class FptnEngine(
             if (remainingMs <= 0L) break
             val timeoutS = authTimeoutSeconds(remainingMs, perCandidateMaxTimeoutS)
             val results = mutableListOf<FptnAuthResult>()
-            val winner = coroutineScope {
+            // Detached batch job: first success must return under the startup budget even when
+            // peer nativePost calls are still blocked and ignore cooperative cancellation.
+            val batchJob = SupervisorJob(currentCoroutineContext()[Job])
+            try {
+                val batchScope = CoroutineScope(currentCoroutineContext() + batchJob)
                 val pending = batch.map { server ->
-                    async {
+                    batchScope.async {
                         authenticateCandidate(
                             server = server,
                             data = data,
@@ -462,15 +465,13 @@ class FptnEngine(
                     }
                     pending.remove(completed)
                     if (result is FptnAuthResult.Success) {
-                        pending.forEach { it.cancel() }
-                        return@coroutineScope result
+                        return result
                     }
                     results += result
                 }
-                null
+            } finally {
+                batchJob.cancel()
             }
-
-            if (winner != null) return winner
             val batchFailures = results.filterIsInstance<FptnAuthResult.Failure>().map { it.reason }
             failures += batchFailures
             if (FPTN_TOKEN_REJECTED in batchFailures) {
