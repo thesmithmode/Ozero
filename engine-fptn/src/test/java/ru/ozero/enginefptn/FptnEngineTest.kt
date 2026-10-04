@@ -293,6 +293,7 @@ class FptnEngineTest {
         assertIs<StartResult.Success>(result)
         assertEquals(setOf("203.0.113.1", "127.0.0.1"), https.createdHosts.toSet())
         assertEquals(2, https.createdHosts.size)
+        assertTrue(waitUntil { https.destroyedHandles.size == 2 })
         assertEquals(setOf(1L, 2L), https.destroyedHandles.toSet())
         assertEquals(2, https.destroyedHandles.size)
     }
