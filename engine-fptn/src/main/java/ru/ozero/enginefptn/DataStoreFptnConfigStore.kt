@@ -9,9 +9,12 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
+import ru.ozero.commoncrypto.PreferenceAtRest
 
 class DataStoreFptnConfigStore(
     private val dataStore: DataStore<Preferences>,
@@ -23,18 +26,26 @@ class DataStoreFptnConfigStore(
     @Volatile
     private var loaded = false
 
-    override fun config(): Flow<FptnConfig> = dataStore.data.map { prefs ->
-        readConfig(prefs).also {
-            latest = it
-            loaded = true
-        }
+    override fun config(): Flow<FptnConfig> = flow {
+        dataStore.edit { migrateToken(it) }
+        emitAll(
+            dataStore.data.map { prefs ->
+                readConfig(prefs).also {
+                    latest = it
+                    loaded = true
+                }
+            },
+        )
     }
 
     override fun currentConfig(): FptnConfig {
         if (!loaded) {
             synchronized(this) {
                 if (!loaded) {
-                    latest = runBlocking(Dispatchers.IO) { dataStore.data.first().let(::readConfig) }
+                    latest = runBlocking(Dispatchers.IO) {
+                        dataStore.edit { migrateToken(it) }
+                        dataStore.data.first().let(::readConfig)
+                    }
                     loaded = true
                 }
             }
@@ -44,6 +55,7 @@ class DataStoreFptnConfigStore(
 
     override suspend fun update(transform: (FptnConfig) -> FptnConfig) {
         dataStore.edit { prefs ->
+            migrateToken(prefs)
             val next = transform(readConfig(prefs))
             writeConfig(prefs, next)
             latest = next
@@ -54,7 +66,7 @@ class DataStoreFptnConfigStore(
     private fun readConfig(prefs: Preferences): FptnConfig {
         val selectedServerName = prefs[KEY_SELECTED_SERVER]?.takeIf { it.isNotBlank() }
         return FptnConfig(
-            token = prefs[KEY_TOKEN].orEmpty(),
+            token = readToken(prefs),
             selectedServerName = selectedServerName,
             bypassMethod = prefs[KEY_BYPASS_METHOD]?.takeIf { it.isNotBlank() }
                 ?: FptnBypassMethod.DEFAULT.strategyName,
@@ -70,7 +82,13 @@ class DataStoreFptnConfigStore(
     }
 
     private fun writeConfig(prefs: MutablePreferences, cfg: FptnConfig) {
-        prefs[KEY_TOKEN] = cfg.token
+        if (cfg.token.isEmpty()) {
+            prefs.remove(KEY_TOKEN)
+            prefs.remove(KEY_TOKEN_ENC)
+        } else {
+            prefs[KEY_TOKEN_ENC] = PreferenceAtRest.seal(cfg.token)
+            prefs.remove(KEY_TOKEN)
+        }
         if (cfg.selectedServerName != null) {
             prefs[KEY_SELECTED_SERVER] = cfg.selectedServerName
         } else {
@@ -86,8 +104,25 @@ class DataStoreFptnConfigStore(
         prefs[KEY_RESET_SERVER] = cfg.resetServerOnDisconnect
     }
 
+    private fun readToken(prefs: Preferences): String {
+        val sealed = prefs[KEY_TOKEN_ENC]
+        if (!sealed.isNullOrEmpty()) return PreferenceAtRest.open(sealed)
+        return prefs[KEY_TOKEN].orEmpty()
+    }
+
+    private fun migrateToken(prefs: MutablePreferences) {
+        val plain = prefs[KEY_TOKEN] ?: return
+        if (plain.isBlank()) {
+            prefs.remove(KEY_TOKEN)
+            return
+        }
+        prefs[KEY_TOKEN_ENC] = PreferenceAtRest.seal(plain)
+        prefs.remove(KEY_TOKEN)
+    }
+
     companion object {
         private val KEY_TOKEN = stringPreferencesKey("fptn_token")
+        private val KEY_TOKEN_ENC = stringPreferencesKey("fptn_token_enc")
         private val KEY_SELECTED_SERVER = stringPreferencesKey("fptn_selected_server")
         private val KEY_BYPASS_METHOD = stringPreferencesKey("fptn_bypass_method")
         private val KEY_SNI_DOMAIN = stringPreferencesKey("fptn_sni_domain")

@@ -2,13 +2,17 @@ package ru.ozero.enginewarp
 
 import android.util.Log
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import ru.ozero.commoncrypto.PreferenceAtRest
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
@@ -23,8 +27,9 @@ class DataStoreWarpConfigSlotStore(
 
     private val mutex = Mutex()
 
-    override fun slots(): Flow<List<WarpConfigSlot>> = dataStore.data.map { prefs ->
-        parseSlots(prefs[KEY_SLOTS] ?: "[]")
+    override fun slots(): Flow<List<WarpConfigSlot>> = flow {
+        dataStore.edit { it.migrateSlotSecretsInPlace() }
+        emitAll(dataStore.data.map { prefs -> parseSlots(prefs[KEY_SLOTS] ?: "[]") })
     }
 
     override fun activeSlot(): Flow<WarpConfigSlot?> = slots().map { list ->
@@ -45,6 +50,7 @@ class DataStoreWarpConfigSlotStore(
         val fingerprint = config.dedupFingerprint()
         var duplicate: WarpConfigSlot? = null
         dataStore.edit { prefs ->
+            prefs.migrateSlotSecretsInPlace()
             val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
             val existing = current.firstOrNull { it.config.dedupFingerprint() == fingerprint }
             if (existing != null) {
@@ -68,6 +74,7 @@ class DataStoreWarpConfigSlotStore(
 
     override suspend fun setActive(id: String): Unit = mutex.withLock {
         dataStore.edit { prefs ->
+            prefs.migrateSlotSecretsInPlace()
             val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
             if (current.none { it.id == id }) return@edit
             val updated = current.map { slot -> slot.copy(isActive = slot.id == id) }
@@ -77,6 +84,7 @@ class DataStoreWarpConfigSlotStore(
 
     override suspend fun rename(id: String, name: String): Unit = mutex.withLock {
         dataStore.edit { prefs ->
+            prefs.migrateSlotSecretsInPlace()
             val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
             val updated = current.map { slot -> if (slot.id == id) slot.copy(name = name) else slot }
             prefs[KEY_SLOTS] = serializeSlots(updated)
@@ -91,6 +99,7 @@ class DataStoreWarpConfigSlotStore(
         endpointList: List<String>,
     ): Unit = mutex.withLock {
         dataStore.edit { prefs ->
+            prefs.migrateSlotSecretsInPlace()
             val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
             val updated = current.map { slot ->
                 if (slot.id == id) {
@@ -105,6 +114,7 @@ class DataStoreWarpConfigSlotStore(
 
     override suspend fun delete(id: String): Unit = mutex.withLock {
         dataStore.edit { prefs ->
+            prefs.migrateSlotSecretsInPlace()
             val current = parseSlots(prefs[KEY_SLOTS] ?: "[]")
             val filtered = current.filter { it.id != id }
             val needsNewActive = filtered.isNotEmpty() && filtered.none { it.isActive }
@@ -119,12 +129,14 @@ class DataStoreWarpConfigSlotStore(
 
     override suspend fun replaceAll(slots: List<WarpConfigSlot>): Unit = mutex.withLock {
         dataStore.edit { prefs ->
+            prefs.migrateSlotSecretsInPlace()
             prefs[KEY_SLOTS] = serializeSlots(slots)
         }
     }
 
     override suspend fun clear(): Unit = mutex.withLock {
         dataStore.edit { prefs ->
+            prefs.migrateSlotSecretsInPlace()
             prefs.remove(KEY_SLOTS)
             prefs.remove(KEY_MIGRATION_DONE)
         }
@@ -135,6 +147,7 @@ class DataStoreWarpConfigSlotStore(
         if (alreadyDone) return
         val legacyConfig = legacyStore.current().first()
         dataStore.edit { prefs ->
+            prefs.migrateSlotSecretsInPlace()
             if (prefs[KEY_MIGRATION_DONE] == true) return@edit
             prefs[KEY_MIGRATION_DONE] = true
             if (legacyConfig == null) return@edit
@@ -203,9 +216,11 @@ class DataStoreWarpConfigSlotStore(
             payloadHexI4 = awgObj.optString("i4Hex", "").takeIf { it.isNotEmpty() },
             payloadHexI5 = awgObj.optString("i5Hex", "").takeIf { it.isNotEmpty() },
         )
-        val rawIni = obj.optString("rawIni", "").takeIf { it.isNotEmpty() }
+        val rawIni = obj.optString("rawIni", "")
+            .takeIf { it.isNotEmpty() }
+            ?.let(PreferenceAtRest::open)
         val config = WarpConfig(
-            privateKey = configObj.getString("priv"),
+            privateKey = PreferenceAtRest.open(configObj.getString("priv")),
             publicKey = configObj.optString("pub", ""),
             peerPublicKey = configObj.getString("peerPub"),
             peerEndpoint = configObj.getString("peerEndpoint"),
@@ -275,7 +290,9 @@ class DataStoreWarpConfigSlotStore(
             obj.put("id", slot.id)
             obj.put("name", slot.name)
             obj.put("isActive", slot.isActive)
-            slot.rawIniOverride?.takeIf { it.isNotEmpty() }?.let { obj.put("rawIni", it) }
+            slot.rawIniOverride?.takeIf { it.isNotEmpty() }?.let { raw ->
+                obj.put("rawIni", PreferenceAtRest.seal(raw))
+            }
             if (slot.endpointList.isNotEmpty()) {
                 val epArr = JSONArray()
                 slot.endpointList.forEach { epArr.put(it) }
@@ -283,7 +300,7 @@ class DataStoreWarpConfigSlotStore(
             }
             val cfg = slot.config
             val configObj = JSONObject()
-            configObj.put("priv", cfg.privateKey)
+            configObj.put("priv", PreferenceAtRest.seal(cfg.privateKey))
             configObj.put("pub", cfg.publicKey)
             configObj.put("peerPub", cfg.peerPublicKey)
             configObj.put("peerEndpoint", cfg.peerEndpoint)
@@ -327,6 +344,12 @@ class DataStoreWarpConfigSlotStore(
             arr.put(obj)
         }
         return arr.toString()
+    }
+
+    private fun MutablePreferences.migrateSlotSecretsInPlace() {
+        val raw = this[KEY_SLOTS] ?: return
+        val sealed = sealWarpSlotSecrets(raw) ?: return
+        this[KEY_SLOTS] = sealed
     }
 
     private companion object {

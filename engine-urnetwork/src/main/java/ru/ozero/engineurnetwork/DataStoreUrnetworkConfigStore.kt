@@ -7,16 +7,22 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import ru.ozero.commoncrypto.PreferenceAtRest
 
 class DataStoreUrnetworkConfigStore(
     private val dataStore: DataStore<Preferences>,
 ) : UrnetworkConfigStore {
-    override fun config(): Flow<UrnetworkConfig> =
-        dataStore.data.map { readConfig(it).withNormalizedCachedLocations() }
+    override fun config(): Flow<UrnetworkConfig> = flow {
+        dataStore.edit { migrateSecrets(it) }
+        emitAll(dataStore.data.map { readConfig(it).withNormalizedCachedLocations() })
+    }
 
     override suspend fun update(transform: (UrnetworkConfig) -> UrnetworkConfig) {
         dataStore.edit { prefs ->
+            migrateSecrets(prefs)
             val next = transform(readConfig(prefs)).withAlwaysOnProviding()
             writeConfig(prefs, next)
         }
@@ -24,8 +30,8 @@ class DataStoreUrnetworkConfigStore(
 
     private fun readConfig(prefs: Preferences): UrnetworkConfig = UrnetworkConfig(
         walletOverride = prefs[KEY_WALLET_OVERRIDE]?.takeIf { it.isNotBlank() },
-        byJwt = prefs[KEY_BY_JWT]?.takeIf { it.isNotBlank() },
-        byClientJwt = prefs[KEY_BY_CLIENT_JWT]?.takeIf { it.isNotBlank() },
+        byJwt = readSecret(prefs, KEY_BY_JWT, KEY_BY_JWT_ENC),
+        byClientJwt = readSecret(prefs, KEY_BY_CLIENT_JWT, KEY_BY_CLIENT_JWT_ENC),
         devicePubkey = prefs[KEY_DEVICE_PUBKEY]?.takeIf { it.isNotBlank() },
         deviceNetworkName = prefs[KEY_DEVICE_NETWORK_NAME]?.takeIf { it.isNotBlank() },
         windowType = UrnetworkWindowType.fromRaw(prefs[KEY_WINDOW_TYPE]),
@@ -47,8 +53,8 @@ class DataStoreUrnetworkConfigStore(
 
     private fun writeConfig(prefs: MutablePreferences, cfg: UrnetworkConfig) {
         prefs.writeOrRemove(KEY_WALLET_OVERRIDE, cfg.walletOverride)
-        prefs.writeOrRemove(KEY_BY_JWT, cfg.byJwt)
-        prefs.writeOrRemove(KEY_BY_CLIENT_JWT, cfg.byClientJwt)
+        prefs.writeSecret(KEY_BY_JWT, KEY_BY_JWT_ENC, cfg.byJwt)
+        prefs.writeSecret(KEY_BY_CLIENT_JWT, KEY_BY_CLIENT_JWT_ENC, cfg.byClientJwt)
         prefs.writeOrRemove(KEY_DEVICE_PUBKEY, cfg.devicePubkey)
         prefs.writeOrRemove(KEY_DEVICE_NETWORK_NAME, cfg.deviceNetworkName)
         prefs[KEY_WINDOW_TYPE] = cfg.windowType.rawValue
@@ -125,10 +131,41 @@ class DataStoreUrnetworkConfigStore(
             }.take(MAX_CACHED_LOCATIONS),
         )
 
+    private fun readSecret(
+        prefs: Preferences,
+        plainKey: Preferences.Key<String>,
+        encKey: Preferences.Key<String>,
+    ): String? {
+        val sealed = prefs[encKey]
+        if (!sealed.isNullOrBlank()) return PreferenceAtRest.open(sealed).takeIf { it.isNotBlank() }
+        return prefs[plainKey]?.takeIf { it.isNotBlank() }
+    }
+
+    private fun migrateSecrets(prefs: MutablePreferences) {
+        migrateSecret(prefs, KEY_BY_JWT, KEY_BY_JWT_ENC)
+        migrateSecret(prefs, KEY_BY_CLIENT_JWT, KEY_BY_CLIENT_JWT_ENC)
+    }
+
+    private fun migrateSecret(
+        prefs: MutablePreferences,
+        plainKey: Preferences.Key<String>,
+        encKey: Preferences.Key<String>,
+    ) {
+        val plain = prefs[plainKey] ?: return
+        if (plain.isBlank()) {
+            prefs.remove(plainKey)
+            return
+        }
+        prefs[encKey] = PreferenceAtRest.seal(plain)
+        prefs.remove(plainKey)
+    }
+
     private companion object {
         val KEY_WALLET_OVERRIDE = stringPreferencesKey("urnetwork_wallet_override")
         val KEY_BY_JWT = stringPreferencesKey("urnetwork_by_jwt")
+        val KEY_BY_JWT_ENC = stringPreferencesKey("urnetwork_by_jwt_enc")
         val KEY_BY_CLIENT_JWT = stringPreferencesKey("urnetwork_by_client_jwt")
+        val KEY_BY_CLIENT_JWT_ENC = stringPreferencesKey("urnetwork_by_client_jwt_enc")
         val KEY_DEVICE_PUBKEY = stringPreferencesKey("urnetwork_device_pubkey")
         val KEY_DEVICE_NETWORK_NAME = stringPreferencesKey("urnetwork_device_network_name")
         val KEY_WINDOW_TYPE = stringPreferencesKey("urnetwork_window_type")
@@ -151,6 +188,21 @@ class DataStoreUrnetworkConfigStore(
 
 private fun MutablePreferences.writeOrRemove(key: Preferences.Key<String>, value: String?) {
     value?.takeIf { it.isNotBlank() }?.let { this[key] = it } ?: remove(key)
+}
+
+private fun MutablePreferences.writeSecret(
+    plainKey: Preferences.Key<String>,
+    encKey: Preferences.Key<String>,
+    value: String?,
+) {
+    val clean = value?.takeIf { it.isNotBlank() }
+    if (clean == null) {
+        remove(plainKey)
+        remove(encKey)
+        return
+    }
+    this[encKey] = PreferenceAtRest.seal(clean)
+    remove(plainKey)
 }
 
 private fun readLegacyJsonLocationCache(raw: String): List<UrnetworkCachedLocation> {

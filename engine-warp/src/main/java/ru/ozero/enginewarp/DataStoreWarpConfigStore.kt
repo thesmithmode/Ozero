@@ -1,24 +1,33 @@
 package ru.ozero.enginewarp
 
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import ru.ozero.commoncrypto.PreferenceAtRest
 import ru.ozero.enginescore.PersistentLoggers
 
 class DataStoreWarpConfigStore(
     private val dataStore: DataStore<Preferences>,
 ) : WarpConfigStore {
 
-    override fun current(): Flow<WarpConfig?> = dataStore.data.map { prefs ->
-        val priv = prefs[KEY_PRIV] ?: return@map null
-        val peerPub = prefs[KEY_PEER_PUB] ?: return@map null
-        val peerEndpoint = prefs[KEY_PEER_ENDPOINT] ?: return@map null
-        val v4 = prefs[KEY_IFACE_V4] ?: return@map null
-        val v6 = prefs[KEY_IFACE_V6] ?: return@map null
+    override fun current(): Flow<WarpConfig?> = flow {
+        dataStore.edit { migratePriv(it) }
+        emitAll(dataStore.data.map { prefs -> decode(prefs) })
+    }
+
+    private fun decode(prefs: Preferences): WarpConfig? {
+        val priv = readPriv(prefs) ?: return null
+        val peerPub = prefs[KEY_PEER_PUB] ?: return null
+        val peerEndpoint = prefs[KEY_PEER_ENDPOINT] ?: return null
+        val v4 = prefs[KEY_IFACE_V4] ?: return null
+        val v6 = prefs[KEY_IFACE_V6] ?: return null
         val pub = prefs[KEY_PUB].orEmpty()
         val license = prefs[KEY_LICENSE].orEmpty()
         val mtu = prefs[KEY_MTU] ?: WarpConfig.DEFAULT_MTU
@@ -48,7 +57,7 @@ class DataStoreWarpConfigStore(
             cookieReplyMagicHeader = parseLongPref(prefs[KEY_AWG_H3], "H3", AwgParams.DEFAULT_H3),
             transportMagicHeader = parseLongPref(prefs[KEY_AWG_H4], "H4", AwgParams.DEFAULT_H4),
         )
-        WarpConfig(
+        return WarpConfig(
             privateKey = priv,
             publicKey = pub,
             peerPublicKey = peerPub,
@@ -67,7 +76,8 @@ class DataStoreWarpConfigStore(
 
     override suspend fun save(config: WarpConfig) {
         dataStore.edit { prefs ->
-            prefs[KEY_PRIV] = config.privateKey
+            prefs[KEY_PRIV_ENC] = PreferenceAtRest.seal(config.privateKey)
+            prefs.remove(KEY_PRIV)
             prefs[KEY_PUB] = config.publicKey
             prefs[KEY_PEER_PUB] = config.peerPublicKey
             prefs[KEY_PEER_ENDPOINT] = config.peerEndpoint
@@ -93,6 +103,7 @@ class DataStoreWarpConfigStore(
     override suspend fun clear() {
         dataStore.edit { prefs ->
             prefs.remove(KEY_PRIV)
+            prefs.remove(KEY_PRIV_ENC)
             prefs.remove(KEY_PUB)
             prefs.remove(KEY_PEER_PUB)
             prefs.remove(KEY_PEER_ENDPOINT)
@@ -113,6 +124,22 @@ class DataStoreWarpConfigStore(
             prefs.remove(KEY_AWG_H3)
             prefs.remove(KEY_AWG_H4)
         }
+    }
+
+    private fun readPriv(prefs: Preferences): String? {
+        val sealed = prefs[KEY_PRIV_ENC]
+        if (!sealed.isNullOrEmpty()) return PreferenceAtRest.open(sealed)
+        return prefs[KEY_PRIV]
+    }
+
+    private fun migratePriv(prefs: MutablePreferences) {
+        val plain = prefs[KEY_PRIV] ?: return
+        if (plain.isBlank()) {
+            prefs.remove(KEY_PRIV)
+            return
+        }
+        prefs[KEY_PRIV_ENC] = PreferenceAtRest.seal(plain)
+        prefs.remove(KEY_PRIV)
     }
 
     private fun parseLongPref(raw: String?, key: String, default: Long): Long {
@@ -139,6 +166,7 @@ class DataStoreWarpConfigStore(
     private companion object {
         const val TAG = "DataStoreWarpConfigStore"
         val KEY_PRIV = stringPreferencesKey("warp_priv")
+        val KEY_PRIV_ENC = stringPreferencesKey("warp_priv_enc")
         val KEY_PUB = stringPreferencesKey("warp_pub")
         val KEY_PEER_PUB = stringPreferencesKey("warp_peer_pub")
         val KEY_PEER_ENDPOINT = stringPreferencesKey("warp_peer_endpoint")
