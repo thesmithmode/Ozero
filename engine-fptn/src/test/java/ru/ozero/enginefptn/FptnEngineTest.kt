@@ -812,9 +812,17 @@ class FptnEngineTest {
 
     @Test
     fun `probe returns success when token has valid servers`() = runTest {
-        store.inject { it.copy(token = "fptn:${validTokenB64()}") }
-        val result = engine.probe()
-        assertIs<ProbeResult.Success>(result)
+        java.net.ServerSocket(0).use { listener ->
+            store.inject {
+                it.copy(token = "fptn:${validTokenB64(host = "127.0.0.1", port = listener.localPort)}")
+            }
+            val success = assertIs<ProbeResult.Success>(engine.probe())
+            assertTrue(success.latencyMs >= 0L)
+        }
+        val closedPort = java.net.ServerSocket(0).use { it.localPort }
+        store.inject { it.copy(token = "fptn:${validTokenB64(host = "127.0.0.1", port = closedPort)}") }
+        val failure = assertIs<ProbeResult.Failure>(engine.probe())
+        assertEquals("FPTN server unreachable", failure.reason)
     }
 
     @Test
@@ -1643,9 +1651,9 @@ class FptnEngineTest {
         assertEquals(FptnBypassMethod.DEFAULT, FptnBypassMethod.fromStrategyName("missing"))
     }
 
-    private fun validTokenB64(host: String = "1.2.3.4", countryCode: String = ""): String {
+    private fun validTokenB64(host: String = "1.2.3.4", countryCode: String = "", port: Int = 443): String {
         val json = """{"version":1,"username":"u","password":"p",
-            "servers":[{"name":"S1","host":"$host","port":443,"countryCode":"$countryCode"}]}"""
+            "servers":[{"name":"S1","host":"$host","port":$port,"countryCode":"$countryCode"}]}"""
         return java.util.Base64.getEncoder().encodeToString(json.toByteArray())
     }
 

@@ -320,7 +320,7 @@ class RawUpdaterTest {
                 .build(),
             groupDao = groupDao,
             profileDao = profileDao,
-            userCaOkHttpClient = OkHttpClient.Builder()
+            systemCaOkHttpClient = OkHttpClient.Builder()
                 .addInterceptor { chain ->
                     userCaCalls.incrementAndGet()
                     chain.proceed(chain.request())
@@ -338,7 +338,7 @@ class RawUpdaterTest {
     }
 
     @Test
-    fun `should use system and user trust client for custom subscriptions`() = runBlocking {
+    fun `should use system trust client for custom subscriptions`() = runBlocking {
         val systemCalls = AtomicInteger(0)
         val userCaCalls = AtomicInteger(0)
         rawUpdater = RawUpdater(
@@ -350,7 +350,7 @@ class RawUpdaterTest {
                 .build(),
             groupDao = groupDao,
             profileDao = profileDao,
-            userCaOkHttpClient = OkHttpClient.Builder()
+            systemCaOkHttpClient = OkHttpClient.Builder()
                 .addInterceptor { chain ->
                     userCaCalls.incrementAndGet()
                     chain.proceed(chain.request())
@@ -380,7 +380,7 @@ class RawUpdaterTest {
                 .build(),
             groupDao = groupDao,
             profileDao = profileDao,
-            userCaOkHttpClient = OkHttpClient.Builder()
+            systemCaOkHttpClient = OkHttpClient.Builder()
                 .addInterceptor {
                     userCaCalls.incrementAndGet()
                     throw SSLHandshakeException("Trust anchor for certification path not found")
@@ -403,7 +403,7 @@ class RawUpdaterTest {
             okHttpClient = OkHttpClient(),
             groupDao = groupDao,
             profileDao = profileDao,
-            userCaOkHttpClient = OkHttpClient.Builder()
+            systemCaOkHttpClient = OkHttpClient.Builder()
                 .addInterceptor { throw SSLHandshakeException("certificate path") }
                 .build(),
             insecureOkHttpClient = OkHttpClient.Builder()
@@ -437,7 +437,7 @@ class RawUpdaterTest {
                 .build(),
             groupDao = groupDao,
             profileDao = profileDao,
-            userCaOkHttpClient = OkHttpClient.Builder()
+            systemCaOkHttpClient = OkHttpClient.Builder()
                 .addInterceptor { throw SSLHandshakeException("certificate path") }
                 .build(),
             insecureOkHttpClient = OkHttpClient.Builder()

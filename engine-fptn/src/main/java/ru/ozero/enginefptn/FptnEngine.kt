@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
@@ -45,6 +46,8 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.util.Locale
 
 class FptnEngine(
@@ -323,36 +326,51 @@ class FptnEngine(
         tunScope = null
         val h = _nativeHandle
         _nativeHandle = 0L
+        try {
+            if (h != 0L) {
+                Log.d(TAG, "stop: nativeStop handle=$h")
+                wsClient.nativeStop(h)
+            }
+            _pfd?.close()
+            _pfd = null
+            scope?.cancel()
 
-        if (h != 0L) {
-            Log.d(TAG, "stop: nativeStop handle=$h")
-            wsClient.nativeStop(h)
+            scope?.coroutineContext?.get(Job)?.join()
+            Log.d(TAG, "stop: TUN loop joined")
+        } finally {
+            withContext(NonCancellable) {
+                if (h != 0L) {
+                    wsClient.nativeDestroy(h)
+                    Log.d(TAG, "stop: nativeDestroy done")
+                }
+                _currentServer = null
+                _currentServerIp = null
+                _accessToken = null
+            }
+            Log.d(TAG, "stop: done")
         }
-        _pfd?.close()
-        _pfd = null
-        scope?.cancel()
-
-        scope?.coroutineContext?.get(Job)?.join()
-        Log.d(TAG, "stop: TUN loop joined")
-
-        if (h != 0L) {
-            wsClient.nativeDestroy(h)
-            Log.d(TAG, "stop: nativeDestroy done")
-        }
-        _currentServer = null
-        _currentServerIp = null
-        _accessToken = null
-        Log.d(TAG, "stop: done")
     }
 
     override suspend fun probe(): ProbeResult {
         val token = configStore.config().first().token
         if (token.isBlank()) return ProbeResult.Failure("No token configured")
         val parsed = FptnToken.parse(token) ?: return ProbeResult.Failure("Invalid token")
-        return if (parsed.servers.isNotEmpty()) {
-            ProbeResult.Success(latencyMs = 0L)
-        } else {
-            ProbeResult.Failure("No servers in token")
+        val server = parsed.servers.firstOrNull() ?: return ProbeResult.Failure("No servers in token")
+        if (server.host.isBlank() || server.port !in 1..65535) {
+            return ProbeResult.Failure("FPTN server endpoint is invalid")
+        }
+        return withContext(Dispatchers.IO) {
+            val startedNs = System.nanoTime()
+            try {
+                Socket().use { socket ->
+                    socket.connect(InetSocketAddress(server.host, server.port), PROBE_CONNECT_TIMEOUT_MS)
+                }
+                ProbeResult.Success(latencyMs = (System.nanoTime() - startedNs) / 1_000_000L)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ProbeResult.Failure("FPTN server unreachable", cause = e)
+            }
         }
     }
 
@@ -648,6 +666,7 @@ class FptnEngine(
         internal const val AUTO_STARTUP_AUTH_BUDGET_MS = 5_000L
         private const val READY_TIMEOUT_MS = 30_000L
         private const val READY_POLL_MS = 300L
+        private const val PROBE_CONNECT_TIMEOUT_MS = 3_000
         internal const val FPTN_INVALID_TOKEN = "Invalid FPTN token"
         internal const val FPTN_NO_SERVER_AVAILABLE = "No FPTN server available"
         internal const val FPTN_DNS_FAILED = "FPTN DNS resolve failed"

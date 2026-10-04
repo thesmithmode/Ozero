@@ -108,7 +108,7 @@ object SingboxModule {
             okHttpClient = SubscriptionTrustClientFactory.createSystem(),
             groupDao = groupDao,
             profileDao = profileDao,
-            userCaOkHttpClient = SubscriptionTrustClientFactory.create(),
+            systemCaOkHttpClient = SubscriptionTrustClientFactory.create(),
             insecureOkHttpClient = SubscriptionTrustClientFactory.createInsecure(),
             database = db,
             onProfilesRemoved = { removedProfileIds ->

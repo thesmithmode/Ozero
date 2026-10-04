@@ -13,12 +13,14 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -144,6 +146,34 @@ class FptnEngineBranchCoverageTest {
         engine.stop()
 
         assertEquals(listOf("nativeStop", "pfd.close", "scope.cancel", "nativeDestroy"), calls)
+    }
+
+    @Test
+    fun `stop still destroys native client when cancelled during tun join`() = runTest {
+        val ws = FakeFastWsClient()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val release = CompletableDeferred<Unit>()
+        val joinStarted = CompletableDeferred<Unit>()
+        scope.launch {
+            try {
+                awaitCancellation()
+            } finally {
+                joinStarted.complete(Unit)
+                withContext(NonCancellable) { release.await() }
+            }
+        }
+        val engine = FptnEngine(InMemoryFptnConfigStore(), wsClient = ws)
+        engine.setPrivate("_nativeHandle", 11L)
+        engine.setPrivate("tunScope", scope)
+
+        val stopJob = launch { engine.stop() }
+        joinStarted.await()
+        stopJob.cancel()
+        release.complete(Unit)
+        stopJob.join()
+
+        assertEquals(listOf(11L), ws.destroyedHandles)
+        assertEquals(0L, engine.getPrivate("_nativeHandle") as Long)
     }
 
     @Test
