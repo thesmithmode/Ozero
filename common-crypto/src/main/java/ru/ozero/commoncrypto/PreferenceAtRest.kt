@@ -2,6 +2,7 @@ package ru.ozero.commoncrypto
 
 import kotlinx.coroutines.CancellationException
 import org.bouncycastle.util.encoders.Base64
+import ru.ozero.enginescore.PersistentLoggers
 
 object AtRestSecrets {
     const val PREFIX = "enc1:"
@@ -46,7 +47,7 @@ object PreferenceAtRest {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            android.util.Log.w(LOG_TAG, "at-rest seal skipped: ${e.javaClass.simpleName}")
+            PersistentLoggers.warn(LOG_TAG, "at-rest seal skipped: ${e.javaClass.simpleName}")
             null
         }
     }
