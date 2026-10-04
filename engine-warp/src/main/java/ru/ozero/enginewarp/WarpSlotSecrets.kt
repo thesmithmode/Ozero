@@ -13,17 +13,20 @@ internal fun sealWarpSlotSecrets(json: String): String? {
     var changed = false
     for (index in 0 until arr.length()) {
         val obj = arr.optJSONObject(index) ?: continue
-        if (sealJsonString(obj, "rawIni")) changed = true
+        val rawIniSealed = sealJsonString(obj, "rawIni") ?: return null
+        if (rawIniSealed) changed = true
         val config = obj.optJSONObject("config") ?: continue
-        if (sealJsonString(config, "priv")) changed = true
+        val privSealed = sealJsonString(config, "priv") ?: return null
+        if (privSealed) changed = true
     }
     return if (changed) arr.toString() else null
 }
 
-private fun sealJsonString(obj: JSONObject, key: String): Boolean {
+private fun sealJsonString(obj: JSONObject, key: String): Boolean? {
     if (!obj.has(key) || obj.isNull(key)) return false
     val value = obj.optString(key, "")
     if (value.isEmpty() || PreferenceAtRest.isSealed(value)) return false
-    obj.put(key, PreferenceAtRest.seal(value))
+    val sealed = PreferenceAtRest.trySeal(value) ?: return null
+    obj.put(key, sealed)
     return true
 }

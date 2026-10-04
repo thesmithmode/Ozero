@@ -156,7 +156,8 @@ class DataStoreUrnetworkConfigStore(
             prefs.remove(plainKey)
             return
         }
-        prefs[encKey] = PreferenceAtRest.seal(plain)
+        val sealed = PreferenceAtRest.trySeal(plain) ?: return
+        prefs[encKey] = sealed
         prefs.remove(plainKey)
     }
 

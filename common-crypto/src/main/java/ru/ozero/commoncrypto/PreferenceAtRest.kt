@@ -1,5 +1,6 @@
 package ru.ozero.commoncrypto
 
+import kotlinx.coroutines.CancellationException
 import org.bouncycastle.util.encoders.Base64
 
 object AtRestSecrets {
@@ -25,12 +26,29 @@ object AtRestSecrets {
 }
 
 object PreferenceAtRest {
+    private const val LOG_TAG = "PreferenceAtRest"
+
     fun isSealed(value: String): Boolean = value.startsWith(AtRestSecrets.PREFIX)
 
     fun seal(plaintext: String): String {
         if (isSealed(plaintext)) return plaintext
         val payload = AtRestSecrets.cipher().encrypt(plaintext.toByteArray(Charsets.UTF_8))
         return AtRestSecrets.PREFIX + Base64.toBase64String(payload)
+    }
+
+    /**
+     * Migration must not fail the config read or delete plaintext when the keystore
+     * cannot encrypt. Null means "leave the existing value untouched".
+     */
+    fun trySeal(plaintext: String): String? {
+        return try {
+            seal(plaintext)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w(LOG_TAG, "at-rest seal skipped: ${e.javaClass.simpleName}")
+            null
+        }
     }
 
     fun open(stored: String): String {

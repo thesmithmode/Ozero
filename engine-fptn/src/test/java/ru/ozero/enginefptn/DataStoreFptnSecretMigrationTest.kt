@@ -13,7 +13,6 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
 import ru.ozero.commoncrypto.AtRestCipher
 import ru.ozero.commoncrypto.AtRestSecrets
@@ -104,10 +103,11 @@ class DataStoreFptnSecretMigrationTest {
         })
         val store = DataStoreFptnConfigStore(dataStore)
         try {
-            assertThrows<IllegalStateException> { store.config().first() }
+            assertEquals(PLAIN, store.config().first().token)
             val prefs = dataStore.data.first()
             assertEquals(PLAIN, prefs[stringPreferencesKey("fptn_token")])
             assertNull(prefs[stringPreferencesKey("fptn_token_enc")])
+            assertEquals(PLAIN, store.config().first().token)
         } finally {
             installDefaultAtRestCipher()
         }

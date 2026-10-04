@@ -138,7 +138,8 @@ class DataStoreWarpConfigStore(
             prefs.remove(KEY_PRIV)
             return
         }
-        prefs[KEY_PRIV_ENC] = PreferenceAtRest.seal(plain)
+        val sealed = PreferenceAtRest.trySeal(plain) ?: return
+        prefs[KEY_PRIV_ENC] = sealed
         prefs.remove(KEY_PRIV)
     }
 

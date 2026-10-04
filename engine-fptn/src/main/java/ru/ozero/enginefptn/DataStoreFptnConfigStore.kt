@@ -116,7 +116,8 @@ class DataStoreFptnConfigStore(
             prefs.remove(KEY_TOKEN)
             return
         }
-        prefs[KEY_TOKEN_ENC] = PreferenceAtRest.seal(plain)
+        val sealed = PreferenceAtRest.trySeal(plain) ?: return
+        prefs[KEY_TOKEN_ENC] = sealed
         prefs.remove(KEY_TOKEN)
     }
 
