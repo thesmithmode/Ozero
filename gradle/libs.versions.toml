@@ -21,7 +21,7 @@ hiltNavigationCompose = "1.3.0"
 datastore = "1.1.1"
 
 # DI
-hilt = "2.56.2"
+hilt = "2.60.1"
 
 # Persistence
 room = "2.6.1"
