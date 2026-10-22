@@ -32,7 +32,7 @@ Cada motor está aislado en un módulo Gradle dedicado y se conecta mediante la 
 - Interfaz `EnginePlugin` unificada — la aplicación no depende de los detalles del transporte
 - Sistema de plugins extensible
 - Kill-switch interno: el tráfico se bloquea ante un fallo del motor (fail-closed)
-- Actualizaciones de APK dentro de la aplicación verificadas con Ed25519
+- El código de actualización incluye verificación Ed25519; la publicación del archivo `.apk.sig` requerido aún no está configurada — consulta los [formatos de firma](docs/build.md#подписи-опубликованного-обновления) (en ruso)
 - Compilación reforzada: R8 minify + shrink, ofuscación de clases
 - UI por motor con sus propios ajustes
 

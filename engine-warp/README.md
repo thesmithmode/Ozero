@@ -23,7 +23,7 @@ EngineWarp
 
 Текущий engine-модуль не использует Maven `com.wireguard.android:tunnel` и не требует переключения DI с Stub на Real. Историческая сборка отдельного AmneziaWG AAR не описывает активный runtime.
 
-`libam-go` загружается только в `:engine_warp`, отдельно от Go runtime URnetwork/sing-box. Правила загрузки и AWG defaults — [AGENTS.md](AGENTS.md).
+`libam-go` загружается только в `:engine_warp`, отдельно от Go runtime URnetwork/sing-box. См. [общие правила загрузки](../AGENTS.md) и [инварианты WARP и AWG defaults](AGENTS.md).
 
 ## Конфигурация
 
