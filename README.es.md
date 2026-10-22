@@ -22,6 +22,7 @@ Cliente VPN open-source para Android con soporte para múltiples motores de tran
 | FPTN | HTTPS + SNI Reality | Ofuscación del handshake TLS imitando dominios populares |
 | URnetwork | mesh P2P | Anonimización mediante una red peer de proveedores |
 | MasterDNS | DNS sobre UDP | Fallback de emergencia, desplegado en tu propio VPS en un clic |
+| sing-box | protocolos y transportes de libbox | Perfiles, suscripciones, selección automática y cadenas |
 
 Cada motor está aislado en un módulo Gradle dedicado y se conecta mediante la interfaz `EnginePlugin`.
 
@@ -31,19 +32,27 @@ Cada motor está aislado en un módulo Gradle dedicado y se conecta mediante la 
 - Interfaz `EnginePlugin` unificada — la aplicación no depende de los detalles del transporte
 - Sistema de plugins extensible
 - Kill-switch interno: el tráfico se bloquea ante un fallo del motor (fail-closed)
-- Suscripciones de servidores verificadas con Ed25519
+- Actualizaciones de APK dentro de la aplicación verificadas con Ed25519
 - Compilación reforzada: R8 minify + shrink, ofuscación de clases
 - UI por motor con sus propios ajustes
 
 ## Compilación
 
 ```bash
-git clone https://github.com/thesmithmode/Ozero.git
+git clone --branch dev https://github.com/thesmithmode/Ozero.git
 cd Ozero
-./gradlew assembleRelease
 ```
 
-La compilación de release requiere variables de entorno para la firma del APK y la clave pública de actualizaciones.
+Antes de compilar, prepara las bibliotecas nativas y los artefactos de los SDK. La compilación de release también requiere variables de firma del APK y una clave pública de actualizaciones. Consulta la [guía de compilación](docs/build.md) (en ruso); clonar el repositorio no prepara todos los motores.
+
+## Documentación
+
+- [Arquitectura y ciclo de vida](docs/architecture.md) (en ruso)
+- [Compilación y publicación de APK](docs/build.md) (en ruso)
+- Motores: [WARP](engine-warp/README.md), [URnetwork](engine-urnetwork/README.md), [FPTN](engine-fptn/README.md)
+- [Plan actual](PLAN.md) (en ruso)
+
+El desarrollo se integra en `dev`, aunque la rama predeterminada de GitHub es `main`. Un push a `main` inicia la publicación de un APK.
 
 ## Licencia
 

@@ -1,68 +1,28 @@
 # engine-urnetwork
 
-URnetwork P2P bandwidth-sharing engine (F7). Использует **два** Go-AAR:
+URnetwork реализован как `EngineUrnetwork` с `RealUrnetworkSdkBridge`. Production DI в [UrnetworkModule](../app/src/main/java/ru/ozero/app/di/UrnetworkModule.kt) использует реальный bridge.
 
-1. `URnetworkSdk.aar` — API-уровень (account, connect URL discovery, gateway
-   selection). Source: `github.com/urnetwork/sdk`. Build: `tools/build-urnetwork-aar.sh`.
-2. `userwireguard.aar` — tunnel-уровень (форк wireguard-go от org urnetwork).
-   Source: `github.com/urnetwork/userwireguard`. Build: `scripts/build_wireguard_android.sh`.
+## SDK и TUN
 
-Оба AAR кладутся в `engine-urnetwork/libs/` и подхватываются `fileTree(...)` в
-`build.gradle.kts`. Если папка пуста — fileTree резолвится в пустой набор и
-конфигурация не падает; Stub bridge остаётся активным.
+[UrnetworkSdkBridge](src/main/java/ru/ozero/engineurnetwork/UrnetworkSdkBridge.kt) разделяет `start(..., byClientJwt)`, `attachTun(tunFd)` и `stop()`. Bridge создаёт SDK device, подключает TUN через `Sdk.newIoLoop(device, tunFd, callback)` и управляет выбором локации и состоянием соединения.
 
-## Bridge layer
+Consumer VPN и relay имеют отдельные координаторы. `attachRelayTun()` не включает consumer connect автоматически. JWT bootstrap, device identity, локации и relay-настройки связываются в Hilt-модуле приложения.
 
-`UrnetworkSdkBridge` — контракт `start(walletAddress, apiUrl, connectUrl) →
-StartResult / stop() / isRunning()`.
+## Подготовка SDK
 
-Реализации:
+- SDK: `URnetworkSdk.aar`, Java package `com.bringyour.sdk`.
+- В engine-модуле SDK используется через `compileOnly`; runtime-зависимость упаковывает `app`.
+- [CI](../.github/workflows/ci.yml) и [release](../.github/workflows/release.yml) скачивают `urnetwork-sdk-*` asset в `engine-urnetwork/libs/` и удаляют дублирующие `go/*.class`.
+- [app/build.gradle.kts](../app/build.gradle.kts) использует `StripGoClassesFromAarTask`. Общие Go stubs подготавливаются вместе с libbox.
+- `userwireguard.aar` не является второй обязательной библиотекой текущего VPN pipeline. Наличие исторического скрипта его сборки не меняет production DI.
+- Отсутствующий SDK не переключает production на заглушку; его нужно подготовить до компиляции модулей, использующих SDK types.
 
-- `StubUrnetworkSdkBridge` — default DI binding (`UrnetworkModule.provideUrnetworkSdkBridge`).
-  `start()` возвращает `Failed("URnetwork SDK AAR not yet built ...")`.
-- `RealUrnetworkSdkBridge` — TBD когда оба AAR доступны. Должен:
-  - инициализировать `URnetworkSdk` (Java package `com.bringyour`),
-  - получить connect URL по walletAddress,
-  - построить inline INI config для userwireguard,
-  - вызвать `userwgbind.StartUserWg(configIni)`.
+Самостоятельная сборка SDK описана в [tools/build-urnetwork-aar.sh](../tools/build-urnetwork-aar.sh). Скрипт по умолчанию использует upstream `main`; для повторяемой сборки выбирайте явную upstream-версию и сохраняйте manifest. Это отдельная операция от сборки APK.
 
-## Сборка AAR
+## Процессы и проверка
 
-### URnetwork SDK
+URnetwork использует Go runtime в основном процессе. WARP загружает свой Go backend в `:engine_warp`; их нельзя переносить в один процесс без пересмотра native isolation.
 
-```
-RUNNER_TEMP=/tmp/urnetwork bash tools/build-urnetwork-aar.sh
-```
+Изменения bridge проверяются на запуске, выборе локации, передаче TUN-пакетов, остановке, повторном старте и завершении `IoLoop`. Relay проверяется отдельно от consumer VPN.
 
-См. blockers в шапке скрипта (Go 1.25, GOEXPERIMENT=greenteagc, replace
-директивы для urnetwork/connect и urnetwork/glog).
-
-### userwireguard tunnel
-
-```
-bash scripts/build_wireguard_android.sh
-```
-
-Идемпотентен — пропускает работу если `userwireguard.aar` существует и SHA в
-`userwireguard.aar.sha256` совпадает (иначе пересобирает). Force: `FORCE_REBUILD=1`.
-
-CI: `binaries.yml` workflow_dispatch с input `artifact: userwireguard` собирает
-AAR в Docker (Go + gomobile + NDK) и публикует prerelease с тегом
-`userwireguard-<sha8>`.
-
-## Switch Stub → Real
-
-В `app/src/main/java/ru/ozero/app/di/UrnetworkModule.kt`:
-
-1. Убедиться что оба AAR лежат в `engine-urnetwork/libs/`.
-2. Реализовать `RealUrnetworkSdkBridge(context)` (TBD).
-3. Удалить `provideUrnetworkSdkBridge()` со `StubUrnetworkSdkBridge()`.
-4. Раскомментировать соседний блок с `RealUrnetworkSdkBridge(context)`.
-
-## Sanity-check артефактов
-
-```
-ls -lh engine-urnetwork/libs/
-cat engine-urnetwork/libs/userwireguard.manifest.txt
-cat engine-urnetwork/libs/manifest.txt
-```
+Общий порядок подготовки артефактов — [docs/build.md](../docs/build.md).

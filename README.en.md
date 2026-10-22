@@ -22,6 +22,7 @@ Open-source Android VPN client supporting multiple transport engines and traffic
 | FPTN | HTTPS + SNI Reality | TLS handshake obfuscation mimicking popular domains |
 | URnetwork | P2P mesh | Anonymisation through a peer provider network |
 | MasterDNS | DNS-over-UDP | Emergency fallback, deployed on your own VPS in one click |
+| sing-box | libbox protocols and transports | Profiles, subscriptions, automatic selection and chains |
 
 Each engine is isolated in a dedicated Gradle module and plugged in through the `EnginePlugin` interface.
 
@@ -31,19 +32,27 @@ Each engine is isolated in a dedicated Gradle module and plugged in through the 
 - Unified `EnginePlugin` interface — the app does not depend on transport internals
 - Extensible plugin system
 - Internal kill-switch: traffic is blocked on engine failure (fail-closed)
-- Server subscriptions verified with Ed25519
+- In-app APK updates verified with Ed25519
 - Build hardening: R8 minify + shrink, class obfuscation
 - Per-engine UI with settings, no shared configuration screen
 
 ## Build
 
 ```bash
-git clone https://github.com/thesmithmode/Ozero.git
+git clone --branch dev https://github.com/thesmithmode/Ozero.git
 cd Ozero
-./gradlew assembleRelease
 ```
 
-The release build requires environment variables for APK signing and the update public key. Details — `.claude/Контекст/Architect.md`.
+Prepare the native libraries and SDK artifacts before building. Release builds also require APK signing variables and an update public key. See the [build guide](docs/build.md) (Russian); cloning alone does not prepare every engine.
+
+## Documentation
+
+- [Architecture and engine lifecycle](docs/architecture.md) (Russian)
+- [Builds, native artifacts and APK releases](docs/build.md) (Russian)
+- Engines: [WARP](engine-warp/README.md), [URnetwork](engine-urnetwork/README.md), [FPTN](engine-fptn/README.md)
+- [Current plan](PLAN.md) (Russian)
+
+Development targets `dev`. GitHub opens `main` by default; target development changes at `dev`. A push to `main` triggers an APK release.
 
 ## License
 
