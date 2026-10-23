@@ -398,18 +398,30 @@ class FptnEngine(
         deadlineMs: Long,
     ): FptnAuthResult {
         val startupCandidates = fptnAutoAuthCandidates(candidates)
-        val authenticated = authenticateCandidates(
-            candidates = startupCandidates,
-            data = data,
-            bypassMethod = bypassMethod,
-            sniDomain = sniDomain,
-            deadlineMs = deadlineMs,
-            perCandidateMaxTimeoutS = AUTO_AUTH_CANDIDATE_TIMEOUT_S,
-        )
-        if (authenticated is FptnAuthResult.Failure) {
-            PersistentLoggers.error(TAG, "authenticate: ${authenticated.reason}")
+        val failures = mutableListOf<String>()
+        repeat(AUTO_AUTH_MAX_ATTEMPTS) {
+            currentCoroutineContext().ensureActive()
+            if (System.currentTimeMillis() >= deadlineMs) {
+                return FptnAuthResult.Failure(startupFptnFailureReason(failures, startupCandidates.size))
+            }
+            when (
+                val result = authenticateCandidates(
+                    candidates = startupCandidates,
+                    data = data,
+                    bypassMethod = bypassMethod,
+                    sniDomain = sniDomain,
+                    deadlineMs = deadlineMs,
+                    perCandidateMaxTimeoutS = AUTO_AUTH_CANDIDATE_TIMEOUT_S,
+                )
+            ) {
+                is FptnAuthResult.Success -> return result
+                is FptnAuthResult.Failure -> {
+                    if (result.reason == FPTN_TOKEN_REJECTED) return result
+                    failures += result.reason.removePrefix("$FPTN_ALL_CANDIDATES_FAILED: ")
+                }
+            }
         }
-        return authenticated
+        return FptnAuthResult.Failure(startupFptnFailureReason(failures, startupCandidates.size))
     }
 
     private suspend fun authenticateManualSelection(
@@ -658,12 +670,12 @@ class FptnEngine(
         private const val TAG = "FptnEngine"
         private const val API_LOGIN_PATH = "/api/v1/login"
         internal const val AUTH_TIMEOUT_S = 15
-        internal const val AUTO_AUTH_CANDIDATE_TIMEOUT_S = 5
-        internal const val AUTO_AUTH_PARALLELISM = 4
-        internal const val AUTO_AUTH_MAX_CANDIDATES = 4
+        internal const val AUTO_AUTH_CANDIDATE_TIMEOUT_S = 10
+        internal const val AUTO_AUTH_PARALLELISM = 16
+        internal const val AUTO_AUTH_MAX_ATTEMPTS = 2
         internal const val MANUAL_AUTH_MAX_ATTEMPTS = 2
         internal const val MANUAL_STARTUP_AUTH_BUDGET_MS = 20_000L
-        internal const val AUTO_STARTUP_AUTH_BUDGET_MS = 5_000L
+        internal const val AUTO_STARTUP_AUTH_BUDGET_MS = 25_000L
         private const val READY_TIMEOUT_MS = 30_000L
         private const val READY_POLL_MS = 300L
         private const val PROBE_CONNECT_TIMEOUT_MS = 3_000
@@ -746,7 +758,7 @@ internal fun classifyFptnAuthFailure(
 }
 
 internal fun fptnAutoAuthCandidates(candidates: List<FptnServer>): List<FptnServer> =
-    candidates.take(FptnEngine.AUTO_AUTH_MAX_CANDIDATES)
+    candidates
 
 internal fun startupAuthBudgetMs(autoSelect: Boolean): Long =
     if (autoSelect) FptnEngine.AUTO_STARTUP_AUTH_BUDGET_MS else FptnEngine.MANUAL_STARTUP_AUTH_BUDGET_MS

@@ -4,14 +4,14 @@ FPTN реализует `EnginePlugin` и `TunFdAcceptor`. Production DI — [Fp
 
 ## Запуск
 
-1. `FptnToken` разбирает токен и список серверов.
+1. `FptnToken` разбирает `fptn:`/`fptnb:` и оба списка: `servers` и `censored_zone_servers`. Дополнительные серверы добавляются после обычных; полностью совпадающие записи объединяются.
 2. `FptnEngine.start()` выбирает кандидатов, выполняет HTTPS login и резолвит адрес выбранного сервера в IPv4.
 3. `attachTun()` создаёт native WebSocket, задаёт callback защиты сокета и подключает обмен пакетами с TUN.
 4. `awaitReady()` проверяет готовность WebSocket до объявления соединения готовым.
 
-Ручной режим работает только с явно выбранным сервером: до двух попыток в общем auth-бюджете 20 секунд. Auto использует первые четыре сервера токена, до четырёх параллельных auth-запросов и общий бюджет 5 секунд; возвращается первый успешный результат. Серверы после четвёртого сейчас автоматически не проверяются.
+Ручной режим работает только с явно выбранным сервером: до двух попыток в общем auth-бюджете 20 секунд. Auto проверяет все серверы токена, до 16 auth-запросов одновременно, с таймаутом запроса до 10 секунд и общим бюджетом 25 секунд; возвращается первый успешный результат. После неудачного прохода допускается один повтор в оставшемся бюджете. Отказ в доступе прекращает повторы.
 
-Readiness имеет отдельный бюджет 30 секунд. Таймаут ожидания runtime restart для FPTN — 55 секунд, чтобы покрывать ручную авторизацию и readiness. Эти значения определены в [FptnEngine](src/main/java/ru/ozero/enginefptn/FptnEngine.kt) и [RuntimeConfigRestartCoordinator](../app/src/main/java/ru/ozero/app/vpn/RuntimeConfigRestartCoordinator.kt).
+Readiness имеет отдельный бюджет 30 секунд. Таймаут ожидания runtime restart для FPTN — 60 секунд, чтобы покрывать авторизацию и readiness. Эти значения определены в [FptnEngine](src/main/java/ru/ozero/enginefptn/FptnEngine.kt) и [RuntimeConfigRestartCoordinator](../app/src/main/java/ru/ozero/app/vpn/RuntimeConfigRestartCoordinator.kt).
 
 ## Настройки
 
@@ -26,3 +26,7 @@ Kotlin-обвязки HTTPS/WebSocket используют `libfptn_native_lib.s
 Gradle-модуль не запускает CMake автоматически. Изменение C++ wrapper требует отдельной пересборки библиотеки и обновления lock; проверка checksum старого asset не подтверждает наличие нового native-кода. Подробности — [native source и готовая библиотека](../docs/build.md#native-source-и-готовая-библиотека).
 
 При проверке на Android нужны auth/readiness, трафик через TUN, смена сети, reconnect и повторный stop/start. Kotlin tests с fake native client не заменяют такую проверку.
+
+## Upstream transport
+
+Android wrappers и protocol library закреплены отдельно в `build_fptn.sh`. Protocol revision включает фоновую NTP-синхронизацию и TCP probe с таймаутом 1500 мс: первая TLS-операция не должна ждать недоступный NTP. Manifest сборки содержит обе ревизии. Workflow `FPTN transport` проверяет NTP-регрессию на настоящем protocol-коде с подставным медленным NTP, затем собирает Android native library и APK с этой библиотекой.
