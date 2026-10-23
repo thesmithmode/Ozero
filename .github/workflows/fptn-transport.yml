@@ -1,0 +1,53 @@
+name: FPTN transport
+
+on:
+  push:
+    branches:
+      - 'fix/fptn-upstream-auth-parity'
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'engine-fptn/**'
+      - 'build-tools/build_fptn.sh'
+      - '.github/workflows/fptn-transport.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  time-provider:
+    name: Authentication does not wait for NTP
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve protocol revision
+        id: protocol
+        shell: python
+        run: |
+          import os
+          import re
+          from pathlib import Path
+
+          source = Path("build-tools/build_fptn.sh").read_text()
+          match = re.search(r'^FPTN_PROTOCOL_COMMIT="([0-9a-f]{40})"$', source, re.M)
+          revision = match.group(1) if match else "1cd7e75e467e49d302384f551ae10de4817bbe54"
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"revision={revision}\n")
+      - name: Fetch pinned transport
+        env:
+          PROTOCOL_REVISION: ${{ steps.protocol.outputs.revision }}
+        run: |
+          git init "$RUNNER_TEMP/fptn-source"
+          git -C "$RUNNER_TEMP/fptn-source" remote add origin https://github.com/fptn-project/fptn.git
+          git -C "$RUNNER_TEMP/fptn-source" fetch --depth 1 origin "$PROTOCOL_REVISION"
+          git -C "$RUNNER_TEMP/fptn-source" checkout --detach FETCH_HEAD
+      - name: Verify startup with slow unavailable NTP
+        run: |
+          g++ -std=c++20 -pthread \
+            -Iengine-fptn/src/test/native/stubs \
+            -I"$RUNNER_TEMP/fptn-source/src" \
+            engine-fptn/src/test/native/time_provider_test.cpp \
+            "$RUNNER_TEMP/fptn-source/src/fptn-protocol-lib/time/time_provider.cpp" \
+            -o "$RUNNER_TEMP/fptn-time-provider-test"
+          "$RUNNER_TEMP/fptn-time-provider-test"
