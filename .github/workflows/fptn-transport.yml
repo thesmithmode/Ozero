@@ -11,6 +11,10 @@ on:
       - 'build-tools/build_fptn.sh'
       - '.github/workflows/fptn-transport.yml'
 
+concurrency:
+  group: fptn-transport-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

@@ -169,9 +169,10 @@ cp "$BUILD_DIR/cmake-build/libfptn_native_lib.so" "$OUT_DIR/libfptn_native_lib-$
 # ---------------------------------------------------------------------------
 {
     echo "# build_fptn manifest"
-    echo "source_repo=$FPTN_REPO"
-    echo "source_commit=$FPTN_COMMIT"
-    echo "protocol_source_commit=$FPTN_PROTOCOL_ACTUAL_COMMIT"
+    echo "source_repo=https://github.com/fptn-project/fptn.git"
+    echo "source_commit=$FPTN_PROTOCOL_ACTUAL_COMMIT"
+    echo "android_source_repo=$FPTN_REPO"
+    echo "android_source_commit=$FPTN_COMMIT"
     echo "camouflage_tls_repo=$CAMTLS_REPO"
     echo "camouflage_tls_commit=$CAMTLS_ACTUAL_COMMIT"
     echo "ndk=$(basename "$NDK_HOME")"
