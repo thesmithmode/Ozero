@@ -21,9 +21,9 @@ Runtime fingerprint учитывает токен, bypass method, SNI domain и 
 
 ## JNI и сборка
 
-Kotlin-обвязки HTTPS/WebSocket используют `libfptn_native_lib.so`. [build_fptn.sh](../build-tools/build_fptn.sh) собирает локальные JNI wrappers с закреплёнными upstream-исходниками. Release APK использует готовый asset по [binaries.lock.yaml](../build-tools/binaries.lock.yaml).
+Kotlin-обвязки HTTPS/WebSocket используют `libfptn_native_lib.so`. [build_fptn.sh](../build-tools/build_fptn.sh) собирает локальные JNI wrappers с закреплёнными upstream-исходниками. Release APK и workflow `FPTN transport` собирают библиотеку через общий action `build-fptn` из закреплённых исходников; Gradle download для FPTN в этих сборках отключён. Обычная локальная Gradle-сборка использует готовый asset по [binaries.lock.yaml](../build-tools/binaries.lock.yaml).
 
-Gradle-модуль не запускает CMake автоматически. Изменение C++ wrapper требует отдельной пересборки библиотеки и обновления lock; проверка checksum старого asset не подтверждает наличие нового native-кода. Подробности — [native source и готовая библиотека](../docs/build.md#native-source-и-готовая-библиотека).
+Gradle-модуль не запускает CMake автоматически. Изменение C++ wrapper требует пересборки библиотеки; проверка checksum старого asset не подтверждает наличие нового native-кода. Release workflow проверяет совпадение упакованной библиотеки с результатом текущей сборки. Подробности — [native source и готовая библиотека](../docs/build.md#native-source-и-готовая-библиотека).
 
 При проверке на Android нужны auth/readiness, трафик через TUN, смена сети, reconnect и повторный stop/start. Kotlin tests с fake native client не заменяют такую проверку.
 

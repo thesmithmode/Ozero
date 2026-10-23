@@ -10,6 +10,7 @@ on:
       - 'engine-fptn/**'
       - 'build-tools/build_fptn.sh'
       - '.github/workflows/fptn-transport.yml'
+      - '.github/actions/build-fptn/**'
 
 concurrency:
   group: fptn-transport-${{ github.head_ref || github.ref_name }}
@@ -63,20 +64,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - name: Build native toolchain
-        run: docker build -t ozero-fptn -f build-tools/Dockerfile.fptn build-tools/
-      - name: Build pinned transport
-        run: |
-          docker run --rm \
-            -v "$PWD:/src" \
-            -w /src \
-            -e REPO_ROOT=/src \
-            -e OUT_DIR=/src/out/fptn \
-            ozero-fptn \
-            bash build-tools/build_fptn.sh
-          sudo chown -R "$(id -u):$(id -g)" out engine-fptn/src/main/cpp/libs build
-          mkdir -p engine-fptn/src/main/jniLibs/arm64-v8a
-          cp out/fptn/libfptn_native_lib-arm64-v8a.so engine-fptn/src/main/jniLibs/arm64-v8a/libfptn_native_lib.so
+      - name: Build FPTN native transport
+        uses: ./.github/actions/build-fptn
       - uses: actions/upload-artifact@v4
         with:
           name: fptn-native
