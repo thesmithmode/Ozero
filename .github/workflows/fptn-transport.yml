@@ -11,6 +11,7 @@ on:
       - 'build-tools/build_fptn.sh'
       - '.github/workflows/fptn-transport.yml'
       - '.github/actions/build-fptn/**'
+      - '.github/actions/prepare-app-native/**'
 
 concurrency:
   group: fptn-transport-${{ github.head_ref || github.ref_name }}
@@ -58,7 +59,7 @@ jobs:
           "$RUNNER_TEMP/fptn-time-provider-test"
 
   android:
-    name: Build Android transport and APK
+    name: Build Android transport
     needs: time-provider
     runs-on: ubuntu-22.04
     timeout-minutes: 60
@@ -70,6 +71,21 @@ jobs:
         with:
           name: fptn-native
           path: out/fptn/
+  apk:
+    name: Package Android APK
+    needs: android
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: fptn-native
+          path: out/fptn
+      - name: Install rebuilt native library
+        run: |
+          mkdir -p engine-fptn/src/main/jniLibs/arm64-v8a
+          cp out/fptn/libfptn_native_lib-arm64-v8a.so engine-fptn/src/main/jniLibs/arm64-v8a/libfptn_native_lib.so
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -80,6 +96,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: true
+      - name: Prepare app native dependencies
+        uses: ./.github/actions/prepare-app-native
       - name: Assemble APK with the rebuilt native library
         run: ./gradlew :app:assembleDebug --stacktrace
       - name: Verify packaged library

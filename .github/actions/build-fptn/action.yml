@@ -5,10 +5,10 @@ runs:
   steps:
     - name: Restore pinned native library
       id: native-cache
-      uses: actions/cache@v6
+      uses: actions/cache/restore@v6
       with:
         path: out/fptn
-        key: fptn-native-${{ runner.os }}-${{ hashFiles('build-tools/Dockerfile.fptn', 'build-tools/build_fptn.sh', 'engine-fptn/src/main/cpp/**') }}
+        key: fptn-native-${{ runner.os }}-${{ hashFiles('build-tools/Dockerfile.fptn', 'build-tools/build_fptn.sh', 'engine-fptn/src/main/cpp/**', '.github/actions/build-fptn/action.yml') }}
     - name: Build native toolchain
       if: steps.native-cache.outputs.cache-hit != 'true'
       shell: bash
@@ -30,3 +30,9 @@ runs:
       run: |
         mkdir -p engine-fptn/src/main/jniLibs/arm64-v8a
         cp out/fptn/libfptn_native_lib-arm64-v8a.so engine-fptn/src/main/jniLibs/arm64-v8a/libfptn_native_lib.so
+    - name: Save pinned native library
+      if: steps.native-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: out/fptn
+        key: ${{ steps.native-cache.outputs.cache-primary-key }}
