@@ -1,0 +1,111 @@
+name: FPTN transport
+
+on:
+  push:
+    branches:
+      - 'fix/fptn-upstream-*'
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'engine-fptn/**'
+      - 'build-tools/build_fptn.sh'
+      - '.github/workflows/fptn-transport.yml'
+      - '.github/actions/build-fptn/**'
+      - '.github/actions/prepare-app-native/**'
+
+concurrency:
+  group: fptn-transport-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  time-provider:
+    name: Authentication does not wait for NTP
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve protocol revision
+        id: protocol
+        shell: python
+        run: |
+          import os
+          import re
+          from pathlib import Path
+
+          source = Path("build-tools/build_fptn.sh").read_text()
+          match = re.search(r'^FPTN_PROTOCOL_COMMIT="([0-9a-f]{40})"$', source, re.M)
+          revision = match.group(1) if match else "1cd7e75e467e49d302384f551ae10de4817bbe54"
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"revision={revision}\n")
+      - name: Fetch pinned transport
+        env:
+          PROTOCOL_REVISION: ${{ steps.protocol.outputs.revision }}
+        run: |
+          git init "$RUNNER_TEMP/fptn-source"
+          git -C "$RUNNER_TEMP/fptn-source" remote add origin https://github.com/fptn-project/fptn.git
+          git -C "$RUNNER_TEMP/fptn-source" fetch --depth 1 origin "$PROTOCOL_REVISION"
+          git -C "$RUNNER_TEMP/fptn-source" checkout --detach FETCH_HEAD
+      - name: Verify startup with slow unavailable NTP
+        run: |
+          g++ -std=c++20 -pthread \
+            -Iengine-fptn/src/test/native/stubs \
+            -I"$RUNNER_TEMP/fptn-source/src" \
+            engine-fptn/src/test/native/time_provider_test.cpp \
+            "$RUNNER_TEMP/fptn-source/src/fptn-protocol-lib/time/time_provider.cpp" \
+            -o "$RUNNER_TEMP/fptn-time-provider-test"
+          "$RUNNER_TEMP/fptn-time-provider-test"
+
+  android:
+    name: Build Android transport
+    needs: time-provider
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build FPTN native transport
+        uses: ./.github/actions/build-fptn
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fptn-native
+          path: out/fptn/
+  apk:
+    name: Package Android APK
+    needs: android
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: fptn-native
+          path: out/fptn
+      - name: Install rebuilt native library
+        run: |
+          mkdir -p engine-fptn/src/main/jniLibs/arm64-v8a
+          cp out/fptn/libfptn_native_lib-arm64-v8a.so engine-fptn/src/main/jniLibs/arm64-v8a/libfptn_native_lib.so
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+      - name: Prepare app native dependencies
+        uses: ./.github/actions/prepare-app-native
+      - name: Assemble APK with the rebuilt native library
+        run: ./gradlew :app:assembleDebug --stacktrace
+      - name: Verify packaged library
+        run: |
+          unzip -p app/build/outputs/apk/debug/app-debug.apk \
+            lib/arm64-v8a/libfptn_native_lib.so > out/fptn/packaged-libfptn_native_lib.so
+          cmp out/fptn/libfptn_native_lib-arm64-v8a.so out/fptn/packaged-libfptn_native_lib.so
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fptn-debug-apk
+          path: app/build/outputs/apk/debug/*.apk

@@ -2,6 +2,7 @@ package ru.ozero.enginefptn
 
 import android.util.Base64
 import org.brotli.dec.BrotliInputStream
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.InputStream
@@ -46,17 +47,13 @@ object FptnToken {
     private fun parseJson(json: String): FptnTokenData? {
         return try {
             val obj = JSONObject(json)
-            val serversArr = obj.optJSONArray("servers") ?: return null
-            val servers = (0 until serversArr.length()).map { i ->
-                val s = serversArr.getJSONObject(i)
-                FptnServer(
-                    name = s.getString("name"),
-                    host = s.getString("host"),
-                    port = s.getInt("port"),
-                    md5Fingerprint = s.optString("md5_fingerprint", ""),
-                    countryCode = s.optCountryCode(),
-                )
+            val regularServers = obj.getJSONArray("servers")
+            val censoredServers = if (obj.isNull("censored_zone_servers")) {
+                JSONArray()
+            } else {
+                obj.getJSONArray("censored_zone_servers")
             }
+            val servers = (parseServers(regularServers) + parseServers(censoredServers)).distinct()
             if (servers.isEmpty()) return null
             FptnTokenData(
                 version = obj.optInt("version", 1),
@@ -68,6 +65,18 @@ object FptnToken {
             null
         }
     }
+
+    private fun parseServers(servers: JSONArray): List<FptnServer> =
+        (0 until servers.length()).map { index ->
+            val server = servers.getJSONObject(index)
+            FptnServer(
+                name = server.getString("name"),
+                host = server.getString("host"),
+                port = server.getInt("port"),
+                md5Fingerprint = server.optString("md5_fingerprint", ""),
+                countryCode = server.optCountryCode(),
+            )
+        }
 
     private fun JSONObject.optNullableString(name: String): String? =
         if (has(name) && !isNull(name)) optString(name).takeIf { it.isNotBlank() } else null
