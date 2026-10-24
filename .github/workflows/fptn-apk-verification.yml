@@ -1,0 +1,65 @@
+name: FPTN APK verification
+
+on:
+  push:
+    branches: ['test/fptn-package-verification']
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify:
+    name: Verify APK with source-matched native artifact
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Verify native inputs match the compiled artifact
+        run: |
+          git diff --exit-code 3f3d92120499a62d12b8f59d6779841cb1ea02ad HEAD -- \
+            build-tools/Dockerfile.fptn build-tools/build_fptn.sh engine-fptn/src/main/cpp
+      - uses: actions/download-artifact@v4
+        with:
+          name: fptn-native
+          run-id: 40033291462
+          github-token: ${{ github.token }}
+          path: out/fptn
+      - name: Verify and install native artifact
+        run: |
+          echo '524d94583ff907cbc8c073bdfd2e8a17ac8b2d1a21a0526750813e4558f32209  out/fptn/libfptn_native_lib-arm64-v8a.so' | sha256sum -c -
+          mkdir -p engine-fptn/src/main/jniLibs/arm64-v8a
+          cp out/fptn/libfptn_native_lib-arm64-v8a.so engine-fptn/src/main/jniLibs/arm64-v8a/libfptn_native_lib.so
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+      - uses: ./.github/actions/prepare-app-native
+      - name: Verify FPTN tests and coverage
+        run: ./gradlew :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification --stacktrace
+      - name: Assemble APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+      - name: Verify packaged native artifact
+        run: |
+          unzip -p app/build/outputs/apk/debug/app-debug.apk \
+            lib/arm64-v8a/libfptn_native_lib.so > out/fptn/packaged-libfptn_native_lib.so
+          cmp out/fptn/libfptn_native_lib-arm64-v8a.so out/fptn/packaged-libfptn_native_lib.so
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fptn-verified-apk
+          path: app/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fptn-verified-tests
+          path: |
+            engine-fptn/build/test-results/
+            engine-fptn/build/reports/jacoco/
