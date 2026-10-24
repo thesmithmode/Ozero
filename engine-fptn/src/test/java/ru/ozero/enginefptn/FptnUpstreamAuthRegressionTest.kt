@@ -49,6 +49,23 @@ class FptnUpstreamAuthRegressionTest {
     }
 
     @Test
+    fun `auto selection keeps searching after an endpoint rejects credentials`() = runTest {
+        val https = SelectionHttpsClient { host, _, _ ->
+            if (host == "127.0.0.21") {
+                FptnNativeResponse(200, """{"access_token":"access"}""", "")
+            } else {
+                FptnNativeResponse(401, "", "unauthorized")
+            }
+        }
+        val engine = engine(https)
+
+        val result = engine.start(EngineConfig.Fptn(token = token(21)), Upstream.None)
+
+        assertIs<StartResult.Success>(result)
+        assertTrue("127.0.0.21" in https.createdHosts)
+    }
+
+    @Test
     fun `auto login allows the upstream ten second request window`() = runTest {
         val https = SelectionHttpsClient { _, timeoutSeconds, _ ->
             if (timeoutSeconds >= 10) {
