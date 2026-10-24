@@ -480,9 +480,6 @@ class FptnEngine(
                 failures = failures,
             )
             if (winner != null) return winner
-            if (FPTN_TOKEN_REJECTED in failures) {
-                return FptnAuthResult.Failure(FPTN_TOKEN_REJECTED)
-            }
         }
         return FptnAuthResult.Failure(startupFptnFailureReason(failures, candidates.size))
     }
