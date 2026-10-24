@@ -240,7 +240,7 @@ jobs:
           UPDATE_GITHUB_OWNER: ${{ github.repository_owner }}
           UPDATE_GITHUB_REPO: ${{ github.event.repository.name }}
           OZERO_VERSION_NAME: ${{ needs.resolve-version.outputs.tag }}
-        run: ./gradlew :app:assembleRelease -x :engine-fptn:downloadBinaries --stacktrace
+        run: ./gradlew :app:assembleRelease --stacktrace
 
       - name: Assert APK versionCode matches gradle.properties
         run: |

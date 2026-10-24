@@ -3,10 +3,18 @@ description: Build the pinned protocol library and install it for Android packag
 runs:
   using: composite
   steps:
+    - name: Restore pinned native library
+      id: native-cache
+      uses: actions/cache@v6
+      with:
+        path: out/fptn
+        key: fptn-native-${{ runner.os }}-${{ hashFiles('build-tools/Dockerfile.fptn', 'build-tools/build_fptn.sh', 'engine-fptn/src/main/cpp/**') }}
     - name: Build native toolchain
+      if: steps.native-cache.outputs.cache-hit != 'true'
       shell: bash
       run: docker build -t ozero-fptn -f build-tools/Dockerfile.fptn build-tools/
     - name: Build pinned transport
+      if: steps.native-cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         docker run --rm \
@@ -17,5 +25,8 @@ runs:
           ozero-fptn \
           bash build-tools/build_fptn.sh
         sudo chown -R "$(id -u):$(id -g)" out engine-fptn/src/main/cpp/libs build
+    - name: Install pinned native library
+      shell: bash
+      run: |
         mkdir -p engine-fptn/src/main/jniLibs/arm64-v8a
         cp out/fptn/libfptn_native_lib-arm64-v8a.so engine-fptn/src/main/jniLibs/arm64-v8a/libfptn_native_lib.so

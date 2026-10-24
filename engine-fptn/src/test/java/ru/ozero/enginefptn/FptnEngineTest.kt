@@ -1424,7 +1424,7 @@ class FptnEngineTest {
         assertEquals(2, FptnEngine.MANUAL_AUTH_MAX_ATTEMPTS)
         assertEquals(2, FptnEngine.AUTO_AUTH_MAX_ATTEMPTS)
         assertEquals(15, FptnEngine.AUTH_TIMEOUT_S)
-        assertEquals(5, FptnEngine.AUTO_AUTH_CANDIDATE_TIMEOUT_S)
+        assertEquals(10, FptnEngine.AUTO_AUTH_CANDIDATE_TIMEOUT_S)
     }
 
     @Test

@@ -81,7 +81,7 @@ jobs:
         with:
           cache-read-only: true
       - name: Assemble APK with the rebuilt native library
-        run: ./gradlew :app:assembleDebug -x :engine-fptn:downloadBinaries --stacktrace
+        run: ./gradlew :app:assembleDebug --stacktrace
       - name: Verify packaged library
         run: |
           unzip -p app/build/outputs/apk/debug/app-debug.apk \
