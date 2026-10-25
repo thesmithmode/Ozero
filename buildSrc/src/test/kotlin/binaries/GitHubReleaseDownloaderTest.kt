@@ -25,10 +25,11 @@ class GitHubReleaseDownloaderTest {
             0
         }
 
-        assertThat(downloader.download(
+        val downloaded = downloader.download(
             "https://github.com/example/project/releases/download/v1.0/asset.so",
             target,
-        )).isTrue()
+        )
+        assertThat(downloaded).isTrue()
         assertThat(Files.readString(target)).isEqualTo("binary")
     }
 
@@ -56,10 +57,11 @@ class GitHubReleaseDownloaderTest {
     fun `missing or blank token keeps the ordinary downloader path`() {
         for (token in listOf(null, "", "   ")) {
             val downloader = GitHubReleaseDownloader(token) { _, _ -> error("Must not execute gh") }
-            assertThat(downloader.download(
+            val downloaded = downloader.download(
                 "https://github.com/example/project/releases/download/v1.0/asset.so",
                 tmp.resolve("asset.so"),
-            )).isFalse()
+            )
+            assertThat(downloaded).isFalse()
         }
     }
 
