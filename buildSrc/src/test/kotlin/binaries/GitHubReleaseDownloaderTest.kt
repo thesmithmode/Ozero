@@ -78,4 +78,28 @@ class GitHubReleaseDownloaderTest {
             .hasMessageContaining("contents:read")
             .hasMessageNotContaining("test-secret")
     }
+
+    @Test
+    fun `process runner passes credentials through environment`() {
+        val code = runGitHubDownload(
+            listOf("sh", "-c", "test \"\$GH_TOKEN\" = test-secret"),
+            "test-secret",
+        )
+
+        assertThat(code).isZero()
+    }
+
+    @Test
+    fun `process runner preserves failed exit status`() {
+        assertThat(runGitHubDownload(listOf("sh", "-c", "exit 7"), "test-secret")).isEqualTo(7)
+    }
+
+    @Test
+    fun `process runner terminates a timed out download`() {
+        assertThatThrownBy {
+            runGitHubDownload(listOf("sleep", "5"), "test-secret", timeoutMs = 1)
+        }.isInstanceOf(BinaryDownloadException::class.java)
+            .hasMessageContaining("timed out")
+            .hasMessageNotContaining("test-secret")
+    }
 }
