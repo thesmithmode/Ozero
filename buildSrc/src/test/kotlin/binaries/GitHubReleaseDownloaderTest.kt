@@ -102,4 +102,19 @@ class GitHubReleaseDownloaderTest {
             .hasMessageContaining("timed out")
             .hasMessageNotContaining("test-secret")
     }
+
+    @Test
+    fun `token selection prefers GH token and falls back for absent or blank values`() {
+        val cases = listOf(
+            mapOf("GH_TOKEN" to "primary", "GITHUB_TOKEN" to "secondary") to "primary",
+            mapOf("GITHUB_TOKEN" to "secondary") to "secondary",
+            mapOf("GH_TOKEN" to "", "GITHUB_TOKEN" to "secondary") to "secondary",
+            mapOf("GH_TOKEN" to "   ", "GITHUB_TOKEN" to "secondary") to "secondary",
+            emptyMap<String, String>() to null,
+        )
+
+        for ((environment, expected) in cases) {
+            assertThat(gitHubDownloadToken(environment::get)).isEqualTo(expected)
+        }
+    }
 }
