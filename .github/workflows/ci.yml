@@ -184,7 +184,6 @@ jobs:
       - name: Upload Sing-box test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-singbox
@@ -358,7 +357,6 @@ jobs:
       - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-coverage-gate
@@ -371,7 +369,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-coverage-gate
@@ -418,7 +415,6 @@ jobs:
       - name: Upload buildSrc test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-buildsrc
@@ -428,7 +424,6 @@ jobs:
       - name: Upload buildSrc coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-buildsrc
@@ -573,7 +568,6 @@ jobs:
       - name: Upload debug APK
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: debug-apk
@@ -696,7 +690,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-app
@@ -706,7 +699,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-app
@@ -756,7 +748,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-common-vpn
@@ -766,7 +757,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-common-vpn
@@ -816,7 +806,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-engine-warp
@@ -826,7 +815,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-engine-warp
@@ -914,7 +902,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-engine-urnetwork
@@ -924,7 +911,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-engine-urnetwork
@@ -974,7 +960,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-engine-byedpi
@@ -984,7 +969,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-engine-byedpi
@@ -1034,7 +1018,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-engine-fptn
@@ -1044,7 +1027,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-engine-fptn
@@ -1162,7 +1144,6 @@ jobs:
       - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-core-modules
@@ -1178,7 +1159,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-core-modules
@@ -1234,7 +1214,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-engine-masterdns
@@ -1244,7 +1223,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-engine-masterdns
@@ -1329,7 +1307,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-engine-singbox
@@ -1339,7 +1316,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-engine-singbox
@@ -1423,7 +1399,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-singbox-process
@@ -1433,7 +1408,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-singbox-process
@@ -1517,7 +1491,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-singbox-core
@@ -1527,7 +1500,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-singbox-core
@@ -1611,7 +1583,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-singbox-fmt
@@ -1621,7 +1592,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-singbox-fmt
@@ -1705,7 +1675,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-singbox-config
@@ -1715,7 +1684,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-singbox-config
@@ -1799,7 +1767,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-singbox-room
@@ -1809,7 +1776,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-singbox-room
@@ -1893,7 +1859,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-singbox-subscription
@@ -1903,7 +1868,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-singbox-subscription
@@ -1947,7 +1911,6 @@ jobs:
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: jacoco-shared-warp-settings
@@ -1957,7 +1920,6 @@ jobs:
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
-
         continue-on-error: true
         with:
           name: test-reports-shared-warp-settings

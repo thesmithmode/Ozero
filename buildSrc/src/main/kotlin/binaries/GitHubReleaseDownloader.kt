@@ -5,17 +5,16 @@ import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
 class GitHubReleaseDownloader(
-    private val token: String? = System.getenv("GH_TOKEN")?.takeIf { it.isNotBlank() }
-        ?: System.getenv("GITHUB_TOKEN"),
+    private val token: String? = System.getenv("GH_TOKEN") ?: System.getenv("GITHUB_TOKEN"),
     private val runDownload: (List<String>, String) -> Int = ::runGitHubDownload,
 ) {
     fun download(url: String, destination: Path): Boolean {
         if (token.isNullOrBlank()) return false
         val uri = URI.create(url)
-        if (
-            uri.scheme != "https" || uri.host != "github.com" || uri.port != -1 ||
-            uri.rawUserInfo != null || uri.rawQuery != null || uri.rawFragment != null
-        ) return false
+        val secureOrigin = uri.scheme == "https" && uri.host == "github.com"
+        val noAuthorityOverrides = uri.port == -1 && uri.rawUserInfo == null
+        val plainAssetPath = uri.rawQuery == null && uri.rawFragment == null
+        if (!secureOrigin || !noAuthorityOverrides || !plainAssetPath) return false
         val match = RELEASE_PATH.matchEntire(uri.path) ?: return false
         val (owner, repo, tag, asset) = match.destructured
         val args = listOf(
