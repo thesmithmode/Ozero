@@ -20,6 +20,8 @@ jobs:
   resolve-version:
     name: Resolve version tag
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       tag: ${{ steps.ver.outputs.tag }}
       version: ${{ steps.ver.outputs.version }}
@@ -479,6 +481,7 @@ jobs:
         with:
           tag_name: ${{ needs.resolve-version.outputs.tag }}
           name: ${{ needs.resolve-version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           prerelease: ${{ contains(needs.resolve-version.outputs.tag, '-') }}
           generate_release_notes: true
           fail_on_unmatched_files: true

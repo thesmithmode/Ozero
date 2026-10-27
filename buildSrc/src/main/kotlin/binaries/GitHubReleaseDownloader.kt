@@ -6,7 +6,7 @@ import java.util.concurrent.TimeUnit
 
 class GitHubReleaseDownloader(
     private val token: String? = System.getenv("GH_TOKEN") ?: System.getenv("GITHUB_TOKEN"),
-    private val runDownload: (List<String>, String) -> Int = ::runGitHubDownload,
+    private val runDownload: (List<String>, String) -> Int = { args, token -> runGitHubDownload(args, token) },
 ) {
     fun download(url: String, destination: Path): Boolean {
         if (token.isNullOrBlank()) return false
@@ -36,13 +36,17 @@ class GitHubReleaseDownloader(
     }
 }
 
-private fun runGitHubDownload(args: List<String>, token: String): Int {
+internal fun runGitHubDownload(
+    args: List<String>,
+    token: String,
+    timeoutMs: Long = TimeUnit.MINUTES.toMillis(5),
+): Int {
     val process = ProcessBuilder(args).apply {
         environment()["GH_TOKEN"] = token
         redirectOutput(ProcessBuilder.Redirect.DISCARD)
         redirectError(ProcessBuilder.Redirect.DISCARD)
     }.start()
-    if (!process.waitFor(5, TimeUnit.MINUTES)) {
+    if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
         process.destroyForcibly()
         throw BinaryDownloadException("Authenticated GitHub asset download timed out")
     }
