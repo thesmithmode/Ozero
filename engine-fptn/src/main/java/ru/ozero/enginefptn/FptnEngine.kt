@@ -49,6 +49,7 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicLong
 
 class FptnEngine(
     private val configStore: FptnConfigStore,
@@ -58,6 +59,7 @@ class FptnEngine(
     private val tunIo: FptnTunIo = AndroidFptnTunIo,
 ) : EnginePlugin, TunFdAcceptor {
 
+    private val authRequestSequence = AtomicLong()
     private val _stats = MutableStateFlow(EngineStats())
     private var tunScope: CoroutineScope? = null
     private var _nativeHandle: Long = 0L
@@ -150,11 +152,6 @@ class FptnEngine(
             "start: candidate selected tokenServers=${tokenData.servers.size} " +
                 "candidates=${candidates.size} autoSelect=${fptn.autoSelect}",
         )
-        Log.d(
-            TAG,
-            "start server=${firstServer.name}:${firstServer.port} bypass=${fptn.bypassMethod} " +
-                "n=${tokenData.servers.size} candidates=${candidates.size}",
-        )
 
         wsClient.loadOnce()
         if (!wsClient.libraryLoaded) {
@@ -164,6 +161,12 @@ class FptnEngine(
             )
         }
 
+        val authStartedNs = System.nanoTime()
+        PersistentLoggers.debug(
+            TAG,
+            "phase=auth_startup result=started candidates=${candidates.size} " +
+                "budgetMs=${startupAuthBudgetMs(fptn.autoSelect)} autoSelect=${fptn.autoSelect}",
+        )
         val authResult = withContext(Dispatchers.IO) {
             val deadlineMs = System.currentTimeMillis() + startupAuthBudgetMs(fptn.autoSelect)
             withTimeoutOrNull(startupAuthBudgetMs(fptn.autoSelect)) {
@@ -189,7 +192,15 @@ class FptnEngine(
 
         val authenticated = when (authResult) {
             is FptnAuthResult.Success -> authResult.server
-            is FptnAuthResult.Failure -> return StartResult.Failure(authResult.reason)
+            is FptnAuthResult.Failure -> {
+                PersistentLoggers.error(
+                    TAG,
+                    "phase=auth_startup result=failed reason=${authResult.reason} " +
+                        "elapsedMs=${(System.nanoTime() - authStartedNs) / 1_000_000L} " +
+                        "budgetMs=${startupAuthBudgetMs(fptn.autoSelect)}",
+                )
+                return StartResult.Failure(authResult.reason)
+            }
         }
 
         _currentServer = authenticated.server
@@ -198,7 +209,10 @@ class FptnEngine(
         _bypassMethod = fptn.bypassMethod
         _sniDomain = fptn.sniDomain
 
-        Log.d(TAG, "start: authenticated, ready to attach TUN")
+        PersistentLoggers.debug(
+            TAG,
+            "phase=auth_startup result=success elapsedMs=${(System.nanoTime() - authStartedNs) / 1_000_000L}",
+        )
         return StartResult.Success(socksPort = 0)
     }
 
@@ -207,7 +221,7 @@ class FptnEngine(
         val serverIp = _currentServerIp ?: return TunAttachResult.Failure("No resolved server IP")
         val token = _accessToken ?: return TunAttachResult.Failure("No access token")
 
-        Log.d(TAG, "attachTun: fd=$tunFd server=${server.name}")
+        Log.d(TAG, "attachTun: opening TUN")
 
         val tun = tunIo.open(tunFd)
         val fos = tun.output
@@ -398,18 +412,30 @@ class FptnEngine(
         deadlineMs: Long,
     ): FptnAuthResult {
         val startupCandidates = fptnAutoAuthCandidates(candidates)
-        val authenticated = authenticateCandidates(
-            candidates = startupCandidates,
-            data = data,
-            bypassMethod = bypassMethod,
-            sniDomain = sniDomain,
-            deadlineMs = deadlineMs,
-            perCandidateMaxTimeoutS = AUTO_AUTH_CANDIDATE_TIMEOUT_S,
-        )
-        if (authenticated is FptnAuthResult.Failure) {
-            PersistentLoggers.error(TAG, "authenticate: ${authenticated.reason}")
+        val failures = mutableListOf<String>()
+        repeat(AUTO_AUTH_MAX_ATTEMPTS) {
+            currentCoroutineContext().ensureActive()
+            if (System.currentTimeMillis() >= deadlineMs) {
+                return FptnAuthResult.Failure(startupFptnFailureReason(failures, startupCandidates.size))
+            }
+            when (
+                val result = authenticateCandidates(
+                    candidates = startupCandidates,
+                    data = data,
+                    bypassMethod = bypassMethod,
+                    sniDomain = sniDomain,
+                    deadlineMs = deadlineMs,
+                    perCandidateMaxTimeoutS = AUTO_AUTH_CANDIDATE_TIMEOUT_S,
+                )
+            ) {
+                is FptnAuthResult.Success -> return result
+                is FptnAuthResult.Failure -> {
+                    if (result.reason == FPTN_TOKEN_REJECTED) return result
+                    failures += result.reason.removePrefix("$FPTN_ALL_CANDIDATES_FAILED: ")
+                }
+            }
         }
-        return authenticated
+        return FptnAuthResult.Failure(startupFptnFailureReason(failures, startupCandidates.size))
     }
 
     private suspend fun authenticateManualSelection(
@@ -468,9 +494,6 @@ class FptnEngine(
                 failures = failures,
             )
             if (winner != null) return winner
-            if (FPTN_TOKEN_REJECTED in failures) {
-                return FptnAuthResult.Failure(FPTN_TOKEN_REJECTED)
-            }
         }
         return FptnAuthResult.Failure(startupFptnFailureReason(failures, candidates.size))
     }
@@ -567,6 +590,24 @@ class FptnEngine(
         timeoutS: Int,
     ): ServerAuthResult {
         currentCoroutineContext().ensureActive()
+        val request = authRequestSequence.incrementAndGet()
+        val candidate = data.servers.indexOf(server) + 1
+        val startedNs = System.nanoTime()
+        fun diagnose(phase: String, response: FptnNativeResponse? = null, error: String? = null) {
+            val status = response?.let {
+                if (it.code >= 600) "nativeCode=${it.code}" else "httpStatus=${it.code}"
+            } ?: "status=exception"
+            PersistentLoggers.debug(
+                TAG,
+                "authenticate: request=$request candidate=$candidate phase=$phase $status " +
+                    "category=${fptnAuthDiagnosticCategory(response, error ?: response?.error)} " +
+                    "elapsedMs=${(System.nanoTime() - startedNs) / 1_000_000L} timeoutS=$timeoutS",
+            )
+        }
+        PersistentLoggers.debug(
+            TAG,
+            "authenticate: request=$request candidate=$candidate phase=native_create result=started",
+        )
         val handle = try {
             httpsClient.nativeCreate(
                 host = server.host,
@@ -578,16 +619,18 @@ class FptnEngine(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            val reason = classifyFptnAuthFailure(error = e.message, exceptionName = e.javaClass.simpleName)
-            PersistentLoggers.error(
-                TAG,
-                "authenticate: create exception ${e.javaClass.simpleName} reason=$reason",
+            diagnose("native_create", error = e.message)
+            return ServerAuthResult.Failure(
+                classifyFptnAuthFailure(error = e.message, exceptionName = e.javaClass.simpleName),
             )
-            return ServerAuthResult.Failure(reason)
         }
         return try {
             currentCoroutineContext().ensureActive()
-            PersistentLoggers.debug(TAG, "authenticate: POST $API_LOGIN_PATH timeout=${timeoutS}s")
+            PersistentLoggers.debug(
+                TAG,
+                "authenticate: POST $API_LOGIN_PATH timeout=${timeoutS}s " +
+                    "request=$request candidate=$candidate phase=login result=started",
+            )
             val body = JSONObject().apply {
                 put("username", data.username)
                 put("password", data.password)
@@ -596,29 +639,26 @@ class FptnEngine(
             currentCoroutineContext().ensureActive()
             if (resp.code == 200) {
                 val token = JSONObject(resp.body).optString("access_token").takeIf { it.isNotBlank() }
-                if (token != null) {
-                    PersistentLoggers.debug(TAG, "authenticate: success")
-                } else {
-                    PersistentLoggers.error(TAG, "authenticate: 200 but no access_token in response")
-                }
+                PersistentLoggers.debug(
+                    TAG,
+                    "authenticate: request=$request candidate=$candidate phase=login " +
+                        "result=${if (token != null) "success" else "missing_access_token"} " +
+                        "httpStatus=200 elapsedMs=${(System.nanoTime() - startedNs) / 1_000_000L}",
+                )
                 token?.let { ServerAuthResult.Success(it) } ?: ServerAuthResult.Failure(FPTN_API_ERROR)
             } else {
+                diagnose("login", resp)
                 val reason = classifyFptnAuthFailure(resp)
-                PersistentLoggers.error(
-                    TAG,
-                    "authenticate: HTTP ${resp.code} reason=$reason",
-                )
                 ServerAuthResult.Failure(reason, terminal = reason == FPTN_TOKEN_REJECTED)
             }
         } catch (e: CancellationException) {
+            PersistentLoggers.debug(TAG, "authenticate: request=$request phase=login result=cancelled")
             throw e
         } catch (e: Exception) {
-            val reason = classifyFptnAuthFailure(error = e.message, exceptionName = e.javaClass.simpleName)
-            PersistentLoggers.error(
-                TAG,
-                "authenticate: exception ${e.javaClass.simpleName} reason=$reason",
+            diagnose("login", error = e.message)
+            ServerAuthResult.Failure(
+                classifyFptnAuthFailure(error = e.message, exceptionName = e.javaClass.simpleName),
             )
-            ServerAuthResult.Failure(reason)
         } finally {
             httpsClient.nativeDestroy(handle)
         }
@@ -658,12 +698,12 @@ class FptnEngine(
         private const val TAG = "FptnEngine"
         private const val API_LOGIN_PATH = "/api/v1/login"
         internal const val AUTH_TIMEOUT_S = 15
-        internal const val AUTO_AUTH_CANDIDATE_TIMEOUT_S = 5
-        internal const val AUTO_AUTH_PARALLELISM = 4
-        internal const val AUTO_AUTH_MAX_CANDIDATES = 4
+        internal const val AUTO_AUTH_CANDIDATE_TIMEOUT_S = 10
+        internal const val AUTO_AUTH_PARALLELISM = 16
+        internal const val AUTO_AUTH_MAX_ATTEMPTS = 2
         internal const val MANUAL_AUTH_MAX_ATTEMPTS = 2
         internal const val MANUAL_STARTUP_AUTH_BUDGET_MS = 20_000L
-        internal const val AUTO_STARTUP_AUTH_BUDGET_MS = 5_000L
+        internal const val AUTO_STARTUP_AUTH_BUDGET_MS = 25_000L
         private const val READY_TIMEOUT_MS = 30_000L
         private const val READY_POLL_MS = 300L
         private const val PROBE_CONNECT_TIMEOUT_MS = 3_000
@@ -746,7 +786,7 @@ internal fun classifyFptnAuthFailure(
 }
 
 internal fun fptnAutoAuthCandidates(candidates: List<FptnServer>): List<FptnServer> =
-    candidates.take(FptnEngine.AUTO_AUTH_MAX_CANDIDATES)
+    candidates
 
 internal fun startupAuthBudgetMs(autoSelect: Boolean): Long =
     if (autoSelect) FptnEngine.AUTO_STARTUP_AUTH_BUDGET_MS else FptnEngine.MANUAL_STARTUP_AUTH_BUDGET_MS
@@ -796,3 +836,21 @@ private fun String?.normalizedCountryCode(): String? =
 
 private fun String.displayCountryName(displayLocale: Locale): String? =
     Locale("", this).getDisplayCountry(displayLocale).takeIf { it.isNotBlank() && it != this }
+
+internal fun fptnAuthDiagnosticCategory(response: FptnNativeResponse?, error: String?): String {
+    val code = response?.code
+    val signal = error.orEmpty().lowercase(Locale.ROOT)
+    return when {
+        code == 401 || code == 403 -> "credentials_rejected"
+        code == 608 || signal.hasAny("timeout", "timed out") -> "timeout"
+        code == 603 || signal.hasAny("unknownhost", "resolve", "dns") -> "dns"
+        code == 609 || signal.hasAny("unreachable", "no route") -> "unreachable"
+        signal.hasAny("certificate", "fingerprint") -> "tls_certificate"
+        signal.hasAny("handshake", "ssl", "tls") -> "tls_handshake"
+        signal.contains("connection reset") -> "connection_reset"
+        signal.contains("refused") -> "connection_refused"
+        signal.hasAny("end of file", "eof", "stream truncated") -> "connection_closed"
+        code != null && code in 300..599 -> "http_error"
+        else -> "transport_unknown"
+    }
+}

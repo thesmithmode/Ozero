@@ -39,6 +39,47 @@ class BinaryDownloaderTest {
     }
 
     @Test
+    fun `authenticated fallback preserves SHA verification and cache behavior`() {
+        val data = "private-binary".toByteArray()
+        server.enqueue(MockResponse().setResponseCode(404))
+        val fallback: (String, Path) -> Boolean = { _, target ->
+            Files.write(target, data)
+            true
+        }
+        val downloader = BinaryDownloader(
+            cacheDir = tmp.resolve("private-cache"),
+            retryDelaysMs = emptyList(),
+            githubDownloader = fallback,
+        )
+        val target = tmp.resolve("private/asset.so")
+
+        downloader.download(server.url("/missing.so").toString(), sha256(data), target)
+
+        assertThat(Files.readAllBytes(target)).isEqualTo(data)
+        downloader.download(server.url("/missing.so").toString(), sha256(data), tmp.resolve("copy/asset.so"))
+        assertThat(server.requestCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `authenticated fallback cannot bypass SHA integrity verification`() {
+        server.enqueue(MockResponse().setResponseCode(404))
+        val downloader = BinaryDownloader(
+            cacheDir = tmp.resolve("private-cache"),
+            retryDelaysMs = emptyList(),
+            githubDownloader = { _, target ->
+                Files.writeString(target, "wrong-binary")
+                true
+            },
+        )
+        val target = tmp.resolve("private/asset.so")
+
+        assertThatThrownBy {
+            downloader.download(server.url("/missing.so").toString(), "0".repeat(64), target)
+        }.isInstanceOf(IntegrityException::class.java)
+        assertThat(Files.exists(target)).isFalse()
+    }
+
+    @Test
     fun `downloads file and writes to destination with matching SHA`() {
         val data = "byedpi-binary".toByteArray()
         server.enqueue(bodyResponse(data))

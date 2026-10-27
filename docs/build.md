@@ -4,7 +4,7 @@
 
 Разработка ведётся в `dev`, а default branch GitHub — `main`. Рабочую ветку создавайте от `dev` и направляйте изменения туда. Push в `main` или тега `v*.*.*` запускает [release.yml](../.github/workflows/release.yml), поэтому `main` не используется для проверки документации или пробной сборки.
 
-[CI](../.github/workflows/ci.yml) запускается для рабочих веток и PR в `dev`/`main`. При открытом PR push-run может пропускать проверки, чтобы не дублировать PR-run; оценивайте jobs полного прогона на нужном SHA. Debug APK публикуется как artifact `debug-apk`. Готовые release APK находятся в [Releases](https://github.com/thesmithmode/Ozero/releases).
+[CI](../.github/workflows/ci.yml) запускается для рабочих веток и PR в `dev`/`main`. При открытом PR push-run может пропускать проверки, чтобы не дублировать PR-run; оценивайте jobs полного прогона на нужном SHA. При доступной квоте Debug APK сохраняется как artifact `debug-apk`. Готовые release APK находятся в [Releases](https://github.com/thesmithmode/Ozero/releases).
 
 ## Окружение
 
@@ -33,7 +33,7 @@ cd Ozero
 | WARP | `libam.so`, `libam-go.so`, `libam-quick.so` уже отслеживаются в `engine-warp/src/main/jniLibs/arm64-v8a`; release проверяет их наличие и идентичность backend |
 | URnetwork | Workflow выбирает `urnetwork-sdk-*` release, скачивает SDK в `engine-urnetwork/libs`, удаляет дублирующие `go/*.class`; приложение дополнительно использует `StripGoClassesFromAarTask` |
 | sing-box | libbox 1.13.12: download/verify scripts, извлечение `classes.jar` и JNI, выделение и patch общих `go` stubs, удаление `go/*.class` из libbox.jar |
-| FPTN | Release скачивает `.so` и manifest по записи `fptn` в [binaries.lock.yaml](../build-tools/binaries.lock.yaml), проверяет source metadata, SHA256 и размер |
+| FPTN | Release собирает `.so` из закреплённых upstream-исходников через общий action `build-fptn` и проверяет совпадение библиотеки в APK с результатом сборки |
 | HEV | Release собирает `libhev-ozero-socks5-tunnel.so` из закреплённого upstream commit, с `APP_CFLAGS=-DPKGNAME=hev` и 16 KB alignment |
 
 Для download scripts libbox вне GitHub Actions задайте `GITHUB_REPOSITORY=thesmithmode/Ozero`; аргумент назначения должен сохранять имя asset `libbox.aar`. Полный порядок извлечения и patch Go stubs берите из workflow. Простое добавление исходного AAR в runtime dependencies дублирует классы Go.
@@ -80,9 +80,13 @@ Android-подпись APK, GPG-подпись файла и Ed25519-подпи�
 
 ## Native source и готовая библиотека
 
-[binaries.yml](../.github/workflows/binaries.yml) собирает и публикует отдельные native-артефакты. Обновление Kotlin/C++ исходников, публикация `.so` и обновление lock — разные операции. Обычная APK-сборка FPTN использует готовую библиотеку: изменение C++ в `engine-fptn/src/main/cpp` не запускает CMake из Gradle.
+[binaries.yml](../.github/workflows/binaries.yml) собирает и публикует отдельные native-артефакты. Обновление Kotlin/C++ исходников, публикация `.so` и обновление lock — разные операции. Обычный запуск Gradle сам не пересобирает FPTN: изменение C++ в `engine-fptn/src/main/cpp` не запускает CMake. Библиотека должна быть подготовлена до упаковки APK.
 
-Текущая идентичность FPTN release tag вычисляется из Dockerfile, build script и `regen_lock.py`; wrapper C++ в хеш не включён. Поэтому SHA256 из lock доказывает целостность выбранного asset, но не его соответствие текущему wrapper source. При native-изменениях явно проверяйте Ozero revision сборки, JNI ABI и новый lock; документирование этого ограничения не меняет действующий pipeline.
+Release и workflow `FPTN transport` собирают FPTN через общий action. Ключ native-кэша учитывает Dockerfile, build script, wrapper C++ и сам action; manifest фиксирует Android reference, protocol library и CamouflageTLS. При изменении этих исходников требуется новая сборка. Перед публикацией APK упакованная `.so` побайтно сравнивается с её результатом.
+
+Release публикует APK и подписи прямо из build job, без промежуточного Actions artifact. Сохранение диагностических отчётов CI необязательно; тесты, coverage и проверка упакованной библиотеки остаются обязательными.
+
+При HTTP 404 загрузчик native-артефактов может использовать GitHub CLI и `GH_TOKEN`/`GITHUB_TOKEN` для приватного release. Токен используется только для распознанных HTTPS GitHub release URL; SHA-256 из lock проверяется и после авторизованной загрузки. Workflow предоставляет собственный токен с разрешением `contents: read`.
 
 ## Проверки
 

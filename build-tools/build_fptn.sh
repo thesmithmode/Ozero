@@ -17,6 +17,7 @@ BUILD_DIR="$REPO_ROOT/build/fptn-$ABI"
 
 FPTN_REPO="https://github.com/fptn-project/FptnClient-Android.git"
 FPTN_SOURCE_COMMIT="2a38c7e4fc9268ae7d30f8ec0390a97e02e41980"
+FPTN_PROTOCOL_COMMIT="a389bee62da930807c3bc85284ee4976e9c7e08f"
 FPTN_CLONE_DIR="$REPO_ROOT/build/fptn-android-src"
 CAMTLS_REPO="https://github.com/fptn-project/camouflage-tls.git"
 CAMTLS_COMMIT="c4b054b741ab1fe8ac5d153c9c024231f8d22449"
@@ -37,6 +38,14 @@ if [[ "$FPTN_COMMIT" != "$FPTN_SOURCE_COMMIT" ]]; then
 fi
 
 FPTN_LIB_DIR="$FPTN_CLONE_DIR/app/src/main/cpp/libs/fptn"
+git -C "$FPTN_LIB_DIR" fetch --depth 1 origin "$FPTN_PROTOCOL_COMMIT"
+git -C "$FPTN_LIB_DIR" checkout --detach FETCH_HEAD
+FPTN_PROTOCOL_ACTUAL_COMMIT="$(git -C "$FPTN_LIB_DIR" rev-parse HEAD)"
+if [[ "$FPTN_PROTOCOL_ACTUAL_COMMIT" != "$FPTN_PROTOCOL_COMMIT" ]]; then
+    echo "ERROR: FPTN protocol checkout mismatch" >&2
+    exit 1
+fi
+FPTN_SYNC_COMMIT="${FPTN_COMMIT}:${FPTN_PROTOCOL_ACTUAL_COMMIT}"
 if [[ ! -d "$FPTN_LIB_DIR" ]] || [[ -z "$(ls -A "$FPTN_LIB_DIR" 2>/dev/null)" ]]; then
     echo "ERROR: fptn submodule empty at $FPTN_LIB_DIR" >&2
     exit 1
@@ -49,10 +58,10 @@ LIBS_DIR="$CPP_SRC/libs"
 FPTN_SYNC_MARKER="$LIBS_DIR/.fptn-source-commit"
 mkdir -p "$LIBS_DIR"
 if [[ ! -d "$LIBS_DIR/fptn" ]] || [[ ! -f "$FPTN_SYNC_MARKER" ]] || \
-    [[ "$(<"$FPTN_SYNC_MARKER")" != "$FPTN_COMMIT" ]]; then
+    [[ "$(<"$FPTN_SYNC_MARKER")" != "$FPTN_SYNC_COMMIT" ]]; then
     rm -rf "$LIBS_DIR/fptn"
     cp -r "$FPTN_LIB_DIR" "$LIBS_DIR/fptn"
-    printf '%s\n' "$FPTN_COMMIT" > "$FPTN_SYNC_MARKER"
+    printf '%s\n' "$FPTN_SYNC_COMMIT" > "$FPTN_SYNC_MARKER"
 fi
 
 # ---------------------------------------------------------------------------
@@ -143,7 +152,7 @@ cmake \
     -DFETCHCONTENT_SOURCE_DIR_CAMOUFLAGETLS="$CAMTLS_DIR" \
     -G Ninja
 
-cmake --build "$BUILD_DIR/cmake-build" --parallel
+cmake --build "$BUILD_DIR/cmake-build" --parallel "${CMAKE_BUILD_PARALLEL_LEVEL:-2}"
 
 # ---------------------------------------------------------------------------
 # 6. Copy output
@@ -160,8 +169,10 @@ cp "$BUILD_DIR/cmake-build/libfptn_native_lib.so" "$OUT_DIR/libfptn_native_lib-$
 # ---------------------------------------------------------------------------
 {
     echo "# build_fptn manifest"
-    echo "source_repo=$FPTN_REPO"
-    echo "source_commit=$FPTN_COMMIT"
+    echo "source_repo=https://github.com/fptn-project/fptn.git"
+    echo "source_commit=$FPTN_PROTOCOL_ACTUAL_COMMIT"
+    echo "android_source_repo=$FPTN_REPO"
+    echo "android_source_commit=$FPTN_COMMIT"
     echo "camouflage_tls_repo=$CAMTLS_REPO"
     echo "camouflage_tls_commit=$CAMTLS_ACTUAL_COMMIT"
     echo "ndk=$(basename "$NDK_HOME")"
