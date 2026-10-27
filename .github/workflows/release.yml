@@ -48,7 +48,7 @@ jobs:
   build-apk:
     name: Build Android APK
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     needs: resolve-version
     permissions:
       contents: write
