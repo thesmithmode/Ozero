@@ -628,7 +628,8 @@ class FptnEngine(
             currentCoroutineContext().ensureActive()
             PersistentLoggers.debug(
                 TAG,
-                "authenticate: request=$request candidate=$candidate phase=login result=started timeoutS=$timeoutS",
+                "authenticate: POST $API_LOGIN_PATH timeout=${timeoutS}s " +
+                    "request=$request candidate=$candidate phase=login result=started",
             )
             val body = JSONObject().apply {
                 put("username", data.username)
