@@ -13,6 +13,9 @@ on:
       - '.github/actions/build-fptn/**'
       - '.github/actions/prepare-app-native/**'
 
+env:
+  GH_TOKEN: ${{ github.token }}
+
 concurrency:
   group: fptn-transport-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true

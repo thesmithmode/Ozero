@@ -4,6 +4,8 @@ runs:
   using: composite
   steps:
     - name: Download native binaries
+      env:
+        GH_TOKEN: ${{ github.token }}
       shell: bash
       run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
 

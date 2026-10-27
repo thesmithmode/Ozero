@@ -9,6 +9,9 @@ on:
 
 permissions: {}
 
+env:
+  GH_TOKEN: ${{ github.token }}
+
 concurrency:
   group: release
   cancel-in-progress: false
