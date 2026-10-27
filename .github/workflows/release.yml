@@ -469,39 +469,10 @@ jobs:
                 "$apk"
           done
 
-      - name: Upload APK artifacts
-        uses: actions/upload-artifact@v6
-        with:
-          name: apk-artifacts
-          path: release-out/*
-          retention-days: 1
-
-  publish:
-    name: Publish GitHub Release
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: [resolve-version, build-apk]
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v8
-        with:
-          path: release-all
-          merge-multiple: true
-
-      - name: Verify APK artifact present
+      - name: Verify APK artifacts
         run: |
           set -euo pipefail
-          cd release-all
-          echo "=== Release artifacts ==="
-          ls -la
-          if ! ls Ozero-*.apk >/dev/null 2>&1; then
-            echo "::error::Missing APK artifact"
-            exit 1
-          fi
-          echo "APK artifact present"
+          test -s "release-out/Ozero-${{ needs.resolve-version.outputs.tag }}.apk"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
@@ -513,5 +484,4 @@ jobs:
           fail_on_unmatched_files: true
           overwrite_files: true
           token: ${{ secrets.GITHUB_TOKEN }}
-          files: |
-            release-all/*
+          files: release-out/*
