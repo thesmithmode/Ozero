@@ -5,7 +5,7 @@ import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
 class GitHubReleaseDownloader(
-    private val token: String? = System.getenv("GH_TOKEN") ?: System.getenv("GITHUB_TOKEN"),
+    private val token: String? = gitHubDownloadToken(),
     private val runDownload: (List<String>, String) -> Int = { args, token -> runGitHubDownload(args, token) },
 ) {
     fun download(url: String, destination: Path): Boolean {
@@ -52,3 +52,6 @@ internal fun runGitHubDownload(
     }
     return process.exitValue()
 }
+
+internal fun gitHubDownloadToken(environment: (String) -> String? = System::getenv): String? =
+    environment("GH_TOKEN")?.takeIf { it.isNotBlank() } ?: environment("GITHUB_TOKEN")
