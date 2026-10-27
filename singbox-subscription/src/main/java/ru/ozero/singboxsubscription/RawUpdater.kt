@@ -51,7 +51,7 @@ class RawUpdater(
     private val okHttpClient: OkHttpClient,
     private val groupDao: SubscriptionGroupDao,
     private val profileDao: ProxyProfileDao,
-    private val userCaOkHttpClient: OkHttpClient = okHttpClient,
+    private val systemCaOkHttpClient: OkHttpClient = okHttpClient,
     private val insecureOkHttpClient: OkHttpClient = okHttpClient,
     private val database: SingboxDatabase? = null,
     private val onProfilesRemoved: suspend (Set<Long>) -> Unit = {},
@@ -275,7 +275,7 @@ class RawUpdater(
     private fun httpClientFor(group: SubscriptionGroup, allowInsecureRetry: Boolean): OkHttpClient = when {
         group.isBuiltin -> okHttpClient
         allowInsecureRetry -> insecureOkHttpClient
-        else -> userCaOkHttpClient
+        else -> systemCaOkHttpClient
     }
 
     private suspend fun executeRequest(

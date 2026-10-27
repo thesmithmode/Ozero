@@ -19,6 +19,7 @@ class BinaryDownloader(
             .followRedirects(HttpClient.Redirect.NORMAL)
             .connectTimeout(Duration.ofSeconds(30))
             .build(),
+    private val githubDownloader: (String, Path) -> Boolean = GitHubReleaseDownloader()::download,
 ) {
     fun download(url: String, expectedSha256: String, finalDst: Path) {
         Files.createDirectories(cacheDir)
@@ -63,6 +64,10 @@ class BinaryDownloader(
                     }
                     404 -> {
                         Files.deleteIfExists(tmp)
+                        if (githubDownloader(url, tmp)) {
+                            Sha256Verifier.verifyAndMove(tmp, cached, expectedSha256)
+                            return
+                        }
                         throw BinaryDownloadException(
                             "HTTP 404 for $url. Tag may not exist. " +
                                 "Run: gh workflow run binaries.yml --ref dev",

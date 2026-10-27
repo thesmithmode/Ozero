@@ -1,10 +1,10 @@
 # AGENTS.md — Ozero
 Само-обучение: новое правило → сюда. Без дублей, ≤100 строк.
 ## Продукт и архитектурный контракт
-Видение → `README.md`. Архитектура → `.codex/Контекст/Architect.md`.
+Видение → [README.md](README.md). Архитектура → [docs/architecture.md](docs/architecture.md). Сборка → [docs/build.md](docs/build.md).
 **Нерушимые инварианты:**
 - Каждый движок = отдельный gradle-модуль `engine-*`. Падение одного не валит соседей.
-- Контракт: `Engine.start(config, upstream)`. `app/` знает только контракт, не детали.
+- Runtime-контракт: `EnginePlugin.start(config, upstream)`. Per-engine UI и DI находятся в `app/`; общая VPN-логика использует контракт.
 - Single-engine = chain длины 1. Новый движок никогда не идёт файлами в `app/`.
 - Единый UI, максимальная изоляция движков.
 ## Комментарии в коде — запрет
@@ -53,29 +53,30 @@
 - VM с StateFlow в `@BeforeEach`: создавать VM **внутри теста** ПОСЛЕ `store.setRaw(...)`. Иначе race.
 - Material Icons: только `material-icons-core`. `Icons.Filled.Android/Apps/PhoneAndroid` — нет в core.
 ## Per-engine UI
-- Каждый engine обязан иметь settings screen в `ui/settings/engines/`. Текущие: byedpi, fptn, urnetwork, warp, masterdns.
+- Каждый engine обязан иметь settings screen в `ui/settings/engines/`. Текущие: byedpi, fptn, urnetwork, warp, masterdns, singbox.
 ## Subprocess-proxy
 - `engine-masterdns` — subprocess-pattern, но полноценный `EnginePlugin` (`@IntoSet` через `MasterDnsModule`). `libmdnsvpn.so` через `ProcessBuilder`, **не** `System.loadLibrary`.
 - Routing: WARP (`socksPort==0`) → subprocess наследует UID (TUN авто). SOCKS-engine → `--socks5-proxy-url socks5://127.0.0.1:<port>`.
 ## Расследование — порядок (закон)
 ПЕРЕД субагентом/advisor/гипотезой:
-1. `wiki-find <тема>` — `.memory/knowledge/` уже компилированы из daily логов.
-2. `ls .codex/Контекст/` + читать `*_ANALYSIS.md` соответствующего движка.
+1. Если доступен `wiki-find`, искать `<тема>`; иначе читать соответствующие `.memory/knowledge/concepts/`. Исторические выводы проверять по текущему коду.
+2. Читать `docs/` и README движка; если локально есть `.codex/Контекст/`, также читать соответствующий `*_ANALYSIS.md`.
 3. Только если 1-2 не дали ответ — субагент/новые гипотезы.
-## Reference impls движков (`.codex/Контекст/`)
+## Локальные reference impls (`.codex/Контекст/`, не входят в Git)
 - `android/` → **URnetwork** (`URNETWORK_INIT_ANALYSIS.md`)
 - `PORTAL_WG_v1.4.3/` + `CYBERPORTAL_X-v1.0.2/` → **WARP** (`PORTAL_WG_ANALYSIS.md`)
 - `ByeByeDPI-v.1.7.5/` → **ByeDPI**. byedpi submodule pin: `ba532298`.
 - `karing/`, `Invizible_Pro*/`, `КИБЕРЩИТ*/`, `ResultV/`, `PortalConnect*/`, `amnezia-{client,vpn}/` — secondary references.
 - `Architect.md`, `AUDIT.md`, `PRD.md`, `SPEC.md`, `ПЛАН.md` — проектные документы, не reference.
 <!-- === rules:start === -->
-## Внешние правила
-- [`context7.md`](.codex/rules/context7.md) — **Закон.** Context7 MCP для всех библиотек/SDK.
-- [`tests.md`](.codex/rules/tests.md) — **Закон.** AAA, coverage ≥95%, exhaustive edge-cases.
-- [`folders.md`](.codex/rules/folders.md) — **Дух.** Новый движок = `engine-*` модуль, не файлы в `app/`.
-- [`git.md`](.codex/rules/git.md) — **Reference.** У Ozero: `dev` default, squash-merge без PR, main только по команде.
-- [`translate.md`](.codex/rules/translate.md) — **Baseline.** Локали ru/en/es/pt → `values-{en,es,pt}/strings.xml`.
+## Правила для чистого clone
+- Библиотеки/SDK: использовать Context7 MCP, если он доступен; сверять контракт с исходниками и закреплённой версией.
+- Тесты: AAA, exhaustive edge-cases, целевой coverage ≥95%; исполняемые CI-gates определены в `buildSrc` и workflow. Запрет локальных прогонов выше сохраняется.
+- Новый движок = `engine-*` модуль, не файлы в `app/`.
+- Git: GitHub default — `main`, разработка — `dev`; рабочие ветки от `dev`, squash-merge в `dev`, `main` только по команде.
+- Локализация: сохранять ресурсы поддерживаемых локалей; текущий список — `LocaleApplier.SUPPORTED_TAGS`, дополнительные XML движков — рядом со `strings.xml`.
+- Локальные `.codex/rules/*.md` могут дополнять правила, если присутствуют; в Git их нет.
 <!-- === rules:end === -->
 ## graphify
-- `graphify-out/GRAPH_REPORT.md` — god nodes, communities. `graphify query/path/explain`. После правок кода — `graphify update .`.
-- `.memory/knowledge/index.md` — project knowledge (почему так сделано, прошлые баги, неочевидные решения).
+- Если локально доступны `graphify` и `graphify-out/GRAPH_REPORT.md`: `graphify query/path/explain`, после правок кода — `graphify update .`.
+- `.memory/knowledge/concepts/` — project knowledge; пользоваться `.memory/knowledge/index.md`, если локальный индекс существует.

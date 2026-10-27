@@ -277,7 +277,7 @@ class FptnEngineTest {
 
         val failure = assertIs<StartResult.Failure>(result)
         assertEquals(FptnEngine.FPTN_API_ERROR, failure.reason)
-        assertEquals(listOf(1L), https.destroyedHandles)
+        assertEquals(listOf(1L, 2L), https.destroyedHandles)
     }
 
     @Test
@@ -293,6 +293,7 @@ class FptnEngineTest {
         assertIs<StartResult.Success>(result)
         assertEquals(setOf("203.0.113.1", "127.0.0.1"), https.createdHosts.toSet())
         assertEquals(2, https.createdHosts.size)
+        assertTrue(waitUntil { https.destroyedHandles.size == 2 })
         assertEquals(setOf(1L, 2L), https.destroyedHandles.toSet())
         assertEquals(2, https.destroyedHandles.size)
     }
@@ -341,7 +342,7 @@ class FptnEngineTest {
     }
 
     @Test
-    fun `auto scan limits a thirty four server token with mixed timeout responses`() = runTest {
+    fun `auto scan covers every server and retries mixed transient failures`() = runTest {
         val https = FakeHttpsClient(
             postResponses = ArrayDeque(
                 (1..34).map { index ->
@@ -362,9 +363,9 @@ class FptnEngineTest {
 
         val failure = assertIs<StartResult.Failure>(result)
         assertEquals("${FptnEngine.FPTN_ALL_CANDIDATES_FAILED}: ${FptnEngine.FPTN_API_ERROR}", failure.reason)
-        assertEquals(FptnEngine.AUTO_AUTH_MAX_CANDIDATES, https.createdHosts.size)
+        assertEquals(34 * FptnEngine.AUTO_AUTH_MAX_ATTEMPTS, https.createdHosts.size)
         assertEquals(
-            setOf("203.0.113.1", "203.0.113.2", "203.0.113.3", "203.0.113.4"),
+            (1..34).map { "203.0.113.$it" }.toSet(),
             https.createdHosts.toSet(),
         )
     }
@@ -812,9 +813,17 @@ class FptnEngineTest {
 
     @Test
     fun `probe returns success when token has valid servers`() = runTest {
-        store.inject { it.copy(token = "fptn:${validTokenB64()}") }
-        val result = engine.probe()
-        assertIs<ProbeResult.Success>(result)
+        java.net.ServerSocket(0).use { listener ->
+            store.inject {
+                it.copy(token = "fptn:${validTokenB64(host = "127.0.0.1", port = listener.localPort)}")
+            }
+            val success = assertIs<ProbeResult.Success>(engine.probe())
+            assertTrue(success.latencyMs >= 0L)
+        }
+        val closedPort = java.net.ServerSocket(0).use { it.localPort }
+        store.inject { it.copy(token = "fptn:${validTokenB64(host = "127.0.0.1", port = closedPort)}") }
+        val failure = assertIs<ProbeResult.Failure>(engine.probe())
+        assertEquals("FPTN server unreachable", failure.reason)
     }
 
     @Test
@@ -1052,11 +1061,6 @@ class FptnEngineTest {
                 source.contains("MANUAL_AUTH_MAX_ATTEMPTS"),
             "Each mode must have a bounded startup policy.",
         )
-        assertTrue(
-            source.contains("AUTO_AUTH_MAX_CANDIDATES") &&
-                source.contains("candidates.take(FptnEngine.AUTO_AUTH_MAX_CANDIDATES)"),
-            "Automatic selection must not authenticate every token server in the critical path.",
-        )
         assertFalse(
             source.contains("listOf(selected) + data.servers.filterNot"),
             "Manual FPTN selection must not silently append fallback candidates.",
@@ -1064,7 +1068,7 @@ class FptnEngineTest {
     }
 
     @Test
-    fun `auto scan preserves token order within its fixed candidate limit`() {
+    fun `auto scan preserves every endpoint in token order`() {
         val candidates = listOf(
             server("France-1"),
             server("France-2"),
@@ -1077,26 +1081,26 @@ class FptnEngineTest {
         val ordered = fptnAutoAuthCandidates(candidates)
 
         assertEquals(
-            listOf("France-1", "France-2", "France-3", "France-4"),
+            candidates.map { it.name },
             ordered.map { it.name },
         )
     }
 
     @Test
-    fun `auto scan caps a thirty four server token without reordering`() {
+    fun `auto scan keeps a thirty four server token without truncation`() {
         val candidates = (1..34).map { server("S$it") }
 
         val ordered = fptnAutoAuthCandidates(candidates)
 
-        assertEquals(FptnEngine.AUTO_AUTH_MAX_CANDIDATES, ordered.size)
-        assertEquals(listOf("S1", "S2", "S3", "S4"), ordered.map { it.name })
+        assertEquals(candidates.size, ordered.size)
+        assertEquals(candidates, ordered)
     }
 
     @Test
-    fun `startup budgets keep auto scanning below the manual retry budget`() {
-        assertEquals(5_000L, startupAuthBudgetMs(autoSelect = true))
+    fun `startup budgets allow upstream auth windows within the chain deadline`() {
+        assertEquals(25_000L, startupAuthBudgetMs(autoSelect = true))
         assertEquals(20_000L, startupAuthBudgetMs(autoSelect = false))
-        assertEquals(5, FptnEngine.AUTO_AUTH_CANDIDATE_TIMEOUT_S)
+        assertEquals(10, FptnEngine.AUTO_AUTH_CANDIDATE_TIMEOUT_S)
         assertEquals(2, FptnEngine.MANUAL_AUTH_MAX_ATTEMPTS)
     }
 
@@ -1418,9 +1422,9 @@ class FptnEngineTest {
     @Test
     fun `manual and auto policies expose their distinct retry limits`() {
         assertEquals(2, FptnEngine.MANUAL_AUTH_MAX_ATTEMPTS)
-        assertEquals(4, FptnEngine.AUTO_AUTH_MAX_CANDIDATES)
+        assertEquals(2, FptnEngine.AUTO_AUTH_MAX_ATTEMPTS)
         assertEquals(15, FptnEngine.AUTH_TIMEOUT_S)
-        assertEquals(5, FptnEngine.AUTO_AUTH_CANDIDATE_TIMEOUT_S)
+        assertEquals(10, FptnEngine.AUTO_AUTH_CANDIDATE_TIMEOUT_S)
     }
 
     @Test
@@ -1643,9 +1647,9 @@ class FptnEngineTest {
         assertEquals(FptnBypassMethod.DEFAULT, FptnBypassMethod.fromStrategyName("missing"))
     }
 
-    private fun validTokenB64(host: String = "1.2.3.4", countryCode: String = ""): String {
+    private fun validTokenB64(host: String = "1.2.3.4", countryCode: String = "", port: Int = 443): String {
         val json = """{"version":1,"username":"u","password":"p",
-            "servers":[{"name":"S1","host":"$host","port":443,"countryCode":"$countryCode"}]}"""
+            "servers":[{"name":"S1","host":"$host","port":$port,"countryCode":"$countryCode"}]}"""
         return java.util.Base64.getEncoder().encodeToString(json.toByteArray())
     }
 
@@ -1846,7 +1850,7 @@ class FptnEngineTest {
         ): FptnNativeResponse {
             return synchronized(this) {
                 if (postFailures.isNotEmpty()) throw postFailures.removeFirst()
-                postResponses.removeFirst()
+                if (postResponses.size > 1) postResponses.removeFirst() else postResponses.first()
             }
         }
     }

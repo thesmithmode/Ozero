@@ -12,7 +12,7 @@ object SubscriptionTrustClientFactory {
     fun createSystem(): OkHttpClient = timeoutBuilder().build()
 
     fun create(): OkHttpClient {
-        val trustManager = systemAndUserTrustManager()
+        val trustManager = systemTrustManager()
         val sslContext = SSLContext.getInstance("TLS")
         sslContext.init(null, arrayOf(trustManager), null)
         return timeoutBuilder()
@@ -45,11 +45,25 @@ object SubscriptionTrustClientFactory {
         .readTimeout(15, TimeUnit.SECONDS)
         .callTimeout(30, TimeUnit.SECONDS)
 
-    private fun systemAndUserTrustManager(): X509TrustManager {
-        val keyStore = KeyStore.getInstance("AndroidCAStore").apply { load(null) }
+    private fun systemTrustManager(): X509TrustManager {
+        val systemOnly = systemOnlyCaKeyStore(KeyStore.getInstance("AndroidCAStore").apply { load(null) })
         val factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply {
-            init(keyStore)
+            init(systemOnly)
         }
         return factory.trustManagers.filterIsInstance<X509TrustManager>().single()
     }
+
+    internal fun systemOnlyCaKeyStore(androidCaStore: KeyStore): KeyStore {
+        val systemOnly = KeyStore.getInstance(KeyStore.getDefaultType()).apply { load(null, null) }
+        val aliases = androidCaStore.aliases()
+        while (aliases.hasMoreElements()) {
+            val alias = aliases.nextElement()
+            if (!alias.startsWith(SYSTEM_CA_ALIAS_PREFIX)) continue
+            val cert = androidCaStore.getCertificate(alias) ?: continue
+            systemOnly.setCertificateEntry(alias, cert)
+        }
+        return systemOnly
+    }
+
+    private const val SYSTEM_CA_ALIAS_PREFIX = "system:"
 }

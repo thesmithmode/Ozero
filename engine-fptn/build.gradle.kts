@@ -15,6 +15,7 @@ android {
 
 dependencies {
     implementation(project(":engines-core"))
+    implementation(project(":common-crypto"))
     implementation(project(":common-vpn"))
     implementation(libs.bundles.coroutines)
 

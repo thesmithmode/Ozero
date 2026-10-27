@@ -88,7 +88,8 @@ class FptnTokenTest {
     fun `should parse valid fptnb payload`() {
         mockkConstructor(org.brotli.dec.BrotliInputStream::class)
         val tokenPayload =
-            """{"version":1,"username":"u","password":"p","servers":[{"name":"S","host":"h","port":443}]}"""
+            """{"version":1,"username":"u","password":"p","servers":[{"name":"S","host":"h","port":443}],
+                "censored_zone_servers":[{"name":"restricted","host":"192.0.2.2","port":7443}]}"""
         val bytes = tokenPayload.toByteArray()
         var reads = 0
         every {
@@ -109,10 +110,10 @@ class FptnTokenTest {
             val result = FptnToken.parse(token)
 
             val parsed = assertNotNull(result)
-            assertEquals(1, parsed.servers.size)
+            assertEquals(2, parsed.servers.size)
             assertEquals("u", parsed.username)
             assertEquals("p", parsed.password)
-            assertEquals("S", parsed.servers.single().name)
+            assertEquals(listOf("S", "restricted"), parsed.servers.map { it.name })
         } finally {
             unmockkConstructor(org.brotli.dec.BrotliInputStream::class)
         }
@@ -355,6 +356,90 @@ class FptnTokenTest {
                 "User-feedback 2026-05-23: валидные fptnb: токены (brotli-compressed) " +
                 "должны парситься. Регрессия — добавь brotli decompression.",
         )
+    }
+
+    @Test
+    fun `should include censored zone servers after regular servers`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"regular","host":"192.0.2.1","port":443}],
+            "censored_zone_servers":[
+                {"name":"restricted","host":"192.0.2.2","port":7443,
+                 "md5_fingerprint":"aabb","country_code":"de"}
+            ]}"""
+
+        val result = assertNotNull(FptnToken.parse("fptn:${encode(json)}"))
+
+        assertEquals(listOf("regular", "restricted"), result.servers.map { it.name })
+        assertEquals("192.0.2.2", result.servers[1].host)
+        assertEquals(7443, result.servers[1].port)
+        assertEquals("aabb", result.servers[1].md5Fingerprint)
+        assertEquals("DE", result.servers[1].countryCode)
+    }
+
+    @Test
+    fun `should parse token with only censored zone servers`() {
+        val json = """{"username":"u","password":"p","servers":[],
+            "censored_zone_servers":[{"name":"restricted","host":"192.0.2.2","port":443}]}"""
+
+        val result = assertNotNull(FptnToken.parse("fptn:${encode(json)}"))
+
+        assertEquals("restricted", result.servers.single().name)
+    }
+
+    @Test
+    fun `should preserve regular servers when censored zone list is empty or null`() {
+        for (additional in listOf("[]", "null")) {
+            val json = """{"username":"u","password":"p",
+                "servers":[{"name":"regular","host":"192.0.2.1","port":443}],
+                "censored_zone_servers":$additional}"""
+
+            val result = assertNotNull(FptnToken.parse("fptn:${encode(json)}"))
+
+            assertEquals("regular", result.servers.single().name)
+        }
+    }
+
+    @Test
+    fun `should reject token when both server lists are empty`() {
+        val json = """{"username":"u","password":"p","servers":[],"censored_zone_servers":[]}"""
+
+        assertNull(FptnToken.parse("fptn:${encode(json)}"))
+    }
+
+    @Test
+    fun `should reject malformed censored zone server list`() {
+        for (additional in listOf("{}", """["bad"]""", """[{"name":"restricted","port":443}]""")) {
+            val json = """{"username":"u","password":"p",
+                "servers":[{"name":"regular","host":"192.0.2.1","port":443}],
+                "censored_zone_servers":$additional}"""
+
+            assertNull(FptnToken.parse("fptn:${encode(json)}"))
+        }
+    }
+
+    @Test
+    fun `should not duplicate identical servers shared by both lists`() {
+        val server = """{"name":"shared","host":"192.0.2.1","port":443}"""
+        val json = """{"username":"u","password":"p","servers":[$server],
+            "censored_zone_servers":[$server]}"""
+
+        val result = assertNotNull(FptnToken.parse("fptn:${encode(json)}"))
+
+        assertEquals("shared", result.servers.single().name)
+    }
+
+    @Test
+    fun `should preserve server aliases and different ports across lists`() {
+        val json = """{"username":"u","password":"p",
+            "servers":[{"name":"regular","host":"192.0.2.1","port":443}],
+            "censored_zone_servers":[
+                {"name":"alias","host":"192.0.2.1","port":443},
+                {"name":"other-port","host":"192.0.2.1","port":7443}
+            ]}"""
+
+        val result = assertNotNull(FptnToken.parse("fptn:${encode(json)}"))
+
+        assertEquals(listOf("regular", "alias", "other-port"), result.servers.map { it.name })
     }
 
     private fun locateFptnTokenSource(): java.io.File {

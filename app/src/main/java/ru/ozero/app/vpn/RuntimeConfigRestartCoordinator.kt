@@ -177,7 +177,11 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         const val TAG = "RuntimeConfigRestartCoordinator"
         const val RESTART_STOP_TIMEOUT_MS = 11_000L
         const val RESTART_START_TIMEOUT_MS = 15_000L
-        const val FPTN_RESTART_START_TIMEOUT_MS = 25_000L
+
+        // Longest auth budget (25s) + awaitReady (30s) + state propagation.
+        // Shorter than that treats a slow successful FPTN restart as a failure
+        // and the next Connected restarts again, because the start is not cancelled.
+        const val FPTN_RESTART_START_TIMEOUT_MS = 60_000L
         const val RESTART_SETTLE_TIMEOUT_MS = 15_000L
     }
 }

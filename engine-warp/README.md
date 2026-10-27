@@ -1,56 +1,38 @@
 # engine-warp
 
-Cloudflare WARP engine (F2). WireGuard-based, конфиг получает через `ProxyWarpAutoConfig`
-— список из ~78 публичных serverless-зеркал (Netlify/Vercel/Cloudflare Workers),
-которые проксируют запрос к Cloudflare и возвращают готовый `[Interface]/[Peer]`
-.conf text. Прямой `api.cloudflareclient.com` блокируется ТСПУ в РФ — список
-зеркал и schema запроса/ответа извлечены из CYBERPORTAL_X-v1.0.2 и подтверждены
-bundled sample КИБЕРЩИТ-X/assets/bundled/str_warp_2.conf.
+WARP использует AmneziaWG backend и реализует `EnginePlugin` через `EngineWarp`. Настройки слотов и AWG-полей находятся также в `shared-warp-settings`.
 
-Проксирующие зеркала генерируют пару ключей серверной стороной → клиент НЕ
-посылает свой public key, и `WarpConfig.publicKey` / `accountLicense` опциональны.
-Регистрация: shuffle списка → race по 8 параллельных POST, общий бюджет 240s,
-первый успех отменяет остальные.
+## Bridge и отдельный процесс
 
-## Bridge layer
+Production DI в [WarpModule](../app/src/main/java/ru/ozero/app/di/WarpModule.kt):
 
-`WarpSdkBridge` — контракт `start(WarpConfig) → StartResult / stop() / isRunning()`.
-
-Реализации:
-
-- `StubWarpSdkBridge` — default DI binding (`WarpModule.provideWarpSdkBridge`).
-  Любой `start()` возвращает `Failed("WireGuard AAR not yet built ...")`. Активна
-  пока `RealWarpSdkBridge` не включён в DI.
-- `RealWarpSdkBridge` — обёртка над `com.wireguard.android.backend.GoBackend` +
-  `Tunnel` API. Maven artifact `com.wireguard.android:tunnel:1.0.20230706` уже
-  подключён в `engine-warp/build.gradle.kts`, кастомный AAR build не требуется.
-
-## DI wiring
-
-В `app/src/main/java/ru/ozero/app/di/WarpModule.kt`:
-
-`RealWarpSdkBridge(RemoteAwgRuntime(context, WarpEngineService))` — bridge
-делегирует AWG-вызовы в isolated process `:engine_warp` через AIDL. Singleton
-гарантируется Hilt. Process-isolation защищает от dual-Go-runtime SIGABRT
-(libam-go в :engine_warp, libgojni в main). См. `OzeroAppProcessIsolationTest`.
-
-## Open TODO в RealWarpSdkBridge
-
-Помечены `// TODO link via DI`:
-
-- Backend lifecycle — сейчас lazy field, при switch → переехать в `@Provides
-  GoBackend` отдельно (полезно для тестов).
-- DNS provider — WARP advertises 1.1.1.1 / 2606:4700:4700::1111, сейчас полагаемся
-  на системный resolver через VpnService. Поднять в `WarpConfig.dnsServers` если
-  WarpAutoConfig начнёт их возвращать.
-- Persistent keepalive — WARP рекомендует 25s на CGNAT/мобильных. Поле появится
-  в `WarpConfig.keepaliveSeconds` после соответствующей правки.
-
-## Sanity-check артефакта
-
-```
-./gradlew :engine-warp:dependencies --configuration releaseRuntimeClasspath \
-    | grep com.wireguard
+```text
+EngineWarp
+  → RealWarpSdkBridge
+    → RemoteAwgRuntime
+      → WarpEngineService (:engine_warp)
 ```
 
-Должен показать `com.wireguard.android:tunnel:1.0.20230706` (resolved).
+[WarpSdkBridge](src/main/java/ru/ozero/enginewarp/WarpSdkBridge.kt) принимает TUN fd, INI-конфигурацию, UAPI path и socket protector через `attachTun()`. Отдельный контракт существует для proxy-режима. Остановка выполняется через `detachTun()` или `stopProxy()`.
+
+[WarpEngineService](../app/src/main/java/ru/ozero/app/warp/WarpEngineService.kt) объявлен в [манифесте app](../app/src/main/AndroidManifest.xml) с `android:process=":engine_warp"`. AIDL связывает процесс приложения с native backend. При смерти процесса вызывается runtime failure routing.
+
+## Нативные артефакты
+
+В Git отслеживаются ARM64-библиотеки `libam.so`, `libam-go.so` и `libam-quick.so` в `src/main/jniLibs/arm64-v8a/`. Release workflow проверяет их наличие в APK и SHA256 backend.
+
+Текущий engine-модуль не использует Maven `com.wireguard.android:tunnel` и не требует переключения DI с Stub на Real. Историческая сборка отдельного AmneziaWG AAR не описывает активный runtime.
+
+`libam-go` загружается только в `:engine_warp`, отдельно от Go runtime URnetwork/sing-box. См. [общие правила загрузки](../AGENTS.md) и [инварианты WARP и AWG defaults](AGENTS.md).
+
+## Конфигурация
+
+`ProxyWarpAutoConfig` получает конфигурации через зеркала. Также поддерживаются импорт конфигураций и слоты. Состав зеркал, retry-бюджет и defaults определены кодом; старые фиксированные количества зеркал не являются контрактом.
+
+AWG-поля из конфигурации должны сохраняться. Если их нет в обычном WARP-конфиге, parser применяет AWG defaults; отсутствие полей не означает отключение обфускации.
+
+## Проверка изменений
+
+Проверяются импорт и сохранение слотов, DNS endpoint до установления TUN, handshake/readiness, передача трафика, смена движка и остановка удалённого процесса. ABI production APK — ARM64; произвольная подмена backend или добавление ABI требует отдельной native-валидации.
+
+Порядок сборки — [docs/build.md](../docs/build.md).

@@ -264,12 +264,38 @@ class RuntimeConfigRestartCoordinatorTest {
             assertFalse(coordinator.restartVpnIfRunning("settings changed"))
         }
         runCurrent()
-        advanceTimeBy(15_001)
+        advanceTimeBy(25_001)
         assertTrue(restart.isActive)
-        advanceTimeBy(10_000)
+        advanceTimeBy(30_000)
         restart.join()
 
         assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
+    }
+
+    @Test
+    fun `slow FPTN restart is success when connected inside auth plus ready budget`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        tunnelController.onSwitchingStarted(from = EngineId.WARP, to = EngineId.FPTN)
+        val coordinator = coordinator(
+            context = recordingContext(startServiceActions) {
+                tunnelController.setState(TunnelState.Disconnecting)
+            },
+            tunnelController = tunnelController,
+        )
+
+        val restart = launch {
+            assertTrue(coordinator.restartVpnIfRunning("settings changed"))
+        }
+        runCurrent()
+        advanceTimeBy(30_000)
+        assertTrue(restart.isActive)
+        tunnelController.setState(TunnelState.Connected(EngineId.FPTN, 0))
+        restart.join()
+
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
+        assertTrue(tunnelController.switching.value == null)
     }
 
     @Test
