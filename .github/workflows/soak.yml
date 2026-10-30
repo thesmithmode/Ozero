@@ -79,7 +79,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Resolve URnetwork SDK release
         id: urnetwork-aar-tag
