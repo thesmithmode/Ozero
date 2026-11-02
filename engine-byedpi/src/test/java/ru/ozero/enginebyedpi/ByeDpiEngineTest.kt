@@ -368,9 +368,23 @@ class ByeDpiEngineTest {
 
     @Test
     fun startWithBlankArgsDoesNotPassEmptyToken() = runTest {
-        every { proxy.startProxy(any()) } returns 0
-        engine.start(EngineConfig.ByeDpi(args = "", socksPort = 1080))
-        verify {
+        val proxyStarted = CountDownLatch(1)
+        every { proxy.startProxy(any()) } answers {
+            proxyStarted.countDown()
+            proxyRunning.await()
+            0
+        }
+        val blankArgsEngine = ByeDpiEngine(
+            proxy,
+            socksProbe = { _, _, _ -> 1L },
+            portFreeChecker = { true },
+        )
+
+        val result = blankArgsEngine.start(EngineConfig.ByeDpi(args = "", socksPort = 1080))
+
+        assertTrue(proxyStarted.await(5, TimeUnit.SECONDS))
+        assertIs<StartResult.Success>(result)
+        verify(exactly = 1) {
             proxy.startProxy(
                 match { args -> args.none { it.isEmpty() } },
             )
