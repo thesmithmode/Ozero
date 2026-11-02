@@ -11,8 +11,8 @@ repositories {
 
 dependencies {
     implementation("com.android.tools.build:gradle:8.7.3")
-    implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.20")
-    implementation("org.jetbrains.kotlin:compose-compiler-gradle-plugin:2.0.20")
+    implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.21")
+    implementation("org.jetbrains.kotlin:compose-compiler-gradle-plugin:2.4.21")
     implementation("org.jetbrains.compose:compose-gradle-plugin:1.7.0")
     implementation("io.gitlab.arturbosch.detekt:detekt-gradle-plugin:1.23.7")
     implementation("org.jlleitschuh.gradle:ktlint-gradle:12.1.1")
