@@ -1,12 +1,14 @@
 name: FPTN transport
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - 'fix/fptn-upstream-*'
   pull_request:
     branches: [dev]
     paths:
+      - '.github/workflows/release.yml'
       - 'engine-fptn/**'
       - 'build-tools/build_fptn.sh'
       - '.github/workflows/fptn-transport.yml'
@@ -65,7 +67,7 @@ jobs:
     name: Build Android transport and APK
     needs: time-provider
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
       - name: Build FPTN native transport

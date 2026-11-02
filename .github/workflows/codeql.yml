@@ -12,6 +12,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GH_TOKEN: ${{ github.token }}
+
 jobs:
   analyze:
     name: CodeQL Analysis (Java)
@@ -19,6 +22,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      actions: read
       security-events: write
 
     steps:
@@ -105,3 +109,15 @@ jobs:
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4
+        with:
+          output: codeql-results
+          upload: ${{ !github.event.repository.private || vars.CODE_SCANNING_ENABLED == 'true' }}
+
+      - name: Preserve CodeQL report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: codeql-results
+          path: codeql-results/*.sarif
+          if-no-files-found: error
+          retention-days: 30
