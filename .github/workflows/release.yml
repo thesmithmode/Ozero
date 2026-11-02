@@ -168,7 +168,7 @@ jobs:
           set -euo pipefail
           READELF="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
           SO="common-vpn/src/main/jniLibs/arm64-v8a/libhev-ozero-socks5-tunnel.so"
-          ALIGN_HEX=$("$READELF" -lW "$SO" | awk '/^\s*LOAD/ {print $NF; exit}')
+          ALIGN_HEX=$("$READELF" -lW "$SO" | awk '/^[[:space:]]*LOAD/ && !found {print $NF; found=1}')
           ALIGN_DEC=$(printf '%d' "$ALIGN_HEX")
           if [ "$ALIGN_DEC" -lt 16384 ]; then
             echo "::error::$SO LOAD alignment=$ALIGN_HEX (<0x4000) — Android 15 16KB pages откажется грузить"
