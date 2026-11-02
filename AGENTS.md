@@ -34,6 +34,7 @@
 - Релизы: каждый merge dev→main запускает release.yml и публикует APK; тег `v*.*.*` остаётся ручным override версии.
 ## Билд
 - Один APK (`assembleRelease`), без dynamic features.
+- Cold FPTN build: общий action освобождает место, проверяет минимум 20 GiB до Docker build и удаляет native build storage до сборки APK.
 - abiFilters: только arm64-v8a. Расширение ABI без перестройки native = рантайм-краш.
 - R8 minify+shrink включены, Log.* НЕ стрипаются (proguard-rules.pro).
 ## Native libs

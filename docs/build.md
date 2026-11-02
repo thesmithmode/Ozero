@@ -84,6 +84,8 @@ Android-подпись APK, GPG-подпись файла и Ed25519-подпи�
 
 Release и workflow `FPTN transport` собирают FPTN через общий action. Ключ native-кэша учитывает Dockerfile, build script, wrapper C++ и сам action; manifest фиксирует Android reference, protocol library и CamouflageTLS. При изменении этих исходников требуется новая сборка. Перед публикацией APK упакованная `.so` побайтно сравнивается с её результатом.
 
+Native build и release используют Ubuntu 22.04. При холодной сборке общий action удаляет неиспользуемые SDK и Docker images, требует минимум 20 GiB свободного места, а после компиляции освобождает промежуточные native-файлы и Docker build cache до сборки APK. Android SDK, NDK и JDK сохраняются. Увеличение timeout не заменяет проверку дискового бюджета.
+
 Release публикует APK и подписи прямо из build job, без промежуточного Actions artifact. Сохранение диагностических отчётов CI необязательно; тесты, coverage и проверка упакованной библиотеки остаются обязательными.
 
 При HTTP 404 загрузчик native-артефактов может использовать GitHub CLI и `GH_TOKEN`/`GITHUB_TOKEN` для приватного release. Токен используется только для распознанных HTTPS GitHub release URL; SHA-256 из lock проверяется и после авторизованной загрузки. Workflow предоставляет собственный токен с разрешением `contents: read`.
