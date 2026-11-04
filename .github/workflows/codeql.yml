@@ -2,7 +2,7 @@ name: CodeQL Security Scan
 
 on:
   schedule:
-    - cron: '17 3 * * *'
+    - cron: '17 3 * * 0'
   push:
     branches:
       - main
