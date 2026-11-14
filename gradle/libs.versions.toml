@@ -64,8 +64,8 @@ jacoco = "0.8.12"
 
 # Robolectric (для runtime Room migration tests — JVM SQLite)
 robolectric = "4.17"
-robolectricAndroidAllInstrumented = "13-robolectric-9030017-i6"
-robolectricAndroidAllInstrumented35 = "14-robolectric-10818077-i6"
+robolectricAndroidAllInstrumented = "13-robolectric-9030017-i7"
+robolectricAndroidAllInstrumented35 = "14-robolectric-10818077-i7"
 
 [libraries]
 # AndroidX
