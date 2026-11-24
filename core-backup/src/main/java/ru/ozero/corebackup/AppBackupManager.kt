@@ -59,7 +59,8 @@ class AppBackupManager(
         val settings = masqueStore?.settings()?.first() ?: return null
         check(!settings.corrupt) { "MASQUE profile is damaged" }
         val unconfigured = settings.profile == null &&
-            settings.transport == MasqueTransport.AUTO && settings.autoEnabled
+            settings.transport == MasqueTransport.AUTO &&
+            settings.autoEnabled
         if (unconfigured) return null
         return BackupMasque(settings.profile?.exportJson(), settings.transport.name, settings.autoEnabled)
     }

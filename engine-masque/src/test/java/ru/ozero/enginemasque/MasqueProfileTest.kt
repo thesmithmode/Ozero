@@ -43,6 +43,7 @@ class MasqueProfileTest {
             JSONObject(json).put("endpoint_v4", "192.0.2"),
             JSONObject(json).put("endpoint_v4", "192.0.02.1"),
             JSONObject(json).put("endpoint_v4", "192.0.2.-1"),
+            JSONObject(json).put("endpoint_v4", "192.0.x.1"),
             JSONObject(json).put("private_key", 123),
             JSONObject(json).put("ipv4", "192.0.2.999"),
             JSONObject(json).put("ipv6", "not-an-ip"),

@@ -3,7 +3,10 @@ package ru.ozero.enginemasque
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -115,6 +118,30 @@ class MasqueProfileStoreTest {
         assertEquals(MasqueTransport.H3, settings.transport)
         assertFalse(settings.autoEnabled)
         assertFalse(settings.corrupt)
+    }
+
+    @Test
+    fun `observing profile updates emits the registered credentials and clear state`(@TempDir tmp: Path) = runTest {
+        val data = PreferenceDataStoreFactory.create(
+            produceFile = { tmp.resolve("masque.preferences_pb").toFile() },
+        )
+        val store = MasqueProfileStore(data)
+        val initial = CompletableDeferred<Unit>()
+        val registered = CompletableDeferred<Unit>()
+        val values = mutableListOf<String?>()
+        val collector = launch {
+            store.profiles().take(3).collect { profile ->
+                values.add(profile?.exportJson())
+                if (values.size == 1) initial.complete(Unit)
+                if (values.size == 2) registered.complete(Unit)
+            }
+        }
+        initial.await()
+        store.save(MasqueProfile.parse(PROFILE))
+        registered.await()
+        store.clear()
+        collector.join()
+        assertEquals(listOf(null, PROFILE, null), values)
     }
 
     private companion object {

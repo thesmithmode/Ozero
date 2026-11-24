@@ -33,22 +33,13 @@ internal object NativeMasqueProcessLauncher : MasqueProcessLauncher {
     private val PROXY_VARIABLES = setOf("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY")
 
     private fun discardOutput(process: Process) {
-        thread(isDaemon = true, name = "masque-output") {
-            try {
-                process.inputStream.use { stream ->
-                    val buffer = ByteArray(8192)
-                    while (stream.read(buffer) != -1) Unit
-                }
-            } catch (_: IOException) {
-                Unit
-            }
-        }
+        thread(isDaemon = true, name = "masque-output") { drainMasqueOutput(process) }
     }
 }
 
 internal class ManagedMasqueProcess(
     private val process: Process,
-    private val forceStop: (Process) -> Unit = ::forceStopProcess,
+    private val forceStop: (Process) -> Unit = { forceStopProcess(it, Build.VERSION.SDK_INT) },
     private val stopWaitMs: Long = 1_000,
 ) : MasqueProcess {
     override val alive: Boolean
@@ -82,8 +73,19 @@ internal class ManagedMasqueProcess(
     }
 }
 
-private fun forceStopProcess(process: Process) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+internal fun drainMasqueOutput(process: Process) {
+    try {
+        process.inputStream.use { stream ->
+            val buffer = ByteArray(8192)
+            while (stream.read(buffer) != -1) Unit
+        }
+    } catch (_: IOException) {
+        Unit
+    }
+}
+
+internal fun forceStopProcess(process: Process, sdkInt: Int) {
+    if (sdkInt >= Build.VERSION_CODES.O) {
         process.destroyForcibly()
     } else {
         process.destroy()

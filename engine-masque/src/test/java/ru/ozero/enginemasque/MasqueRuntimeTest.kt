@@ -291,6 +291,90 @@ class MasqueRuntimeTest {
     }
 
     @Test
+    fun `default runtime refuses registration without consent`() = runBlocking {
+        val runtime = MasqueRuntime(binary(), directory)
+        assertThrows<IllegalArgumentException> { runtime.register(false) }
+        assertFalse(runtime.isReady())
+        runtime.stop()
+    }
+
+    @Test
+    fun `both address families and transports failing never leave a session`() = runBlocking {
+        val commands = mutableListOf<List<String>>()
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { command ->
+                commands.add(command)
+                Child(false)
+            },
+            MasqueReadinessProbe { error("Dead process cannot be ready") },
+        )
+        val config = JSONObject(profile().json)
+            .put("endpoint_v6", "2001:db8::3")
+            .put("endpoint_h2_v6", "2001:db8::4")
+        assertNull(runtime.start(MasqueProfile.parse(config.toString()), 1080, MasqueTransport.AUTO))
+        assertEquals(listOf(false, true, false, true), commands.map { "--ipv6" in it })
+        assertEquals(listOf(false, false, true, true), commands.map { "--http2" in it })
+        assertFalse(runtime.isReady())
+        assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+    }
+
+    @Test
+    fun `child dying during TLS startup cannot become active`() = runBlocking {
+        val child = Child(true)
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { command ->
+                File(File(command[2]).parentFile, "ready").writeText("ready")
+                child
+            },
+            MasqueReadinessProbe {
+                child.alive = false
+                true
+            },
+        )
+        assertNull(runtime.start(profile(), 1080, MasqueTransport.H3))
+        assertFalse(runtime.isReady())
+        assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+    }
+
+    @Test
+    fun `child dying during a health check cannot report healthy`() = runBlocking {
+        val child = Child(true)
+        var probes = 0
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { command ->
+                File(File(command[2]).parentFile, "ready").writeText("ready")
+                child
+            },
+            MasqueReadinessProbe {
+                if (++probes == 2) child.alive = false
+                true
+            },
+        )
+        assertEquals(MasqueTransport.H3, runtime.start(profile(), 1080, MasqueTransport.H3))
+        assertFalse(runtime.isReady())
+        runtime.stop()
+    }
+
+    @Test
+    fun `non-executable binary fails before creating a workspace`() = runBlocking {
+        val file = binary().apply { check(setExecutable(false)) }
+        val runtime = MasqueRuntime(
+            file,
+            directory,
+            MasqueProcessLauncher { error("Must not launch") },
+            MasqueReadinessProbe { false },
+        )
+        assertThrows<IllegalStateException> { runtime.start(profile(), 1080, MasqueTransport.H3) }
+        assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+    }
+
+    @Test
     fun `invalid port binary and private directory fail before launch`(): Unit = runBlocking {
         val launcher = MasqueProcessLauncher { error("Must not launch") }
         val missing = File(directory, "missing")

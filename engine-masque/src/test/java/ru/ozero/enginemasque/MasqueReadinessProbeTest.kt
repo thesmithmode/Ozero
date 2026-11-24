@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
+import java.net.ServerSocket
 import java.net.Socket
 import javax.net.ssl.SSLParameters
 import javax.net.ssl.SSLSocket
@@ -39,6 +40,21 @@ class MasqueReadinessProbeTest {
         verify { socket.close() }
         every { tls.startHandshake() } throws IOException("fixture")
         assertFalse(probe.check(1080))
+    }
+
+    @Test
+    fun `default probe rejects a closed local endpoint without direct fallback`() {
+        val port = ServerSocket(0).use { it.localPort }
+        assertFalse(TlsMasqueReadinessProbe().check(port))
+    }
+
+    @Test
+    fun `default TLS factory rejects an unconnected transport socket`() {
+        val socket = mockk<Socket>(relaxed = true)
+        every { socket.isConnected } returns false
+        val probe = TlsMasqueReadinessProbe(createSocket = { socket })
+        assertFalse(probe.check(1080))
+        verify { socket.close() }
     }
 
     @Test

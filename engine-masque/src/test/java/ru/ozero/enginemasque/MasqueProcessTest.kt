@@ -8,10 +8,14 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
+import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.IOException
+import java.io.InputStream
 
 class MasqueProcessTest {
     @Test
@@ -36,6 +40,49 @@ class MasqueProcessTest {
         } finally {
             child.close()
         }
+    }
+
+    @Test
+    fun `output is drained even when the process writes more than a pipe buffer`() {
+        val stream = ByteArrayInputStream(ByteArray(128 * 1024))
+        val process = mockk<Process>(relaxed = true)
+        every { process.inputStream } returns stream
+        drainMasqueOutput(process)
+        assertEquals(0, stream.available())
+    }
+
+    @Test
+    fun `closing the output pipe during process death is harmless`() {
+        val stream = mockk<InputStream>(relaxed = true)
+        every { stream.read(any<ByteArray>()) } throws IOException("pipe closed")
+        val process = mockk<Process>(relaxed = true)
+        every { process.inputStream } returns stream
+        drainMasqueOutput(process)
+        verify { stream.close() }
+    }
+
+    @Test
+    fun `forced termination uses the API appropriate process method`() {
+        val process = mockk<Process>(relaxed = true)
+        forceStopProcess(process, 24)
+        forceStopProcess(process, 25)
+        forceStopProcess(process, 26)
+        forceStopProcess(process, 35)
+        verify(exactly = 2) { process.destroy() }
+        verify(exactly = 2) { process.destroyForcibly() }
+    }
+
+    @Test
+    fun `normal process exit is awaited without forcing termination`() {
+        val process = mockk<Process>(relaxed = true)
+        var polls = 0
+        every { process.exitValue() } answers {
+            if (++polls <= 2) throw IllegalThreadStateException() else 0
+        }
+        val child = ManagedMasqueProcess(process, forceStop = { error("force stop not needed") })
+        child.close()
+        assertFalse(child.alive)
+        assertTrue(polls >= 3)
     }
 
     @Test
