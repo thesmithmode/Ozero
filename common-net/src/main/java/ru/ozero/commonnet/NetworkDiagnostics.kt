@@ -17,6 +17,7 @@ enum class NatObservation {
 data class NetworkDiagnosticsReport(
     val linkMtu: Int?,
     val tcpReachable: Boolean,
+    val udpReachable: Boolean,
     val nat: NatObservation?,
 )
 
@@ -37,9 +38,9 @@ class NetworkDiagnostics(
             if (!allowed()) return@withContext null
             val tcp = checkTcp(allowed)
             if (!allowed()) return@withContext null
-            val nat = checkStun(allowed)
+            val stun = checkStun(allowed)
             if (!allowed()) return@withContext null
-            NetworkDiagnosticsReport(linkMtu, tcp, nat)
+            NetworkDiagnosticsReport(linkMtu, tcp, stun != null, stun?.nat)
         }
 
     private fun checkTcp(allowed: () -> Boolean): Boolean = runCatching {
@@ -51,13 +52,13 @@ class NetworkDiagnostics(
         }
     }.getOrDefault(false)
 
-    private fun checkStun(allowed: () -> Boolean): NatObservation? = runCatching {
+    private fun checkStun(allowed: () -> Boolean): StunResult? = runCatching {
         val target = InetSocketAddress(stunHost, stunPort)
         if (target.isUnresolved || !allowed()) return@runCatching null
         DatagramSocket().use { socket ->
             socket.soTimeout = timeoutMs
             socket.connect(target)
-            val local = socket.localSocketAddress
+            val local = socket.localSocketAddress as? InetSocketAddress
             val transaction = ByteArray(12).also { SecureRandom().nextBytes(it) }
             val request = StunBinding.request(transaction)
             if (!allowed()) return@runCatching null
@@ -66,7 +67,14 @@ class NetworkDiagnostics(
             socket.receive(response)
             val mapped = StunBinding.mappedAddress(response.data.copyOf(response.length), transaction)
                 ?: return@runCatching null
-            if (mapped == local) NatObservation.UNCHANGED else NatObservation.TRANSLATED
+            val nat = when {
+                local == null || local.address.isAnyLocalAddress -> null
+                mapped == local -> NatObservation.UNCHANGED
+                else -> NatObservation.TRANSLATED
+            }
+            StunResult(nat)
         }
     }.getOrNull()
+
+    private data class StunResult(val nat: NatObservation?)
 }

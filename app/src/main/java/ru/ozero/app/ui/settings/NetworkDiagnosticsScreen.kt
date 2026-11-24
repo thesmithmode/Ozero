@@ -110,7 +110,7 @@ private fun DiagnosticsResults(report: NetworkDiagnosticsReport) {
         if (report.tcpReachable) R.string.network_diagnostics_ok else R.string.network_diagnostics_no_response,
     )
     val udp = stringResource(
-        if (report.nat != null) R.string.network_diagnostics_ok else R.string.network_diagnostics_no_response,
+        if (report.udpReachable) R.string.network_diagnostics_ok else R.string.network_diagnostics_no_response,
     )
     val nat = when (report.nat) {
         NatObservation.TRANSLATED -> stringResource(R.string.network_diagnostics_translated)

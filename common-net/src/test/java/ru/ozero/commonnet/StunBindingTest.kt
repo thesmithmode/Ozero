@@ -43,7 +43,10 @@ class StunBindingTest {
             valid.copyOf().apply { this[23] = 127 },
             valid.copyOf().apply { this[25] = 3 },
             valid.copyOf().apply { this[24] = 1 },
-            valid.copyOf().apply { this[26] = 0x21; this[27] = 0x12 },
+            valid.copyOf().apply {
+                this[26] = 0x21
+                this[27] = 0x12
+            },
             valid.copyOf().apply { this[21] = 1 },
         )
 
