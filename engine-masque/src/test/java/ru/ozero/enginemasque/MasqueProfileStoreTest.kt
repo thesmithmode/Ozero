@@ -1,9 +1,14 @@
 package ru.ozero.enginemasque
 
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
@@ -142,6 +147,38 @@ class MasqueProfileStoreTest {
         store.clear()
         collector.join()
         assertEquals(listOf(null, PROFILE, null), values)
+    }
+
+    @Test
+    fun `immediate storage updates preserve profile and settings without suspension`() = runTest {
+        val data = ImmediatePreferencesStore()
+        val store = MasqueProfileStore(data)
+        val profile = MasqueProfile.parse(PROFILE)
+        store.save(profile)
+        assertEquals(PROFILE, store.profiles().first()?.exportJson())
+        store.setTransport(MasqueTransport.H2)
+        store.setAutoEnabled(false)
+        assertEquals(MasqueTransport.H2, store.settings().first().transport)
+        assertFalse(store.settings().first().autoEnabled)
+        store.restore(profile, MasqueTransport.H3, true)
+        assertEquals(MasqueTransport.H3, store.settings().first().transport)
+        assertTrue(store.settings().first().autoEnabled)
+        store.restore(null, MasqueTransport.AUTO, false)
+        assertEquals(PROFILE, store.profiles().first()?.exportJson())
+        store.clear()
+        assertNull(store.profiles().first())
+        assertFalse(store.settings().first().corrupt)
+    }
+
+    private class ImmediatePreferencesStore : DataStore<Preferences> {
+        private val state = MutableStateFlow<Preferences>(emptyPreferences())
+        override val data: Flow<Preferences> get() = state
+
+        override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+            val updated = transform(state.value)
+            state.value = updated
+            return updated
+        }
     }
 
     private companion object {

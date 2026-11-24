@@ -1,6 +1,7 @@
 package ru.ozero.enginemasque
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -371,6 +372,31 @@ class MasqueRuntimeTest {
             MasqueReadinessProbe { false },
         )
         assertThrows<IllegalStateException> { runtime.start(profile(), 1080, MasqueTransport.H3) }
+        assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+    }
+
+    @Test
+    fun `runtime operations called from IO clean up without a dispatcher hop`() = runBlocking(Dispatchers.IO) {
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { command ->
+                if ("register" in command) {
+                    File(command[2]).writeText(profile().json)
+                    Child(false, 0)
+                } else {
+                    File(File(command[2]).parentFile, "ready").writeText("ready")
+                    Child(true)
+                }
+            },
+            MasqueReadinessProbe { true },
+        )
+        val registered = runtime.register(true)
+        assertEquals(profile().json, registered.json)
+        assertEquals(MasqueTransport.H3, runtime.start(registered, 1080, MasqueTransport.H3))
+        assertTrue(runtime.isReady())
+        runtime.stop()
+        assertFalse(runtime.isReady())
         assertEquals(listOf("usque"), directory.list().orEmpty().toList())
     }
 
