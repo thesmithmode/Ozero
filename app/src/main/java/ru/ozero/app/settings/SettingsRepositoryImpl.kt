@@ -40,11 +40,17 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     override suspend fun setTrafficMode(mode: TrafficMode) {
-        dataStore.edit { it[SettingsKeys.TRAFFIC_MODE] = mode.name }
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.TRAFFIC_MODE] = mode.name
+            if (mode == TrafficMode.TUN && prefs.readManualEngine()?.proxyOnly == true) {
+                prefs.remove(SettingsKeys.MANUAL_ENGINE)
+            }
+        }
     }
 
     override suspend fun setManualEngine(engine: EngineId?) {
         dataStore.edit { prefs ->
+            if (engine?.proxyOnly == true && prefs.readTrafficMode() != TrafficMode.PROXY) return@edit
             if (engine == null) {
                 prefs.remove(SettingsKeys.MANUAL_ENGINE)
             } else {
@@ -55,7 +61,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setEngineAutoPriority(priority: List<EngineId>) {
         dataStore.edit { prefs ->
-            val cleaned = priority.distinct().filter { !it.isStub }
+            val cleaned = priority.distinct().filter { !it.isStub && !it.proxyOnly }
             if (cleaned.isEmpty()) {
                 prefs.remove(SettingsKeys.ENGINE_AUTO_PRIORITY)
             } else {
@@ -234,10 +240,10 @@ class SettingsRepositoryImpl @Inject constructor(
             ?: return SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
         val parsed = raw.split(",")
             .mapNotNull { name -> runCatching { EngineId.valueOf(name.trim()) }.getOrNull() }
-            .filter { !it.isStub }
+            .filter { !it.isStub && !it.proxyOnly }
             .distinct()
         if (parsed.isEmpty()) return SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
-        val missing = EngineId.entries.filter { !it.isStub && it !in parsed }
+        val missing = EngineId.entries.filter { !it.isStub && !it.proxyOnly && it !in parsed }
         return parsed + missing
     }
 

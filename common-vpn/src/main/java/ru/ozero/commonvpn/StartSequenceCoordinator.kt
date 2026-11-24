@@ -381,6 +381,7 @@ class StartSequenceCoordinator(
     ): List<Pair<EngineId, EngineConfig>> {
         val candidates = mutableListOf<Pair<EngineId, EngineConfig>>()
         for (id in settings.engineAutoPriority) {
+            if (id.proxyOnly) continue
             if (!engineAllowedForTrafficMode(id, trafficMode)) continue
             val config = buildEngineConfig(id, settings, trafficMode) ?: continue
             candidates += id to config
@@ -426,7 +427,7 @@ class StartSequenceCoordinator(
     }
 
     private fun engineAllowedForTrafficMode(engineId: EngineId, trafficMode: TrafficMode): Boolean {
-        if (trafficMode == TrafficMode.TUN) return true
+        if (trafficMode == TrafficMode.TUN) return !engineId.proxyOnly
         return deps.enginePlugins.firstOrNull { it.id == engineId }
             ?.capabilities
             ?.providesLocalSocksWithoutUpstream == true

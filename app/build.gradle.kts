@@ -161,6 +161,7 @@ dependencies {
     implementation(project(":engine-masterdns"))
     implementation(project(":engine-fptn"))
     implementation(project(":engine-singbox"))
+    implementation(project(":engine-tgwss"))
     implementation(project(":singbox-process"))
     implementation(project(":singbox-core"))
     implementation(project(":singbox-fmt"))

@@ -9,6 +9,7 @@ import ru.ozero.enginebyedpi.ByeDpiEngine
 import ru.ozero.enginebyedpi.ByeDpiProxy
 import ru.ozero.enginebyedpi.ByeDpiProxyContract
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginetgwss.TelegramWssEngine
 import javax.inject.Singleton
 
 @Module
@@ -27,4 +28,9 @@ object EnginesModule {
     @Singleton
     @IntoSet
     fun provideByeDpiEngine(byeDpiEngine: ByeDpiEngine): EnginePlugin = byeDpiEngine
+
+    @Provides
+    @Singleton
+    @IntoSet
+    fun provideTelegramWssEngine(): EnginePlugin = TelegramWssEngine()
 }

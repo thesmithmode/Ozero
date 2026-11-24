@@ -176,5 +176,8 @@ class TelegramWssProxy(
         sockets.forEach(::release)
         acceptor.shutdownNow()
         workers.shutdownNow()
+        http.dispatcher.cancelAll()
+        http.connectionPool.evictAll()
+        http.dispatcher.executorService.shutdownNow()
     }
 }
