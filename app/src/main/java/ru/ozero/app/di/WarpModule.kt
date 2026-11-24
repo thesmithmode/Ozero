@@ -21,6 +21,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.app.warp.WarpEngineService
 import ru.ozero.commonvpn.RuntimeFailureRouter
+import ru.ozero.commonvpn.TunnelController
+import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineRuntimeConfigProvider
@@ -109,27 +111,35 @@ object WarpModule {
     fun provideWarpSdkBridge(
         @ApplicationContext context: Context,
         runtimeFailureRouter: RuntimeFailureRouter,
+        tunnelController: TunnelController,
     ): WarpSdkBridge = RealWarpSdkBridge(
         RemoteAwgRuntime(
             context = context,
             serviceComponent = ComponentName(context, WarpEngineService::class.java),
             onProcessDied = {
-                runtimeFailureRouter.handleEngineFailure(EngineId.WARP, "remote-binder-died")
+                val active = when (val state = tunnelController.state.value) {
+                    is TunnelState.Probing -> state.engineId
+                    is TunnelState.Connecting -> state.engineId
+                    is TunnelState.Connected -> state.engineId
+                    is TunnelState.Failed -> state.engineId
+                    else -> null
+                }
+                val owner = if (active == EngineId.TGWSS) EngineId.TGWSS else EngineId.WARP
+                runtimeFailureRouter.handleEngineFailure(owner, "remote-binder-died")
             },
         ),
     )
 
     @Provides
     @Singleton
-    @IntoSet
-    fun provideEngineWarp(
+    fun provideWarpEngineDirect(
         @ApplicationContext context: Context,
         autoConfig: WarpAutoConfig,
         store: WarpConfigSlotStore,
         bridge: WarpSdkBridge,
         settingsRepository: SettingsRepository,
         endpointProber: WarpEndpointProber,
-    ): EnginePlugin = EngineWarp(
+    ): EngineWarp = EngineWarp(
         autoConfig = autoConfig,
         configStore = store,
         sdkBridge = bridge,
@@ -145,6 +155,22 @@ object WarpModule {
         },
         endpointProber = endpointProber,
     )
+
+    @Provides
+    @Singleton
+    @IntoSet
+    fun provideEngineWarp(warp: EngineWarp): EnginePlugin = warp
+
+    @Provides
+    @Singleton
+    @IntoSet
+    fun provideTelegramWarpRuntimeConfigProvider(store: WarpConfigSlotStore): EngineRuntimeConfigProvider =
+        object : EngineRuntimeConfigProvider {
+            override val engineId = EngineId.TGWSS
+            override val changes = store.activeSlot().map { it?.runtimeFingerprint() }
+            override val includeStarting = false
+            override val restartReason = "Telegram WSS WARP slot changed"
+        }
 
     @Provides
     @Singleton

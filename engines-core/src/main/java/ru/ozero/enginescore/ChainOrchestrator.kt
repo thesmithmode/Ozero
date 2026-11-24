@@ -14,6 +14,8 @@ class ChainOrchestrator(
     suspend fun start(steps: List<ChainStep>): ChainResult = mutex.withLock {
         require(steps.isNotEmpty()) { "ChainOrchestrator.start: steps empty — single-engine = chain of 1" }
 
+        rejectStandaloneChain(steps)?.let { return@withLock it }
+
         var upstream: Upstream = Upstream.None
         var lastSocksPort = 0
 
@@ -71,6 +73,12 @@ class ChainOrchestrator(
             }
         }
         ChainResult.Success(finalSocksPort = lastSocksPort)
+    }
+
+    private suspend fun rejectStandaloneChain(steps: List<ChainStep>): ChainResult.Failure? {
+        if (steps.size == 1) return null
+        val index = steps.indexOfFirst { it.engineId.manualStandaloneOnly }
+        return if (index >= 0) rollback(index, "engine supports standalone mode only") else null
     }
 
     suspend fun stop() = mutex.withLock {

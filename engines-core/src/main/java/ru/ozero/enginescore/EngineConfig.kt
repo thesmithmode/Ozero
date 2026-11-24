@@ -114,6 +114,10 @@ sealed class EngineConfig {
         override val engineId = EngineId.OPERA
     }
 
+    data class TelegramWss(val socksPort: Int = 10812, val tunnelMode: Boolean = true) : EngineConfig() {
+        override val engineId = EngineId.TGWSS
+    }
+
     data class Fptn(
         val token: String = "",
         val selectedServerName: String? = null,

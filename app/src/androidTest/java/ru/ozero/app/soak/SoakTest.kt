@@ -223,6 +223,50 @@ class SoakTest {
         }
     }
 
+    @Test
+    fun runTelegramWssTunSmoke() = runBlocking {
+        val args = InstrumentationRegistry.getArguments()
+        Assume.assumeTrue("OZERO_TGWSS_SMOKE must be 1", args.getString("OZERO_TGWSS_SMOKE") == "1")
+        val url = requireNotNull(args.getString("OZERO_TGWSS_SMOKE_URL"))
+        val marker = requireNotNull(args.getString("OZERO_TGWSS_SMOKE_MARKER"))
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        check(VpnService.prepare(context) == null) { "VPN consent not granted" }
+        val dependencies = EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            SoakTestEntryPoint::class.java,
+        )
+        val settings = dependencies.settingsRepository()
+        val controller = dependencies.tunnelController()
+        val original = settings.settings.first()
+        try {
+            stopVpn(context, controller)
+            settings.setTrafficMode(TrafficMode.TUN)
+            settings.setSplitMode(SplitTunnelMode.ALL)
+            settings.setKillswitchEnabled(true)
+            for (engine in listOf(EngineId.TGWSS, EngineId.WARP, EngineId.TGWSS)) {
+                settings.setManualEngine(engine)
+                startVpn(context)
+                awaitConnected(controller, engine, TGWSS_START_TIMEOUT_MS)
+                val probe = probeFromExternalUid(context, instrumentation.context, url, marker)
+                check(probe.vpnTransport) { "$engine external probe is outside the VPN" }
+                check(probe.httpCode in 200..299 && probe.markerMatch) {
+                    "$engine external routed HTTP failed: ${probe.stage} HTTP ${probe.httpCode}"
+                }
+                stopVpn(context, controller)
+            }
+        } finally {
+            try {
+                stopVpn(context, controller)
+            } finally {
+                settings.setManualEngine(original.manualEngine)
+                settings.setTrafficMode(original.trafficMode)
+                settings.setSplitMode(original.splitMode)
+                settings.setKillswitchEnabled(original.killswitchEnabled)
+            }
+        }
+    }
+
     private suspend fun loadSubscriptionProfiles(
         dependencies: SoakTestEntryPoint,
     ): Map<String, SoakProfile> {
@@ -339,8 +383,12 @@ class SoakTest {
         )
     }
 
-    private suspend fun awaitConnected(controller: TunnelController, engineId: EngineId = EngineId.SINGBOX) {
-        val state = withTimeout(START_TIMEOUT_MS) {
+    private suspend fun awaitConnected(
+        controller: TunnelController,
+        engineId: EngineId = EngineId.SINGBOX,
+        timeoutMs: Long = START_TIMEOUT_MS,
+    ) {
+        val state = withTimeout(timeoutMs) {
             controller.state.first { it is TunnelState.Connected || it is TunnelState.Failed }
         }
         check(state is TunnelState.Connected && state.engineId == engineId) {
@@ -483,6 +531,7 @@ class SoakTest {
         private const val LOCAL_SUBSCRIPTION_URL = "http://10.0.2.2:18080/subscription.txt"
         private const val DEFAULT_MARKER = "ozero-singbox-routed"
         private const val START_TIMEOUT_MS = 30_000L
+        private const val TGWSS_START_TIMEOUT_MS = 120_000L
         private const val STOP_TIMEOUT_MS = 10_000L
         private const val PROBE_TIMEOUT_MS = 15_000L
         private const val RUNTIME_REFRESH_OBSERVATION_MS = 2_000L

@@ -168,6 +168,21 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `Telegram WSS works in TUN and proxy mode without entering auto priority`() = runTest {
+        repository.setManualEngine(EngineId.TGWSS)
+        assertEquals(EngineId.TGWSS, repository.settings.first().manualEngine)
+        repository.setTrafficMode(TrafficMode.PROXY)
+        repository.setManualEngine(EngineId.TGWSS)
+        assertEquals(EngineId.TGWSS, repository.settings.first().manualEngine)
+        repository.setEngineAutoPriority(listOf(EngineId.TGWSS, EngineId.WARP))
+        assertFalse(EngineId.TGWSS in repository.settings.first().engineAutoPriority)
+        dataStore.edit { prefs -> prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = "TGWSS,WARP" }
+        assertFalse(EngineId.TGWSS in repository.settings.first().engineAutoPriority)
+        repository.setTrafficMode(TrafficMode.TUN)
+        assertEquals(EngineId.TGWSS, repository.settings.first().manualEngine)
+    }
+
+    @Test
     fun `unknown split mode in DataStore falls back to default`() = runTest {
         dataStore.edit { prefs ->
             prefs[SettingsKeys.SPLIT_MODE] = "NOT_A_MODE"

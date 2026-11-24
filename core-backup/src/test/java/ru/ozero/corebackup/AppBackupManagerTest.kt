@@ -126,6 +126,25 @@ class AppBackupManagerTest {
     }
 
     @Test
+    fun `Telegram WSS selection and proxy mode round trip through general settings backup`() = runTest {
+        ozeroDs.edit { prefs ->
+            prefs[SettingsKeys.MANUAL_ENGINE] = "TGWSS"
+            prefs[SettingsKeys.TRAFFIC_MODE] = "PROXY"
+        }
+        val exported = manager.export(setOf(BackupCategory.GENERAL_SETTINGS))
+        assertEquals("TGWSS", exported.settings.manualEngine)
+        assertEquals("PROXY", exported.settings.trafficMode)
+        ozeroDs.edit { prefs ->
+            prefs.remove(SettingsKeys.MANUAL_ENGINE)
+            prefs[SettingsKeys.TRAFFIC_MODE] = "TUN"
+        }
+        manager.import(exported, setOf(BackupCategory.GENERAL_SETTINGS))
+        val restored = ozeroDs.data.first()
+        assertEquals("TGWSS", restored[SettingsKeys.MANUAL_ENGINE])
+        assertEquals("PROXY", restored[SettingsKeys.TRAFFIC_MODE])
+    }
+
+    @Test
     fun `export and import — FPTN token сохраняется в backup`() = runTest {
         fptnStore.inject { it.copy(token = "fptn:secret-token") }
         val exported = manager.export()

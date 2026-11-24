@@ -65,7 +65,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setEngineAutoPriority(priority: List<EngineId>) {
         dataStore.edit { prefs ->
-            val cleaned = priority.distinct().filter { !it.isStub }
+            val cleaned = priority.distinct().filter { !it.isStub && !it.manualStandaloneOnly }
             if (cleaned.isEmpty()) {
                 prefs.remove(SettingsKeys.ENGINE_AUTO_PRIORITY)
             } else {
@@ -247,10 +247,10 @@ class SettingsRepositoryImpl @Inject constructor(
             ?: return SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
         val parsed = raw.split(",")
             .mapNotNull { name -> runCatching { EngineId.valueOf(name.trim()) }.getOrNull() }
-            .filter { !it.isStub }
+            .filter { !it.isStub && !it.manualStandaloneOnly }
             .distinct()
         if (parsed.isEmpty()) return SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
-        val missing = EngineId.entries.filter { !it.isStub && it !in parsed }
+        val missing = EngineId.entries.filter { !it.isStub && !it.manualStandaloneOnly && it !in parsed }
         return parsed + missing
     }
 

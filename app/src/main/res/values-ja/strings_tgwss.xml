@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tgwss_summary">Telegram は WSS、それ以外は WARP を使用します。VPN とスプリットトンネルに対応します。</string>
+    <string name="tgwss_setup">メイン画面で Telegram WSS を選択して VPN に接続してください。Telegram の設定は不要です。除外アプリはスプリットトンネルで指定します。プロキシモードでは SOCKS5 を手動設定します。</string>
+    <string name="tgwss_address">SOCKS5: 127.0.0.1:%1$d（ユーザー名・パスワード不要）</string>
+    <string name="tgwss_open">Telegram で開く</string>
+    <string name="tgwss_open_failed">Telegram を開けませんでした。アドレスとポートを手動で入力してください。</string>
+    <string name="tgwss_not_running">ローカルプロキシは停止しています。</string>
+</resources>

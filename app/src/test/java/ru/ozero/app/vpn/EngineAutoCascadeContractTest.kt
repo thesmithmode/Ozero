@@ -15,6 +15,7 @@ class EngineAutoCascadeContractTest {
         EngineId.SINGBOX to "ru.ozero.enginesingbox.SingboxEngine",
         EngineId.FPTN to "ru.ozero.enginefptn.FptnEngine",
         EngineId.OPERA to "ru.ozero.engineopera.OperaEngine",
+        EngineId.TGWSS to "ru.ozero.enginetgwss.TelegramWssEngine",
     )
 
     @Test
@@ -29,9 +30,19 @@ class EngineAutoCascadeContractTest {
     }
 
     @Test
+    fun `standalone engines explicitly implement proxy config and stay out of automatic defaults`() {
+        EngineId.entries.filter { it.manualStandaloneOnly }.forEach { id ->
+            val className = nonStubEngineClasses[id] ?: fail("Missing proxy engine $id")
+            val clazz = Class.forName(className)
+            assertTrue(clazz.declaredMethods.any { it.name == "buildProxyConfig" })
+            assertTrue(id !in ru.ozero.enginescore.settings.SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY)
+        }
+    }
+
+    @Test
     fun `каждый non-stub EnginePlugin объявляет конфигурацию поддерживаемого режима`() {
         val missing = mutableListOf<String>()
-        EngineId.entries.filter { !it.isStub }.forEach { id ->
+        EngineId.entries.filter { !it.isStub && !it.manualStandaloneOnly }.forEach { id ->
             val className = nonStubEngineClasses[id] ?: fail("Добавь $id в map выше")
             val clazz = runCatching { Class.forName(className) }.getOrElse {
                 fail("Класс не найден: $className (id=$id)")

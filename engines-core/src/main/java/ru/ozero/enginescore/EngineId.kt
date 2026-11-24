@@ -1,6 +1,6 @@
 package ru.ozero.enginescore
 
-enum class EngineId(val displayName: String, val isStub: Boolean) {
+enum class EngineId(val displayName: String, val isStub: Boolean, val manualStandaloneOnly: Boolean = false) {
     BYEDPI(displayName = "ByeDPI", isStub = false),
     URNETWORK(displayName = "URnetwork", isStub = false),
     WARP(displayName = "WARP", isStub = false),
@@ -8,4 +8,5 @@ enum class EngineId(val displayName: String, val isStub: Boolean) {
     SINGBOX(displayName = "Sing-box", isStub = false),
     FPTN(displayName = "FPTN", isStub = false),
     OPERA(displayName = "Opera Proxy", isStub = false),
+    TGWSS(displayName = "Telegram WSS", isStub = false, manualStandaloneOnly = true),
 }
