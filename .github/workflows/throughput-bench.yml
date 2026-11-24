@@ -42,6 +42,9 @@ jobs:
       - name: Download native binaries
         run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
 
+      - name: Build MASQUE native transport
+        uses: ./.github/actions/build-masque
+
       - name: Build debug APK + androidTest APK
         run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
 

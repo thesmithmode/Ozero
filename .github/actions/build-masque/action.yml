@@ -1,0 +1,19 @@
+name: Build pinned MASQUE transport
+description: Build usque from the pinned source revision and verify the Android executable
+inputs:
+  abi:
+    description: Android ABI to build
+    required: false
+    default: arm64-v8a
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.3'
+        cache: false
+    - name: Build pinned usque
+      shell: bash
+      env:
+        MASQUE_ABI: ${{ inputs.abi }}
+      run: bash scripts/build-masque-binary.sh "$MASQUE_ABI"

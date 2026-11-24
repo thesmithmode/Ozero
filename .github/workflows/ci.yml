@@ -308,6 +308,9 @@ jobs:
             cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
           fi
 
+      - name: Build MASQUE native transport
+        uses: ./.github/actions/build-masque
+
       - name: coverage verification first
         run: >
           ./gradlew
@@ -471,8 +474,17 @@ jobs:
           ls -la singbox-core/libs/
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
+      - name: Build MASQUE native transport
+        uses: ./.github/actions/build-masque
+
       - name: assembleDebug
         run: ./gradlew assembleDebug --stacktrace
+
+      - name: Verify packaged MASQUE transport
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)
+          bash scripts/verify-masque-apk.sh "$APK" arm64-v8a
 
       - name: Assert APK contains MasterDNS subprocess binary
         run: |
@@ -1765,7 +1777,7 @@ jobs:
           retention-days: 14
 
   test-engine-masque:
-    name: Tests — engine-masque (draft)
+    name: Tests — engine-masque
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs:
@@ -1785,22 +1797,21 @@ jobs:
         with:
           packages: 'platform-tools'
       - uses: gradle/actions/setup-gradle@v4
-      - name: Unit tests and coverage report
-        run: ./gradlew :engine-masque:testDebugUnitTest :engine-masque:jacocoTestReport --stacktrace
+      - name: Unit tests and coverage gate
+        run: >-
+          ./gradlew :engine-masque:testDebugUnitTest :engine-masque:jacocoTestReport
+          :engine-masque:jacocoTestCoverageVerification --stacktrace
       - name: Verify tests were discovered
         run: |
           python3 -m pip install --quiet defusedxml
           python3 scripts/verify-junit-nonzero.py engine-masque
-      - uses: actions/setup-go@v6
-        with:
-          go-version: '1.26.3'
-          cache: false
-      - name: Build pinned Android ARM64 binary
-        run: bash scripts/build-masque-binary.sh
-      - name: Upload draft native artifact and reports
+      - name: Build MASQUE native transport
+        uses: ./.github/actions/build-masque
+      - name: Upload native artifact and reports
+        if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: masque-draft
+          name: masque-native-and-reports
           path: |
             engine-masque/build/native/**
             engine-masque/build/reports/**

@@ -231,6 +231,14 @@ jobs:
           cp "$SRC/libs/x86_64/libhev-socks5-tunnel.so" "$OUT/libhev-ozero-socks5-tunnel.so"
           test -s "$OUT/libhev-ozero-socks5-tunnel.so"
 
+      - name: Build MASQUE native transport
+        uses: ./.github/actions/build-masque
+
+      - name: Build MASQUE x86_64 transport
+        uses: ./.github/actions/build-masque
+        with:
+          abi: x86_64
+
       - name: Build x86_64 debug and instrumentation APKs
         run: |
           set -euo pipefail

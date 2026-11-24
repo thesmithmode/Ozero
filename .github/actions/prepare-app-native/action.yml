@@ -9,6 +9,9 @@ runs:
       shell: bash
       run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
 
+    - name: Build MASQUE native transport
+      uses: ./.github/actions/build-masque
+
     - name: Prepare URnetwork AAR
       uses: ./.github/actions/prepare-urnetwork
 

@@ -99,6 +99,7 @@ android {
     }
 
     packaging {
+        jniLibs.keepDebugSymbols += "**/libusque.so"
         resources {
             excludes +=
                 setOf(
@@ -109,6 +110,15 @@ android {
                     "META-INF/AL2.0",
                     "META-INF/LGPL2.1",
                 )
+        }
+    }
+}
+
+tasks.matching { it.name == "packageDebug" || it.name == "packageRelease" }.configureEach {
+    doFirst {
+        val nativeDir = rootProject.file("engine-masque/build/native")
+        supportedAbis.forEach { abi ->
+            check(nativeDir.resolve("$abi/libusque.so").isFile) { "MASQUE native binary missing for $abi" }
         }
     }
 }
