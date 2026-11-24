@@ -19,6 +19,7 @@ import ru.ozero.app.ui.settings.SettingsScreen
 import ru.ozero.app.ui.settings.engines.ByeDpiEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.FptnEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.MasterDnsSettingsScreen
+import ru.ozero.app.ui.settings.engines.OperaEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkSharedTrafficScreen
 import ru.ozero.app.ui.settings.engines.WarpEngineSettingsScreen
@@ -36,6 +37,7 @@ private fun engineParamsTarget(engineId: EngineId?): TopScreen = when (engineId)
     EngineId.MASTERDNS -> TopScreen.MasterDnsSettings
     EngineId.FPTN -> TopScreen.FptnSettings
     EngineId.SINGBOX -> TopScreen.SingboxSettings
+    EngineId.OPERA -> TopScreen.OperaSettings
 }
 
 @Composable
@@ -69,6 +71,7 @@ fun RootNavigation(
                     onOpenMasterDnsSettings = { navigate(TopScreen.MasterDnsSettings) },
                     onOpenFptnSettings = { navigate(TopScreen.FptnSettings) },
                     onOpenSingboxSettings = { navigate(TopScreen.SingboxSettings) },
+                    onOpenOperaSettings = { navigate(TopScreen.OperaSettings) },
                     onOpenStatsHistory = { navigate(TopScreen.StatsHistory) },
                     onOpenBackup = { navigate(TopScreen.Backup) },
                     onOpenAutoModeSettings = { navigate(TopScreen.AutoModeSettings) },
@@ -94,6 +97,7 @@ fun RootNavigation(
             TopScreen.WarpEngineSettings -> WarpEngineSettingsScreen(onBack = { back() })
             TopScreen.MasterDnsSettings -> MasterDnsSettingsScreen(onBack = { back() })
             TopScreen.FptnSettings -> FptnEngineSettingsScreen(onBack = { back() })
+            TopScreen.OperaSettings -> OperaEngineSettingsScreen(onBack = { back() })
             TopScreen.SingboxSettings -> SingboxEngineSettingsScreen(
                 onBack = { back() },
                 onOpenAdvanced = { navigate(TopScreen.SingboxAdvancedSettings) },

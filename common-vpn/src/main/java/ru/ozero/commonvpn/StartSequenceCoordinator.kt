@@ -217,7 +217,7 @@ class StartSequenceCoordinator(
                 }
         }
         if (!usesCustomTun) deps.engineWatchdog.startHealthKillswitchWatcher(activeEngineId)
-        if (usesCustomTun && activeEngineId == EngineId.SINGBOX) {
+        if (usesCustomTun && activeEngineId in setOf(EngineId.SINGBOX, EngineId.OPERA)) {
             deps.engineWatchdog.startRoutedProbeWatchdog(activeEngineId)
         } else if (usesCustomTun) {
             deps.engineWatchdog.startPeerWatchdog(activeEngineId)
@@ -263,6 +263,7 @@ class StartSequenceCoordinator(
                 PersistentLoggers.warn(TAG, "proxy healthMonitor.start threw: ${t.message}")
             }
         deps.engineWatchdog.startHealthKillswitchWatcher(engineId)
+        if (engineId == EngineId.OPERA) deps.engineWatchdog.startRoutedProbeWatchdog(engineId)
         deps.statsLogger.start()
         return true
     }
@@ -365,7 +366,7 @@ class StartSequenceCoordinator(
         if (manualEngine != null) return manualEngine
         val pluginIds = deps.enginePlugins.mapTo(mutableSetOf()) { it.id }
         return settings.engineAutoPriority.firstOrNull { it in pluginIds }
-            ?: deps.enginePlugins.firstOrNull()?.id
+            ?: pluginIds.firstOrNull()
     }
 
     private fun shouldPreserveTunOnAutoRetry(

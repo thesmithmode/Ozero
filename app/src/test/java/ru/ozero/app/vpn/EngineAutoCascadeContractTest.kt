@@ -14,6 +14,7 @@ class EngineAutoCascadeContractTest {
         EngineId.MASTERDNS to "ru.ozero.enginemasterdns.MasterDnsEngine",
         EngineId.SINGBOX to "ru.ozero.enginesingbox.SingboxEngine",
         EngineId.FPTN to "ru.ozero.enginefptn.FptnEngine",
+        EngineId.OPERA to "ru.ozero.engineopera.OperaEngine",
     )
 
     @Test
@@ -28,7 +29,7 @@ class EngineAutoCascadeContractTest {
     }
 
     @Test
-    fun `каждый non-stub EnginePlugin обязан override buildManualConfig для участия в auto cascade`() {
+    fun `каждый non-stub EnginePlugin объявляет конфигурацию поддерживаемого режима`() {
         val missing = mutableListOf<String>()
         EngineId.entries.filter { !it.isStub }.forEach { id ->
             val className = nonStubEngineClasses[id] ?: fail("Добавь $id в map выше")
@@ -42,7 +43,7 @@ class EngineAutoCascadeContractTest {
         }
         assertTrue(
             missing.isEmpty(),
-            "Non-stub engines обязаны override fun buildManualConfig(settings): EngineConfig?, " +
+            "Non-stub engines обязаны override конфигурацию поддерживаемого режима, " +
                 "иначе StartSequenceCoordinator.autoCandidates() их пропускает через mapNotNull, " +
                 "и они не участвуют в auto cascade. Missing: $missing",
         )

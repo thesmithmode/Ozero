@@ -23,6 +23,8 @@ data class SettingsModel(
     val appMode: AppMode = DEFAULT_APP_MODE,
     val killswitchEnabled: Boolean = DEFAULT_KILLSWITCH_ENABLED,
     val alwaysOnBannerDismissed: Boolean = DEFAULT_ALWAYS_ON_BANNER_DISMISSED,
+    val operaRegion: String = "EU",
+    val operaSelection: String = "fastest",
 ) {
     companion object {
         val DEFAULT_SPLIT_MODE: SplitTunnelMode = SplitTunnelMode.ALL
@@ -32,6 +34,7 @@ data class SettingsModel(
         val DEFAULT_MANUAL_ENGINE: EngineId? = null
         val DEFAULT_ENGINE_AUTO_PRIORITY: List<EngineId> = listOf(
             EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI, EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+            EngineId.OPERA,
         )
         const val DEFAULT_URNETWORK_ENABLED: Boolean = false
         val DEFAULT_URNETWORK_JWT: String? = null

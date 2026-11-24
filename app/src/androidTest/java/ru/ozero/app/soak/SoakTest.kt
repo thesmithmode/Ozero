@@ -36,6 +36,7 @@ import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.TrafficMode
 import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginescore.settings.SplitTunnelMode
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.singboxfmt.AbstractBean
@@ -181,6 +182,47 @@ class SoakTest {
         check(successfulCycles.values.all { it == cyclesPerProtocol })
     }
 
+    @Test
+    fun runOperaTunSmoke() = runBlocking {
+        val args = InstrumentationRegistry.getArguments()
+        Assume.assumeTrue("OZERO_OPERA_SMOKE must be 1", args.getString("OZERO_OPERA_SMOKE") == "1")
+        val url = requireNotNull(args.getString("OZERO_OPERA_SMOKE_URL"))
+        val marker = requireNotNull(args.getString("OZERO_OPERA_SMOKE_MARKER"))
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        check(VpnService.prepare(context) == null) { "VPN consent not granted" }
+        val dependencies = EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            SoakTestEntryPoint::class.java,
+        )
+        val settings = dependencies.settingsRepository()
+        val controller = dependencies.tunnelController()
+        val original = settings.settings.first()
+        try {
+            stopVpn(context, controller)
+            settings.setTrafficMode(TrafficMode.TUN)
+            settings.setManualEngine(EngineId.OPERA)
+            settings.setSplitMode(SplitTunnelMode.ALL)
+            settings.setKillswitchEnabled(true)
+            repeat(3) {
+                startVpn(context)
+                awaitConnected(controller, EngineId.OPERA)
+                val probe = probeFromExternalUid(context, instrumentation.context, url, marker)
+                check(probe.vpnTransport) { "Opera probe is outside the VPN" }
+                check(probe.httpCode in 200..299 && probe.markerMatch) {
+                    "Opera external TCP/DNS probe failed: ${probe.stage} HTTP ${probe.httpCode}"
+                }
+                stopVpn(context, controller)
+            }
+        } finally {
+            stopVpn(context, controller)
+            settings.setManualEngine(original.manualEngine)
+            settings.setTrafficMode(original.trafficMode)
+            settings.setSplitMode(original.splitMode)
+            settings.setKillswitchEnabled(original.killswitchEnabled)
+        }
+    }
+
     private suspend fun loadSubscriptionProfiles(
         dependencies: SoakTestEntryPoint,
     ): Map<String, SoakProfile> {
@@ -297,12 +339,12 @@ class SoakTest {
         )
     }
 
-    private suspend fun awaitConnected(controller: TunnelController) {
+    private suspend fun awaitConnected(controller: TunnelController, engineId: EngineId = EngineId.SINGBOX) {
         val state = withTimeout(START_TIMEOUT_MS) {
             controller.state.first { it is TunnelState.Connected || it is TunnelState.Failed }
         }
-        check(state is TunnelState.Connected && state.engineId == EngineId.SINGBOX) {
-            "Sing-box failed to connect: $state"
+        check(state is TunnelState.Connected && state.engineId == engineId) {
+            "$engineId failed to connect: $state"
         }
     }
 

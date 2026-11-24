@@ -137,6 +137,11 @@
             android:exported="false" />
 
         <service
+            android:name="ru.ozero.singboxprocess.OperaTunService"
+            android:process=":engine_opera_tun"
+            android:exported="false" />
+
+        <service
             android:name=".ui.strategy.StrategyScanService"
             android:foregroundServiceType="dataSync"
             android:exported="false" />

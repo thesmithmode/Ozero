@@ -70,6 +70,8 @@ data class BackupSettings(
     val bydpiDefaultAccepted: Boolean? = null,
     val urnetworkCountryCode: String? = null,
     val fptnToken: String? = null,
+    val operaRegion: String? = null,
+    val operaSelection: String? = null,
 )
 
 data class BackupUrnetwork(

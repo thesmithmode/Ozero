@@ -1,6 +1,16 @@
 tag: fptn-ec465fed
 generated_at: 2026-09-12T16:27:58Z
 artifacts:
+  - name: libopera_proxy-arm64-v8a.so
+    engine: opera
+    abi: arm64-v8a
+    destination: jniLibs
+    target_filename: libopera_proxy.so
+    download_url: https://github.com/Alexey71/opera-proxy/releases/download/v1.30.0/opera-proxy.android-arm64
+    sha256: e2c7eff21a6f4fa9bd40295f985d3dd02af86e693d32f7653b4afe9ea49dde82
+    size_bytes: 8506944
+    source_repo: https://github.com/Alexey71/opera-proxy
+    source_commit: 57205a4bf61b55991c35841198cc27ead5ef6962
   - name: libxray.aar
     engine: xray
     destination: libs

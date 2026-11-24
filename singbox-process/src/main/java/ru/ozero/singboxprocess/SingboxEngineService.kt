@@ -14,7 +14,8 @@ import ru.ozero.enginesingbox.singboxConfigFingerprint
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.singboxcore.Libsingboxgojni
 
-class SingboxEngineService : Service() {
+open class SingboxEngineService : Service() {
+    protected open val runtimeDirectory: String = "singbox"
     private val stopLock = Any()
 
     private val binder = object : ISingboxEngineProcess.Stub() {
@@ -226,7 +227,7 @@ class SingboxEngineService : Service() {
     override fun onCreate() {
         super.onCreate()
         Libsingboxgojni.loadOnce()
-        val dataDir = applicationContext.filesDir.absolutePath + "/singbox"
+        val dataDir = applicationContext.filesDir.absolutePath + "/$runtimeDirectory"
         java.io.File(dataDir).mkdirs()
         java.io.File("$dataDir/tmp").mkdirs()
         SingboxRuntime.setup(dataDir)
