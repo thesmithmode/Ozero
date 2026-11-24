@@ -552,7 +552,7 @@ class StartSequenceCoordinatorBehaviorTest {
 
         fixture.coordinator.run()
 
-        assertEquals(listOf(EngineConfig.TelegramWss()), engine.startedConfigs)
+        assertEquals(listOf<EngineConfig>(EngineConfig.TelegramWss()), engine.startedConfigs)
         verify(exactly = 1) {
             fixture.tunnelGateway.start(match { it.tunPfd === tunFd && it.socksPort == 10812 })
         }
@@ -577,7 +577,7 @@ class StartSequenceCoordinatorBehaviorTest {
 
         fixture.coordinator.run()
 
-        assertEquals(listOf(EngineConfig.TelegramWss(tunnelMode = false)), engine.startedConfigs)
+        assertEquals(listOf<EngineConfig>(EngineConfig.TelegramWss(tunnelMode = false)), engine.startedConfigs)
         verify(exactly = 0) { fixture.tunnelGateway.start(any()) }
         verify(exactly = 1) { fixture.engineWatchdog.startRoutedProbeWatchdog(EngineId.TGWSS) }
         verify(exactly = 1) { fixture.engineWatchdog.startHealthKillswitchWatcher(EngineId.TGWSS) }
