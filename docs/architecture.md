@@ -10,7 +10,7 @@
 | Контракты движков | `engines-core`: `EnginePlugin`, конфигурации, capabilities, readiness и socket protection |
 | VPN | `common-vpn`: сервис, TUN, запуск, остановка, переключение, watchdog и состояние туннеля |
 | Общие компоненты | `common-dns`, `common-net`, `common-crypto`, `core-storage`, `core-backup` |
-| Транспорты | `engine-byedpi`, `engine-warp`, `engine-fptn`, `engine-urnetwork`, `engine-masterdns`, `engine-singbox`, `engine-masque` |
+| Транспорты | `engine-byedpi`, `engine-warp`, `engine-fptn`, `engine-urnetwork`, `engine-masterdns`, `engine-singbox`, `engine-opera`, `engine-masque` |
 | WARP | `shared-warp-settings`: общая модель конфигурации и AWG-параметры |
 | sing-box | `singbox-process`, `singbox-core`, `singbox-fmt`, `singbox-config`, `singbox-room`, `singbox-subscription` |
 
@@ -33,6 +33,7 @@
 - sing-box использует runtime-модуль `singbox-process`, libbox и сервис в процессе `:engine_singbox`. URnetwork и sing-box используют общую подготовку `go.Seq`; классы `go/*` удаляются из дублирующих SDK-артефактов.
 - FPTN использует Kotlin-обвязку HTTPS/WebSocket и JNI-библиотеку `libfptn_native_lib.so`.
 - MasterDNS запускает нативный клиент как subprocess.
+- Opera Proxy запускает закреплённый ARM64 subprocess с локальным TCP SOCKS5. Для TUN используется libbox в отдельном процессе `:engine_opera_tun`: DNS через DoH и Opera, TCP через Opera, прочий UDP отклоняется.
 - MASQUE запускает отдельный usque subprocess с SOCKS5, H2/H3 и проверкой трафика; профиль хранится зашифрованным.
 
 Изоляция WARP нужна для совместимости Go runtimes. Native-библиотеки загружаются лениво; правила загрузки и порядка остановки сохраняются в [AGENTS.md](../AGENTS.md).

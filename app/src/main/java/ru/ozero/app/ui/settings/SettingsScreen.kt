@@ -67,6 +67,7 @@ fun SettingsScreen(
     onOpenMasterDnsSettings: () -> Unit = {},
     onOpenFptnSettings: () -> Unit = {},
     onOpenSingboxSettings: () -> Unit = {},
+    onOpenOperaSettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -90,6 +91,7 @@ fun SettingsScreen(
             onOpenMasterDnsSettings = onOpenMasterDnsSettings,
             onOpenFptnSettings = onOpenFptnSettings,
             onOpenSingboxSettings = onOpenSingboxSettings,
+            onOpenOperaSettings = onOpenOperaSettings,
         ),
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
@@ -215,6 +217,7 @@ private fun ContentBody(
                 onOpenMasterDns = nav.onOpenMasterDnsSettings,
                 onOpenFptn = nav.onOpenFptnSettings,
                 onOpenSingbox = nav.onOpenSingboxSettings,
+                onOpenOpera = nav.onOpenOperaSettings,
             )
         }
         item { SectionDivider() }
@@ -404,6 +407,7 @@ private fun EnginesSection(
     onOpenMasterDns: () -> Unit,
     onOpenFptn: () -> Unit,
     onOpenSingbox: () -> Unit,
+    onOpenOpera: () -> Unit,
 ) {
     NavRow(
         title = stringResource(R.string.settings_byedpi_title),
@@ -452,6 +456,13 @@ private fun EnginesSection(
         summary = stringResource(R.string.settings_singbox_summary),
         tag = "settings_singbox_row",
         onClick = onOpenSingbox,
+        enabled = true,
+    )
+    NavRow(
+        title = "Opera Proxy",
+        summary = stringResource(R.string.settings_opera_summary),
+        tag = "settings_opera_row",
+        onClick = onOpenOpera,
         enabled = true,
     )
 }

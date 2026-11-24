@@ -99,6 +99,7 @@ android {
     }
 
     packaging {
+        jniLibs.keepDebugSymbols += "**/libopera_proxy.so"
         jniLibs.keepDebugSymbols += "**/libusque.so"
         resources {
             excludes +=
@@ -169,6 +170,7 @@ dependencies {
     implementation(project(":engine-masque"))
     implementation(project(":shared-warp-settings"))
     implementation(project(":engine-masterdns"))
+    implementation(project(":engine-opera"))
     implementation(project(":engine-fptn"))
     implementation(project(":engine-singbox"))
     implementation(project(":singbox-process"))

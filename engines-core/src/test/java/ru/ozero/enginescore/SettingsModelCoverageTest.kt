@@ -32,10 +32,13 @@ class SettingsModelCoverageTest {
                 EngineId.MASTERDNS,
                 EngineId.SINGBOX,
                 EngineId.FPTN,
+                EngineId.OPERA,
                 EngineId.MASQUE,
             ),
             model.engineAutoPriority,
         )
+        assertEquals("EU", model.operaRegion)
+        assertEquals("fastest", model.operaSelection)
         assertFalse(model.urnetworkEnabled)
         assertTrue(model.byedpiUseUiMode)
         assertEquals(AppMode.SIMPLE, model.appMode)

@@ -32,6 +32,8 @@ class EngineSettingsRestartObserver(
         val customDnsServers: List<String>,
         val engineAutoPriority: List<EngineId>?,
         val byedpiUiSettings: ByeDpiUiSettings = ByeDpiUiSettings.DEFAULT,
+        val operaRegion: String = "EU",
+        val operaSelection: String = "fastest",
     )
 
     data class Trigger(val previous: Snapshot, val snapshot: Snapshot)
@@ -54,6 +56,8 @@ class EngineSettingsRestartObserver(
                     trafficMode = it.trafficMode,
                     customDnsServers = it.customDnsServers,
                     engineAutoPriority = if (it.manualEngine == null) it.engineAutoPriority else null,
+                    operaRegion = it.operaRegion,
+                    operaSelection = it.operaSelection,
                 )
             }
             .distinctUntilChanged()
@@ -138,6 +142,8 @@ class EngineSettingsRestartObserver(
                     byedpiUseUiMode == other.byedpiUseUiMode &&
                     byedpiUiSettings == other.byedpiUiSettings &&
                     commonRuntimeMatches
+            EngineId.OPERA ->
+                operaRegion == other.operaRegion && operaSelection == other.operaSelection && commonRuntimeMatches
             else -> commonRuntimeMatches
         }
     }

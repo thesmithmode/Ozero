@@ -1382,6 +1382,7 @@ class StartSequenceCoordinatorBehaviorTest {
                 proxyMode = true,
             )
             EngineId.FPTN -> EngineConfig.Fptn(token = "test")
+            EngineId.OPERA -> EngineConfig.Opera(proxyMode = true)
             EngineId.MASQUE -> EngineConfig.Masque(profileJson = "{}", transport = "AUTO")
         }
     }

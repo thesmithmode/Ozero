@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_opera_summary">Opera के ज़रिए VPN और SOCKS5। TCP और DNS के लिए Cloudflare DoH; अन्य UDP समर्थित नहीं है।</string>
+    <string name="opera_region">क्षेत्र</string>
+    <string name="opera_selection">सर्वर चयन</string>
+    <string name="opera_first">पहला उपलब्ध</string>
+    <string name="opera_random">यादृच्छिक</string>
+    <string name="opera_fastest">सबसे तेज़</string>
+</resources>

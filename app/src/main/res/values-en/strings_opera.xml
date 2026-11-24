@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_opera_summary">VPN and SOCKS5 via Opera. TCP and DNS via Cloudflare DoH; other UDP is unsupported.</string>
+    <string name="opera_region">Region</string>
+    <string name="opera_selection">Server selection</string>
+    <string name="opera_first">First available</string>
+    <string name="opera_random">Random</string>
+    <string name="opera_fastest">Fastest</string>
+</resources>

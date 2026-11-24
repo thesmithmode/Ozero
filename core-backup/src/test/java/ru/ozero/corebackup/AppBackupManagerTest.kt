@@ -88,6 +88,25 @@ class AppBackupManagerTest {
     )
 
     @Test
+    fun `Opera settings survive export and import`() = runTest {
+        ozeroDs.edit { prefs ->
+            prefs[SettingsKeys.OPERA_REGION] = "AS"
+            prefs[SettingsKeys.OPERA_SELECTION] = "random"
+        }
+        val exported = manager.export()
+        assertEquals("AS", exported.settings.operaRegion)
+        assertEquals("random", exported.settings.operaSelection)
+        ozeroDs.edit { prefs ->
+            prefs.remove(SettingsKeys.OPERA_REGION)
+            prefs.remove(SettingsKeys.OPERA_SELECTION)
+        }
+        manager.import(exported)
+        assertEquals("AS", ozeroDs.data.first()[SettingsKeys.OPERA_REGION])
+        assertEquals("random", ozeroDs.data.first()[SettingsKeys.OPERA_SELECTION])
+        assertNull(manager.export(setOf(BackupCategory.WARP)).settings.operaRegion)
+    }
+
+    @Test
     fun `unused MASQUE leaves existing backup format unchanged`() = runTest {
         val store = mockk<MasqueProfileStore>(relaxed = true)
         every { store.settings() } returns flowOf(MasqueSettings())

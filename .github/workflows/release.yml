@@ -342,6 +342,18 @@ jobs:
           fi
           echo "APK contains MasterDNS subprocess binary"
 
+      - name: Verify APK Opera Proxy binary matches pinned ARM64 release
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
+          test -n "$APK"
+          TEMP=$(mktemp)
+          trap 'rm -f "$TEMP"' EXIT
+          unzip -p "$APK" lib/arm64-v8a/libopera_proxy.so > "$TEMP"
+          cmp engine-opera/src/main/jniLibs/arm64-v8a/libopera_proxy.so "$TEMP"
+          readelf -h "$TEMP" | grep -E 'Machine:.*AArch64'
+          readelf -h "$TEMP" | grep -E 'Type:.*DYN'
+
       - name: Assert WARP libam-go.so SHA256 == PORTAL_WG_v1.4.3 reference
         run: |
           set -euo pipefail

@@ -19,6 +19,10 @@ interface SettingsRepository {
 
     suspend fun setEngineAutoPriority(priority: List<EngineId>) = Unit
 
+    suspend fun setOperaRegion(region: String) = Unit
+
+    suspend fun setOperaSelection(selection: String) = Unit
+
     suspend fun setUrnetworkEnabled(enabled: Boolean)
 
     suspend fun setUrnetworkJwt(jwt: String?)
