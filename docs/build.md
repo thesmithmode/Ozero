@@ -78,6 +78,46 @@ Android-подпись APK, GPG-подпись файла и Ed25519-подпи�
 
 На текущей версии пользователи устанавливают обновления вручную. Код [GithubReleaseFetcher](../app/src/main/java/ru/ozero/app/selfupdate/GithubReleaseFetcher.kt) и [ApkUpdateVerifier](../app/src/main/java/ru/ozero/app/selfupdate/ApkUpdateVerifier.kt) подготовлен для проверки Ed25519, но экран и фоновая задача его не вызывают. Если встроенное обновление понадобится, подключать его следует после определения правил публикации стабильных и пробных сборок.
 
+
+### Зеркала релизов
+
+После успешной публикации на GitHub release workflow может отправлять те же файлы
+`Ozero-vX.Y.Z.apk`, `.apk.sha256` и `.apk.asc` на GitVerse и SourceForge.
+Зеркала отключены по умолчанию; включаются независимо. APK не пересобирается и
+не переподписывается. Для включённого зеркала обязательны SHA-256 и корректная
+отдельная GPG-подпись (`RELEASE_GPG_PRIVATE_KEY`, при необходимости
+`RELEASE_GPG_PASSPHRASE`). Ошибка зеркала помечает release workflow ошибочным,
+но уже опубликованный GitHub Release остаётся доступен, и второе зеркало всё
+равно выполняется, если настроено.
+
+Настройка в GitHub Settings → Secrets and variables → Actions:
+
+| Тип | Имя | Значение |
+|---|---|---|
+| Variable | `GITVERSE_REPOSITORY` | Публичный репозиторий проекта в формате owner/repo; пусто — выключено |
+| Variable | `GITVERSE_USERNAME` | Логин владельца токена с доступом на запись |
+| Secret | `GITVERSE_TOKEN` | Токен GitVerse с правами записи в целевой репозиторий |
+| Variable | `SOURCEFORGE_PROJECT` | UNIX-имя публичного проекта; пусто — выключено |
+| Variable | `SOURCEFORGE_USERNAME` | Логин аккаунта с правами release technician |
+| Secret | `SOURCEFORGE_SSH_KEY` | Отдельный закрытый SSH-ключ без passphrase, публичная часть добавлена в аккаунт |
+| Variable | `SOURCEFORGE_KNOWN_HOSTS` | Проверенная запись known_hosts для frs.sourceforge.net из официальных отпечатков |
+
+GitVerse: заранее создать или импортировать публичный репозиторий, допускающий
+запись. Workflow отправляет только тег текущего коммита (без force и без
+изменения веток); при несовпадении существующего тега останавливается.
+Релиз создаётся как черновик, загружаются три артефакта, затем он публикуется.
+Повторный запуск обновляет только три одноимённых файла, не трогая другие
+ассеты. SourceForge: предварительно создать проект и включить File Release
+System. Файлы загружаются rsync по SSH в `/home/frs/project/<project>/<tag>/`,
+проверка ключа хоста обязательна; другие релизы не удаляются. При обрыве
+передачи возможно временное наличие неполного набора файлов в каталоге.
+Не публикуйте ссылки на зеркало до успешного первого релиза и ручной
+проверки скачивания и подписей. Встроенный автоапдейтер не меняется.
+
+Документация: [GitVerse Releases API](https://gitverse.ru/docs/developers/public-api/releases/),
+[SourceForge FRS](https://sourceforge.net/p/forge/documentation/Release%20Files%20for%20Download/),
+[SourceForge SSH](https://sourceforge.net/p/forge/documentation/SSH/).
+
 ## Native source и готовая библиотека
 
 Для URnetwork CI и выпуск APK используют один [закреплённый AAR](../.github/checksums/urnetwork-sdk.lock). SHA-256 проверяется до подготовки архива, в том числе при попадании в кэш. При обновлении SDK поменяйте тег и хеш вместе.

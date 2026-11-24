@@ -67,6 +67,18 @@ jobs:
             core.setOutput('skip_push', skipPush ? 'true' : 'false');
             core.setOutput('run_ci', runCi ? 'true' : 'false');
 
+  release-mirror-tests:
+    name: Release mirror tests
+    runs-on: ubuntu-latest
+    needs: detect-open-pr-for-same-sha
+    if: ${{ needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Test mirror publishing without credentials
+        run: python3 -m unittest discover -s .github/scripts -p 'test_release_mirrors.py' -v
+
   kotlin-style:
     name: ktlint + detekt
     runs-on: ubuntu-latest

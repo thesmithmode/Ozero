@@ -468,6 +468,7 @@ jobs:
           test -s "release-out/Ozero-${{ needs.resolve-version.outputs.tag }}.apk"
 
       - name: Publish GitHub Release
+        id: publish-github
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.resolve-version.outputs.tag }}
@@ -479,3 +480,22 @@ jobs:
           overwrite_files: true
           token: ${{ secrets.GITHUB_TOKEN }}
           files: release-out/*
+
+      - name: Publish GitVerse mirror
+        if: ${{ !cancelled() && steps.publish-github.outcome == 'success' && vars.GITVERSE_REPOSITORY != '' }}
+        env:
+          TAG: ${{ needs.resolve-version.outputs.tag }}
+          GITVERSE_REPOSITORY: ${{ vars.GITVERSE_REPOSITORY }}
+          GITVERSE_USERNAME: ${{ vars.GITVERSE_USERNAME }}
+          GITVERSE_TOKEN: ${{ secrets.GITVERSE_TOKEN }}
+        run: python3 .github/scripts/release-mirrors.py gitverse "$TAG" release-out
+
+      - name: Publish SourceForge mirror
+        if: ${{ !cancelled() && steps.publish-github.outcome == 'success' && vars.SOURCEFORGE_PROJECT != '' }}
+        env:
+          TAG: ${{ needs.resolve-version.outputs.tag }}
+          SOURCEFORGE_PROJECT: ${{ vars.SOURCEFORGE_PROJECT }}
+          SOURCEFORGE_USERNAME: ${{ vars.SOURCEFORGE_USERNAME }}
+          SOURCEFORGE_SSH_KEY: ${{ secrets.SOURCEFORGE_SSH_KEY }}
+          SOURCEFORGE_KNOWN_HOSTS: ${{ vars.SOURCEFORGE_KNOWN_HOSTS }}
+        run: python3 .github/scripts/release-mirrors.py sourceforge "$TAG" release-out
