@@ -61,7 +61,7 @@ class MasqueEngine(
 
     private fun createConfig(current: MasqueSettings, settings: SettingsModel?): EngineConfig? {
         val profile = current.profile ?: return null
-        if (!available() || (!current.autoEnabled && settings?.manualEngine != id)) return null
+        if (current.corrupt || !available() || (!current.autoEnabled && settings?.manualEngine != id)) return null
         return EngineConfig.Masque(profile.json, current.transport.name, settings?.ipv6Enabled == true)
     }
 
@@ -102,7 +102,11 @@ class MasqueEngine(
     override fun stopTimeoutMs(): Long = 6_000
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult =
-        if (runtime.isReady()) EnginePlugin.ReadyResult.Ready else EnginePlugin.ReadyResult.Timeout("MASQUE unavailable")
+        if (runtime.isReady()) {
+            EnginePlugin.ReadyResult.Ready
+        } else {
+            EnginePlugin.ReadyResult.Timeout("MASQUE unavailable")
+        }
 
     override suspend fun probe(): ProbeResult {
         val started = System.nanoTime()

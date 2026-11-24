@@ -56,6 +56,7 @@ class AppBackupManager(
     }
 
     private suspend fun exportMasque(): BackupMasque? = masqueStore?.settings()?.first()?.let {
+        check(!it.corrupt) { "MASQUE profile is damaged" }
         BackupMasque(it.profile?.exportJson(), it.transport.name, it.autoEnabled)
     }
 

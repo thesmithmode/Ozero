@@ -26,6 +26,10 @@ class MasqueTransportTest {
         assertTrue("1080" in h3)
         assertFalse("--http2" in h3)
         assertEquals(h3 + "--http2", h2)
+        assertTrue("--no-tunnel-ipv6" in h3)
+        val v6 = MasqueCommand.socks(binary, config, 1080, MasqueTransport.H3, true, true)
+        assertTrue("--ipv6" in v6)
+        assertFalse("--no-tunnel-ipv6" in v6)
         for (flag in listOf("--insecure", "--local-dns", "--system-dns")) {
             assertFalse(flag in h3)
             assertFalse(flag in h2)

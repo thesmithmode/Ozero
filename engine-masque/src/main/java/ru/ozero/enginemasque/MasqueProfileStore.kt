@@ -14,6 +14,7 @@ data class MasqueSettings(
     val profile: MasqueProfile? = null,
     val transport: MasqueTransport = MasqueTransport.AUTO,
     val autoEnabled: Boolean = true,
+    val corrupt: Boolean = false,
 ) {
     fun fingerprint(): String? = profile?.let {
         val digest = MessageDigest.getInstance("SHA-256").digest(it.json.toByteArray())
@@ -24,14 +25,19 @@ data class MasqueSettings(
 
 class MasqueProfileStore(private val store: DataStore<Preferences>) {
     fun settings(): Flow<MasqueSettings> = store.data.map { prefs ->
+        val raw = prefs[PROFILE]
+        val rawTransport = prefs[TRANSPORT]
+        val profile = raw?.let(::decodeOrNull)
+        val transport = MasqueTransport.entries.firstOrNull { it.name == rawTransport }
         MasqueSettings(
-            profile = prefs[PROFILE]?.let(::decode),
-            transport = prefs[TRANSPORT]?.let(MasqueTransport::valueOf) ?: MasqueTransport.AUTO,
+            profile = profile,
+            transport = transport ?: MasqueTransport.AUTO,
             autoEnabled = prefs[AUTO_ENABLED] ?: true,
+            corrupt = (raw != null && profile == null) || (rawTransport != null && transport == null),
         )
     }
 
-    fun profiles(): Flow<MasqueProfile?> = settings().map { it.profile }
+    fun profiles(): Flow<MasqueProfile?> = settings().map { it.profile.takeUnless { _ -> it.corrupt } }
 
     suspend fun save(profile: MasqueProfile) {
         val sealed = encrypt(profile)
@@ -56,7 +62,10 @@ class MasqueProfileStore(private val store: DataStore<Preferences>) {
     }
 
     suspend fun clear() {
-        store.edit { it.remove(PROFILE) }
+        store.edit { prefs ->
+            prefs.remove(PROFILE)
+            if (MasqueTransport.entries.none { it.name == prefs[TRANSPORT] }) prefs.remove(TRANSPORT)
+        }
     }
 
     private fun encrypt(profile: MasqueProfile): String {
@@ -65,9 +74,13 @@ class MasqueProfileStore(private val store: DataStore<Preferences>) {
         return sealed
     }
 
-    private fun decode(value: String): MasqueProfile {
-        check(PreferenceAtRest.isSealed(value)) { "MASQUE profile is not encrypted" }
-        return MasqueProfile.parse(PreferenceAtRest.open(value))
+    private fun decodeOrNull(value: String): MasqueProfile? {
+        if (!PreferenceAtRest.isSealed(value)) return null
+        return try {
+            MasqueProfile.parse(PreferenceAtRest.open(value))
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private companion object {

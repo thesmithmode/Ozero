@@ -38,6 +38,7 @@ class MasqueSettingsViewModel @Inject constructor(
             registered = it.profile != null,
             transport = it.transport,
             autoEnabled = it.autoEnabled,
+            error = it.corrupt,
             loaded = true,
         )
     }.catch { emit(MasqueSettingsUiState(error = true, loaded = true)) }

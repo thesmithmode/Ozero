@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
 import ru.ozero.commoncrypto.AesGcmAtRestCipher
 import ru.ozero.commoncrypto.AtRestSecrets
@@ -48,9 +47,41 @@ class MasqueProfileStoreTest {
         )
         val store = MasqueProfileStore(data)
         data.edit { it[KEY] = PROFILE }
-        assertThrows<IllegalStateException> { store.profiles().first() }
+        assertTrue(store.settings().first().corrupt)
+        assertNull(store.profiles().first())
         data.edit { it[KEY] = "enc1:AAAA" }
-        assertThrows<IllegalArgumentException> { store.profiles().first() }
+        assertTrue(store.settings().first().corrupt)
+        assertNull(store.profiles().first())
+        store.clear()
+        assertFalse(store.settings().first().corrupt)
+        assertNull(store.profiles().first())
+    }
+
+    @Test
+    fun `transport auto eligibility and profile restore are persistent`(@TempDir tmp: Path) = runTest {
+        val data = PreferenceDataStoreFactory.create(
+            produceFile = { tmp.resolve("masque.preferences_pb").toFile() },
+        )
+        val store = MasqueProfileStore(data)
+        assertEquals(MasqueTransport.AUTO, store.settings().first().transport)
+        assertTrue(store.settings().first().autoEnabled)
+        assertNull(store.settings().first().fingerprint())
+        val profile = MasqueProfile.parse(PROFILE)
+        store.restore(profile, MasqueTransport.H2, false)
+        val first = store.settings().first()
+        assertEquals(MasqueTransport.H2, first.transport)
+        assertFalse(first.autoEnabled)
+        assertEquals(PROFILE, first.profile?.exportJson())
+        store.setTransport(MasqueTransport.H3)
+        store.setAutoEnabled(true)
+        val updated = store.settings().first()
+        assertEquals(MasqueTransport.H3, updated.transport)
+        assertTrue(updated.autoEnabled)
+        assertFalse(first.fingerprint() == updated.fingerprint())
+        store.restore(null, MasqueTransport.AUTO, true)
+        assertEquals(PROFILE, store.profiles().first()?.exportJson())
+        store.clear()
+        assertNull(store.settings().first().fingerprint())
     }
 
     private companion object {

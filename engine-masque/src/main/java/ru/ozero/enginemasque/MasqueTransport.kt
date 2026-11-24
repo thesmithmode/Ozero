@@ -30,6 +30,7 @@ internal object MasqueCommand {
         port: Int,
         transport: MasqueTransport,
         ipv6Enabled: Boolean = false,
+        endpointIpv6: Boolean = false,
     ): List<String> {
         require(port in 1..65535) { "Invalid SOCKS port" }
         require(transport != MasqueTransport.AUTO) { "Select a concrete transport" }
@@ -47,6 +48,7 @@ internal object MasqueCommand {
                 ),
             )
             if (!ipv6Enabled) add("--no-tunnel-ipv6")
+            if (endpointIpv6) add("--ipv6")
             if (transport == MasqueTransport.H2) add("--http2")
         }
     }

@@ -83,7 +83,9 @@ fun MasqueSettingsScreen(onBack: () -> Unit, viewModel: MasqueSettingsViewModel 
                     viewModel.clear()
                 }) { Text(stringResource(R.string.masque_clear)) }
             },
-            dismissButton = { TextButton(onClick = { clear = false }) { Text(stringResource(R.string.masque_cancel)) } },
+            dismissButton = {
+                TextButton(onClick = { clear = false }) { Text(stringResource(R.string.masque_cancel)) }
+            },
         )
     }
 }
@@ -116,7 +118,9 @@ private fun MasqueTransportSection(
             FilterChip(
                 selected = state.transport == transport,
                 onClick = { onTransport(transport) },
-                label = { Text(if (transport == MasqueTransport.AUTO) stringResource(R.string.masque_auto) else transport.name) },
+                label = {
+                    Text(if (transport == MasqueTransport.AUTO) stringResource(R.string.masque_auto) else transport.name)
+                },
                 enabled = enabled,
             )
         }
