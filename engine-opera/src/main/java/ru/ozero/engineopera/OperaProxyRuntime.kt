@@ -19,7 +19,7 @@ class OperaProxyRuntime(
     private val launcher: OperaProxyLauncher,
     private val routedProbe: suspend (Int) -> Long = OperaSocksProbe::probe,
     private val allocatePort: () -> Int = ::freePort,
-    private val timeoutMs: Long = 45_000L,
+    private val timeoutMs: Long = 25_000L,
     private val retryDelayMs: Long = 250L,
 ) {
     private class Session(val process: OperaProxyProcess, val port: Int) {

@@ -143,14 +143,14 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `Opera selection is cleared when switching back to TUN`() = runTest {
+    fun `Opera selection is retained in both traffic modes`() = runTest {
         repository.setManualEngine(EngineId.OPERA)
-        assertNull(repository.settings.first().manualEngine)
+        assertEquals(EngineId.OPERA, repository.settings.first().manualEngine)
         repository.setTrafficMode(TrafficMode.PROXY)
         repository.setManualEngine(EngineId.OPERA)
         assertEquals(EngineId.OPERA, repository.settings.first().manualEngine)
         repository.setTrafficMode(TrafficMode.TUN)
-        assertNull(repository.settings.first().manualEngine)
+        assertEquals(EngineId.OPERA, repository.settings.first().manualEngine)
     }
 
     @Test

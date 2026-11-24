@@ -66,12 +66,13 @@ class StartSequenceCoordinatorDecisionCoverageTest {
         )
         val opera = DecisionPlugin(
             EngineId.OPERA,
-            proxyConfig = EngineConfig.Opera(),
+            manualConfig = EngineConfig.Opera(),
+            proxyConfig = EngineConfig.Opera(proxyMode = true),
             capabilities = proxyCapabilities(providesStandalone = true),
         )
         val coordinator = coordinator(proxyOnly, notStandalone, opera)
 
-        assertFalse(coordinator.engineAllowed(EngineId.OPERA, TrafficMode.TUN))
+        assertTrue(coordinator.engineAllowed(EngineId.OPERA, TrafficMode.TUN))
         assertTrue(coordinator.engineAllowed(EngineId.OPERA, TrafficMode.PROXY))
         assertTrue(coordinator.engineAllowed(EngineId.BYEDPI, TrafficMode.TUN))
         assertTrue(coordinator.engineAllowed(EngineId.WARP, TrafficMode.PROXY))

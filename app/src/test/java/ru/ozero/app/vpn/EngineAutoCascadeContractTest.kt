@@ -36,8 +36,7 @@ class EngineAutoCascadeContractTest {
             val clazz = runCatching { Class.forName(className) }.getOrElse {
                 fail("Класс не найден: $className (id=$id)")
             }
-            val methodName = if (id.proxyOnly) "buildProxyConfig" else "buildManualConfig"
-            val hasOverride = clazz.declaredMethods.any { it.name == methodName }
+            val hasOverride = clazz.declaredMethods.any { it.name == "buildManualConfig" }
             if (!hasOverride) {
                 missing += "$id → $className"
             }

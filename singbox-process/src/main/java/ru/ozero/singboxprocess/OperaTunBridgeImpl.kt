@@ -104,6 +104,8 @@ class OperaTunBridgeImpl(private val context: Context) : OperaTunBridge {
             if (remote != null && !remote.stopAndWait(owner, STOP_TIMEOUT_MS)) {
                 PersistentLoggers.warn("OperaTunBridge", "TUN stop was not acknowledged")
             }
+        } catch (e: android.os.RemoteException) {
+            PersistentLoggers.warn("OperaTunBridge", "TUN process unavailable: ${e.javaClass.simpleName}")
         } finally {
             runCatching { context.unbindService(connection) }
                 .onFailure { PersistentLoggers.warn("OperaTunBridge", "unbind failed: ${it.javaClass.simpleName}") }
