@@ -7,7 +7,9 @@ import org.junit.jupiter.api.Test
 class MasqueProfileTest {
     @Test
     fun `profile keeps original data but redacts string representation`() {
-        val json = """{"private_key":"test","endpoint_pub_key":"test","endpoint_v4":"192.0.2.1","ipv4":"192.0.2.2","ipv6":"2001:db8::1","id":"test","access_token":"test"}"""
+        val json = """{"private_key":"test","endpoint_pub_key":"test","endpoint_v4":"192.0.2.1",
+            |"ipv4":"192.0.2.2","ipv6":"2001:db8::1","id":"test","access_token":"test"}
+        """.trimMargin()
         val profile = MasqueProfile.parse(json)
         assertEquals(json, profile.json)
         assertEquals("MasqueProfile(***)", profile.toString())

@@ -12,6 +12,8 @@ git -C "$work/usque" fetch --depth 1 origin "$revision"
 git -C "$work/usque" checkout --detach FETCH_HEAD
 test "$(git -C "$work/usque" rev-parse HEAD)" = "$revision"
 
+python3 "$root/scripts/patch-masque-upstream.py" "$work/usque"
+
 out="$root/engine-masque/build/native/arm64-v8a"
 mkdir -p "$out"
 (

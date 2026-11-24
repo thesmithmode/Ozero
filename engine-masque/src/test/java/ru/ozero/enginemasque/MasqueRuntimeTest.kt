@@ -1,6 +1,9 @@
 package ru.ozero.enginemasque
 
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -21,7 +24,9 @@ class MasqueRuntimeTest {
     }
 
     private fun profile(): MasqueProfile = MasqueProfile.parse(
-        """{"private_key":"test","endpoint_pub_key":"test","endpoint_v4":"192.0.2.1","ipv4":"192.0.2.2","ipv6":"2001:db8::1","id":"test","access_token":"test"}""",
+        """{"private_key":"test","endpoint_pub_key":"test","endpoint_v4":"192.0.2.1",
+            |"ipv4":"192.0.2.2","ipv6":"2001:db8::1","id":"test","access_token":"test"}
+        """.trimMargin(),
     )
 
     private fun binary(): File = File(directory, "usque").apply {
@@ -38,6 +43,7 @@ class MasqueRuntimeTest {
             directory,
             MasqueProcessLauncher { command ->
                 commands.add(command)
+                File(File(command[2]).parentFile, "ready").writeText("ready")
                 Child("--http2" in command).also { children.add(it) }
             },
             MasqueReadinessProbe { true },
@@ -71,12 +77,51 @@ class MasqueRuntimeTest {
         val runtime = MasqueRuntime(
             binary(),
             directory,
-            MasqueProcessLauncher { child },
+            MasqueProcessLauncher { command ->
+                File(File(command[2]).parentFile, "ready").writeText("ready")
+                child
+            },
             MasqueReadinessProbe { false },
             startupTimeoutMs = 10,
         )
         assertNull(runtime.start(profile(), 1080, MasqueTransport.H3))
         assertFalse(child.alive)
         assertFalse(runtime.isReady())
+    }
+    @Test
+    fun `listener without child owned readiness marker cannot report success`() = runBlocking {
+        val child = Child(true)
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { child },
+            MasqueReadinessProbe { error("Unowned port must not be probed") },
+            startupTimeoutMs = 10,
+        )
+        assertNull(runtime.start(profile(), 1080, MasqueTransport.H3))
+        assertFalse(child.alive)
+        assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+    }
+
+    @Test
+    fun `cancelling startup closes child and removes plaintext`() = runBlocking {
+        val launched = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val child = Child(true)
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher {
+                launched.complete(Unit)
+                child
+            },
+            MasqueReadinessProbe { false },
+        )
+        val job = launch { runtime.start(profile(), 1080, MasqueTransport.H3) }
+        launched.await()
+        yield()
+        job.cancelAndJoin()
+        assertFalse(child.alive)
+        assertFalse(runtime.isReady())
+        assertEquals(listOf("usque"), directory.list().orEmpty().toList())
     }
 }

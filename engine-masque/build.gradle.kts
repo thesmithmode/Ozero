@@ -13,7 +13,9 @@ android {
 }
 
 dependencies {
+    implementation(project(":common-crypto"))
     implementation(libs.bundles.coroutines)
+    implementation(libs.datastore.preferences)
 
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)

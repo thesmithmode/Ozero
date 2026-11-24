@@ -2,13 +2,17 @@ package ru.ozero.enginemasque
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.io.IOException
+import java.nio.file.Files
+import kotlin.coroutines.coroutineContext
 
 class MasqueRuntime internal constructor(
     private val binary: File,
@@ -25,27 +29,18 @@ class MasqueRuntime internal constructor(
     )
 
     private val mutex = Mutex()
-    private var running: MasqueProcess? = null
-    private var activeConfig: File? = null
-    private var activePort: Int? = null
+    private var session: Session? = null
 
-    suspend fun register(acceptedTerms: Boolean): MasqueProfile = withContext(Dispatchers.IO) {
+    suspend fun register(acceptedTerms: Boolean): MasqueProfile = mutex.withLock {
         require(acceptedTerms) { "Cloudflare terms must be accepted" }
-        mutex.withLock {
-            check(running == null) { "Stop MASQUE before registration" }
+        withContext(Dispatchers.IO) {
+            check(session == null) { "Stop MASQUE before registration" }
             val workspace = newWorkspace()
-            val config = File(workspace, "config.json")
+            val config = File(workspace, CONFIG_NAME)
             try {
                 val process = launcher.launch(MasqueCommand.register(binary, config))
                 try {
-                    val code = withTimeoutOrNull(45_000) {
-                        while (process.alive) delay(100)
-                        process.exitCode()
-                    }
-                    check(code == 0 && config.isFile && config.length() in 1..MasqueProfile.MAX_BYTES.toLong()) {
-                        "MASQUE registration failed"
-                    }
-                    MasqueProfile.parse(config.readText())
+                    readRegistration(process, config)
                 } finally {
                     process.close()
                 }
@@ -55,73 +50,115 @@ class MasqueRuntime internal constructor(
         }
     }
 
+    private suspend fun readRegistration(process: MasqueProcess, config: File): MasqueProfile {
+        val code = withTimeoutOrNull(45_000) {
+            while (process.alive) delay(100)
+            process.exitCode()
+        }
+        check(code == 0 && config.isFile && config.length() in 1..MasqueProfile.MAX_BYTES.toLong()) {
+            "MASQUE registration failed"
+        }
+        return MasqueProfile.parse(config.readText())
+    }
+
     suspend fun start(profile: MasqueProfile, port: Int, transport: MasqueTransport): MasqueTransport? =
-        withContext(Dispatchers.IO) {
+        mutex.withLock {
             require(port in 1..65535) { "Invalid SOCKS port" }
-            mutex.withLock {
-                stopLocked()
-                for (attempt in transport.attempts()) {
-                    val config = File(newWorkspace(), "config.json")
-                    var process: MasqueProcess? = null
-                    var keep = false
-                    try {
-                        config.writeText(profile.json)
-                        val child = launcher.launch(MasqueCommand.socks(binary, config, port, attempt))
-                        process = child
-                        val ready = withTimeoutOrNull(startupTimeoutMs) {
-                            while (child.alive) {
-                                if (readiness.check(port) && child.alive) return@withTimeoutOrNull true
-                                delay(100)
-                            }
-                            false
-                        } == true
-                        if (ready) {
-                            running = child
-                            activeConfig = config
-                            activePort = port
-                            keep = true
-                            return@withLock attempt
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (_: IOException) {
-                        keep = false
-                    } finally {
-                        if (!keep) {
-                            try {
-                                process?.close()
-                            } finally {
-                                config.parentFile?.deleteRecursively()
-                            }
-                        }
-                    }
+            try {
+                withContext(Dispatchers.IO) {
+                    stopLocked()
+                    startLocked(profile, port, transport)
                 }
-                null
+            } catch (e: CancellationException) {
+                withContext(NonCancellable + Dispatchers.IO) { stopLocked() }
+                throw e
             }
         }
 
-    suspend fun isReady(): Boolean = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            val port = activePort
-            running?.alive == true && port != null && readiness.check(port)
+    private suspend fun startLocked(
+        profile: MasqueProfile,
+        port: Int,
+        transport: MasqueTransport,
+    ): MasqueTransport? {
+        for (attempt in transport.attempts()) {
+            val started = startAttempt(profile, port, attempt)
+            if (started != null) {
+                session = started
+                return attempt
+            }
+        }
+        return null
+    }
+
+    private suspend fun startAttempt(
+        profile: MasqueProfile,
+        port: Int,
+        transport: MasqueTransport,
+    ): Session? {
+        val workspace = newWorkspace()
+        val config = File(workspace, CONFIG_NAME)
+        var child: MasqueProcess? = null
+        var started = false
+        try {
+            config.writeText(profile.json)
+            val process = launcher.launch(MasqueCommand.socks(binary, config, port, transport))
+            child = process
+            started = awaitReady(process, workspace, port)
+            return if (started) Session(process, workspace, port) else null
+        } catch (_: IOException) {
+            return null
+        } finally {
+            if (!started) {
+                try {
+                    child?.close()
+                } finally {
+                    workspace.deleteRecursively()
+                }
+            }
         }
     }
 
-    suspend fun stop() = withContext(Dispatchers.IO) {
-        mutex.withLock { stopLocked() }
+    private suspend fun awaitReady(process: MasqueProcess, workspace: File, port: Int): Boolean =
+        withTimeoutOrNull(startupTimeoutMs) {
+            val marker = File(workspace, READY_NAME)
+            while (process.alive) {
+                if (marker.isFile && readiness.check(port) && process.alive) {
+                    coroutineContext.ensureActive()
+                    return@withTimeoutOrNull true
+                }
+                delay(100)
+            }
+            false
+        } == true
+
+    suspend fun isReady(): Boolean = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            val active = session
+            active != null && active.process.alive && readiness.check(active.port) && active.process.alive
+        }
+    }
+
+    suspend fun stop() = mutex.withLock {
+        withContext(NonCancellable + Dispatchers.IO) { stopLocked() }
     }
 
     private fun stopLocked() {
-        running?.close()
-        running = null
-        activePort = null
-        activeConfig?.parentFile?.deleteRecursively()
-        activeConfig = null
+        val active = session ?: return
+        active.process.close()
+        session = null
+        active.workspace.deleteRecursively()
     }
 
     private fun newWorkspace(): File {
         check(binary.isFile && binary.canExecute()) { "MASQUE binary unavailable" }
         check(privateDirectory.isDirectory) { "MASQUE private directory unavailable" }
-        return java.nio.file.Files.createTempDirectory(privateDirectory.toPath(), "masque-").toFile()
+        return Files.createTempDirectory(privateDirectory.toPath(), "masque-").toFile()
+    }
+
+    private data class Session(val process: MasqueProcess, val workspace: File, val port: Int)
+
+    private companion object {
+        const val CONFIG_NAME = "config.json"
+        const val READY_NAME = "ready"
     }
 }
