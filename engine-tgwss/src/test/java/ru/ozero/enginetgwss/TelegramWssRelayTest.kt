@@ -103,7 +103,9 @@ class TelegramWssRelayTest {
     }
 
     private fun socksRequest(lastOctet: Int): ByteArray =
-        byteArrayOf(5, 1, 0, 5, 1, 0, 1, 149.toByte(), 154.toByte(), 167.toByte(), lastOctet.toByte(), 1, 187.toByte())
+        byteArrayOf(
+            5, 1, 0, 5, 1, 0, 1, 149.toByte(), 154.toByte(), 167.toByte(), lastOctet.toByte(), 1, 187.toByte(),
+        )
 
     private fun initAndPacket(dc: Int = 2): Pair<ByteArray, ByteArray> {
         val header = ByteArray(64) { it.toByte() }

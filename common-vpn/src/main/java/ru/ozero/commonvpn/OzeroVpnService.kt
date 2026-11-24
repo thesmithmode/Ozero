@@ -15,6 +15,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -74,6 +75,9 @@ class OzeroVpnService : android.net.VpnService() {
             stopSignal = stopSignal,
             statsJobRef = statsJobRef,
             engineExtras = ::engineExtras,
+            engineStatsProvider = {
+                chainOrchestrator.activeEngines().firstOrNull { it.id.proxyOnly }?.stats()?.first()
+            },
         )
     }
     private val startSequence: StartSequenceCoordinator by lazy {

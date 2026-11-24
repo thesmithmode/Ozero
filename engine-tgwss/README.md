@@ -22,3 +22,16 @@ The TCP stream is framed into encrypted MTProto packets with a bounded packet
 size. For media DCs, the alternate Telegram WSS hostname is tried only if
 the initial MTProto header has not been queued for transmission. Live Android interoperability with Telegram DCs, media, and reconnects
 must be verified before release. See NOTICE for pinned protocol references.
+
+## Release acceptance
+
+- Required CI: style, assembleDebug, all unit tests and the 95% coverage gate.
+- On an Android ARM64 device, select Proxy mode and Telegram WSS, start, and
+  open the proxy settings in Telegram. Verify login/connection, two-way text
+  messages, image/file transfer, reconnect after a network change, and stop.
+- Verify non-Telegram destinations are rejected, the SOCKS listener is removed
+  after stop, the TUN and auto-mode options cannot select this engine, and the
+  general settings backup restores the manual proxy selection.
+- Compare the engine traffic counters with a real transfer and confirm the
+  existing VPN engines still work. A successful WSS upgrade alone is not proof
+  of end-to-end compatibility.
