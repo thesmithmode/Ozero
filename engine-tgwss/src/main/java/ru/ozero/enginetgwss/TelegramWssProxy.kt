@@ -104,56 +104,11 @@ class TelegramWssProxy internal constructor(
     private fun relay(socket: Socket) {
         socket.soTimeout = 10_000
         val input = DataInputStream(socket.getInputStream())
-        val output = socket.getOutputStream()
-        val destination = TelegramSocks.negotiate(input, output) ?: return
+        val destination = TelegramSocks.negotiate(input, socket.getOutputStream()) ?: return
         val header = ByteArray(TelegramInit.SIZE).also { input.readFully(it) }
         val init = TelegramInit.prepare(header, destination) ?: return
-        val ready = CountDownLatch(1)
-        val opened = AtomicBoolean(false)
-        val ws = webSockets.newWebSocket(request(destination), object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) {
-                if (response.header("Sec-WebSocket-Protocol") == "binary" && webSocket.send(init.toByteString())) {
-                    opened.set(true)
-                    sent.addAndGet(init.size.toLong())
-                } else {
-                    webSocket.cancel()
-                    release(socket)
-                }
-                ready.countDown()
-            }
-
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                try {
-                    output.write(bytes.toByteArray())
-                    output.flush()
-                    received.addAndGet(bytes.size.toLong())
-                } catch (_: IOException) {
-                    webSocket.cancel()
-                    release(socket)
-                }
-            }
-
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                webSocket.cancel()
-                release(socket)
-            }
-
-            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                webSocket.close(code, null)
-                release(socket)
-            }
-
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                release(socket)
-            }
-
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                release(socket)
-                ready.countDown()
-            }
-        })
+        val ws = openRelay(socket, destination, init) ?: return
         try {
-            if (!ready.await(10, TimeUnit.SECONDS) || !opened.get()) return
             socket.soTimeout = 0
             val packets = TelegramPacketReader(input, header)
             while (!closed.get() && !socket.isClosed) {
@@ -161,10 +116,101 @@ class TelegramWssProxy internal constructor(
                 if (ws.queueSize() + packet.size > 8_388_608 || !ws.send(packet.toByteString())) break
                 sent.addAndGet(packet.size.toLong())
             }
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
         } finally {
             ws.cancel()
+        }
+    }
+
+    private fun openRelay(socket: Socket, destination: TelegramDestination, init: ByteArray): WebSocket? {
+        for (host in destination.hosts) {
+            if (closed.get() || socket.isClosed) return null
+            val attempt = RelayAttempt(socket, init)
+            val ws = webSockets.newWebSocket(request(host), attempt)
+            try {
+                if (attempt.awaitCommitted()) return ws
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                attempt.expire()
+                ws.cancel()
+                return null
+            }
+            ws.cancel()
+        }
+        return null
+    }
+
+    private inner class RelayAttempt(
+        private val socket: Socket,
+        private val init: ByteArray,
+    ) : WebSocketListener() {
+        private val ready = CountDownLatch(1)
+        private val lock = Any()
+        private var committed = false
+        private var expired = false
+
+        override fun onOpen(webSocket: WebSocket, response: Response) {
+            synchronized(lock) {
+                if (!expired && !closed.get() &&
+                    response.header("Sec-WebSocket-Protocol") == "binary" &&
+                    webSocket.send(init.toByteString())
+                ) {
+                    committed = true
+                    sent.addAndGet(init.size.toLong())
+                } else {
+                    expired = true
+                    webSocket.cancel()
+                }
+                ready.countDown()
+            }
+        }
+
+        override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+            if (!synchronized(lock) { committed }) {
+                terminate(webSocket)
+                return
+            }
+            try {
+                socket.getOutputStream().apply {
+                    write(bytes.toByteArray())
+                    flush()
+                }
+                received.addAndGet(bytes.size.toLong())
+            } catch (_: IOException) {
+                terminate(webSocket)
+            }
+        }
+
+        override fun onMessage(webSocket: WebSocket, text: String) = terminate(webSocket)
+
+        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) = terminate(webSocket)
+
+        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = finish()
+
+        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = finish()
+
+        private fun terminate(webSocket: WebSocket) {
+            finish()
+            webSocket.cancel()
+        }
+
+        private fun finish() {
+            synchronized(lock) {
+                expired = true
+                if (committed) release(socket)
+                ready.countDown()
+            }
+        }
+
+        fun awaitCommitted(): Boolean {
+            ready.await(10, TimeUnit.SECONDS)
+            return synchronized(lock) {
+                expired = true
+                committed
+            }
+        }
+
+        fun expire() {
+            synchronized(lock) { expired = true }
         }
     }
 
@@ -178,7 +224,7 @@ class TelegramWssProxy internal constructor(
             for (dc in listOf(2, 4, 1)) {
                 if (latency.get() >= 0 || closed.get()) break
                 val ws = webSockets.newWebSocket(
-                    request(TelegramDestination(dc, false)),
+                    request(TelegramDestination(dc, false).host),
                     object : WebSocketListener() {
                         override fun onOpen(webSocket: WebSocket, response: Response) {
                             if (response.header("Sec-WebSocket-Protocol") == "binary") {
@@ -201,8 +247,8 @@ class TelegramWssProxy internal constructor(
         }
     }
 
-    private fun request(destination: TelegramDestination): Request = Request.Builder()
-        .url("wss://${destination.host}/apiws")
+    private fun request(host: String): Request = Request.Builder()
+        .url("wss://$host/apiws")
         .header("Origin", "https://web.telegram.org")
         .header("Sec-WebSocket-Protocol", "binary")
         .build()

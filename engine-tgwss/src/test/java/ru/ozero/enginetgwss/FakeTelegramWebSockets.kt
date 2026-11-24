@@ -12,13 +12,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal class FakeTelegramWebSockets(
     private val protocol: String? = "binary",
     private val connectFails: Boolean = false,
+    private val rejectedHosts: Set<String> = emptySet(),
 ) : WebSocket.Factory {
     val sessions = LinkedBlockingQueue<Session>()
 
     override fun newWebSocket(request: Request, listener: WebSocketListener): WebSocket {
         val session = Session(request, listener)
         sessions.add(session)
-        if (connectFails) {
+        if (connectFails || request.url.host in rejectedHosts) {
             listener.onFailure(session, java.io.IOException("test connection failure"), null)
         } else {
             val response = Response.Builder()

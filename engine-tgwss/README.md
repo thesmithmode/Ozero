@@ -19,5 +19,6 @@ does not prove end-to-end MTProto message delivery. Settings backup uses the exi
 selection and traffic mode fields.
 
 The TCP stream is framed into encrypted MTProto packets with a bounded packet
-size. Live Android interoperability with Telegram DCs, media, and reconnects
+size. For media DCs, the alternate Telegram WSS hostname is tried only if
+the initial MTProto header has not been queued for transmission. Live Android interoperability with Telegram DCs, media, and reconnects
 must be verified before release. See NOTICE for pinned protocol references.

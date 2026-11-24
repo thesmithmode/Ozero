@@ -23,7 +23,7 @@ class TelegramWssRelayTest {
                 socket.soTimeout = 2000
                 val input = DataInputStream(socket.getInputStream())
                 val output = socket.getOutputStream()
-                output.write(byteArrayOf(5, 1, 0, 5, 1, 0, 1, 149.toByte(), 154.toByte(), 167.toByte(), 41, 1, 187.toByte()))
+                output.write(socksRequest(41))
                 output.flush()
                 assertContentEquals(
                     byteArrayOf(5, 0, 5, 0, 0, 1, 0, 0, 0, 0, 0, 0),
@@ -70,7 +70,42 @@ class TelegramWssRelayTest {
         }
     }
 
-    private fun initAndPacket(): Pair<ByteArray, ByteArray> {
+    @Test
+    fun `media endpoint falls back only before init is sent`() {
+        val webSockets = FakeTelegramWebSockets(rejectedHosts = setOf("kws2-1.web.telegram.org"))
+        TelegramWssProxy(webSockets) {}.use { proxy ->
+            Socket("127.0.0.1", proxy.start()).use { socket ->
+                socket.soTimeout = 2000
+                val input = DataInputStream(socket.getInputStream())
+                socket.getOutputStream().apply {
+                    write(socksRequest(151))
+                    flush()
+                }
+                input.readFully(ByteArray(12))
+                val (header, packet) = initAndPacket(-2)
+                socket.getOutputStream().apply {
+                    write(header)
+                    write(packet)
+                    flush()
+                }
+                val first = assertNotNull(webSockets.sessions.poll(2, TimeUnit.SECONDS))
+                val second = assertNotNull(webSockets.sessions.poll(2, TimeUnit.SECONDS))
+                assertEquals("kws2-1.web.telegram.org", first.request().url.host)
+                assertEquals("kws2.web.telegram.org", second.request().url.host)
+                assertTrue(first.sent.isEmpty())
+                assertContentEquals(header, assertNotNull(second.sent.poll(2, TimeUnit.SECONDS)).toByteArray())
+                assertContentEquals(packet, assertNotNull(second.sent.poll(2, TimeUnit.SECONDS)).toByteArray())
+                second.listener.onFailure(second, java.io.IOException("closed"), null)
+                assertEquals(-1, input.read())
+                assertNull(webSockets.sessions.poll(100, TimeUnit.MILLISECONDS))
+            }
+        }
+    }
+
+    private fun socksRequest(lastOctet: Int): ByteArray =
+        byteArrayOf(5, 1, 0, 5, 1, 0, 1, 149.toByte(), 154.toByte(), 167.toByte(), lastOctet.toByte(), 1, 187.toByte())
+
+    private fun initAndPacket(dc: Int = 2): Pair<ByteArray, ByteArray> {
         val header = ByteArray(64) { it.toByte() }
         val cipher = Cipher.getInstance("AES/CTR/NoPadding")
         cipher.init(
@@ -80,8 +115,8 @@ class TelegramWssRelayTest {
         )
         val stream = cipher.update(ByteArray(64))
         for (index in 56..59) header[index] = (stream[index].toInt() xor 0xef).toByte()
-        header[60] = (stream[60].toInt() xor 2).toByte()
-        header[61] = stream[61]
+        header[60] = (stream[60].toInt() xor (dc and 0xff)).toByte()
+        header[61] = (stream[61].toInt() xor ((dc shr 8) and 0xff)).toByte()
         return header to cipher.update(byteArrayOf(2) + ByteArray(8))
     }
 }

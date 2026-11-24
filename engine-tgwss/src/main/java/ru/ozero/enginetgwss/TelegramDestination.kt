@@ -1,8 +1,13 @@
 package ru.ozero.enginetgwss
 
 internal data class TelegramDestination(val dc: Int, val media: Boolean) {
+    private val webDc: Int get() = if (dc == 203) 2 else dc
+
     val host: String
-        get() = if (media) "kws$dc-1.web.telegram.org" else "kws$dc.web.telegram.org"
+        get() = if (media) "kws$webDc-1.web.telegram.org" else "kws$webDc.web.telegram.org"
+
+    val hosts: List<String>
+        get() = if (media) listOf(host, "kws$webDc.web.telegram.org") else listOf(host)
 
     companion object {
         private val destinations = mapOf(
@@ -38,6 +43,7 @@ internal data class TelegramDestination(val dc: Int, val media: Boolean) {
             "91.108.56.102" to TelegramDestination(5, true),
             "91.108.56.128" to TelegramDestination(5, true),
             "91.108.56.151" to TelegramDestination(5, true),
+            "91.105.192.100" to TelegramDestination(203, false),
         )
 
         fun resolve(ip: String, port: Int): TelegramDestination? =

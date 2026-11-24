@@ -26,7 +26,6 @@ class TelegramWssEngine internal constructor(
 ) : EnginePlugin {
     constructor() : this({ TelegramWssProxy { true } })
 
-
     override val id = EngineId.TGWSS
     override val capabilities = EngineCapabilities(
         supportsTcp = true,
