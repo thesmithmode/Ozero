@@ -4,7 +4,12 @@ package ru.ozero.singboxsubscription
 
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient
@@ -13,6 +18,7 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -223,6 +229,81 @@ class RawUpdaterTest {
 
         assertTrue(rawUpdater.refresh(group().copy(isBuiltin = false), allowInsecureRetry = true).isFailure)
         assertEquals(0, retries.get())
+    }
+
+    @Test
+    fun `should retry interrupted response body through fallback`() = runBlocking {
+        val retries = AtomicInteger()
+        val direct = OkHttpClient.Builder().retryOnConnectionFailure(false).build()
+        server.enqueue(
+            MockResponse()
+                .setBody("x".repeat(32_768))
+                .setSocketPolicy(SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY),
+        )
+        server.enqueue(MockResponse().setBody(vless1))
+        rawUpdater = RawUpdater(
+            direct,
+            groupDao,
+            profileDao,
+            fallbackClient = {
+                retries.incrementAndGet()
+                OkHttpClient()
+            },
+        )
+
+        assertEquals(1, rawUpdater.refresh(group()).getOrThrow())
+        assertEquals(1, retries.get())
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `should cancel pending direct request without retry`() = runBlocking {
+        val enqueued = CompletableDeferred<Unit>()
+        val pendingCall = mockk<Call>(relaxed = true)
+        every { pendingCall.enqueue(any()) } answers {
+            enqueued.complete(Unit)
+            Unit
+        }
+        val client = mockk<OkHttpClient>()
+        every { client.newCall(any()) } returns pendingCall
+        rawUpdater = RawUpdater(
+            client,
+            groupDao,
+            profileDao,
+            fallbackClient = { error("cancel must not retry") },
+        )
+        val g = group()
+        val job = launch { rawUpdater.refresh(g) }
+
+        withTimeout(5_000) { enqueued.await() }
+        job.cancelAndJoin()
+
+        verify(exactly = 1) { pendingCall.cancel() }
+        assertTrue(job.isCancelled)
+        assertEquals(0, profileDao.profiles.size)
+    }
+
+    @Test
+    fun `should cancel pending fallback request without saving profiles`() = runBlocking {
+        val enqueued = CompletableDeferred<Unit>()
+        val pendingCall = mockk<Call>(relaxed = true)
+        every { pendingCall.enqueue(any()) } answers {
+            enqueued.complete(Unit)
+            Unit
+        }
+        val proxy = mockk<OkHttpClient>()
+        every { proxy.newCall(any()) } returns pendingCall
+        val direct = OkHttpClient.Builder().addInterceptor { throw UnknownHostException("unreachable") }.build()
+        rawUpdater = RawUpdater(direct, groupDao, profileDao, fallbackClient = { proxy })
+        val g = group()
+        val job = launch { rawUpdater.refresh(g) }
+
+        withTimeout(5_000) { enqueued.await() }
+        job.cancelAndJoin()
+
+        verify(exactly = 1) { pendingCall.cancel() }
+        assertTrue(job.isCancelled)
+        assertEquals(0, profileDao.profiles.size)
     }
 
     @Test
