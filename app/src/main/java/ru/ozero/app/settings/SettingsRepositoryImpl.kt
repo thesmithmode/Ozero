@@ -43,6 +43,16 @@ class SettingsRepositoryImpl @Inject constructor(
         dataStore.edit { it[SettingsKeys.TRAFFIC_MODE] = mode.name }
     }
 
+    override suspend fun setOperaRegion(region: String) {
+        require(region in setOf("EU", "AS", "AM"))
+        dataStore.edit { it[SettingsKeys.OPERA_REGION] = region }
+    }
+
+    override suspend fun setOperaSelection(selection: String) {
+        require(selection in setOf("first", "random", "fastest"))
+        dataStore.edit { it[SettingsKeys.OPERA_SELECTION] = selection }
+    }
+
     override suspend fun setManualEngine(engine: EngineId?) {
         dataStore.edit { prefs ->
             if (engine == null) {
@@ -169,6 +179,9 @@ class SettingsRepositoryImpl @Inject constructor(
         autoStart = this[SettingsKeys.AUTO_START] ?: SettingsModel.DEFAULT_AUTO_START,
         trafficMode = readTrafficMode(),
         manualEngine = readManualEngine(),
+        operaRegion = this[SettingsKeys.OPERA_REGION]?.takeIf { it in setOf("EU", "AS", "AM") } ?: "EU",
+        operaSelection = this[SettingsKeys.OPERA_SELECTION]
+            ?.takeIf { it in setOf("first", "random", "fastest") } ?: "fastest",
         engineAutoPriority = readEngineAutoPriority(),
         urnetworkEnabled = this[SettingsKeys.URNETWORK_ENABLED] ?: SettingsModel.DEFAULT_URNETWORK_ENABLED,
         urnetworkJwt = this[SettingsKeys.URNETWORK_JWT],

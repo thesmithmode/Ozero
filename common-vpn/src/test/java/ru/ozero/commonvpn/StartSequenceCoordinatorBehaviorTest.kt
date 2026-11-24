@@ -586,6 +586,27 @@ class StartSequenceCoordinatorBehaviorTest {
     }
 
     @Test
+    fun `Opera proxy still uses routed watchdog alongside Telegram WSS support`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.OPERA,
+            socksPort = 10813,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(trafficMode = TrafficMode.PROXY, manualEngine = EngineId.OPERA),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(listOf<EngineConfig>(EngineConfig.Opera(proxyMode = true)), engine.startedConfigs)
+        verify(exactly = 0) { fixture.tunnelGateway.start(any()) }
+        verify(exactly = 1) { fixture.engineWatchdog.startRoutedProbeWatchdog(EngineId.OPERA) }
+        verify(exactly = 1) { fixture.engineWatchdog.startHealthKillswitchWatcher(EngineId.OPERA) }
+        assertEquals(EngineId.OPERA, assertIs<TunnelState.Connected>(fixture.tunnelController.state.value).engineId)
+    }
+
+    @Test
     fun `manual TUN establish null stops chain and requests service stop`() = runTest {
         val engine = FakeEnginePlugin(id = EngineId.BYEDPI, socksPort = 2092, capabilities = tunnelCapabilities())
         val fixture = startFixture(
@@ -1352,6 +1373,7 @@ class StartSequenceCoordinatorBehaviorTest {
             )
             EngineId.FPTN -> EngineConfig.Fptn(token = "test")
             EngineId.TGWSS -> EngineConfig.TelegramWss(socksPort = socksPort)
+            EngineId.OPERA -> EngineConfig.Opera(proxyMode = true)
         }
     }
 

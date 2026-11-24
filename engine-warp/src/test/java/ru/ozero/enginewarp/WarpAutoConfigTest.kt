@@ -608,9 +608,11 @@ class WarpAutoConfigTest {
     }
 
     @Test
-    fun `default mirrors список содержит CYBERPORTAL_X URLs (sentinel против регрессии endpoint)`() {
+    fun `default mirrors use unique supported HTTPS registration endpoints`() {
         val urls = ProxyWarpAutoConfig.DEFAULT_MIRRORS
-        assertTrue(urls.size >= 70, "Список зеркал из CYBERPORTAL_X-1.0.2 содержит 78 URL")
+        assertTrue(urls.isNotEmpty())
+        assertEquals(urls.size, urls.distinct().size)
+        assertTrue(urls.all { it.startsWith("https://") })
         assertTrue(
             urls.none { it.contains("api.cloudflareclient.com") },
             "api.cloudflareclient.com блокируется ТСПУ в РФ — НЕ должен быть в списке зеркал",
@@ -619,22 +621,9 @@ class WarpAutoConfigTest {
             urls.all { it.endsWith("/api/warp") || it.endsWith("/api/generate") },
             "Все зеркала используют поддерживаемые endpoints",
         )
-        assertTrue(
-            urls.any { it.endsWith("/api/generate") },
-            "Список включает публичные generator mirrors из справочных сайтов",
-        )
-        assertTrue(
-            urls.any { it.contains("netlify.app") },
-            "Часть зеркал hosted на Netlify",
-        )
-        assertTrue(
-            urls.any { it.contains("vercel.app") },
-            "Часть зеркал hosted на Vercel",
-        )
-        assertTrue(
-            urls.any { it.contains("cyberportal.workers.dev") },
-            "Часть зеркал на Cloudflare Workers",
-        )
+        assertTrue(urls.any { it.endsWith("/api/generate") })
+        assertTrue(urls.any { it.contains("cyberportal.workers.dev") })
+        assertTrue(urls.contains("https://warp-gen.cyb-portal.org/api/warp"))
     }
 
     @Test

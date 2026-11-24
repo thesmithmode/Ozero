@@ -14,6 +14,7 @@ android {
 
 dependencies {
     implementation(project(":engine-singbox"))
+    implementation(project(":engine-opera"))
     implementation(project(":singbox-core"))
     implementation(project(":engines-core"))
     compileOnly(fileTree(mapOf("dir" to rootProject.file("singbox-core/libs-stubs"), "include" to listOf("*.jar"))))

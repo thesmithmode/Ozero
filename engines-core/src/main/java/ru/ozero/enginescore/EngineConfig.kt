@@ -105,6 +105,15 @@ sealed class EngineConfig {
         }
     }
 
+    data class Opera(
+        val region: String = "EU",
+        val selection: String = "fastest",
+        val proxyMode: Boolean = false,
+        val ipv6Enabled: Boolean = false,
+    ) : EngineConfig() {
+        override val engineId = EngineId.OPERA
+    }
+
     data class TelegramWss(val socksPort: Int = 10812, val tunnelMode: Boolean = true) : EngineConfig() {
         override val engineId = EngineId.TGWSS
     }

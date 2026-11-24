@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_opera_summary">VPN وSOCKS5 عبر Opera. اتصال TCP وDNS عبر Cloudflare DoH؛ لا يدعم بقية UDP.</string>
+    <string name="opera_region">المنطقة</string>
+    <string name="opera_selection">اختيار الخادم</string>
+    <string name="opera_first">أول خادم متاح</string>
+    <string name="opera_random">عشوائي</string>
+    <string name="opera_fastest">الأسرع</string>
+</resources>

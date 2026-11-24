@@ -66,6 +66,7 @@ fun SettingsScreen(
     onOpenMasterDnsSettings: () -> Unit = {},
     onOpenFptnSettings: () -> Unit = {},
     onOpenSingboxSettings: () -> Unit = {},
+    onOpenOperaSettings: () -> Unit = {},
     onOpenTelegramWssSettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -90,6 +91,7 @@ fun SettingsScreen(
             onOpenFptnSettings = onOpenFptnSettings,
             onOpenSingboxSettings = onOpenSingboxSettings,
             onOpenTelegramWssSettings = onOpenTelegramWssSettings,
+            onOpenOperaSettings = onOpenOperaSettings,
         ),
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
@@ -215,6 +217,7 @@ private fun ContentBody(
                 onOpenFptn = nav.onOpenFptnSettings,
                 onOpenSingbox = nav.onOpenSingboxSettings,
                 onOpenTelegramWss = nav.onOpenTelegramWssSettings,
+                onOpenOpera = nav.onOpenOperaSettings,
             )
         }
         item { SectionDivider() }
@@ -402,6 +405,7 @@ private fun EnginesSection(
     onOpenMasterDns: () -> Unit,
     onOpenFptn: () -> Unit,
     onOpenSingbox: () -> Unit,
+    onOpenOpera: () -> Unit,
     onOpenTelegramWss: () -> Unit,
 ) {
     NavRow(
@@ -451,6 +455,13 @@ private fun EnginesSection(
         summary = stringResource(R.string.tgwss_summary),
         tag = "settings_tgwss_row",
         onClick = onOpenTelegramWss,
+        enabled = true,
+    )
+    NavRow(
+        title = "Opera Proxy",
+        summary = stringResource(R.string.settings_opera_summary),
+        tag = "settings_opera_row",
+        onClick = onOpenOpera,
         enabled = true,
     )
 }

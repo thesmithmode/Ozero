@@ -7,5 +7,6 @@ enum class EngineId(val displayName: String, val isStub: Boolean, val manualStan
     MASTERDNS(displayName = "MasterDNS", isStub = false),
     SINGBOX(displayName = "Sing-box", isStub = false),
     FPTN(displayName = "FPTN", isStub = false),
+    OPERA(displayName = "Opera Proxy", isStub = false),
     TGWSS(displayName = "Telegram WSS", isStub = false, manualStandaloneOnly = true),
 }

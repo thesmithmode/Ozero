@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_opera_summary">通过 Opera 提供 VPN 和 SOCKS5。支持 TCP 和 Cloudflare DoH DNS，不支持其他 UDP。</string>
+    <string name="opera_region">地区</string>
+    <string name="opera_selection">服务器选择</string>
+    <string name="opera_first">首个可用</string>
+    <string name="opera_random">随机</string>
+    <string name="opera_fastest">最快</string>
+</resources>

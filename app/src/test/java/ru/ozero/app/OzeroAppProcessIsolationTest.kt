@@ -126,6 +126,15 @@ class OzeroAppProcessIsolationTest {
         )
     }
 
+    @Test
+    fun `Opera TUN process uses the isolated libbox startup guard`() {
+        val source = locateOzeroApp().readText()
+        assertTrue(source.contains("name.endsWith(\":engine_opera_tun\")"))
+        val manifest = File(locateRepoRoot(), "app/src/main/AndroidManifest.xml").readText()
+        assertTrue(manifest.contains("ru.ozero.singboxprocess.OperaTunService"))
+        assertTrue(manifest.contains("android:process=\":engine_opera_tun\""))
+    }
+
     private fun locateOzeroApp(): File {
         val repoRoot = locateRepoRoot()
         val file = File(repoRoot, "app/src/main/java/ru/ozero/app/OzeroApp.kt")

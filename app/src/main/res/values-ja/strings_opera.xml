@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_opera_summary">Opera 経由の VPN と SOCKS5。TCP と Cloudflare DoH による DNS に対応し、その他の UDP は非対応です。</string>
+    <string name="opera_region">地域</string>
+    <string name="opera_selection">サーバー選択</string>
+    <string name="opera_first">最初の利用可能なサーバー</string>
+    <string name="opera_random">ランダム</string>
+    <string name="opera_fastest">最速</string>
+</resources>

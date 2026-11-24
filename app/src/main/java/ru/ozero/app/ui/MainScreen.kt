@@ -1203,6 +1203,7 @@ internal fun probingLabelRes(engineId: EngineId?, isReconnecting: Boolean): Int 
         EngineId.FPTN -> R.string.main_status_probing
         EngineId.SINGBOX -> R.string.main_status_connecting
         EngineId.TGWSS -> R.string.main_status_connecting
+        EngineId.OPERA -> R.string.main_status_connecting
     }
 }
 
