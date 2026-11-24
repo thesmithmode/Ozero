@@ -1,5 +1,6 @@
 package ru.ozero.enginemasque
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 
@@ -16,8 +18,8 @@ class MasqueRuntimeTest {
     @TempDir
     lateinit var directory: File
 
-    private class Child(override var alive: Boolean) : MasqueProcess {
-        override fun exitCode(): Int = 1
+    private class Child(override var alive: Boolean, private val code: Int = 1) : MasqueProcess {
+        override fun exitCode(): Int = code
         override fun close() {
             alive = false
         }
@@ -88,6 +90,7 @@ class MasqueRuntimeTest {
         assertFalse(child.alive)
         assertFalse(runtime.isReady())
     }
+
     @Test
     fun `listener without child owned readiness marker cannot report success`() = runBlocking {
         val child = Child(true)
@@ -105,7 +108,7 @@ class MasqueRuntimeTest {
 
     @Test
     fun `cancelling startup closes child and removes plaintext`() = runBlocking {
-        val launched = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val launched = CompletableDeferred<Unit>()
         val child = Child(true)
         val runtime = MasqueRuntime(
             binary(),
@@ -122,6 +125,41 @@ class MasqueRuntimeTest {
         job.cancelAndJoin()
         assertFalse(child.alive)
         assertFalse(runtime.isReady())
+        assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+    }
+    @Test
+    fun `registration requires explicit terms and deletes temporary profile`() = runBlocking {
+        val commands = mutableListOf<List<String>>()
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { command ->
+                commands.add(command)
+                File(command[2]).writeText(profile().json)
+                Child(false, 0)
+            },
+            MasqueReadinessProbe { false },
+        )
+        assertThrows<IllegalArgumentException> { runtime.register(false) }
+        assertTrue(commands.isEmpty())
+        assertEquals(profile().json, runtime.register(true).json)
+        assertEquals(1, commands.size)
+        assertTrue("--accept-tos" in commands.single())
+        assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+    }
+
+    @Test
+    fun `registration rejects child failure and deletes temporary profile`() = runBlocking {
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { command ->
+                File(command[2]).writeText(profile().json)
+                Child(false)
+            },
+            MasqueReadinessProbe { false },
+        )
+        assertThrows<IllegalStateException> { runtime.register(true) }
         assertEquals(listOf("usque"), directory.list().orEmpty().toList())
     }
 }
