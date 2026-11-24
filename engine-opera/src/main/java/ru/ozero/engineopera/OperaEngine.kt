@@ -22,12 +22,14 @@ import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.settings.SettingsModel
+import java.io.IOException
 
 class OperaEngine(
     private val runtime: OperaProxyRuntime,
     private val tun: OperaTunBridge,
     private val binaryAvailable: () -> Boolean,
     private val closeFd: (Int) -> Unit = { ParcelFileDescriptor.adoptFd(it).close() },
+    private val dnsProbe: suspend (Int) -> Unit = OperaSocksProbe::probeDns,
 ) : EnginePlugin, TunFdAcceptor {
     override val id = EngineId.OPERA
     override val capabilities = EngineCapabilities(
@@ -132,6 +134,13 @@ class OperaEngine(
             return ProbeResult.Failure("Opera TUN runtime unavailable")
         }
         val result = runtime.probe()
+        if (result is ProbeResult.Success && !current.config.proxyMode) {
+            try {
+                dnsProbe(current.port)
+            } catch (e: IOException) {
+                return ProbeResult.Failure("Opera routed DNS unavailable", cause = e)
+            }
+        }
         return if (active === current) result else ProbeResult.Failure("Opera session changed")
     }
 

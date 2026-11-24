@@ -16,6 +16,7 @@ import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.settings.SettingsModel
+import java.io.IOException
 
 class OperaEngineTest {
     private class FakeProcess : OperaProxyProcess {
@@ -50,11 +51,13 @@ class OperaEngineTest {
         launcher: OperaProxyLauncher = OperaProxyLauncher { _, _ -> FakeProcess() },
         tun: FakeTun = FakeTun(),
         closeFd: (Int) -> Unit = {},
+        dnsProbe: suspend (Int) -> Unit = {},
     ) = OperaEngine(
         OperaProxyRuntime(launcher, routedProbe = { 12L }, allocatePort = { 12000 }),
         tun,
         binaryAvailable = { available },
         closeFd = closeFd,
+        dnsProbe = dnsProbe,
     )
 
     @Test
@@ -116,7 +119,7 @@ class OperaEngineTest {
     fun `TUN readiness requires attachment and transfers fd only after native start`() = runTest {
         val bridge = FakeTun()
         val closed = mutableListOf<Int>()
-        val plugin = engine(tun = bridge, closeFd = closed::add)
+        val plugin = engine(tun = bridge, closeFd = { closed.add(it) })
         assertEquals(StartResult.Success(12000), plugin.start(EngineConfig.Opera(), Upstream.None))
         assertTrue(plugin.probe() is ProbeResult.Failure)
         assertTrue(plugin.exitNodeStrategy(12000) is ExitNodeStrategy.Unavailable)
@@ -129,6 +132,18 @@ class OperaEngineTest {
         assertTrue(plugin.probe() is ProbeResult.Failure)
         plugin.stop()
         assertFalse(bridge.running)
+    }
+
+    @Test
+    fun `TUN readiness fails if routed DNS is unavailable while proxy mode does not require DoH`() = runTest {
+        val plugin = engine(dnsProbe = { throw IOException("DNS failure") })
+        plugin.start(EngineConfig.Opera(), Upstream.None)
+        assertEquals(TunAttachResult.Success, plugin.attachTun(42))
+        assertTrue(plugin.awaitReady() is EnginePlugin.ReadyResult.Timeout)
+        plugin.stop()
+        plugin.start(EngineConfig.Opera(proxyMode = true), Upstream.None)
+        assertEquals(EnginePlugin.ReadyResult.Ready, plugin.awaitReady())
+        plugin.stop()
     }
 
     @Test

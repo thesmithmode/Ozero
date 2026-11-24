@@ -30,6 +30,8 @@ class AppBackupSerializerTest {
         bydpiDefaultAccepted = false,
         urnetworkCountryCode = "DE",
         fptnToken = "token",
+        operaRegion = "AM",
+        operaSelection = "first",
     )
 
     private val fullBackupUrnetwork = BackupUrnetwork(
