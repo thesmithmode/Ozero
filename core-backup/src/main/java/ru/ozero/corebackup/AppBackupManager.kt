@@ -88,6 +88,12 @@ class AppBackupManager(
             appMode = fromCategory(
                 BackupCategory.GENERAL_SETTINGS in categories,
             ) { prefs[SettingsKeys.APP_MODE] },
+            operaRegion = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { prefs[SettingsKeys.OPERA_REGION] },
+            operaSelection = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { prefs[SettingsKeys.OPERA_SELECTION] },
             engineAutoPriority = fromCategory(
                 BackupCategory.GENERAL_SETTINGS in categories,
             ) { prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] },
@@ -164,6 +170,9 @@ class AppBackupManager(
         s.appMode?.let { prefs[SettingsKeys.APP_MODE] = it }
         s.engineAutoPriority?.let { prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = it }
         s.trafficMode?.let { prefs[SettingsKeys.TRAFFIC_MODE] = it }
+        s.operaRegion?.takeIf { it in setOf("EU", "AS", "AM") }?.let { prefs[SettingsKeys.OPERA_REGION] = it }
+        s.operaSelection?.takeIf { it in setOf("first", "random", "fastest") }
+            ?.let { prefs[SettingsKeys.OPERA_SELECTION] = it }
     }
 
     private suspend fun importSplitTunnel(data: AppBackupData) {

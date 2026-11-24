@@ -23,6 +23,8 @@ data class SettingsModel(
     val appMode: AppMode = DEFAULT_APP_MODE,
     val killswitchEnabled: Boolean = DEFAULT_KILLSWITCH_ENABLED,
     val alwaysOnBannerDismissed: Boolean = DEFAULT_ALWAYS_ON_BANNER_DISMISSED,
+    val operaRegion: String = "EU",
+    val operaSelection: String = "fastest",
 ) {
     companion object {
         val DEFAULT_SPLIT_MODE: SplitTunnelMode = SplitTunnelMode.ALL
