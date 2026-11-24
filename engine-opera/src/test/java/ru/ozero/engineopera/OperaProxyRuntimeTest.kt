@@ -65,7 +65,7 @@ class OperaProxyRuntimeTest {
             timeoutMs = 100,
             retryDelayMs = 10,
         )
-        assertEquals(StartResult.Failure("opera readiness timeout"), runtime.start(OperaProxyConfig()))
+        assertEquals(StartResult.Failure("opera readiness timeout or process stopped"), runtime.start(OperaProxyConfig()))
         assertFalse(process.alive)
     }
 
@@ -90,6 +90,84 @@ class OperaProxyRuntimeTest {
             assertFalse(process.alive)
         }
         assertTrue(job.isCancelled)
+    }
+
+    @Test
+    fun `stop does not wait for an in-flight startup probe`() = runTest {
+        val process = FakeProcess()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val runtime = OperaProxyRuntime(
+            launcher = OperaProxyLauncher { _, _ -> process },
+            routedProbe = {
+                entered.complete(Unit)
+                release.await()
+                20L
+            },
+            allocatePort = { 12345 },
+        )
+        val starting = async { runtime.start(OperaProxyConfig()) }
+        entered.await()
+        runtime.stop()
+        assertFalse(process.alive)
+        release.complete(Unit)
+        assertTrue(starting.await() is StartResult.Failure)
+    }
+
+    @Test
+    fun `superseded startup cannot stop the replacement process`() = runTest {
+        val old = FakeProcess()
+        val replacement = FakeProcess()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var launches = 0
+        var nextPort = 12344
+        val runtime = OperaProxyRuntime(
+            launcher = OperaProxyLauncher { _, _ ->
+                if (launches++ == 0) old else replacement
+            },
+            routedProbe = { port ->
+                if (port == 12345) {
+                    entered.complete(Unit)
+                    release.await()
+                }
+                20L
+            },
+            allocatePort = { ++nextPort },
+        )
+        val starting = async { runtime.start(OperaProxyConfig()) }
+        entered.await()
+        assertEquals(StartResult.Success(12346), runtime.start(OperaProxyConfig()))
+        release.complete(Unit)
+        assertTrue(starting.await() is StartResult.Failure)
+        assertFalse(old.alive)
+        assertTrue(replacement.alive)
+        runtime.stop()
+    }
+
+    @Test
+    fun `stopping during health check invalidates its successful response`() = runTest {
+        val process = FakeProcess()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var calls = 0
+        val runtime = OperaProxyRuntime(
+            launcher = OperaProxyLauncher { _, _ -> process },
+            routedProbe = {
+                if (++calls > 1) {
+                    entered.complete(Unit)
+                    release.await()
+                }
+                20L
+            },
+            allocatePort = { 12345 },
+        )
+        assertEquals(StartResult.Success(12345), runtime.start(OperaProxyConfig()))
+        val probing = async { runtime.probe() }
+        entered.await()
+        runtime.stop()
+        release.complete(Unit)
+        assertTrue(probing.await() is ProbeResult.Failure)
     }
 
     @Test
