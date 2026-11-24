@@ -28,14 +28,15 @@ import java.util.concurrent.atomic.AtomicLong
 class TelegramWssProxy internal constructor(
     private val webSockets: WebSocket.Factory,
     private val closeTransport: () -> Unit,
+    private val warpRelay: WarpSocksRelay? = null,
 ) : Closeable {
-    private constructor(client: OkHttpClient) : this(client, {
+    private constructor(client: OkHttpClient, warpPort: Int?) : this(client, {
         client.dispatcher.cancelAll()
         client.connectionPool.evictAll()
         client.dispatcher.executorService.shutdownNow()
-    })
+    }, warpPort?.let(::WarpSocksRelay))
 
-    constructor(protectSocket: (Socket) -> Boolean) : this(
+    constructor(protectSocket: (Socket) -> Boolean, warpPort: Int? = null) : this(
         OkHttpClient.Builder()
             .socketFactory(TelegramSocketFactory(protectSocket))
             .proxy(Proxy.NO_PROXY)
@@ -43,10 +44,11 @@ class TelegramWssProxy internal constructor(
             .followSslRedirects(false)
             .pingInterval(20, TimeUnit.SECONDS)
             .build(),
+        warpPort,
     )
     private val closed = AtomicBoolean(false)
     private val sockets = ConcurrentHashMap.newKeySet<Socket>()
-    private val workers = ThreadPoolExecutor(0, 16, 30, TimeUnit.SECONDS, SynchronousQueue())
+    private val workers = ThreadPoolExecutor(0, 128, 30, TimeUnit.SECONDS, SynchronousQueue())
     private val acceptor = Executors.newSingleThreadExecutor()
     private var listener: ServerSocket? = null
     private val sent = AtomicLong()
@@ -104,10 +106,26 @@ class TelegramWssProxy internal constructor(
     private fun relay(socket: Socket) {
         socket.soTimeout = 10_000
         val input = DataInputStream(socket.getInputStream())
-        val destination = TelegramSocks.negotiate(input, socket.getOutputStream()) ?: return
-        val header = ByteArray(TelegramInit.SIZE).also { input.readFully(it) }
-        val init = TelegramInit.prepare(header, destination) ?: return
-        val ws = openRelay(socket, destination, init) ?: return
+        val output = socket.getOutputStream()
+        val request = TelegramSocks.readRequest(input, output, fullTunnel = warpRelay != null) ?: return
+        val destination = request.telegram
+        if (destination == null) {
+            val fallback = warpRelay
+            if (fallback == null) {
+                TelegramSocks.reply(output, 2)
+            } else {
+                fallback.relay(socket, input, request)
+            }
+            return
+        }
+        TelegramSocks.reply(output, 0)
+        val header = readHeader(input)
+        val init = TelegramInit.prepare(header, destination)
+        val ws = init?.let { openRelay(socket, destination, it) }
+        if (ws == null) {
+            warpRelay?.relay(socket, input, request, header)
+            return
+        }
         try {
             socket.soTimeout = 0
             val packets = TelegramPacketReader(input, header)
@@ -119,6 +137,21 @@ class TelegramWssProxy internal constructor(
         } finally {
             ws.cancel()
         }
+    }
+
+    private fun readHeader(input: DataInputStream): ByteArray {
+        val buffer = ByteArray(TelegramInit.SIZE)
+        var count = 0
+        try {
+            while (count < buffer.size) {
+                val read = input.read(buffer, count, buffer.size - count)
+                if (read < 0) break
+                count += read
+            }
+        } catch (_: java.net.SocketTimeoutException) {
+            return buffer.copyOf(count)
+        }
+        return buffer.copyOf(count)
     }
 
     private fun openRelay(socket: Socket, destination: TelegramDestination, init: ByteArray): WebSocket? {
@@ -265,6 +298,7 @@ class TelegramWssProxy internal constructor(
         sockets.forEach(::release)
         acceptor.shutdownNow()
         workers.shutdownNow()
+        warpRelay?.close()
         closeTransport()
     }
 }
