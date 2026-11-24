@@ -1,13 +1,16 @@
 package ru.ozero.enginetgwss
 
+import android.content.Context
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
@@ -19,77 +22,107 @@ import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.probe.Socks5HandshakeProbe
 import ru.ozero.enginescore.settings.SettingsModel
-import ru.ozero.enginescore.settings.TrafficMode
 
 class TelegramWssEngine internal constructor(
-    private val newProxy: () -> TelegramWssProxy,
+    private val warp: EnginePlugin,
+    private val newProxy: (Int, Boolean) -> TelegramWssProxy,
+    private val probeWarp: suspend (Int) -> Boolean,
 ) : EnginePlugin {
-    constructor() : this({ TelegramWssProxy { true } })
+    constructor(context: Context, warp: EnginePlugin) : this(
+        warp,
+        { port, tunnelMode ->
+            val network = TelegramNetwork(context)
+            TelegramWssProxy(port, network.dns) { socket -> !tunnelMode || network.protect(socket) }
+        },
+        { port -> runInterruptible(Dispatchers.IO) { WarpRouteProbe.check(port) } },
+    )
 
     override val id = EngineId.TGWSS
     override val capabilities = EngineCapabilities(
         supportsTcp = true,
-        supportsUdp = false,
+        supportsUdp = true,
         supportsDoH = false,
-        localOnly = true,
+        localOnly = false,
         requiresServer = false,
         supportsUpstreamSocks = false,
     )
 
-    private data class Session(val proxy: TelegramWssProxy, val port: Int, val startedAt: Long)
+    private data class Session(
+        val proxy: TelegramWssProxy,
+        val port: Int,
+        val warpPort: Int,
+        val startedAt: Long,
+    )
 
     private val mutex = Mutex()
 
     @Volatile
     private var session: Session? = null
 
-    override fun buildManualConfig(settings: SettingsModel?): EngineConfig? = null
+    override fun buildManualConfig(settings: SettingsModel?): EngineConfig = EngineConfig.TelegramWss()
 
-    override fun buildProxyConfig(settings: SettingsModel?): EngineConfig? =
-        if (settings?.trafficMode == TrafficMode.PROXY && settings.manualEngine == id) {
-            EngineConfig.TelegramWss()
-        } else {
-            null
-        }
+    override fun buildProxyConfig(settings: SettingsModel?): EngineConfig =
+        EngineConfig.TelegramWss(tunnelMode = false)
+
+    override fun stopTimeoutMs(): Long = 3_500L
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult = mutex.withLock {
         if (config !is EngineConfig.TelegramWss || upstream !is Upstream.None) {
-            return@withLock StartResult.Failure("Telegram WSS requires standalone proxy mode")
+            return@withLock StartResult.Failure("Telegram WSS requires standalone mode")
         }
         closeSession()
-        val proxy = newProxy()
+        var proxy: TelegramWssProxy? = null
+        var started = false
         try {
+            val fallback = warp.start(EngineConfig.WarpProxy(), Upstream.None)
+            if (fallback !is StartResult.Success || fallback.socksPort <= 0) {
+                return@withLock StartResult.Failure("WARP fallback could not start")
+            }
+            if (warp.awaitReady() != EnginePlugin.ReadyResult.Ready) {
+                return@withLock StartResult.Failure("WARP fallback not ready")
+            }
+            proxy = newProxy(fallback.socksPort, config.tunnelMode)
             val port = proxy.start(config.socksPort)
-            session = Session(proxy, port, System.currentTimeMillis())
+            session = Session(proxy, port, fallback.socksPort, System.currentTimeMillis())
+            started = true
             StartResult.Success(port)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (failure: Exception) {
-            proxy.close()
-            StartResult.Failure("Telegram WSS listener failed", failure)
+            StartResult.Failure("Telegram WSS start failed", failure)
+        } finally {
+            if (!started) {
+                proxy?.close()
+                withContext(NonCancellable) { warp.stop() }
+            }
         }
     }
 
     override suspend fun stop() = mutex.withLock { closeSession() }
 
-    private fun closeSession() {
-        val previous = session
+    private suspend fun closeSession() {
+        val previous = session ?: return
         session = null
-        previous?.proxy?.close()
+        try {
+            previous.proxy.close()
+        } finally {
+            withContext(NonCancellable) { warp.stop() }
+        }
     }
 
     override suspend fun probe(): ProbeResult {
         val current = session ?: return ProbeResult.Failure("Telegram WSS is not running")
         return try {
-            Socks5HandshakeProbe.probe("127.0.0.1", current.port)
-            val latency = runInterruptible(Dispatchers.IO) { current.proxy.probeRemote() }
-            if (latency == null) {
-                ProbeResult.Failure("Telegram WSS endpoint unavailable")
+            val latency = Socks5HandshakeProbe.probe("127.0.0.1", current.port)
+            if (!probeWarp(current.warpPort)) {
+                ProbeResult.Failure("WARP TCP/UDP fallback unavailable")
             } else {
                 ProbeResult.Success(latency)
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            ProbeResult.Failure("Telegram WSS listener unavailable", failure)
+            ProbeResult.Failure("Telegram WSS unavailable", failure)
         }
     }
 
@@ -99,7 +132,8 @@ class TelegramWssEngine internal constructor(
     }
 
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy =
-        ExitNodeStrategy.Unavailable("Telegram-only proxy has no general internet exit")
+        session?.let { ExitNodeStrategy.ViaSocks("127.0.0.1", it.port) }
+            ?: ExitNodeStrategy.Unavailable("Telegram WSS is not running")
 
     override fun stats(): Flow<EngineStats> = flow {
         while (true) {

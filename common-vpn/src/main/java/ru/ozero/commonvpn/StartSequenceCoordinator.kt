@@ -217,6 +217,7 @@ class StartSequenceCoordinator(
                 }
         }
         if (!usesCustomTun) deps.engineWatchdog.startHealthKillswitchWatcher(activeEngineId)
+        if (activeEngineId.manualStandaloneOnly) deps.engineWatchdog.startRoutedProbeWatchdog(activeEngineId)
         if (usesCustomTun && activeEngineId == EngineId.SINGBOX) {
             deps.engineWatchdog.startRoutedProbeWatchdog(activeEngineId)
         } else if (usesCustomTun) {
@@ -263,6 +264,7 @@ class StartSequenceCoordinator(
                 PersistentLoggers.warn(TAG, "proxy healthMonitor.start threw: ${t.message}")
             }
         deps.engineWatchdog.startHealthKillswitchWatcher(engineId)
+        if (engineId.manualStandaloneOnly) deps.engineWatchdog.startRoutedProbeWatchdog(engineId)
         deps.statsLogger.start()
         return true
     }
@@ -363,7 +365,7 @@ class StartSequenceCoordinator(
 
     private fun resolveTargetForUi(manualEngine: EngineId?, settings: SettingsModel): EngineId? {
         if (manualEngine != null) return manualEngine
-        val autoPlugins = deps.enginePlugins.filterNot { it.id.proxyOnly }
+        val autoPlugins = deps.enginePlugins.filterNot { it.id.manualStandaloneOnly }
         val pluginIds = autoPlugins.mapTo(mutableSetOf()) { it.id }
         return settings.engineAutoPriority.firstOrNull { it in pluginIds }
             ?: autoPlugins.firstOrNull()?.id
@@ -382,7 +384,7 @@ class StartSequenceCoordinator(
     ): List<Pair<EngineId, EngineConfig>> {
         val candidates = mutableListOf<Pair<EngineId, EngineConfig>>()
         for (id in settings.engineAutoPriority) {
-            if (id.proxyOnly) continue
+            if (id.manualStandaloneOnly) continue
             if (!engineAllowedForTrafficMode(id, trafficMode)) continue
             val config = buildEngineConfig(id, settings, trafficMode) ?: continue
             candidates += id to config
@@ -428,7 +430,7 @@ class StartSequenceCoordinator(
     }
 
     private fun engineAllowedForTrafficMode(engineId: EngineId, trafficMode: TrafficMode): Boolean {
-        if (trafficMode == TrafficMode.TUN) return !engineId.proxyOnly
+        if (trafficMode == TrafficMode.TUN) return true
         return deps.enginePlugins.firstOrNull { it.id == engineId }
             ?.capabilities
             ?.providesLocalSocksWithoutUpstream == true

@@ -17,6 +17,7 @@ internal class WarpSocksRelay(private val port: Int) : Closeable {
         val output = client.getOutputStream()
         val upstream = Socket()
         active.add(upstream)
+        var replySent = prefix != null
         try {
             if (closed.get()) throw IOException("WARP relay stopped")
             upstream.connect(InetSocketAddress(LOOPBACK, port), TIMEOUT_MS)
@@ -32,6 +33,7 @@ internal class WarpSocksRelay(private val port: Int) : Closeable {
             upstreamOutput.flush()
             val response = readResponse(upstreamInput, request.command)
             if (prefix == null) {
+                replySent = true
                 output.write(response)
                 output.flush()
             }
@@ -63,8 +65,8 @@ internal class WarpSocksRelay(private val port: Int) : Closeable {
                 runCatching { upstream.close() }
                 runCatching { client.close() }
             }
-        } catch (failure: IOException) {
-            if (prefix == null && !client.isClosed) {
+        } catch (_: IOException) {
+            if (!replySent && !client.isClosed) {
                 runCatching { TelegramSocks.reply(output, 1) }
             }
         } finally {

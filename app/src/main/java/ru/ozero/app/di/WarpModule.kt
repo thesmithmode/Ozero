@@ -121,15 +121,14 @@ object WarpModule {
 
     @Provides
     @Singleton
-    @IntoSet
-    fun provideEngineWarp(
+    fun provideWarpEngineDirect(
         @ApplicationContext context: Context,
         autoConfig: WarpAutoConfig,
         store: WarpConfigSlotStore,
         bridge: WarpSdkBridge,
         settingsRepository: SettingsRepository,
         endpointProber: WarpEndpointProber,
-    ): EnginePlugin = EngineWarp(
+    ): EngineWarp = EngineWarp(
         autoConfig = autoConfig,
         configStore = store,
         sdkBridge = bridge,
@@ -145,6 +144,22 @@ object WarpModule {
         },
         endpointProber = endpointProber,
     )
+
+    @Provides
+    @Singleton
+    @IntoSet
+    fun provideEngineWarp(warp: EngineWarp): EnginePlugin = warp
+
+    @Provides
+    @Singleton
+    @IntoSet
+    fun provideTelegramWarpRuntimeConfigProvider(store: WarpConfigSlotStore): EngineRuntimeConfigProvider =
+        object : EngineRuntimeConfigProvider {
+            override val engineId = EngineId.TGWSS
+            override val changes = store.activeSlot().map { it?.runtimeFingerprint() }
+            override val includeStarting = false
+            override val restartReason = "Telegram WSS WARP slot changed"
+        }
 
     @Provides
     @Singleton

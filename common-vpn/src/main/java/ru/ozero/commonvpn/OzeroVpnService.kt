@@ -76,7 +76,11 @@ class OzeroVpnService : android.net.VpnService() {
             statsJobRef = statsJobRef,
             engineExtras = ::engineExtras,
             engineStatsProvider = {
-                chainOrchestrator.activeEngines().firstOrNull { it.id.proxyOnly }?.stats()?.first()
+                if (tunIfaceNameRef.get() == null) {
+                    chainOrchestrator.activeEngines().firstOrNull { it.id.manualStandaloneOnly }?.stats()?.first()
+                } else {
+                    null
+                }
             },
         )
     }

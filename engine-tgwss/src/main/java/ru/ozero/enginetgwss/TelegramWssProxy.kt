@@ -27,21 +27,27 @@ import java.util.concurrent.atomic.AtomicLong
 
 class TelegramWssProxy internal constructor(
     private val webSockets: WebSocket.Factory,
-    private val closeTransport: () -> Unit,
     private val warpRelay: WarpSocksRelay? = null,
+    private val closeTransport: () -> Unit,
 ) : Closeable {
-    private constructor(client: OkHttpClient, warpPort: Int?) : this(client, {
+    private constructor(client: OkHttpClient, warpPort: Int?) : this(client, warpPort?.let(::WarpSocksRelay), {
         client.dispatcher.cancelAll()
         client.connectionPool.evictAll()
         client.dispatcher.executorService.shutdownNow()
-    }, warpPort?.let(::WarpSocksRelay))
+    })
 
-    constructor(protectSocket: (Socket) -> Boolean, warpPort: Int? = null) : this(
+    constructor(
+        warpPort: Int? = null,
+        dns: okhttp3.Dns = okhttp3.Dns.SYSTEM,
+        protectSocket: (Socket) -> Boolean,
+    ) : this(
         OkHttpClient.Builder()
             .socketFactory(TelegramSocketFactory(protectSocket))
+            .dns(dns)
             .proxy(Proxy.NO_PROXY)
             .followRedirects(false)
             .followSslRedirects(false)
+            .connectTimeout(5, TimeUnit.SECONDS)
             .pingInterval(20, TimeUnit.SECONDS)
             .build(),
         warpPort,

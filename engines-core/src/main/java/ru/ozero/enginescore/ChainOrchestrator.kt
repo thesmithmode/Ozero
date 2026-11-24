@@ -20,8 +20,8 @@ class ChainOrchestrator(
         steps.forEachIndexed { idx, step ->
             val plugin = engines.firstOrNull { it.id == step.engineId }
                 ?: return@withLock rollback(idx, "engine ${step.engineId} not found in registry")
-            if (steps.size > 1 && step.engineId.proxyOnly) {
-                return@withLock rollback(idx, "engine ${step.engineId} supports standalone proxy mode only")
+            if (steps.size > 1 && step.engineId.manualStandaloneOnly) {
+                return@withLock rollback(idx, "engine ${step.engineId} supports standalone mode only")
             }
             if (steps.size > 1 && idx == 0 && !plugin.capabilities.providesLocalSocksWithoutUpstream) {
                 PersistentLoggers.warn(TAG, "step $idx ${step.engineId} has no standalone local SOCKS port")

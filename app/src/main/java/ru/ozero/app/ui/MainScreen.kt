@@ -90,12 +90,7 @@ fun MainScreen(
     val appMode by viewModel.appMode.collectAsStateWithLifecycle()
     val manualEngine by viewModel.manualEngine.collectAsStateWithLifecycle()
     val engineAutoPriority by viewModel.engineAutoPriority.collectAsStateWithLifecycle()
-    val trafficMode by viewModel.trafficMode.collectAsStateWithLifecycle()
-    val selectableEngines = if (trafficMode == ru.ozero.enginescore.settings.TrafficMode.PROXY) {
-        engineAutoPriority + EngineId.TGWSS
-    } else {
-        engineAutoPriority
-    }
+    val selectableEngines = (engineAutoPriority + EngineId.TGWSS).distinct()
     val speedHistory by viewModel.speedHistory.collectAsStateWithLifecycle()
     val urnetworkPeerCount by viewModel.urnetworkPeerCount.collectAsStateWithLifecycle()
     val urnetworkPeerSearchSeconds by viewModel.urnetworkPeerSearchSeconds.collectAsStateWithLifecycle()
