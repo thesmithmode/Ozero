@@ -50,9 +50,22 @@ object AppBackupSerializer {
         root.put("splitRules", rulesArr)
 
         data.strategy?.let { root.put("strategy", BackupStrategySerializer.serialize(it)) }
+        data.masque?.let { root.put("masque", serializeMasque(it)) }
 
         return root.toString(2)
     }
+
+    private fun serializeMasque(data: BackupMasque): JSONObject = JSONObject().apply {
+        data.profileJson?.let { put("profileJson", it) }
+        put("transport", data.transport)
+        put("autoEnabled", data.autoEnabled)
+    }
+
+    private fun deserializeMasque(data: JSONObject): BackupMasque = BackupMasque(
+        profileJson = data.optString("profileJson").takeIf { it.isNotEmpty() },
+        transport = data.getString("transport"),
+        autoEnabled = data.getBoolean("autoEnabled"),
+    )
 
     fun serializeEncrypted(data: AppBackupData): ByteArray =
         BackupCipher.encrypt(serialize(data).toByteArray(Charsets.UTF_8))
@@ -132,6 +145,7 @@ object AppBackupSerializer {
             warpSlots = warpSlots,
             splitRules = splitRules,
             strategy = strategy,
+            masque = root.optJSONObject("masque")?.let(::deserializeMasque),
         )
     }.getOrElse { e ->
         if (e is BackupParseException) throw e

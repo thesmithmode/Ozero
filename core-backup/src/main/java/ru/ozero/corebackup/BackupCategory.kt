@@ -8,6 +8,7 @@ enum class BackupCategory {
     URNETWORK,
     STRATEGY,
     SPLIT_TUNNEL,
+    MASQUE,
     ;
 
     fun isPresentIn(data: AppBackupData): Boolean = when (this) {
@@ -15,6 +16,7 @@ enum class BackupCategory {
         DNS_HOSTS -> data.settings.hasDns()
         BYEDPI -> data.settings.hasByedpi()
         WARP -> data.warpSlots.isNotEmpty()
+        MASQUE -> data.masque != null
         URNETWORK -> data.settings.hasUrnPrefs() || data.urnetwork.hasAny()
         STRATEGY -> data.strategy != null
         SPLIT_TUNNEL -> data.settings.splitMode != null || data.splitRules.isNotEmpty()

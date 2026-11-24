@@ -17,7 +17,8 @@ data class MasqueSettings(
 ) {
     fun fingerprint(): String? = profile?.let {
         val digest = MessageDigest.getInstance("SHA-256").digest(it.json.toByteArray())
-        "${digest.contentHashCode()}:${transport.name}:$autoEnabled"
+        val hash = digest.joinToString("") { byte -> "%02x".format(byte) }
+        "$hash:${transport.name}:$autoEnabled"
     }
 }
 
@@ -45,10 +46,10 @@ class MasqueProfileStore(private val store: DataStore<Preferences>) {
         store.edit { it[AUTO_ENABLED] = enabled }
     }
 
-    suspend fun restore(profile: MasqueProfile, transport: MasqueTransport, autoEnabled: Boolean) {
-        val sealed = encrypt(profile)
+    suspend fun restore(profile: MasqueProfile?, transport: MasqueTransport, autoEnabled: Boolean) {
+        val sealed = profile?.let(::encrypt)
         store.edit {
-            it[PROFILE] = sealed
+            sealed?.let { encrypted -> it[PROFILE] = encrypted }
             it[TRANSPORT] = transport.name
             it[AUTO_ENABLED] = autoEnabled
         }

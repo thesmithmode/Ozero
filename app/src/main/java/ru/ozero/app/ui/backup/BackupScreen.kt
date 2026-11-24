@@ -278,6 +278,7 @@ private fun BackupCategory.labelRes(): Int = when (this) {
     BackupCategory.DNS_HOSTS -> R.string.backup_category_dns_hosts
     BackupCategory.BYEDPI -> R.string.backup_category_byedpi
     BackupCategory.WARP -> R.string.backup_category_warp
+    BackupCategory.MASQUE -> R.string.masque_title
     BackupCategory.URNETWORK -> R.string.backup_category_urnetwork
     BackupCategory.STRATEGY -> R.string.backup_category_strategy
     BackupCategory.SPLIT_TUNNEL -> R.string.backup_category_split_tunnel
