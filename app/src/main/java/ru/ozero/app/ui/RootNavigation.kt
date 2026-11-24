@@ -71,6 +71,7 @@ fun RootNavigation(
                     onOpenMasterDnsSettings = { navigate(TopScreen.MasterDnsSettings) },
                     onOpenFptnSettings = { navigate(TopScreen.FptnSettings) },
                     onOpenSingboxSettings = { navigate(TopScreen.SingboxSettings) },
+                    onOpenOperaSettings = { navigate(TopScreen.OperaSettings) },
                     onOpenStatsHistory = { navigate(TopScreen.StatsHistory) },
                     onOpenBackup = { navigate(TopScreen.Backup) },
                     onOpenAutoModeSettings = { navigate(TopScreen.AutoModeSettings) },

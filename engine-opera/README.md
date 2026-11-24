@@ -1,9 +1,13 @@
-# Opera Proxy (draft)
+# Opera Proxy
 
 Source: [Alexey71/opera-proxy v1.30.0](https://github.com/Alexey71/opera-proxy/tree/57205a4bf61b55991c35841198cc27ead5ef6962), MIT (see LICENSE.upstream).
 
-Isolated Android library for subprocess lifecycle, loopback SOCKS5, EU/AS/AM selection and a routed TLS readiness check. No public proxy fallback, custom credentials, or TLS verification bypass. The provider is third-party and availability is not guaranteed. SOCKS CONNECT is TCP-only; UDP and DNS routing must be handled or rejected explicitly by integration.
+Android ARM64 release asset is pinned by SHA-256 in build-tools/binaries.lock.yaml. An alternative source build recipe is provided in scripts/build-opera-proxy.sh.
 
-Build the pinned native source on Linux with Android NDK and the upstream Go toolchain: `bash scripts/build-opera-proxy.sh`. No APK artifacts from other apps are reused.
+The engine runs an isolated subprocess with loopback TCP SOCKS5, EU/AS/AM and first/random/fastest server selection. Startup must pass a routed TLS handshake. No public proxy fallback, custom credentials, or disabled certificate verification.
 
-This module is not yet registered as an EnginePlugin, not included in the app dependency graph, and not selectable by users. Before enabling it, complete EngineId/config, Hilt, settings and backup, auto-mode, HEV DNS/TCP-only routing, release native packaging and license/third-party notices, CI coverage and device smoke testing. Confirm that the upstream service permits the intended usage. Do not merge as a completed feature before these checks.
+Select proxy mode in connection settings and then Opera Proxy, or include Opera in proxy-mode automatic selection. Configure the region and selection policy in the engine settings. Settings are included in the general backup category.
+
+The upstream SOCKS implementation supports CONNECT only. Opera is excluded from device-wide TUN selection: ordinary UDP/DNS and QUIC cannot be transported by this implementation. Applications using SOCKS must resolve names remotely. The provider is third-party, may restrict usage and its availability is not guaranteed.
+
+Before merging: verify CI/coverage, actual ARM64 APK packaging and on-device start/stop and connectivity; confirm provider service terms permit intended usage. No third-party APK binaries are copied.

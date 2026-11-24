@@ -875,7 +875,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification :engine-opera:testDebugUnitTest --stacktrace --continue
+        run: ./gradlew :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification :engine-opera:testDebugUnitTest :engine-opera:jacocoTestReport :engine-opera:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -888,7 +888,9 @@ jobs:
         continue-on-error: true
         with:
           name: jacoco-engine-fptn
-          path: engine-fptn/build/reports/jacoco/**
+          path: |
+            engine-fptn/build/reports/jacoco/**
+            engine-opera/build/reports/jacoco/**
           retention-days: 14
 
       - name: Upload test reports
@@ -897,7 +899,9 @@ jobs:
         continue-on-error: true
         with:
           name: test-reports-engine-fptn
-          path: engine-fptn/build/reports/tests/**
+          path: |
+            engine-fptn/build/reports/tests/**
+            engine-opera/build/reports/tests/**
           retention-days: 14
 
   test-engines-urnetwork-byedpi:
