@@ -26,6 +26,12 @@ mkdir -p "$out"
 (
     cd "$work/usque"
     export GOOS=android GOARCH="$arch" CGO_ENABLED=0 GOTOOLCHAIN=local
+    if [[ "$abi" == x86_64 ]]; then
+        ndk="${MASQUE_NDK_PATH:?Android NDK required for x86_64}"
+        export CC="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android24-clang"
+        test -x "$CC"
+        export CGO_ENABLED=1
+    fi
     gofmt -w main.go internal/socks5.go cmd/socks.go
     go mod download
     go mod verify

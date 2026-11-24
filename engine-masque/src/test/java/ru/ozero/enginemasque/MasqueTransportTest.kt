@@ -27,6 +27,9 @@ class MasqueTransportTest {
         assertFalse("--http2" in h3)
         assertEquals(h3 + "--http2", h2)
         assertTrue("--no-tunnel-ipv6" in h3)
+        assertTrue("--always-reconnect" in h3)
+        val dns = h3.zipWithNext().filter { it.first == "--dns" }.map { it.second }
+        assertEquals(listOf("9.9.9.9", "149.112.112.112"), dns)
         val v6 = MasqueCommand.socks(binary, config, 1080, MasqueTransport.H3, true, true)
         assertTrue("--ipv6" in v6)
         assertFalse("--no-tunnel-ipv6" in v6)

@@ -119,7 +119,12 @@ private fun MasqueTransportSection(
                 selected = state.transport == transport,
                 onClick = { onTransport(transport) },
                 label = {
-                    Text(if (transport == MasqueTransport.AUTO) stringResource(R.string.masque_auto) else transport.name)
+                    val label = if (transport == MasqueTransport.AUTO) {
+                        stringResource(R.string.masque_auto)
+                    } else {
+                        transport.name
+                    }
+                    Text(label)
                 },
                 enabled = enabled,
             )

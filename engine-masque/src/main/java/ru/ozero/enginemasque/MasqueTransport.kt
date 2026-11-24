@@ -45,9 +45,13 @@ internal object MasqueCommand {
                     "127.0.0.1",
                     "--port",
                     port.toString(),
+                    "--always-reconnect",
                 ),
             )
-            if (!ipv6Enabled) add("--no-tunnel-ipv6")
+            if (!ipv6Enabled) {
+                add("--no-tunnel-ipv6")
+                addAll(listOf("--dns", "9.9.9.9", "--dns", "149.112.112.112"))
+            }
             if (endpointIpv6) add("--ipv6")
             if (transport == MasqueTransport.H2) add("--http2")
         }

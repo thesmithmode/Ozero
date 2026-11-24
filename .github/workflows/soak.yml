@@ -238,6 +238,7 @@ jobs:
         uses: ./.github/actions/build-masque
         with:
           abi: x86_64
+          ndk-path: ${{ steps.ndk.outputs.ndk-path }}
 
       - name: Build x86_64 debug and instrumentation APKs
         run: |

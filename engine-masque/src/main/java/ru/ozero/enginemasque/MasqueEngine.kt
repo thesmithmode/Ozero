@@ -61,7 +61,8 @@ class MasqueEngine(
 
     private fun createConfig(current: MasqueSettings, settings: SettingsModel?): EngineConfig? {
         val profile = current.profile ?: return null
-        if (current.corrupt || !available() || (!current.autoEnabled && settings?.manualEngine != id)) return null
+        if (current.corrupt || !available()) return null
+        if (!current.autoEnabled && settings?.manualEngine != id) return null
         return EngineConfig.Masque(profile.json, current.transport.name, settings?.ipv6Enabled == true)
     }
 

@@ -53,7 +53,8 @@ class MasqueProfile private constructor(internal val json: String) {
 
         private fun isIpv4(address: String): Boolean {
             val parts = address.split('.')
-            return parts.size == 4 && parts.all { part ->
+            if (parts.size != 4) return false
+            return parts.all { part ->
                 part.toIntOrNull()?.let { it in 0..255 && it.toString() == part } == true
             }
         }
