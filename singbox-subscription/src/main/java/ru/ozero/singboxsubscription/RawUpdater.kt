@@ -388,15 +388,6 @@ class RawUpdater(
         private fun String.safeTransportLabel(): String =
             trim().lowercase().filter { it.isLetterOrDigit() || it in "-_." }.take(48).ifBlank { "none" }
 
-        private fun IOException.canRetryViaLocalProxy(): Boolean = causeChain().none {
-            it is SubscriptionHttpException ||
-                it is SubscriptionBodyTooLargeException ||
-                it is SSLException ||
-                it is CertificateException ||
-                it is CertPathValidatorException ||
-                it is CancellationException
-        }
-
         private fun normalizeError(e: Throwable): Throwable = when {
             e.isSubscriptionCertificateFailure() ->
                 SSLHandshakeException("Subscription TLS certificate validation failed").initCause(e)
@@ -453,8 +444,6 @@ class RawUpdater(
                 message.orEmpty().containsCertificateFailureText()
         }
 
-        private fun Throwable.causeChain(): Sequence<Throwable> = generateSequence(this) { it.cause }
-
         private fun String.containsCertificateFailureText(): Boolean {
             val text = lowercase()
             return text.contains("chain validation failed") ||
@@ -473,6 +462,17 @@ class RawUpdater(
         }
     }
 }
+
+private fun IOException.canRetryViaLocalProxy(): Boolean = causeChain().none {
+    it is SubscriptionHttpException ||
+        it is SubscriptionBodyTooLargeException ||
+        it is SSLException ||
+        it is CertificateException ||
+        it is CertPathValidatorException ||
+        it is CancellationException
+}
+
+private fun Throwable.causeChain(): Sequence<Throwable> = generateSequence(this) { it.cause }
 
 private fun ResponseBody.readUtf8Limited(maxBytes: Long): String {
     val declaredLength = contentLength()
