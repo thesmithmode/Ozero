@@ -39,6 +39,7 @@ class TelegramPacketReaderTest {
     @Test
     fun `zero and oversized packet lengths are rejected`() {
         assertThrows(IOException::class.java) { reader(0xef, byteArrayOf(0)).first.readPacket() }
+        assertThrows(IOException::class.java) { reader(0xaa, byteArrayOf(1)).first.readPacket() }
         assertThrows(IOException::class.java) {
             reader(0xee, byteArrayOf(1, 0, 64, 0)).first.readPacket()
         }

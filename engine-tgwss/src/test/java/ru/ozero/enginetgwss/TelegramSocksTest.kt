@@ -55,6 +55,21 @@ class TelegramSocksTest {
         assertNull(negotiate(5, 1, 0, 5, 1, 0, 1, 149, 154, 167, 41, 0, 22).first)
     }
 
+    @Test
+    fun `full tunnel SOCKS accepts domains IPv6 and UDP without resolving on the host`() {
+        val name = "example.test".encodeToByteArray()
+        val domain = byteArrayOf(5, 1, 0, 3, name.size.toByte()) + name + byteArrayOf(1, 187.toByte())
+        val ipv6 = byteArrayOf(5, 1, 0, 4) + ByteArray(16) { 1 } + byteArrayOf(0, 80)
+        val udp = byteArrayOf(5, 3, 0, 1) + ByteArray(6)
+        for (request in listOf(domain, ipv6, udp)) {
+            val input = DataInputStream(ByteArrayInputStream(byteArrayOf(5, 1, 0) + request))
+            val output = ByteArrayOutputStream()
+            val parsed = requireNotNull(TelegramSocks.readRequest(input, output, fullTunnel = true))
+            org.junit.jupiter.api.Assertions.assertArrayEquals(request, parsed.encode())
+            assertNull(parsed.telegram)
+        }
+    }
+
     private fun negotiate(vararg data: Int): Pair<TelegramDestination?, ByteArray> {
         val input = DataInputStream(ByteArrayInputStream(data.map(Int::toByte).toByteArray()))
         val output = ByteArrayOutputStream()

@@ -38,7 +38,7 @@ class WarpSocksRelayTest {
             assertContentEquals(payload, ByteArray(payload.size).also { input.readFully(it) })
             upstream.getOutputStream().write(payload)
         }) { client ->
-            request(client, request)
+            sendRequest(client, request)
             val input = DataInputStream(client.getInputStream())
             assertContentEquals(success, ByteArray(10).also { input.readFully(it) })
             client.getOutputStream().write(payload)
@@ -65,7 +65,7 @@ class WarpSocksRelayTest {
                 udp.send(DatagramPacket(payload, payload.size, received.socketAddress))
                 assertEquals(-1, input.read())
             }) { client ->
-                request(client, req)
+                sendRequest(client, req)
                 val response = ByteArray(10).also { DataInputStream(client.getInputStream()).readFully(it) }
                 assertContentEquals(byteArrayOf(127, 0, 0, 1), response.copyOfRange(4, 8))
                 DatagramSocket(InetSocketAddress(loopback, 0)).use { local ->
@@ -85,7 +85,7 @@ class WarpSocksRelayTest {
         TelegramWssProxy(FakeTelegramWebSockets(), WarpSocksRelay(port)) {}.use { proxy ->
             Socket(loopback, proxy.start()).use { client ->
                 client.soTimeout = 3000
-                request(client, byteArrayOf(5, 1, 0, 1, 1, 1, 1, 1, 1, 187.toByte()))
+                sendRequest(client, byteArrayOf(5, 1, 0, 1, 1, 1, 1, 1, 1, 187.toByte()))
                 val reply = ByteArray(10).also { DataInputStream(client.getInputStream()).readFully(it) }
                 assertEquals(1, reply[1].toInt())
             }
@@ -112,7 +112,7 @@ class WarpSocksRelayTest {
         upstream.getOutputStream().write(byteArrayOf(5, 0))
     }
 
-    private fun request(client: Socket, request: ByteArray) {
+    private fun sendRequest(client: Socket, request: ByteArray) {
         client.getOutputStream().apply {
             write(byteArrayOf(5, 1, 0))
             flush()

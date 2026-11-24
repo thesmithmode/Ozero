@@ -14,17 +14,19 @@ internal object WarpRouteProbe {
     private val resolver = byteArrayOf(1, 1, 1, 1)
     private const val TIMEOUT_MS = 3_000
 
-    fun check(port: Int): Boolean = try {
-        checkTcp(port) && checkUdp(port)
+    fun check(
+        port: Int,
+        sslFactory: () -> SSLSocketFactory = { SSLSocketFactory.getDefault() as SSLSocketFactory },
+    ): Boolean = try {
+        checkTcp(port, sslFactory) && checkUdp(port)
     } catch (_: IOException) {
         false
     }
 
-    private fun checkTcp(port: Int): Boolean = Socket().use { socket ->
+    private fun checkTcp(port: Int, sslFactory: () -> SSLSocketFactory): Boolean = Socket().use { socket ->
         val reply = negotiate(socket, port, SocksRequest(1, resolver, 443, 1))
         if (reply[1].toInt() != 0) return false
-        val factory = SSLSocketFactory.getDefault() as SSLSocketFactory
-        (factory.createSocket(socket, "1.1.1.1", 443, true) as SSLSocket).use { tls ->
+        (sslFactory().createSocket(socket, "1.1.1.1", 443, true) as SSLSocket).use { tls ->
             tls.soTimeout = TIMEOUT_MS
             tls.sslParameters = tls.sslParameters.apply { endpointIdentificationAlgorithm = "HTTPS" }
             tls.startHandshake()
