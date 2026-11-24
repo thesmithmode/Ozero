@@ -875,12 +875,12 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification --stacktrace --continue
+        run: ./gradlew :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification :engine-opera:testDebugUnitTest --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
           python3 -m pip install --quiet defusedxml
-          python3 scripts/verify-junit-nonzero.py engine-fptn
+          python3 scripts/verify-junit-nonzero.py engine-fptn engine-opera
 
       - name: Upload coverage report
         if: always()
