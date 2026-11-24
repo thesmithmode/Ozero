@@ -91,7 +91,11 @@ class AppBackupManagerTest {
     fun `unused MASQUE leaves existing backup format unchanged`() = runTest {
         val store = mockk<MasqueProfileStore>(relaxed = true)
         every { store.settings() } returns flowOf(MasqueSettings())
-        val integrated = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, fptnStore, masqueStore = store)
+        val integrated = AppBackupManager(
+            ozeroDs, warpStore, urnStore, splitDao, fptnStore,
+            urnetworkDeviceIdentity = urnIdentity,
+            masqueStore = store,
+        )
         val old = manager.export()
         val new = integrated.export()
         assertNull(new.masque)
@@ -133,7 +137,9 @@ class AppBackupManagerTest {
         assertEquals(BackupMasque(null, "AUTO", false), integrated.export(categories).masque)
         val data = makeMinimalBackup().copy(masque = BackupMasque(json, "H2", false))
         integrated.import(data, categories)
-        coVerify(exactly = 1) { store.restore(match<MasqueProfile> { it.exportJson() == json }, MasqueTransport.H2, false) }
+        coVerify(exactly = 1) {
+            store.restore(match<MasqueProfile> { it.exportJson() == json }, MasqueTransport.H2, false)
+        }
         assertNull(ozeroDs.data.first()[SettingsKeys.MANUAL_ENGINE])
     }
 
