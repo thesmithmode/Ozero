@@ -125,25 +125,31 @@ class WarpSocksRelayTest {
         }
     }
 
+    private fun serve(server: ServerSocket, action: (Socket) -> Unit) {
+        server.accept().use { socket ->
+            socket.soTimeout = 3000
+            action(socket)
+        }
+    }
+
+    private fun runClient(port: Int, action: (Socket) -> Unit) {
+        TelegramWssProxy(FakeTelegramWebSockets(), WarpSocksRelay(port)) {}.use { proxy ->
+            Socket(loopback, proxy.start()).use { client ->
+                client.soTimeout = 3000
+                action(client)
+            }
+        }
+    }
+
     private fun withUpstream(serverAction: (Socket) -> Unit, clientAction: (Socket) -> Unit) {
         ServerSocket(0, 1, loopback).use { server ->
             server.soTimeout = 3000
             val worker = Executors.newSingleThreadExecutor()
             try {
-                val task = worker.submit(Callable {
-                    server.accept().use { socket ->
-                        socket.soTimeout = 3000
-                        serverAction(socket)
-                    }
-                })
-                TelegramWssProxy(FakeTelegramWebSockets(), WarpSocksRelay(server.localPort)) {}.use { proxy ->
-                    Socket(loopback, proxy.start()).use { client ->
-                        client.soTimeout = 3000
-                        clientAction(client)
-                    }
-                    task.get(5, TimeUnit.SECONDS)
-                    assertTrue(task.isDone)
-                }
+                val task = worker.submit(Callable { serve(server, serverAction) })
+                runClient(server.localPort, clientAction)
+                task.get(5, TimeUnit.SECONDS)
+                assertTrue(task.isDone)
             } finally {
                 worker.shutdownNow()
             }

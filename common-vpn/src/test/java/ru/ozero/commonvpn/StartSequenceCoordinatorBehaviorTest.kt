@@ -1305,6 +1305,7 @@ class StartSequenceCoordinatorBehaviorTest {
                 proxyMode = true,
             )
             EngineId.FPTN -> EngineConfig.Fptn(token = "test")
+            EngineId.TGWSS -> EngineConfig.TelegramWss(socksPort = socksPort)
         }
     }
 
