@@ -126,6 +126,7 @@ tasks.matching { it.name == "packageDebug" || it.name == "packageRelease" }.conf
 gradle.taskGraph.whenReady {
     val isRelease = allTasks.any { it.name.endsWith("Release") && it.name.contains("assemble") }
     if (!isRelease) return@whenReady
+    check(!soakX86_64) { "Release APK must contain ARM64 only" }
     val key = providers.environmentVariable("UPDATE_PUBLIC_KEY_HEX").orNull
     val placeholder = "0000000000000000000000000000000000000000000000000000000000000000"
     if (key.isNullOrBlank() || key == placeholder) {

@@ -1,7 +1,9 @@
 package ru.ozero.enginemasque
 
+import android.os.Build
 import java.io.File
-import java.util.concurrent.TimeUnit
+import java.io.IOException
+import kotlin.concurrent.thread
 
 internal interface MasqueProcess {
     val alive: Boolean
@@ -18,18 +20,44 @@ internal object NativeMasqueProcessLauncher : MasqueProcessLauncher {
         val config = File(command[2])
         val process = ProcessBuilder(command)
             .redirectErrorStream(true)
-            .redirectOutput(File("/dev/null"))
             .apply {
                 environment()["OZERO_MASQUE_MANAGED"] = "1"
                 environment()["OZERO_MASQUE_READY_FILE"] = File(config.parentFile, "ready").absolutePath
+                environment().keys.removeAll { it.uppercase(java.util.Locale.ROOT) in PROXY_VARIABLES }
             }
             .start()
+        discardOutput(process)
         return ManagedMasqueProcess(process)
+    }
+
+    private val PROXY_VARIABLES = setOf("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY")
+
+    private fun discardOutput(process: Process) {
+        thread(isDaemon = true, name = "masque-output") {
+            try {
+                process.inputStream.use { stream ->
+                    val buffer = ByteArray(8192)
+                    while (stream.read(buffer) != -1) Unit
+                }
+            } catch (_: IOException) {
+                Unit
+            }
+        }
     }
 }
 
-internal class ManagedMasqueProcess(private val process: Process) : MasqueProcess {
-    override val alive: Boolean get() = process.isAlive
+internal class ManagedMasqueProcess(
+    private val process: Process,
+    private val forceStop: (Process) -> Unit = ::forceStopProcess,
+    private val stopWaitMs: Long = 1_000,
+) : MasqueProcess {
+    override val alive: Boolean
+        get() = try {
+            process.exitValue()
+            false
+        } catch (_: IllegalThreadStateException) {
+            true
+        }
 
     override fun exitCode(): Int = process.exitValue()
 
@@ -38,10 +66,26 @@ internal class ManagedMasqueProcess(private val process: Process) : MasqueProces
             process.outputStream.close()
         } finally {
             process.destroy()
-            if (!process.waitFor(1, TimeUnit.SECONDS)) {
-                process.destroyForcibly()
-                check(process.waitFor(1, TimeUnit.SECONDS)) { "MASQUE process did not stop" }
+            if (!waitForExit()) {
+                forceStop(process)
+                check(waitForExit()) { "MASQUE process did not stop" }
             }
         }
+    }
+
+    private fun waitForExit(): Boolean {
+        val deadline = System.nanoTime() + stopWaitMs * 1_000_000
+        while (alive && System.nanoTime() < deadline) {
+            Thread.sleep(20)
+        }
+        return !alive
+    }
+}
+
+private fun forceStopProcess(process: Process) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        process.destroyForcibly()
+    } else {
+        process.destroy()
     }
 }

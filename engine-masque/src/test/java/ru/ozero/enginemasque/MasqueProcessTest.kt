@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 class MasqueProcessTest {
     @Test
@@ -42,11 +41,15 @@ class MasqueProcessTest {
     @Test
     fun `stubborn child is forcibly terminated or stop fails`() {
         val process = mockk<Process>(relaxed = true)
-        every { process.waitFor(1, TimeUnit.SECONDS) } returnsMany listOf(false, true)
-        ManagedMasqueProcess(process).close()
+        var exited = false
+        every { process.exitValue() } answers { if (exited) 0 else throw IllegalThreadStateException() }
+        val child = ManagedMasqueProcess(process, forceStop = { exited = true }, stopWaitMs = 0)
+        child.close()
+        assertFalse(child.alive)
         verify { process.destroy() }
-        verify { process.destroyForcibly() }
-        every { process.waitFor(1, TimeUnit.SECONDS) } returns false
-        assertThrows<IllegalStateException> { ManagedMasqueProcess(process).close() }
+        exited = false
+        assertThrows<IllegalStateException> {
+            ManagedMasqueProcess(process, forceStop = {}, stopWaitMs = 0).close()
+        }
     }
 }

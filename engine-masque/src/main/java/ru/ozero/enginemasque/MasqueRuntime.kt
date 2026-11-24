@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.io.IOException
-import java.nio.file.Files
+import java.util.UUID
 import kotlin.coroutines.coroutineContext
 
 class MasqueRuntime internal constructor(
@@ -167,7 +167,9 @@ class MasqueRuntime internal constructor(
     private fun newWorkspace(): File {
         check(binary.isFile && binary.canExecute()) { "MASQUE binary unavailable" }
         check(privateDirectory.isDirectory) { "MASQUE private directory unavailable" }
-        return Files.createTempDirectory(privateDirectory.toPath(), "masque-").toFile()
+        return File(privateDirectory, "masque-${UUID.randomUUID()}").apply {
+            check(mkdir()) { "Cannot create MASQUE workspace" }
+        }
     }
 
     private data class Session(val process: MasqueProcess, val workspace: File, val port: Int)
