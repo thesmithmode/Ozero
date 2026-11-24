@@ -25,16 +25,25 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
-class TelegramWssProxy(
-    protectSocket: (Socket) -> Boolean,
+class TelegramWssProxy internal constructor(
+    private val webSockets: WebSocket.Factory,
+    private val closeTransport: () -> Unit,
 ) : Closeable {
-    private val http = OkHttpClient.Builder()
-        .socketFactory(TelegramSocketFactory(protectSocket))
-        .proxy(Proxy.NO_PROXY)
-        .followRedirects(false)
-        .followSslRedirects(false)
-        .pingInterval(20, TimeUnit.SECONDS)
-        .build()
+    private constructor(client: OkHttpClient) : this(client, {
+        client.dispatcher.cancelAll()
+        client.connectionPool.evictAll()
+        client.dispatcher.executorService.shutdownNow()
+    })
+
+    constructor(protectSocket: (Socket) -> Boolean) : this(
+        OkHttpClient.Builder()
+            .socketFactory(TelegramSocketFactory(protectSocket))
+            .proxy(Proxy.NO_PROXY)
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .pingInterval(20, TimeUnit.SECONDS)
+            .build(),
+    )
     private val closed = AtomicBoolean(false)
     private val sockets = ConcurrentHashMap.newKeySet<Socket>()
     private val workers = ThreadPoolExecutor(0, 16, 30, TimeUnit.SECONDS, SynchronousQueue())
@@ -101,12 +110,7 @@ class TelegramWssProxy(
         val init = TelegramInit.prepare(header, destination) ?: return
         val ready = CountDownLatch(1)
         val opened = AtomicBoolean(false)
-        val request = Request.Builder()
-            .url("wss://${destination.host}/apiws")
-            .header("Origin", "https://web.telegram.org")
-            .header("Sec-WebSocket-Protocol", "binary")
-            .build()
-        val ws = http.newWebSocket(request, object : WebSocketListener() {
+        val ws = webSockets.newWebSocket(request(destination), object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 if (response.header("Sec-WebSocket-Protocol") == "binary" && webSocket.send(init.toByteString())) {
                     opened.set(true)
@@ -164,6 +168,45 @@ class TelegramWssProxy(
         }
     }
 
+    internal fun probeRemote(timeoutMs: Long = 5_000): Long? {
+        if (closed.get()) return null
+        val ready = CountDownLatch(1)
+        val latency = AtomicLong(-1)
+        val started = System.nanoTime()
+        val probes = mutableListOf<WebSocket>()
+        try {
+            for (dc in listOf(2, 4, 1)) {
+                if (latency.get() >= 0 || closed.get()) break
+                val ws = webSockets.newWebSocket(
+                    request(TelegramDestination(dc, false)),
+                    object : WebSocketListener() {
+                        override fun onOpen(webSocket: WebSocket, response: Response) {
+                            if (response.header("Sec-WebSocket-Protocol") == "binary") {
+                                latency.compareAndSet(
+                                    -1,
+                                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
+                                )
+                                ready.countDown()
+                            }
+                            webSocket.cancel()
+                        }
+                    },
+                )
+                probes.add(ws)
+            }
+            ready.await(timeoutMs, TimeUnit.MILLISECONDS)
+            return latency.get().takeIf { it >= 0 && !closed.get() }
+        } finally {
+            probes.forEach { it.cancel() }
+        }
+    }
+
+    private fun request(destination: TelegramDestination): Request = Request.Builder()
+        .url("wss://${destination.host}/apiws")
+        .header("Origin", "https://web.telegram.org")
+        .header("Sec-WebSocket-Protocol", "binary")
+        .build()
+
     private fun release(socket: Socket) {
         runCatching { socket.close() }
         sockets.remove(socket)
@@ -176,8 +219,6 @@ class TelegramWssProxy(
         sockets.forEach(::release)
         acceptor.shutdownNow()
         workers.shutdownNow()
-        http.dispatcher.cancelAll()
-        http.connectionPool.evictAll()
-        http.dispatcher.executorService.shutdownNow()
+        closeTransport()
     }
 }

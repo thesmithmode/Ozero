@@ -1,7 +1,9 @@
 package ru.ozero.enginetgwss
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
@@ -19,7 +21,12 @@ import ru.ozero.enginescore.probe.Socks5HandshakeProbe
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.TrafficMode
 
-class TelegramWssEngine : EnginePlugin {
+class TelegramWssEngine internal constructor(
+    private val newProxy: () -> TelegramWssProxy,
+) : EnginePlugin {
+    constructor() : this({ TelegramWssProxy { true } })
+
+
     override val id = EngineId.TGWSS
     override val capabilities = EngineCapabilities(
         supportsTcp = true,
@@ -37,6 +44,8 @@ class TelegramWssEngine : EnginePlugin {
     @Volatile
     private var session: Session? = null
 
+    override fun buildManualConfig(settings: SettingsModel?): EngineConfig? = null
+
     override fun buildProxyConfig(settings: SettingsModel?): EngineConfig? =
         if (settings?.trafficMode == TrafficMode.PROXY && settings.manualEngine == id) {
             EngineConfig.TelegramWss()
@@ -49,8 +58,7 @@ class TelegramWssEngine : EnginePlugin {
             return@withLock StartResult.Failure("Telegram WSS requires standalone proxy mode")
         }
         closeSession()
-        // Proxy-only mode never establishes a TUN; keep the operating system's normal socket routing.
-        val proxy = TelegramWssProxy { true }
+        val proxy = newProxy()
         try {
             val port = proxy.start(config.socksPort)
             session = Session(proxy, port, System.currentTimeMillis())
@@ -72,7 +80,13 @@ class TelegramWssEngine : EnginePlugin {
     override suspend fun probe(): ProbeResult {
         val current = session ?: return ProbeResult.Failure("Telegram WSS is not running")
         return try {
-            ProbeResult.Success(Socks5HandshakeProbe.probe("127.0.0.1", current.port))
+            Socks5HandshakeProbe.probe("127.0.0.1", current.port)
+            val latency = runInterruptible(Dispatchers.IO) { current.proxy.probeRemote() }
+            if (latency == null) {
+                ProbeResult.Failure("Telegram WSS endpoint unavailable")
+            } else {
+                ProbeResult.Success(latency)
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {

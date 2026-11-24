@@ -13,8 +13,9 @@ The WebSocket targets Telegram's own web.telegram.org endpoints with standard TL
 The engine is intentionally excluded from TUN mode, automatic selection, and
 multi-engine chains. There is no general internet exit or UDP call support.
 Because no TUN is established in this mode, outgoing sockets use normal OS
-routing; they do not bypass other VPNs. Local readiness checks only verify the
-SOCKS5 listener, not the Telegram DC. Settings backup uses the existing engine
+routing; they do not bypass other VPNs. Readiness verifies the local SOCKS5
+listener and a TLS WebSocket handshake with an approved Telegram endpoint. It
+does not prove end-to-end MTProto message delivery. Settings backup uses the existing engine
 selection and traffic mode fields.
 
 The TCP stream is framed into encrypted MTProto packets with a bounded packet
