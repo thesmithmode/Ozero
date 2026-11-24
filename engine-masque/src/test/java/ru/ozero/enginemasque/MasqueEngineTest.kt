@@ -69,7 +69,10 @@ class MasqueEngineTest {
         val result = engine.start(config, Upstream.None) as StartResult.Success
         assertTrue(result.socksPort in 1..65535)
         assertTrue(engine.stats().first().connectedSince > 0)
-        assertEquals(ExitNodeStrategy.ViaSocks("127.0.0.1", result.socksPort), engine.exitNodeStrategy(result.socksPort))
+        assertEquals(
+            ExitNodeStrategy.ViaSocks("127.0.0.1", result.socksPort),
+            engine.exitNodeStrategy(result.socksPort),
+        )
         assertTrue(engine.exitNodeStrategy(0) is ExitNodeStrategy.Unavailable)
         assertEquals(EnginePlugin.ReadyResult.Ready, engine.awaitReady())
         assertTrue(engine.probe() is ProbeResult.Success)
