@@ -26,6 +26,8 @@ import java.security.cert.CertPathValidatorException
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
 import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.io.IOException
 import javax.net.ssl.SSLHandshakeException
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -89,6 +91,138 @@ class RawUpdaterTest {
         assertEquals(2, profileDao.profiles.size)
         assertTrue(profileDao.profiles.all { it.groupId == g.id })
         assertEquals("mihomo/1.19.23", server.takeRequest().getHeader("User-Agent"))
+    }
+
+    @Test
+    fun `should retry network failure through available local proxy using selected trust client`() = runBlocking {
+        val direct = OkHttpClient.Builder().addInterceptor { throw UnknownHostException("unreachable") }.build()
+        val retries = AtomicInteger()
+        server.enqueue(MockResponse().setBody(vless1).addHeader("Subscription-Userinfo", "total=1000; upload=100"))
+        rawUpdater = RawUpdater(
+            okHttpClient = direct,
+            groupDao = groupDao,
+            profileDao = profileDao,
+            fallbackClient = { selected ->
+                assertTrue(selected === direct)
+                retries.incrementAndGet()
+                OkHttpClient()
+            },
+        )
+        val g = group()
+
+        assertEquals(1, rawUpdater.refresh(g).getOrThrow())
+        assertEquals(1, retries.get())
+        assertEquals(1, profileDao.profiles.size)
+        assertEquals("mihomo/1.19.23", server.takeRequest().getHeader("User-Agent"))
+    }
+
+    @Test
+    fun `should not consult fallback when first request succeeds`() = runBlocking {
+        server.enqueue(MockResponse().setBody(vless1))
+        rawUpdater = RawUpdater(
+            OkHttpClient(),
+            groupDao,
+            profileDao,
+            fallbackClient = { error("unexpected retry") },
+        )
+
+        assertEquals(1, rawUpdater.refresh(group()).getOrThrow())
+    }
+
+    @Test
+    fun `should keep certificate failure on original trust route`() = runBlocking {
+        val direct = OkHttpClient.Builder().addInterceptor { throw SSLHandshakeException("certificate") }.build()
+        val retries = AtomicInteger()
+        rawUpdater = RawUpdater(
+            direct,
+            groupDao,
+            profileDao,
+            fallbackClient = {
+                retries.incrementAndGet()
+                OkHttpClient()
+            },
+        )
+
+        assertTrue(rawUpdater.refresh(group()).isFailure)
+        assertEquals(0, retries.get())
+    }
+
+    @Test
+    fun `should not retry HTTP errors or invalid subscription content`() = runBlocking {
+        val retries = AtomicInteger()
+        rawUpdater = RawUpdater(
+            OkHttpClient(),
+            groupDao,
+            profileDao,
+            fallbackClient = {
+                retries.incrementAndGet()
+                OkHttpClient()
+            },
+        )
+        val g = group()
+        server.enqueue(MockResponse().setResponseCode(403))
+        server.enqueue(MockResponse().setBody("not a subscription"))
+        server.enqueue(MockResponse().setBody("x").setHeader("Content-Length", 16L * 1024 * 1024 + 1))
+
+        repeat(3) { assertTrue(rawUpdater.refresh(g).isFailure) }
+        assertEquals(0, retries.get())
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test
+    fun `should preserve direct failure when no local proxy is available`() = runBlocking {
+        val direct = OkHttpClient.Builder().addInterceptor { throw UnknownHostException("unreachable") }.build()
+        val retries = AtomicInteger()
+        rawUpdater = RawUpdater(
+            direct,
+            groupDao,
+            profileDao,
+            fallbackClient = {
+                retries.incrementAndGet()
+                null
+            },
+        )
+
+        assertTrue(rawUpdater.refresh(group()).exceptionOrNull() is UnknownHostException)
+        assertEquals(1, retries.get())
+    }
+
+    @Test
+    fun `should stop after one failed fallback`() = runBlocking {
+        val direct = OkHttpClient.Builder().addInterceptor { throw UnknownHostException("unreachable") }.build()
+        val retries = AtomicInteger()
+        rawUpdater = RawUpdater(
+            direct,
+            groupDao,
+            profileDao,
+            fallbackClient = {
+                retries.incrementAndGet()
+                OkHttpClient.Builder().addInterceptor { throw IOException("proxy unavailable") }.build()
+            },
+        )
+
+        assertTrue(rawUpdater.refresh(group()).isFailure)
+        assertEquals(1, retries.get())
+        assertEquals(0, profileDao.profiles.size)
+    }
+
+    @Test
+    fun `should not send explicitly insecure retry through proxy`() = runBlocking {
+        val insecure = OkHttpClient.Builder().addInterceptor { throw UnknownHostException("unreachable") }.build()
+        val retries = AtomicInteger()
+        rawUpdater = RawUpdater(
+            OkHttpClient(),
+            groupDao,
+            profileDao,
+            insecureOkHttpClient = insecure,
+            fallbackClient = {
+                retries.incrementAndGet()
+                OkHttpClient()
+            },
+        )
+
+        assertTrue(rawUpdater.refresh(group().copy(isBuiltin = false), allowInsecureRetry = true).isFailure)
+        assertEquals(0, retries.get())
     }
 
     @Test
