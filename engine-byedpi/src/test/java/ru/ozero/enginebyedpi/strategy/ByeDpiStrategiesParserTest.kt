@@ -109,6 +109,7 @@ class ByeDpiStrategiesParserTest {
         )
         assertFalse(result.any { it.command.isBlank() })
     }
+
     @Test
     fun `bundled strategy assets and test fixture stay synchronized`() {
         val module = File(System.getProperty("user.dir") ?: ".")
