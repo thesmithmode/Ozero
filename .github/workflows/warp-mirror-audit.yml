@@ -1,0 +1,29 @@
+name: WARP mirror audit
+
+on:
+  push:
+    branches: [feature-warp-mirror-audit]
+    paths:
+      - '.github/workflows/warp-mirror-audit.yml'
+      - 'tools/warp-mirror-audit.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Probe each WARP registration endpoint
+        run: python3 tools/warp-mirror-audit.py
+      - name: Upload status-only report
+        uses: actions/upload-artifact@v6
+        with:
+          name: warp-mirror-audit
+          path: warp-mirror-audit.json
+          retention-days: 7
