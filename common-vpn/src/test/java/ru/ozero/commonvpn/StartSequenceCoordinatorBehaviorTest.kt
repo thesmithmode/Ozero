@@ -47,6 +47,30 @@ import kotlin.test.assertTrue
 class StartSequenceCoordinatorBehaviorTest {
 
     @Test
+    fun `MASQUE proxy and VPN use routed watchdog while other SOCKS engines keep existing path`() = runTest {
+        for (mode in listOf(TrafficMode.PROXY, TrafficMode.TUN)) {
+            val engine = FakeEnginePlugin(
+                id = EngineId.MASQUE,
+                socksPort = 2088,
+                capabilities = standaloneProxyCapabilities().copy(requiresRoutedProbe = true),
+            )
+            val fixture = startFixture(
+                engine,
+                settings = SettingsModel(trafficMode = mode, manualEngine = EngineId.MASQUE),
+            )
+            if (mode == TrafficMode.TUN) {
+                fixture.establishedTunFd()
+                every { fixture.tunnelGateway.start(any()) } returns 0
+            }
+            fixture.coordinator.run()
+            assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+            verify(exactly = 1) { fixture.engineWatchdog.startRoutedProbeWatchdog(EngineId.MASQUE) }
+            verify(exactly = 0) { fixture.engineWatchdog.startPeerWatchdog(any()) }
+            verify(exactly = if (mode == TrafficMode.TUN) 1 else 0) { fixture.tunnelGateway.start(any()) }
+        }
+    }
+
+    @Test
     fun `manual proxy success starts engine, health monitor, stats logger and session`() = runTest {
         val engine = FakeEnginePlugin(
             id = EngineId.SINGBOX,
@@ -1305,6 +1329,7 @@ class StartSequenceCoordinatorBehaviorTest {
                 proxyMode = true,
             )
             EngineId.FPTN -> EngineConfig.Fptn(token = "test")
+            EngineId.MASQUE -> EngineConfig.Masque(profileJson = "{}", transport = "AUTO")
         }
     }
 

@@ -2350,6 +2350,7 @@ class StartSequenceCoordinatorExtraTest {
                 proxyMode = true,
             )
             EngineId.FPTN -> EngineConfig.Fptn(token = "test")
+            EngineId.MASQUE -> EngineConfig.Masque(profileJson = "{}", transport = "AUTO")
         }
     }
 
