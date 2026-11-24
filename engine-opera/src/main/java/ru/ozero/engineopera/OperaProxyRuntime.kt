@@ -3,12 +3,11 @@ package ru.ozero.engineopera
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import java.io.IOException
@@ -32,14 +31,17 @@ class OperaProxyRuntime(
             val selectedPort = withContext(Dispatchers.IO) {
                 allocatePort().also { process = launcher.launch(config, it) }
             }
-            withTimeout(timeoutMs) {
+            val ready = withTimeoutOrNull(timeoutMs) {
                 awaitRoute(selectedPort)
+                true
+            } ?: false
+            if (ready) {
+                port = selectedPort
+                StartResult.Success(selectedPort)
+            } else {
+                stopProcess()
+                StartResult.Failure("opera readiness timeout")
             }
-            port = selectedPort
-            StartResult.Success(selectedPort)
-        } catch (e: TimeoutCancellationException) {
-            stopProcess()
-            StartResult.Failure("opera readiness timeout")
         } catch (e: CancellationException) {
             stopProcess()
             throw e

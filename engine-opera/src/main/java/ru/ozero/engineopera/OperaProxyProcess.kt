@@ -1,6 +1,7 @@
 package ru.ozero.engineopera
 
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 interface OperaProxyProcess {
     val alive: Boolean
@@ -42,7 +43,10 @@ class SubprocessOperaProxyLauncher(
 
                 override fun stop() {
                     process.destroy()
-                    if (process.isAlive) process.destroyForcibly()
+                    if (!process.waitFor(500, TimeUnit.MILLISECONDS)) {
+                        process.destroyForcibly()
+                        check(process.waitFor(500, TimeUnit.MILLISECONDS)) { "opera process did not stop" }
+                    }
                 }
             }
         } catch (e: Exception) {

@@ -2,7 +2,6 @@ package ru.ozero.engineopera
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.Socket
@@ -23,10 +22,8 @@ object OperaSocksProbe {
             val factory = SSLSocketFactory.getDefault() as SSLSocketFactory
             (factory.createSocket(socket, TARGET, TARGET_PORT, true) as SSLSocket).use { tls ->
                 tls.soTimeout = TIMEOUT_MS
+                tls.sslParameters = tls.sslParameters.apply { endpointIdentificationAlgorithm = "HTTPS" }
                 tls.startHandshake()
-                if (!javax.net.ssl.HttpsURLConnection.getDefaultHostnameVerifier().verify(TARGET, tls.session)) {
-                    throw IOException("opera probe hostname verification failed")
-                }
             }
         }
         (System.nanoTime() - started) / 1_000_000L

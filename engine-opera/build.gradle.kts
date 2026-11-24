@@ -1,5 +1,10 @@
 plugins {
     id("ozero.android.library")
+    id("ozero.binaries")
+}
+
+ozeroBinaries {
+    artifact("libopera_proxy-arm64-v8a.so")
 }
 
 android {
