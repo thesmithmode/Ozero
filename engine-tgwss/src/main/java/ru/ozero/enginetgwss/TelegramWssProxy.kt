@@ -26,9 +26,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 class TelegramWssProxy(
-    client: OkHttpClient = OkHttpClient(),
+    protectSocket: (Socket) -> Boolean,
 ) : Closeable {
-    private val http = client.newBuilder()
+    private val http = OkHttpClient.Builder()
+        .socketFactory(TelegramSocketFactory(protectSocket))
         .proxy(Proxy.NO_PROXY)
         .followRedirects(false)
         .followSslRedirects(false)

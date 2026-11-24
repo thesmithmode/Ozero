@@ -13,7 +13,7 @@ import java.net.Socket
 class TelegramWssProxyTest {
     @Test
     fun `loopback listener rejects non Telegram destinations without network access`() {
-        TelegramWssProxy().use { proxy ->
+        TelegramWssProxy { true }.use { proxy ->
             val port = proxy.start()
             Socket("127.0.0.1", port).use { socket ->
                 socket.soTimeout = 2000
@@ -32,7 +32,7 @@ class TelegramWssProxyTest {
 
     @Test
     fun `close releases listener and prevents restart`() {
-        val proxy = TelegramWssProxy()
+        val proxy = TelegramWssProxy { true }
         val port = proxy.start()
         assertTrue(port > 0)
         proxy.close()
