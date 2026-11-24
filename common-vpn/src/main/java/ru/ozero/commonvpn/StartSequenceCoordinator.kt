@@ -264,7 +264,9 @@ class StartSequenceCoordinator(
                 PersistentLoggers.warn(TAG, "proxy healthMonitor.start threw: ${t.message}")
             }
         deps.engineWatchdog.startHealthKillswitchWatcher(engineId)
-        if (engineId == EngineId.OPERA || engineId.manualStandaloneOnly) deps.engineWatchdog.startRoutedProbeWatchdog(engineId)
+        if (engineId == EngineId.OPERA || engineId.manualStandaloneOnly) {
+            deps.engineWatchdog.startRoutedProbeWatchdog(engineId)
+        }
         deps.statsLogger.start()
         return true
     }
