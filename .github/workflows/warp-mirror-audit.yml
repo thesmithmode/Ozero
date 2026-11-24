@@ -13,17 +13,24 @@ permissions:
 
 jobs:
   audit:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
       - name: Probe each WARP registration endpoint
-        run: python3 tools/warp-mirror-audit.py
+        run: python tools/warp-mirror-audit.py
       - name: Upload status-only report
         uses: actions/upload-artifact@v6
         with:
-          name: warp-mirror-audit
+          name: warp-mirror-audit-${{ matrix.os }}
           path: warp-mirror-audit.json
           retention-days: 7

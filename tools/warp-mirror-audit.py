@@ -7,6 +7,8 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from urllib.parse import urlsplit, urlencode
+import os
 
 SOURCE = Path("engine-warp/src/main/java/ru/ozero/enginewarp/ProxyWarpAutoConfig.kt")
 CANDIDATES = (
@@ -15,8 +17,9 @@ CANDIDATES = (
     "https://warp-gen-vip.vercel.app/api/warp",
     "https://portalwg.vercel.app/api/warp",
     "https://warp-gen.cyb-portal.org/api/warp",
+    "https://getwarp.pages.dev/api/generate",
 )
-MAX_BODY = 1024 * 1024
+MAX_BODY = 524288
 
 
 def kotlin_constant(source, name):
@@ -94,34 +97,84 @@ def valid_config(body, peer_key, peer_host):
         return False
 
 
-def probe(url, source):
+def safe_url(value):
+    try:
+        parsed = urlsplit(value)
+        return parsed.scheme + "://" + (parsed.hostname or "") + parsed.path
+    except ValueError:
+        return ""
+
+
+def provider_signal(headers, body):
+    combined = (headers + "\n" + body[:8192]).lower()
+    signatures = {
+        "deployment_disabled": ("deployment_disabled",),
+        "deployment_paused": ("deployment_paused",),
+        "deployment_not_found": ("deployment_not_found",),
+        "deployment_blocked": ("deployment_blocked",),
+        "site_suspended": ("site has been suspended", "site is suspended", "site has been paused", "site is paused"),
+        "cloudflare_worker_exception": ("error 1101", "worker threw exception"),
+        "cloudflare_worker_limit": ("error 1102", "worker exceeded resource limits"),
+        "rate_limit": ("too many requests", "rate limit exceeded"),
+    }
+    return next((key for key, phrases in signatures.items() if any(p in combined for p in phrases)), None)
+
+
+def dns_status(host):
+    results = {}
+    for name, resolver in (("google", "https://dns.google/resolve"), ("cloudflare", "https://cloudflare-dns.com/dns-query")):
+        for kind in ("A", "AAAA"):
+            try:
+                url = resolver + "?" + urlencode({"name": host, "type": kind})
+                run = subprocess.run(
+                    ["curl", "--silent", "--proto", "=https", "--max-time", "5", "--header", "Accept: application/dns-json", url],
+                    capture_output=True, text=True, timeout=7, check=False,
+                )
+                value = json.loads(run.stdout) if run.returncode == 0 else {}
+                results[name + "_" + kind] = value.get("Status")
+            except (OSError, ValueError, subprocess.TimeoutExpired):
+                results[name + "_" + kind] = None
+    return results
+
+
+def probe(url, source, diagnostic=False):
     payload = kotlin_constant(source, "GENERATOR_REQUEST_BODY" if url.endswith("/api/generate") else "REQUEST_BODY")
     agent = kotlin_constant(source, "DEFAULT_USER_AGENT")
     start = time.monotonic()
     with tempfile.TemporaryDirectory() as directory:
         output = Path(directory) / "response"
+        headers = Path(directory) / "headers"
         try:
             proc = subprocess.run(
-                ["curl", "--silent", "--show-error", "--proto", "=https",
-                 "--connect-timeout", "5", "--max-time", "12", "--max-filesize", str(MAX_BODY),
-                 "--user-agent", agent, "--header", "Content-Type: application/json",
-                 "--data-binary", payload, "--output", str(output),
-                 "--write-out", "%{http_code}", url],
+                ["curl", "--silent", "--show-error", "--proto", "=https", "--proto-redir", "=https",
+                 "--location", "--max-redirs", "4", "--connect-timeout", "6", "--max-time", "12",
+                 "--max-filesize", str(MAX_BODY), "--user-agent", agent,
+                 "--header", "Content-Type: application/json", "--header", "Accept: application/json",
+                 "--http1.1", "--data-binary", payload, "--dump-header", str(headers), "--output", str(output),
+                 "--write-out", "%{http_code}\\n%{url_effective}\\n%{num_redirects}", url],
                 capture_output=True, text=True, timeout=15, check=False,
             )
         except (subprocess.TimeoutExpired, OSError):
-            return "transport_error", 0, round((time.monotonic() - start) * 1000)
-        status = int(proc.stdout) if proc.stdout.isdigit() else 0
+            return {"status": "transport_error", "http": 0, "ms": round((time.monotonic() - start) * 1000)}
+        fields = proc.stdout.splitlines()
+        status = int(fields[0]) if fields and fields[0].isdigit() else 0
+        effective = safe_url(fields[1]) if len(fields) > 1 else ""
+        body = output.read_bytes()[:MAX_BODY].decode("utf-8", errors="replace") if output.exists() else ""
+        header_text = headers.read_text(encoding="utf-8", errors="replace") if headers.exists() else ""
+        marker = provider_signal(header_text, body) if not 200 <= status < 300 else None
         if proc.returncode:
             label = {6: "dns_error", 7: "connect_error", 28: "timeout", 60: "tls_error"}.get(proc.returncode, "transport_error")
         elif status in (404, 410):
             label = "endpoint_missing"
         elif 200 <= status < 300:
-            body = output.read_bytes()[:MAX_BODY].decode("utf-8", errors="replace")
             label = "valid_config" if valid_config(body, kotlin_constant(source, "CLOUDFLARE_WARP_PEER_PUBKEY"), kotlin_constant(source, "CLOUDFLARE_WARP_PEER_HOST")) else "invalid_config"
         else:
             label = "http_error"
-        return label, status, round((time.monotonic() - start) * 1000)
+        result = {"status": label, "http": status, "ms": round((time.monotonic() - start) * 1000),
+                  "provider_signal": marker, "effective_url": effective}
+        if diagnostic and label == "dns_error":
+            result["dns"] = dns_status(urlsplit(url).hostname)
+        return result
 
 
 def main():
@@ -132,18 +185,16 @@ def main():
         raise ValueError("Empty or duplicate mirror list")
     candidates = [url for url in CANDIDATES if url not in existing]
     urls = existing + candidates
-    print(f"Existing: {len(existing)}; candidates: {len(candidates)}", flush=True)
+    print(f"Existing: {len(existing)}; candidates: {len(candidates)}; runner: {os.getenv('RUNNER_OS', 'unknown')}", flush=True)
     results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         for url, result in zip(urls, pool.map(lambda u: probe(u, source), urls)):
-            label, code, elapsed = result
-            row = {"url": url, "existing": url in existing, "status": label, "http": code, "ms": elapsed}
+            row = {"url": url, "existing": url in existing, **result}
             results.append(row)
             print(json.dumps(row), flush=True)
-        missing = [row for row in results if row["status"] == "endpoint_missing"]
-        for row, result in zip(missing, pool.map(lambda r: probe(r["url"], source), missing)):
-            label, code, elapsed = result
-            row["recheck"] = {"status": label, "http": code, "ms": elapsed}
+        failed = [row for row in results if row["status"] != "valid_config"]
+        for row, result in zip(failed, pool.map(lambda r: probe(r["url"], source, True), failed)):
+            row["recheck"] = result
             print("RECHECK " + json.dumps(row), flush=True)
     Path("warp-mirror-audit.json").write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
 
