@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_opera_summary">TCP SOCKS5 プロキシ。プロキシモード専用で、端末全体の VPN ではありません。UDP 非対応。</string>
+    <string name="opera_region">地域</string>
+    <string name="opera_selection">サーバー選択</string>
+    <string name="opera_first">最初の利用可能なサーバー</string>
+    <string name="opera_random">ランダム</string>
+    <string name="opera_fastest">最速</string>
+</resources>

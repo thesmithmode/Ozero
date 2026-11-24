@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_opera_summary">Proxy TCP SOCKS5. Solo modo proxy, no VPN del sistema. UDP no compatible.</string>
+    <string name="opera_region">Región</string>
+    <string name="opera_selection">Selección de servidor</string>
+    <string name="opera_first">Primero disponible</string>
+    <string name="opera_random">Aleatorio</string>
+    <string name="opera_fastest">Más rápido</string>
+</resources>

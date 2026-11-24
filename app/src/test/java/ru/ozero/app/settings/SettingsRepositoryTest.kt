@@ -134,11 +134,37 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `setManualEngine accepts every EngineId value`() = runTest {
+    fun `setManualEngine accepts every EngineId value in proxy mode`() = runTest {
+        repository.setTrafficMode(TrafficMode.PROXY)
         EngineId.entries.forEach { engine ->
             repository.setManualEngine(engine)
             assertEquals(engine, repository.settings.first().manualEngine)
         }
+    }
+
+    @Test
+    fun `Opera selection is cleared when switching back to TUN`() = runTest {
+        repository.setManualEngine(EngineId.OPERA)
+        assertNull(repository.settings.first().manualEngine)
+        repository.setTrafficMode(TrafficMode.PROXY)
+        repository.setManualEngine(EngineId.OPERA)
+        assertEquals(EngineId.OPERA, repository.settings.first().manualEngine)
+        repository.setTrafficMode(TrafficMode.TUN)
+        assertNull(repository.settings.first().manualEngine)
+    }
+
+    @Test
+    fun `Opera settings persist and invalid stored values use defaults`() = runTest {
+        repository.setOperaRegion("AS")
+        repository.setOperaSelection("random")
+        assertEquals("AS", repository.settings.first().operaRegion)
+        assertEquals("random", repository.settings.first().operaSelection)
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.OPERA_REGION] = "bad"
+            prefs[SettingsKeys.OPERA_SELECTION] = "bad"
+        }
+        assertEquals("EU", repository.settings.first().operaRegion)
+        assertEquals("fastest", repository.settings.first().operaSelection)
     }
 
     @Test
@@ -166,7 +192,7 @@ class SettingsRepositoryTest {
         assertEquals(
             listOf(
                 EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
-                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN, EngineId.OPERA,
             ),
             current.engineAutoPriority,
         )
@@ -178,7 +204,7 @@ class SettingsRepositoryTest {
         assertEquals(
             listOf(
                 EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
-                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN, EngineId.OPERA,
             ),
             repository.settings.first().engineAutoPriority,
         )
@@ -194,7 +220,7 @@ class SettingsRepositoryTest {
         assertEquals(
             listOf(
                 EngineId.BYEDPI, EngineId.FPTN, EngineId.WARP,
-                EngineId.URNETWORK, EngineId.MASTERDNS, EngineId.SINGBOX,
+                EngineId.URNETWORK, EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.OPERA,
             ),
             repository.settings.first().engineAutoPriority,
         )
@@ -228,7 +254,7 @@ class SettingsRepositoryTest {
         assertEquals(
             listOf(
                 EngineId.WARP, EngineId.BYEDPI, EngineId.URNETWORK,
-                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN, EngineId.OPERA,
             ),
             repository.settings.first().engineAutoPriority,
         )

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_opera_summary">TCP-SOCKS5-Proxy. Nur Proxy-Modus, kein systemweites VPN. UDP wird nicht unterstützt.</string>
+    <string name="opera_region">Region</string>
+    <string name="opera_selection">Serverauswahl</string>
+    <string name="opera_first">Erster verfügbarer</string>
+    <string name="opera_random">Zufällig</string>
+    <string name="opera_fastest">Schnellster</string>
+</resources>

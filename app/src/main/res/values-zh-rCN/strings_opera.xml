@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_opera_summary">TCP SOCKS5 代理。仅支持代理模式，不是系统级 VPN。不支持 UDP。</string>
+    <string name="opera_region">地区</string>
+    <string name="opera_selection">服务器选择</string>
+    <string name="opera_first">首个可用</string>
+    <string name="opera_random">随机</string>
+    <string name="opera_fastest">最快</string>
+</resources>

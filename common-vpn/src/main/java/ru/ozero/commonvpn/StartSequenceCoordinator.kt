@@ -364,8 +364,9 @@ class StartSequenceCoordinator(
     private fun resolveTargetForUi(manualEngine: EngineId?, settings: SettingsModel): EngineId? {
         if (manualEngine != null) return manualEngine
         val pluginIds = deps.enginePlugins.mapTo(mutableSetOf()) { it.id }
+            .filter { !it.proxyOnly || settings.trafficMode == TrafficMode.PROXY }
         return settings.engineAutoPriority.firstOrNull { it in pluginIds }
-            ?: deps.enginePlugins.firstOrNull()?.id
+            ?: pluginIds.firstOrNull()
     }
 
     private fun shouldPreserveTunOnAutoRetry(

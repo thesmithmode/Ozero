@@ -120,7 +120,9 @@ class EngineSettingsRestartObserver(
         onRestartConnected(snapshot)
     }
 
-    private fun Snapshot.targetEngine(): EngineId? = manualEngine ?: engineAutoPriority?.firstOrNull()
+    private fun Snapshot.targetEngine(): EngineId? = manualEngine ?: engineAutoPriority?.firstOrNull {
+        !it.proxyOnly || trafficMode == TrafficMode.PROXY
+    }
 
     private fun canAcceptStartupSnapshot(
         currentEngine: EngineId,
