@@ -224,6 +224,8 @@ jobs:
 
       - name: Build MASQUE native transport
         uses: ./.github/actions/build-masque
+        with:
+          ndk-path: ${{ steps.ndk.outputs.ndk-path }}
 
       - name: Build signed release APK
         env:

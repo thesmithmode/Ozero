@@ -10,6 +10,16 @@ def replace_once(path, old, new):
 
 
 root = Path(sys.argv[1])
+replace_once(
+    root / "config" / "config.go",
+    "file, err := os.Create(configPath)",
+    "file, err := os.OpenFile(configPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)",
+)
+replace_once(
+    root / "api" / "masque.go",
+    "if len(rawCerts) == 0 {\n\t\t\t\treturn nil\n\t\t\t}",
+    "if len(rawCerts) == 0 {\n\t\t\t\treturn errors.New(\"missing endpoint certificate\")\n\t\t\t}",
+)
 main = root / "main.go"
 replace_once(main, '\t"fmt"\n', '\t"fmt"\n\t"io"\n')
 replace_once(

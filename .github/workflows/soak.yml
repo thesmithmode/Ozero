@@ -233,6 +233,8 @@ jobs:
 
       - name: Build MASQUE native transport
         uses: ./.github/actions/build-masque
+        with:
+          ndk-path: ${{ steps.ndk.outputs.ndk-path }}
 
       - name: Build MASQUE x86_64 transport
         uses: ./.github/actions/build-masque
