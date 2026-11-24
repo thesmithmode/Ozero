@@ -138,6 +138,10 @@ class TelegramWssProxy(
                 release(socket)
             }
 
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                release(socket)
+            }
+
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 release(socket)
                 ready.countDown()
@@ -146,12 +150,11 @@ class TelegramWssProxy(
         try {
             if (!ready.await(10, TimeUnit.SECONDS) || !opened.get()) return
             socket.soTimeout = 0
-            val buffer = ByteArray(16_384)
+            val packets = TelegramPacketReader(input, header)
             while (!closed.get() && !socket.isClosed) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                if (ws.queueSize() > 1_048_576 || !ws.send(buffer.toByteString(0, count))) break
-                sent.addAndGet(count.toLong())
+                val packet = packets.readPacket() ?: break
+                if (ws.queueSize() + packet.size > 8_388_608 || !ws.send(packet.toByteString())) break
+                sent.addAndGet(packet.size.toLong())
             }
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()

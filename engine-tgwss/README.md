@@ -9,9 +9,11 @@ trust manager or certificate bypass. The WebSocket targets Telegram's own
 
 The module is included in Gradle but deliberately not registered as an
 EnginePlugin or exposed in the app yet. Before enabling it, verify MTProto
-packet framing and live DC connectivity, integrate protected outbound sockets,
+live DC connectivity and packet framing interoperability, integrate protected outbound sockets,
 restrict the engine to Telegram (not system-wide auto mode or chains), add
-settings/backup/UI and lifecycle tests, and validate CI. No production
+settings/backup/UI and lifecycle tests, and validate CI. The TCP stream is framed into encrypted MTProto packets (abridged,
+intermediate and padded intermediate) with bounded packet size.
+No production
 compatibility or coverage claim is made.
 
 Protocol reference: Yornich/tg-ws-proxy-android at

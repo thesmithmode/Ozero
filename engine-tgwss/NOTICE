@@ -1,9 +1,13 @@
 Protocol and data-center mapping adapted from Yornich/tg-ws-proxy-android
 https://github.com/Yornich/tg-ws-proxy-android/tree/cd9c08b10758783c9a6455e399ede01b78a3201b
 
+MTProto packet framing reference: Flowseal/tg-ws-proxy
+https://github.com/Flowseal/tg-ws-proxy/tree/3fc8b9ee984fc36f52d59b2323735dc8d681864d
+
 MIT License
 
 Copyright (c) 2025 Yornich
+Copyright (c) 2026 Flowseal
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
