@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tgwss_summary">केवल Telegram के लिए स्थानीय प्रॉक्सी। पूरे डिवाइस के लिए VPN नहीं है।</string>
+    <string name="tgwss_setup">सेटिंग्स में प्रॉक्सी मोड और Telegram WSS चुनें। कनेक्शन शुरू करें, फिर Telegram में SOCKS5 प्रॉक्सी जोड़ें। UDP कॉल समर्थित नहीं हैं।</string>
+    <string name="tgwss_address">SOCKS5: 127.0.0.1:%1$d (बिना उपयोगकर्ता नाम या पासवर्ड)</string>
+    <string name="tgwss_open">Telegram में खोलें</string>
+    <string name="tgwss_open_failed">Telegram नहीं खुल सका। पता और पोर्ट मैन्युअल रूप से दर्ज करें।</string>
+    <string name="tgwss_not_running">स्थानीय प्रॉक्सी नहीं चल रही है।</string>
+</resources>

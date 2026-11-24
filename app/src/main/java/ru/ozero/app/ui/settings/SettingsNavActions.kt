@@ -15,4 +15,5 @@ data class SettingsNavActions(
     val onOpenMasterDnsSettings: () -> Unit = {},
     val onOpenFptnSettings: () -> Unit = {},
     val onOpenSingboxSettings: () -> Unit = {},
+    val onOpenTelegramWssSettings: () -> Unit = {},
 )

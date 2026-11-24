@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.enginescore.EngineId
 import ru.ozero.app.ui.about.AboutScreen
 import ru.ozero.app.ui.backup.BackupScreen
@@ -19,6 +20,7 @@ import ru.ozero.app.ui.settings.SettingsScreen
 import ru.ozero.app.ui.settings.engines.ByeDpiEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.FptnEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.MasterDnsSettingsScreen
+import ru.ozero.app.ui.settings.engines.TelegramWssSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkSharedTrafficScreen
 import ru.ozero.app.ui.settings.engines.WarpEngineSettingsScreen
@@ -36,6 +38,7 @@ private fun engineParamsTarget(engineId: EngineId?): TopScreen = when (engineId)
     EngineId.MASTERDNS -> TopScreen.MasterDnsSettings
     EngineId.FPTN -> TopScreen.FptnSettings
     EngineId.SINGBOX -> TopScreen.SingboxSettings
+    EngineId.TGWSS -> TopScreen.TelegramWssSettings
 }
 
 @Composable
@@ -69,6 +72,7 @@ fun RootNavigation(
                     onOpenMasterDnsSettings = { navigate(TopScreen.MasterDnsSettings) },
                     onOpenFptnSettings = { navigate(TopScreen.FptnSettings) },
                     onOpenSingboxSettings = { navigate(TopScreen.SingboxSettings) },
+                    onOpenTelegramWssSettings = { navigate(TopScreen.TelegramWssSettings) },
                     onOpenStatsHistory = { navigate(TopScreen.StatsHistory) },
                     onOpenBackup = { navigate(TopScreen.Backup) },
                     onOpenAutoModeSettings = { navigate(TopScreen.AutoModeSettings) },
@@ -99,6 +103,10 @@ fun RootNavigation(
                 onOpenAdvanced = { navigate(TopScreen.SingboxAdvancedSettings) },
             )
             TopScreen.SingboxAdvancedSettings -> SingboxAdvancedSettingsScreen(onBack = { back() })
+            TopScreen.TelegramWssSettings -> {
+                val state by viewModel.state.collectAsStateWithLifecycle()
+                TelegramWssSettingsScreen(state = state, onBack = { back() })
+            }
             TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
             TopScreen.StatsHistory -> TrafficStatsScreen(onBack = { back() })
             TopScreen.Main ->

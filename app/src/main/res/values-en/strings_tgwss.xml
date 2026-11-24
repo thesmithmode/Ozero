@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tgwss_summary">Local proxy for Telegram only. Not a device-wide VPN.</string>
+    <string name="tgwss_setup">Select Proxy mode and Telegram WSS in Settings. Start the connection, then add the SOCKS5 proxy in Telegram. UDP calls are not supported.</string>
+    <string name="tgwss_address">SOCKS5: 127.0.0.1:%1$d (no username or password)</string>
+    <string name="tgwss_open">Open in Telegram</string>
+    <string name="tgwss_open_failed">Could not open Telegram. Enter the address and port manually.</string>
+    <string name="tgwss_not_running">The local proxy is not running.</string>
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tgwss_summary">仅适用于 Telegram 的本地代理，不是全设备 VPN。</string>
+    <string name="tgwss_setup">在设置中选择代理模式和 Telegram WSS。启动连接后，在 Telegram 中添加 SOCKS5 代理。不支持 UDP 通话。</string>
+    <string name="tgwss_address">SOCKS5: 127.0.0.1:%1$d（无需用户名或密码）</string>
+    <string name="tgwss_open">在 Telegram 中打开</string>
+    <string name="tgwss_open_failed">无法打开 Telegram。请手动输入地址和端口。</string>
+    <string name="tgwss_not_running">本地代理未运行。</string>
+</resources>

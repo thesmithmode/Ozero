@@ -1,21 +1,22 @@
-# Telegram WSS (experimental)
+# Telegram WSS
 
-Isolated Kotlin transport prototype for Telegram MTProto over TLS WebSocket.
-The local SOCKS5 listener accepts only explicitly mapped Telegram IPv4 DC addresses
-and selected TCP ports. Unknown destinations, UDP and unsupported MTProto
-headers are rejected. No direct TCP fallback, no third-party proxy, no custom
-trust manager or certificate bypass. The WebSocket targets Telegram's own
-`web.telegram.org` endpoints with normal OkHttp TLS validation.
+Standalone local SOCKS5 proxy for Telegram MTProto over TLS WebSocket.
+Select Proxy traffic mode and Telegram WSS manually in Ozero, start the
+connection, and use the engine settings screen to open Telegram's proxy
+configuration. The listener is bound to 127.0.0.1:10812, with no user credentials.
 
-The module is included in Gradle but deliberately not registered as an
-EnginePlugin or exposed in the app yet. Before enabling it, verify MTProto
-live DC connectivity and packet framing interoperability, wire the mandatory outbound socket protection callback to VpnService,
-resolve Telegram DNS through the correct underlying network,
-restrict the engine to Telegram (not system-wide auto mode or chains), add
-settings/backup/UI and lifecycle tests, and validate CI. The TCP stream is framed into encrypted MTProto packets (abridged,
-intermediate and padded intermediate) with bounded packet size.
-No production
-compatibility or coverage claim is made.
+The transport accepts only explicitly mapped Telegram IPv4 DC addresses and
+selected TCP ports. Unknown destinations, UDP and unsupported MTProto headers
+are rejected. No direct TCP fallback, third-party proxy, or certificate bypass.
+The WebSocket targets Telegram's own web.telegram.org endpoints with standard TLS.
 
-Protocol reference: Yornich/tg-ws-proxy-android at
-`cd9c08b10758783c9a6455e399ede01b78a3201b` (MIT; see NOTICE).
+The engine is intentionally excluded from TUN mode, automatic selection, and
+multi-engine chains. There is no general internet exit or UDP call support.
+Because no TUN is established in this mode, outgoing sockets use normal OS
+routing; they do not bypass other VPNs. Local readiness checks only verify the
+SOCKS5 listener, not the Telegram DC. Settings backup uses the existing engine
+selection and traffic mode fields.
+
+The TCP stream is framed into encrypted MTProto packets with a bounded packet
+size. Live Android interoperability with Telegram DCs, media, and reconnects
+must be verified before release. See NOTICE for pinned protocol references.

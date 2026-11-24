@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tgwss_summary">Локальный прокси только для Telegram. Не является VPN для всего устройства.</string>
+    <string name="tgwss_setup">В настройках выберите режим «Прокси» и движок Telegram WSS. Запустите подключение, затем добавьте SOCKS5-прокси в Telegram. Звонки по UDP не поддерживаются.</string>
+    <string name="tgwss_address">SOCKS5: 127.0.0.1:%1$d (без имени пользователя и пароля)</string>
+    <string name="tgwss_open">Открыть в Telegram</string>
+    <string name="tgwss_open_failed">Не удалось открыть Telegram. Введите адрес и порт вручную.</string>
+    <string name="tgwss_not_running">Локальный прокси не запущен.</string>
+</resources>
