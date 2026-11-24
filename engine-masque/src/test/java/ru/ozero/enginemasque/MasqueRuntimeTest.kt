@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.io.IOException
+import org.json.JSONObject
 
 class MasqueRuntimeTest {
     @TempDir
@@ -162,5 +164,72 @@ class MasqueRuntimeTest {
         )
         assertThrows<IllegalStateException> { runtime.register(true) }
         assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+    }
+
+    @Test
+    fun `IPv6 endpoint fallback is independent from inner IPv6`() = runBlocking {
+        val commands = mutableListOf<List<String>>()
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { command ->
+                commands.add(command)
+                File(File(command[2]).parentFile, "ready").writeText("ready")
+                Child("--ipv6" in command)
+            },
+            MasqueReadinessProbe { true },
+        )
+        val config = MasqueProfile.parse(JSONObject(profile().json).put("endpoint_v6", "2001:db8::3").toString())
+        assertEquals(MasqueTransport.H3, runtime.start(config, 1080, MasqueTransport.AUTO))
+        assertEquals(2, commands.size)
+        assertFalse("--ipv6" in commands.first())
+        assertTrue("--ipv6" in commands.last())
+        assertTrue("--no-tunnel-ipv6" in commands.last())
+        assertThrows<IllegalStateException> { runtime.register(true) }
+        runtime.stop()
+        runtime.stop()
+    }
+
+    @Test
+    fun `launch failure cleans workspace and falls back`() = runBlocking {
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { command ->
+                if ("--http2" !in command) throw IOException("fixture")
+                File(File(command[2]).parentFile, "ready").writeText("ready")
+                Child(true)
+            },
+            MasqueReadinessProbe { true },
+        )
+        assertEquals(MasqueTransport.H2, runtime.start(profile(), 1080, MasqueTransport.AUTO))
+        runtime.stop()
+        assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+    }
+
+    @Test
+    fun `registration timeout closes child and cleans workspace`() = runBlocking {
+        val child = Child(true)
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { child },
+            MasqueReadinessProbe { false },
+            registrationTimeoutMs = 10,
+        )
+        assertThrows<IllegalStateException> { runtime.register(true) }
+        assertFalse(child.alive)
+        assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+    }
+
+    @Test
+    fun `invalid port binary and private directory fail before launch`() = runBlocking {
+        val launcher = MasqueProcessLauncher { error("Must not launch") }
+        val missing = File(directory, "missing")
+        val runtime = MasqueRuntime(missing, directory, launcher, MasqueReadinessProbe { false })
+        assertThrows<IllegalArgumentException> { runtime.start(profile(), 0, MasqueTransport.H3) }
+        assertThrows<IllegalStateException> { runtime.start(profile(), 1080, MasqueTransport.H3) }
+        val badDirectory = MasqueRuntime(binary(), missing, launcher, MasqueReadinessProbe { false })
+        assertThrows<IllegalStateException> { badDirectory.register(true) }
     }
 }

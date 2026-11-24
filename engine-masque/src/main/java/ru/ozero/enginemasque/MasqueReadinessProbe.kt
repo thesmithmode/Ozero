@@ -11,10 +11,15 @@ internal fun interface MasqueReadinessProbe {
     fun check(port: Int): Boolean
 }
 
-internal object TlsMasqueReadinessProbe : MasqueReadinessProbe {
+internal class TlsMasqueReadinessProbe(
+    private val createSocket: (Proxy) -> Socket = { Socket(it) },
+    private val createTlsFactory: () -> SSLSocketFactory = {
+        SSLSocketFactory.getDefault() as SSLSocketFactory
+    },
+) : MasqueReadinessProbe {
     override fun check(port: Int): Boolean = try {
         val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", port))
-        Socket(proxy).use { socket ->
+        createSocket(proxy).use { socket ->
             socket.soTimeout = TIMEOUT_MS
             socket.connect(InetSocketAddress(TARGET, 443), TIMEOUT_MS)
             handshake(socket)
@@ -25,7 +30,7 @@ internal object TlsMasqueReadinessProbe : MasqueReadinessProbe {
     }
 
     private fun handshake(socket: Socket) {
-        val factory = SSLSocketFactory.getDefault() as SSLSocketFactory
+        val factory = createTlsFactory()
         (factory.createSocket(socket, TARGET, 443, true) as SSLSocket).use { tls ->
             tls.sslParameters = tls.sslParameters.apply { endpointIdentificationAlgorithm = "HTTPS" }
             tls.soTimeout = TIMEOUT_MS
@@ -33,6 +38,8 @@ internal object TlsMasqueReadinessProbe : MasqueReadinessProbe {
         }
     }
 
-    private const val TARGET = "1.1.1.1"
-    private const val TIMEOUT_MS = 2_000
+    private companion object {
+        const val TARGET = "1.1.1.1"
+        const val TIMEOUT_MS = 2_000
+    }
 }

@@ -20,12 +20,13 @@ class MasqueRuntime internal constructor(
     private val launcher: MasqueProcessLauncher,
     private val readiness: MasqueReadinessProbe,
     private val startupTimeoutMs: Long = 6_000,
+    private val registrationTimeoutMs: Long = 45_000,
 ) {
     constructor(binary: File, privateDirectory: File) : this(
         binary,
         privateDirectory,
         NativeMasqueProcessLauncher,
-        TlsMasqueReadinessProbe,
+        TlsMasqueReadinessProbe(),
     )
 
     private val mutex = Mutex()
@@ -51,7 +52,7 @@ class MasqueRuntime internal constructor(
     }
 
     private suspend fun readRegistration(process: MasqueProcess, config: File): MasqueProfile {
-        val code = withTimeoutOrNull(45_000) {
+        val code = withTimeoutOrNull(registrationTimeoutMs) {
             while (process.alive) delay(100)
             process.exitCode()
         }

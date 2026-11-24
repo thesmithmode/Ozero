@@ -16,7 +16,7 @@ data class MasqueSettings(
     val autoEnabled: Boolean = true,
     val corrupt: Boolean = false,
 ) {
-    fun fingerprint(): String? = profile?.let {
+    fun fingerprint(): String? = profile?.takeUnless { corrupt }?.let {
         val digest = MessageDigest.getInstance("SHA-256").digest(it.json.toByteArray())
         val hash = digest.joinToString("") { byte -> "%02x".format(byte) }
         "$hash:${transport.name}:$autoEnabled"
