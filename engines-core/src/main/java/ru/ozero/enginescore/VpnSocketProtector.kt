@@ -12,8 +12,10 @@ object VpnSocketProtectorHolder : VpnSocketProtector {
     @Volatile
     private var current: Binding? = null
 
+    fun bind(protector: VpnSocketProtector) = bind(protector, null)
+
     @Synchronized
-    fun bind(protector: VpnSocketProtector, socketProtector: ((Socket) -> Boolean)? = null) {
+    fun bind(protector: VpnSocketProtector, socketProtector: ((Socket) -> Boolean)?) {
         current = Binding(protector, socketProtector)
     }
 

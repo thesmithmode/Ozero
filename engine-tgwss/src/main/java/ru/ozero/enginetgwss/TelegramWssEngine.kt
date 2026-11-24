@@ -22,6 +22,7 @@ import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.probe.Socks5HandshakeProbe
 import ru.ozero.enginescore.settings.SettingsModel
+import java.util.concurrent.TimeUnit
 
 class TelegramWssEngine internal constructor(
     private val warp: EnginePlugin,
@@ -91,8 +92,11 @@ class TelegramWssEngine internal constructor(
             StartResult.Failure("Telegram WSS start failed", failure)
         } finally {
             if (!started) {
-                proxy?.close()
-                withContext(NonCancellable) { warp.stop() }
+                try {
+                    proxy?.close()
+                } finally {
+                    withContext(NonCancellable) { warp.stop() }
+                }
             }
         }
     }
@@ -112,11 +116,12 @@ class TelegramWssEngine internal constructor(
     override suspend fun probe(): ProbeResult {
         val current = session ?: return ProbeResult.Failure("Telegram WSS is not running")
         return try {
-            val latency = Socks5HandshakeProbe.probe("127.0.0.1", current.port)
-            if (!probeWarp(current.port)) {
+            val started = System.nanoTime()
+            Socks5HandshakeProbe.probe("127.0.0.1", current.port)
+            if (!probeWarp(current.port) || session !== current) {
                 ProbeResult.Failure("WARP TCP/UDP fallback unavailable")
             } else {
-                ProbeResult.Success(latency)
+                ProbeResult.Success(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started))
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
