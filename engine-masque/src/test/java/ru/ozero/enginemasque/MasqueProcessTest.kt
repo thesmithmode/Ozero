@@ -86,6 +86,36 @@ class MasqueProcessTest {
     }
 
     @Test
+    fun `default forced termination closes a stubborn child`() {
+        val process = mockk<Process>(relaxed = true)
+        var exited = false
+        var destroyCalls = 0
+        every { process.exitValue() } answers { if (exited) 0 else throw IllegalThreadStateException() }
+        every { process.destroy() } answers {
+            if (++destroyCalls == 2) exited = true
+        }
+        every { process.destroyForcibly() } answers {
+            exited = true
+            process
+        }
+        val child = ManagedMasqueProcess(process, stopWaitMs = 0)
+        child.close()
+        assertFalse(child.alive)
+        verify(atLeast = 1) { process.destroy() }
+    }
+
+    @Test
+    fun `closing a broken stdin still destroys the child`() {
+        val process = mockk<Process>(relaxed = true)
+        val output = mockk<java.io.OutputStream>(relaxed = true)
+        every { process.outputStream } returns output
+        every { output.close() } throws IOException("pipe closed")
+        every { process.exitValue() } returns 0
+        assertThrows<IOException> { ManagedMasqueProcess(process).close() }
+        verify(exactly = 1) { process.destroy() }
+    }
+
+    @Test
     fun `stubborn child is forcibly terminated or stop fails`() {
         val process = mockk<Process>(relaxed = true)
         var exited = false

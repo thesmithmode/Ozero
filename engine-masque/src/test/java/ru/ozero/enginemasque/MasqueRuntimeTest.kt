@@ -401,11 +401,25 @@ class MasqueRuntimeTest {
     }
 
     @Test
+    fun `registration launch failure removes its private workspace`(): Unit = runBlocking {
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { throw IOException("fixture") },
+            MasqueReadinessProbe { false },
+        )
+        assertThrows<IOException> { runtime.register(true) }
+        assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+        assertFalse(runtime.isReady())
+    }
+
+    @Test
     fun `invalid port binary and private directory fail before launch`(): Unit = runBlocking {
         val launcher = MasqueProcessLauncher { error("Must not launch") }
         val missing = File(directory, "missing")
         val runtime = MasqueRuntime(missing, directory, launcher, MasqueReadinessProbe { false })
         assertThrows<IllegalArgumentException> { runtime.start(profile(), 0, MasqueTransport.H3) }
+        assertThrows<IllegalArgumentException> { runtime.start(profile(), 65536, MasqueTransport.H3) }
         assertThrows<IllegalStateException> { runtime.start(profile(), 1080, MasqueTransport.H3) }
         val badDirectory = MasqueRuntime(binary(), missing, launcher, MasqueReadinessProbe { false })
         assertThrows<IllegalStateException> { badDirectory.register(true) }
