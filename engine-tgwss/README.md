@@ -24,3 +24,15 @@ concurrent use of the shared WARP runtime in chains and redundant auto picks.
 - Verify backup round trip, runtime slot changes and switching to/from WARP.
 - A fake SOCKS server or a WSS upgrade alone cannot prove compatibility with
   the pinned native binary or end-to-end Telegram delivery.
+
+## ARM64 device smoke test
+
+With a working WARP slot and VPN consent on a dedicated test device, run the
+existing instrumentation target `SoakTest#runTelegramWssTunSmoke` with
+`OZERO_TGWSS_SMOKE=1`, `OZERO_TGWSS_SMOKE_URL` (a reachable HTTPS URL), and
+`OZERO_TGWSS_SMOKE_MARKER` (its exact response body after trimming). The test
+starts Telegram WSS, WARP, then Telegram WSS again in TUN mode and checks VPN
+transport and routed HTTPS from the separate test APK UID. Telegram WSS startup
+also requires its internal routed TCP/UDP and WSS readiness probes. The test
+stops the VPN and restores the original settings; it is opt-in and does not
+replace the Telegram delivery, split-tunnel or network-transition checks above.
