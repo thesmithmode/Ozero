@@ -8,6 +8,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import java.io.IOException
@@ -60,6 +61,7 @@ class OperaProxyRuntime(
             throw e
         } catch (e: Exception) {
             cleanup(launched)
+            PersistentLoggers.warn("OperaRuntime", "startup failed: ${e.javaClass.simpleName}")
             StartResult.Failure("opera startup failed")
         }
     }
@@ -77,7 +79,7 @@ class OperaProxyRuntime(
                 ProbeResult.Failure("opera process exited")
             }
         } catch (e: IOException) {
-            ProbeResult.Failure("opera routed probe failed", code = ProbeResult.Failure.Code.ROUTED_PROBE_FAILED)
+            ProbeResult.Failure("opera routed probe failed", cause = e, code = ProbeResult.Failure.Code.ROUTED_PROBE_FAILED)
         }
     }
 

@@ -65,7 +65,10 @@ class OperaProxyRuntimeTest {
             timeoutMs = 100,
             retryDelayMs = 10,
         )
-        assertEquals(StartResult.Failure("opera readiness timeout or process stopped"), runtime.start(OperaProxyConfig()))
+        assertEquals(
+            StartResult.Failure("opera readiness timeout or process stopped"),
+            runtime.start(OperaProxyConfig()),
+        )
         assertFalse(process.alive)
     }
 
@@ -84,11 +87,8 @@ class OperaProxyRuntimeTest {
         val job = async { runtime.start(OperaProxyConfig()) }
         entered.await()
         job.cancel()
-        try {
-            job.await()
-        } catch (e: CancellationException) {
-            assertFalse(process.alive)
-        }
+        assertTrue(runCatching { job.await() }.exceptionOrNull() is CancellationException)
+        assertFalse(process.alive)
         assertTrue(job.isCancelled)
     }
 
