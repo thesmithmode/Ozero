@@ -1,0 +1,16 @@
+name: Prepare verified URnetwork SDK
+description: Verify the pinned AAR before preparing it for Android builds
+runs:
+  using: composite
+  steps:
+    - name: Cache the original URnetwork AAR
+      uses: actions/cache@v6
+      with:
+        path: ${{ runner.temp }}/ozero-urnetwork/URnetworkSdk.aar
+        key: urnetwork-aar-raw-v1-${{ hashFiles('.github/checksums/urnetwork-sdk.lock') }}
+
+    - name: Verify and prepare URnetwork AAR
+      env:
+        GH_TOKEN: ${{ github.token }}
+      shell: bash
+      run: bash .github/scripts/prepare-urnetwork-aar.sh "$RUNNER_TEMP/ozero-urnetwork"

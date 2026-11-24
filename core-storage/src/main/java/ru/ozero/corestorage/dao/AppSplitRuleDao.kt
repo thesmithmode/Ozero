@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 import ru.ozero.corestorage.entity.AppSplitRule
 
@@ -17,4 +18,13 @@ interface AppSplitRuleDao {
 
     @Query("DELETE FROM app_split_rules WHERE packageName = :packageName")
     suspend fun delete(packageName: String)
+
+    @Query("DELETE FROM app_split_rules")
+    suspend fun deleteAll()
+
+    @Transaction
+    suspend fun replaceAll(rules: List<AppSplitRule>) {
+        deleteAll()
+        rules.forEach { upsert(it) }
+    }
 }

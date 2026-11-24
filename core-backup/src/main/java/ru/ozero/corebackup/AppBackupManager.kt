@@ -167,10 +167,10 @@ class AppBackupManager(
     }
 
     private suspend fun importSplitTunnel(data: AppBackupData) {
+        splitRuleDao.replaceAll(data.splitRules.map { AppSplitRule(it.packageName, it.isExcluded) })
         data.settings.splitMode?.let { mode ->
             ozeroSettings.edit { prefs -> prefs[SettingsKeys.SPLIT_MODE] = mode }
         }
-        importSplit(data.splitRules)
     }
 
     private suspend fun importFptnToken(s: BackupSettings) {
@@ -220,17 +220,6 @@ class AppBackupManager(
                     UrnetworkLocationSelection(countryCode = it.countryCode, region = it.region, city = it.city)
                 } ?: current.selectedLocation,
             )
-        }
-    }
-
-    private suspend fun importSplit(rules: List<BackupSplitRule>) {
-        val existingRules = splitRuleDao.observeAll().first()
-        val backupPackages = rules.map { it.packageName }.toSet()
-        for (existing in existingRules) {
-            if (existing.packageName !in backupPackages) splitRuleDao.delete(existing.packageName)
-        }
-        for (rule in rules) {
-            splitRuleDao.upsert(AppSplitRule(packageName = rule.packageName, isExcluded = rule.isExcluded))
         }
     }
 

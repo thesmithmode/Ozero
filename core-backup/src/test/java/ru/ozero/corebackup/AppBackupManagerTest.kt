@@ -26,6 +26,7 @@ import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigSlot
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -671,6 +672,18 @@ class AppBackupManagerTest {
     }
 
     @Test
+    fun `failed replacement preserves split tunnel mode`() = runTest {
+        ozeroDs.edit { it[SettingsKeys.SPLIT_MODE] = "BLOCKLIST" }
+        splitDao.failReplacement = true
+        val backup = makeMinimalBackup()
+        val data = backup.copy(settings = backup.settings.copy(splitMode = "ALLOWLIST"))
+
+        assertFailsWith<IllegalStateException> { manager.import(data, setOf(BackupCategory.SPLIT_TUNNEL)) }
+
+        assertEquals("BLOCKLIST", ozeroDs.data.first()[SettingsKeys.SPLIT_MODE])
+    }
+
+    @Test
     fun `export then import — полный roundtrip с категориями ALL`() = runTest {
         ozeroDs.edit { prefs ->
             prefs[SettingsKeys.SPLIT_MODE] = "per_app"
@@ -869,6 +882,7 @@ class AppBackupManagerTest {
 
     private class FakeSplitRuleDao : AppSplitRuleDao {
         val rules = MutableStateFlow<List<AppSplitRule>>(emptyList())
+        var failReplacement = false
         override suspend fun upsert(rule: AppSplitRule) {
             val current = rules.value.toMutableList()
             current.removeAll { it.packageName == rule.packageName }
@@ -878,6 +892,15 @@ class AppBackupManagerTest {
         override fun observeAll(): Flow<List<AppSplitRule>> = rules
         override suspend fun delete(packageName: String) {
             rules.value = rules.value.filter { it.packageName != packageName }
+        }
+
+        override suspend fun deleteAll() {
+            rules.value = emptyList()
+        }
+
+        override suspend fun replaceAll(rules: List<AppSplitRule>) {
+            check(!failReplacement)
+            this.rules.value = rules.associateBy { it.packageName }.values.toList()
         }
     }
 

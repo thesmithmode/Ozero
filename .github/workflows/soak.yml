@@ -81,40 +81,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Resolve URnetwork SDK release
-        id: urnetwork-aar-tag
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          tag=$(gh release list --limit 100 --json tagName \
-            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
-            | head -n1 | tr -d '"')
-          test -n "$tag"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-
-      - name: Restore URnetwork SDK
-        id: urnetwork-aar-cache
-        uses: actions/cache@v6
-        with:
-          path: engine-urnetwork/libs
-          key: urnetwork-aar-${{ steps.urnetwork-aar-tag.outputs.tag }}-go-stripped-v1
-
-      - name: Prepare URnetwork SDK
-        if: steps.urnetwork-aar-cache.outputs.cache-hit != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          mkdir -p engine-urnetwork/libs
-          gh release download "${{ steps.urnetwork-aar-tag.outputs.tag }}" -p '*' -D engine-urnetwork/libs --clobber
-          for aar in engine-urnetwork/libs/*.aar; do
-            test -f "$aar"
-            tmpdir=$(mktemp -d)
-            unzip -o "$aar" -d "$tmpdir/aar-exploded"
-            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
-            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
-          done
+      - name: Prepare URnetwork AAR
+        uses: ./.github/actions/prepare-urnetwork
 
       - name: Restore verified libbox
         id: singbox-aar-cache
@@ -320,6 +288,7 @@ jobs:
       - name: Upload soak evidence
         uses: actions/upload-artifact@v6
         if: always()
+        continue-on-error: true
         with:
           name: singbox-x86_64-soak-evidence-${{ matrix.require_reality }}
           path: |
@@ -330,4 +299,4 @@ jobs:
             soak-http.log
             reality-decoy.log
           if-no-files-found: warn
-          retention-days: 30
+          retention-days: 7
