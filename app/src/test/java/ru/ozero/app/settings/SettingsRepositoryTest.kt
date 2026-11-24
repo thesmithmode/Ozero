@@ -134,11 +134,27 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `setManualEngine accepts every EngineId value`() = runTest {
+    fun `setManualEngine accepts every EngineId value in proxy mode`() = runTest {
+        repository.setTrafficMode(TrafficMode.PROXY)
         EngineId.entries.forEach { engine ->
             repository.setManualEngine(engine)
             assertEquals(engine, repository.settings.first().manualEngine)
         }
+    }
+
+    @Test
+    fun `Telegram WSS is manual proxy only and does not enter auto priority`() = runTest {
+        repository.setManualEngine(EngineId.TGWSS)
+        assertNull(repository.settings.first().manualEngine)
+        repository.setTrafficMode(TrafficMode.PROXY)
+        repository.setManualEngine(EngineId.TGWSS)
+        assertEquals(EngineId.TGWSS, repository.settings.first().manualEngine)
+        repository.setEngineAutoPriority(listOf(EngineId.TGWSS, EngineId.WARP))
+        assertFalse(EngineId.TGWSS in repository.settings.first().engineAutoPriority)
+        dataStore.edit { prefs -> prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = "TGWSS,WARP" }
+        assertFalse(EngineId.TGWSS in repository.settings.first().engineAutoPriority)
+        repository.setTrafficMode(TrafficMode.TUN)
+        assertNull(repository.settings.first().manualEngine)
     }
 
     @Test

@@ -14,6 +14,7 @@ class EngineAutoCascadeContractTest {
         EngineId.MASTERDNS to "ru.ozero.enginemasterdns.MasterDnsEngine",
         EngineId.SINGBOX to "ru.ozero.enginesingbox.SingboxEngine",
         EngineId.FPTN to "ru.ozero.enginefptn.FptnEngine",
+        EngineId.TGWSS to "ru.ozero.enginetgwss.TelegramWssEngine",
     )
 
     @Test
@@ -28,9 +29,19 @@ class EngineAutoCascadeContractTest {
     }
 
     @Test
+    fun `proxy-only engines explicitly implement proxy config and stay out of automatic defaults`() {
+        EngineId.entries.filter { it.proxyOnly }.forEach { id ->
+            val className = nonStubEngineClasses[id] ?: fail("Missing proxy engine $id")
+            val clazz = Class.forName(className)
+            assertTrue(clazz.declaredMethods.any { it.name == "buildProxyConfig" })
+            assertTrue(id !in ru.ozero.enginescore.settings.SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY)
+        }
+    }
+
+    @Test
     fun `каждый non-stub EnginePlugin обязан override buildManualConfig для участия в auto cascade`() {
         val missing = mutableListOf<String>()
-        EngineId.entries.filter { !it.isStub }.forEach { id ->
+        EngineId.entries.filter { !it.isStub && !it.proxyOnly }.forEach { id ->
             val className = nonStubEngineClasses[id] ?: fail("Добавь $id в map выше")
             val clazz = runCatching { Class.forName(className) }.getOrElse {
                 fail("Класс не найден: $className (id=$id)")
