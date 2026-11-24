@@ -8,7 +8,7 @@ Cloudflare WARP CONNECT-IP over HTTP/3 (QUIC) or HTTP/2 (TCP), implemented with 
 - The isolated subprocess exposes loopback SOCKS5 only. Upstream pinning and tunnel DNS remain enabled. Both TCP and UDP must bind before the readiness marker, and a TLS payload through the SOCKS endpoint confirms connectivity.
 - Child lifetime follows the parent stdin pipe; runtime profile is removed after loading, stale private workspaces are cleaned before reuse, and cancellation terminates the process. Process logs are discarded to avoid exposing credentials.
 - The routed watchdog uses payload checks, and the shared TUN/UID statistics and shutdown path are reused. IPv6 is disabled in the transport when disabled in Ozero.
-- Build in CI using the pinned source-build action; debug and release verify the exact packaged ELF and MIT notice. ARM64 is the production ABI; x86_64 is available for the existing soak workflow.
+- Build in CI using the pinned source-build action; debug and release verify the exact packaged ELF and MIT notice. ARM64 is the production ABI; x86_64 is available for the existing soak workflow, which checks the packaged ELF and runs the native CLI under the application UID without registering an account.
 
 ## Release validation
 

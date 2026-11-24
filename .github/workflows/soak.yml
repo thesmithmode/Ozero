@@ -252,6 +252,8 @@ jobs:
           APK="app/build/outputs/apk/debug/app-debug.apk"
           unzip -l "$APK" | grep -q 'lib/x86_64/libbox.so'
           unzip -l "$APK" | grep -q 'lib/x86_64/libhev-ozero-socks5-tunnel.so'
+          bash scripts/verify-masque-apk.sh "$APK" x86_64
+          bash scripts/verify-masque-apk.sh "$APK" arm64-v8a
 
       - name: Resolve soak parameters
         env:
@@ -305,6 +307,7 @@ jobs:
           path: |
             soak-metrics.json
             ${{ runner.temp }}/soak-output.txt
+            ${{ runner.temp }}/masque-native-smoke.txt
             ${{ runner.temp }}/soak-logcat.txt
             singbox-server.log
             soak-http.log
