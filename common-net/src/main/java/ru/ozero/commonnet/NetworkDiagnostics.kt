@@ -45,7 +45,7 @@ class NetworkDiagnostics(
     private fun checkTcp(allowed: () -> Boolean): Boolean = runCatching {
         Socket().use { socket ->
             val target = InetSocketAddress(tcpHost, tcpPort)
-            if (!allowed()) return false
+            if (!allowed()) return@runCatching false
             socket.connect(target, timeoutMs)
             true
         }
@@ -53,19 +53,19 @@ class NetworkDiagnostics(
 
     private fun checkStun(allowed: () -> Boolean): NatObservation? = runCatching {
         val target = InetSocketAddress(stunHost, stunPort)
-        if (target.isUnresolved || !allowed()) return null
+        if (target.isUnresolved || !allowed()) return@runCatching null
         DatagramSocket().use { socket ->
             socket.soTimeout = timeoutMs
             socket.connect(target)
             val local = socket.localSocketAddress
             val transaction = ByteArray(12).also { SecureRandom().nextBytes(it) }
             val request = StunBinding.request(transaction)
-            if (!allowed()) return null
+            if (!allowed()) return@runCatching null
             socket.send(DatagramPacket(request, request.size))
             val response = DatagramPacket(ByteArray(2048), 2048)
             socket.receive(response)
             val mapped = StunBinding.mappedAddress(response.data.copyOf(response.length), transaction)
-                ?: return null
+                ?: return@runCatching null
             if (mapped == local) NatObservation.UNCHANGED else NatObservation.TRANSLATED
         }
     }.getOrNull()
