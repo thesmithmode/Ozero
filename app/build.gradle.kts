@@ -99,6 +99,7 @@ android {
     }
 
     packaging {
+        jniLibs.keepDebugSymbols += "**/libopera_proxy.so"
         resources {
             excludes +=
                 setOf(
