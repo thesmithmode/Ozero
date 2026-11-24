@@ -3,7 +3,6 @@ package ru.ozero.enginetgwss
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.os.ParcelFileDescriptor
 import okhttp3.Dns
 import ru.ozero.enginescore.VpnSocketProtectorHolder
 import java.net.Socket
@@ -24,5 +23,5 @@ internal class TelegramNetwork(context: Context) {
     }
 
     fun protect(socket: Socket): Boolean =
-        ParcelFileDescriptor.fromSocket(socket).use { VpnSocketProtectorHolder.protect(it.fd) }
+        VpnSocketProtectorHolder.protectSocket(socket)
 }

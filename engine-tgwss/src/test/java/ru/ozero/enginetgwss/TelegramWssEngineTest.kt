@@ -55,7 +55,10 @@ class TelegramWssEngineTest {
             assertIs<ProbeResult.Success>(engine.probe())
             assertIs<EnginePlugin.ReadyResult.Ready>(engine.awaitReady())
             assertTrue(engine.stats().first().connectedSince > 0)
-            assertEquals(ExitNodeStrategy.ViaSocks("127.0.0.1", first.socksPort), engine.exitNodeStrategy(first.socksPort))
+            assertEquals(
+                ExitNodeStrategy.ViaSocks("127.0.0.1", first.socksPort),
+                engine.exitNodeStrategy(first.socksPort),
+            )
             assertIs<StartResult.Success>(engine.start(EngineConfig.TelegramWss(0, false), Upstream.None))
         } finally {
             engine.stop()

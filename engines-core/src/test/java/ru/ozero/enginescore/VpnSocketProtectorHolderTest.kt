@@ -2,6 +2,7 @@ package ru.ozero.enginescore
 
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import java.net.Socket
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -21,6 +22,22 @@ class VpnSocketProtectorHolderTest {
         VpnSocketProtectorHolder.bind(protector)
         bound = protector
         return protector
+    }
+
+    @Test
+    fun `socket protection belongs to the current binding`() {
+        Socket().use { socket ->
+            assertFalse(VpnSocketProtectorHolder.protectSocket(socket))
+            val protector = VpnSocketProtector { true }
+            bound = protector
+            VpnSocketProtectorHolder.bind(protector) { it === socket }
+            assertTrue(VpnSocketProtectorHolder.protectSocket(socket))
+            Socket().use { assertFalse(VpnSocketProtectorHolder.protectSocket(it)) }
+            VpnSocketProtectorHolder.unbind(VpnSocketProtector { false })
+            assertTrue(VpnSocketProtectorHolder.protectSocket(socket))
+            VpnSocketProtectorHolder.bind(protector)
+            assertFalse(VpnSocketProtectorHolder.protectSocket(socket))
+        }
     }
 
     @Test
