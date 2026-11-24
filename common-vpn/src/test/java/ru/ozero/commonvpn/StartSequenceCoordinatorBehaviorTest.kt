@@ -71,8 +71,26 @@ class StartSequenceCoordinatorBehaviorTest {
     }
 
     @Test
+    fun `Opera proxy retains routed watchdog independently of capability flag`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.OPERA,
+            socksPort = 2088,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(trafficMode = TrafficMode.PROXY, manualEngine = EngineId.OPERA),
+        )
+        fixture.coordinator.run()
+        assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+        verify(exactly = 1) { fixture.engineWatchdog.startHealthKillswitchWatcher(EngineId.OPERA) }
+        verify(exactly = 1) { fixture.engineWatchdog.startRoutedProbeWatchdog(EngineId.OPERA) }
+        verify(exactly = 0) { fixture.engineWatchdog.startPeerWatchdog(any()) }
+    }
+
+    @Test
     fun `existing SOCKS engines retain health monitor without routed probe watchdog`() = runTest {
-        for (id in EngineId.entries.filter { it != EngineId.MASQUE }) {
+        for (id in EngineId.entries.filter { it != EngineId.MASQUE && it != EngineId.OPERA }) {
             val engine = FakeEnginePlugin(
                 id = id,
                 socksPort = 2088,
@@ -91,8 +109,8 @@ class StartSequenceCoordinatorBehaviorTest {
     }
 
     @Test
-    fun `existing Singbox custom TUN retains routed watchdog and Warp retains peer watchdog`() = runTest {
-        for (id in listOf(EngineId.SINGBOX, EngineId.WARP)) {
+    fun `Singbox and Opera custom TUN retain routed watchdog and Warp retains peer watchdog`() = runTest {
+        for (id in listOf(EngineId.SINGBOX, EngineId.OPERA, EngineId.WARP)) {
             val engine = CustomTunEngine(id = id, socksPort = 2088)
             val fixture = startFixture(
                 engine,
@@ -114,7 +132,7 @@ class StartSequenceCoordinatorBehaviorTest {
             assertEquals(listOf(2205), engine.attachedFds)
             verify(exactly = 0) { fixture.tunnelGateway.start(any()) }
             verify(exactly = 0) { fixture.engineWatchdog.startHealthKillswitchWatcher(any()) }
-            verify(exactly = if (id == EngineId.SINGBOX) 1 else 0) {
+            verify(exactly = if (id != EngineId.WARP) 1 else 0) {
                 fixture.engineWatchdog.startRoutedProbeWatchdog(id)
             }
             verify(exactly = if (id == EngineId.WARP) 1 else 0) {
@@ -1468,6 +1486,7 @@ class StartSequenceCoordinatorBehaviorTest {
         private fun engineConfig(): EngineConfig = when (id) {
             EngineId.WARP -> EngineConfig.WarpProxy(socksPort = socksPort)
             EngineId.SINGBOX -> EngineConfig.Singbox(beanBlob = byteArrayOf(1), protocolType = 1, proxyMode = false)
+            EngineId.OPERA -> EngineConfig.Opera()
             else -> EngineConfig.ByeDpi(socksPort = socksPort)
         }
 
