@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="settings_opera_summary">Proxy TCP SOCKS5. Apenas modo proxy, não VPN do sistema. UDP não suportado.</string>
+    <string name="settings_opera_summary">VPN e SOCKS5 via Opera. TCP e DNS via Cloudflare DoH; outros fluxos UDP não são suportados.</string>
     <string name="opera_region">Região</string>
     <string name="opera_selection">Seleção de servidor</string>
     <string name="opera_first">Primeiro disponível</string>
