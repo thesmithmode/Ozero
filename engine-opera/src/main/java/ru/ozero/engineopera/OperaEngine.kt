@@ -148,7 +148,8 @@ class OperaEngine(
 
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
         val current = active
-        return if (current != null && current.port == socksPort && (current.config.proxyMode || current.attached)) {
+        val ready = current?.let { it.config.proxyMode || it.attached } == true
+        return if (ready && current?.port == socksPort) {
             ExitNodeStrategy.ViaSocks(OperaProxyCommand.LOOPBACK, socksPort)
         } else {
             ExitNodeStrategy.Unavailable("Opera SOCKS endpoint unavailable")

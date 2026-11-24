@@ -79,7 +79,11 @@ class OperaProxyRuntime(
                 ProbeResult.Failure("opera process exited")
             }
         } catch (e: IOException) {
-            ProbeResult.Failure("opera routed probe failed", cause = e, code = ProbeResult.Failure.Code.ROUTED_PROBE_FAILED)
+            ProbeResult.Failure(
+                "opera routed probe failed",
+                cause = e,
+                code = ProbeResult.Failure.Code.ROUTED_PROBE_FAILED,
+            )
         }
     }
 
