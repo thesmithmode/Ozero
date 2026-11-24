@@ -34,9 +34,12 @@ import org.robolectric.shadows.ShadowNetworkCapabilities
 import ru.ozero.enginescore.ChainOrchestrator
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginescore.VpnSocketProtector
+import ru.ozero.enginescore.VpnSocketProtectorHolder
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
 import ru.ozero.enginescore.settings.TrafficMode
+import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -341,19 +344,26 @@ class OzeroVpnServiceRuntimeLifecycleTest {
     @Test
     fun `onDestroy unbinds runtime failure handler and releases socket protector binding`() {
         val runtimeFailureRouter = mockk<RuntimeFailureRouter>(relaxed = true)
-        val socketProtector = mockk<ru.ozero.enginescore.VpnSocketProtector>()
-        val holderField = getSocketProtectorHolderField()
-        holderField.set(null, socketProtector)
+        val socketProtector = VpnSocketProtector { true }
+        VpnSocketProtectorHolder.bind(socketProtector) { true }
 
         val service = preparedService()
             .also { it.setDependency("runtimeFailureRouter", runtimeFailureRouter) }
             .also { it.setDependency("socketProtector", socketProtector) }
             .also { it.setDependency("shutdownCoord", mockk<ShutdownCoordinator>(relaxed = true)) }
 
-        service.onDestroy()
+        try {
+            assertTrue(VpnSocketProtectorHolder.protect(1))
+            Socket().use { assertTrue(VpnSocketProtectorHolder.protectSocket(it)) }
+            service.onDestroy()
 
-        coVerify(exactly = 1) { runtimeFailureRouter.unbind(any()) }
-        assertEquals(null, getSocketProtectorHolderField().get(null))
+            coVerify(exactly = 1) { runtimeFailureRouter.unbind(any()) }
+            assertFalse(VpnSocketProtectorHolder.isBound())
+            assertFalse(VpnSocketProtectorHolder.protect(1))
+            Socket().use { assertFalse(VpnSocketProtectorHolder.protectSocket(it)) }
+        } finally {
+            VpnSocketProtectorHolder.unbind(socketProtector)
+        }
     }
 
     @Test
@@ -1108,12 +1118,6 @@ class OzeroVpnServiceRuntimeLifecycleTest {
         val field = OzeroVpnService::class.java.getDeclaredField("wifiLock")
         field.isAccessible = true
         return field.get(this) as WifiManager.WifiLock?
-    }
-
-    private fun getSocketProtectorHolderField(): java.lang.reflect.Field {
-        val holderField = ru.ozero.enginescore.VpnSocketProtectorHolder::class.java.getDeclaredField("current")
-        holderField.isAccessible = true
-        return holderField
     }
 
     private fun waitUntil(
