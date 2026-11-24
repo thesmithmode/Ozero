@@ -15,6 +15,7 @@ import ru.ozero.app.ui.logs.LogsScreen
 import ru.ozero.app.ui.servers.ServersScreen
 import ru.ozero.app.ui.settings.AutoModeSettingsScreen
 import ru.ozero.app.ui.settings.LanguageScreen
+import ru.ozero.app.ui.settings.NetworkDiagnosticsScreen
 import ru.ozero.app.ui.settings.SettingsScreen
 import ru.ozero.app.ui.settings.engines.ByeDpiEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.FptnEngineSettingsScreen
@@ -73,9 +74,11 @@ fun RootNavigation(
                     onOpenBackup = { navigate(TopScreen.Backup) },
                     onOpenAutoModeSettings = { navigate(TopScreen.AutoModeSettings) },
                     onOpenLanguage = { navigate(TopScreen.Language) },
+                    onOpenNetworkDiagnostics = { navigate(TopScreen.NetworkDiagnostics) },
                 )
             TopScreen.AutoModeSettings -> AutoModeSettingsScreen(onBack = { back() })
             TopScreen.Language -> LanguageScreen(onBack = { back() })
+            TopScreen.NetworkDiagnostics -> NetworkDiagnosticsScreen(onBack = { back() })
             TopScreen.Backup -> BackupScreen(onBack = { back() })
             TopScreen.Logs -> LogsScreen(onBack = { back() })
             TopScreen.SplitTunnel -> SplitTunnelScreen(onBack = { back() })

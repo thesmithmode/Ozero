@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="network_diagnostics_title">ネットワーク診断</string>
+    <string name="network_diagnostics_summary">MTU、TCP/UDP 到達性、NAT</string>
+    <string name="network_diagnostics_warning">Cloudflare への直接テスト (1.1.1.1:443、stun.cloudflare.com:3478)。サーバーに IP が通知されます。VPN の診断ではありません。MTU はインターフェースの値であり、パス MTU ではありません。NAT は観測された変換のみです。</string>
+    <string name="network_diagnostics_run">診断を実行</string>
+    <string name="network_diagnostics_disconnect">診断には VPN を切断してください。</string>
+    <string name="network_diagnostics_unavailable">ネットワークが利用できないか変更されました。</string>
+    <string name="network_diagnostics_unknown">不明</string>
+    <string name="network_diagnostics_bytes">%1$d バイト</string>
+    <string name="network_diagnostics_ok">応答あり</string>
+    <string name="network_diagnostics_no_response">応答なし</string>
+    <string name="network_diagnostics_translated">アドレスまたはポートが変換された</string>
+    <string name="network_diagnostics_unchanged">変換は観測されなかった</string>
+    <string name="network_diagnostics_mtu">インターフェース MTU: %1$s</string>
+    <string name="network_diagnostics_tcp">TCP 443: %1$s</string>
+    <string name="network_diagnostics_udp">UDP STUN: %1$s</string>
+    <string name="network_diagnostics_nat">NAT: %1$s</string>
+</resources>

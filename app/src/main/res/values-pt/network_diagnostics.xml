@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="network_diagnostics_title">Diagnóstico de rede</string>
+    <string name="network_diagnostics_summary">MTU, conectividade TCP/UDP e NAT</string>
+    <string name="network_diagnostics_warning">Testes diretos da Cloudflare (1.1.1.1:443, stun.cloudflare.com:3478). O servidor vê seu IP. Os resultados não descrevem a VPN. A MTU é da interface, não do caminho; NAT indica apenas a tradução observada.</string>
+    <string name="network_diagnostics_run">Iniciar diagnóstico</string>
+    <string name="network_diagnostics_disconnect">Desconecte a VPN para executar o diagnóstico.</string>
+    <string name="network_diagnostics_unavailable">Rede indisponível ou alterada.</string>
+    <string name="network_diagnostics_unknown">Desconhecido</string>
+    <string name="network_diagnostics_bytes">%1$d bytes</string>
+    <string name="network_diagnostics_ok">Resposta recebida</string>
+    <string name="network_diagnostics_no_response">Sem resposta</string>
+    <string name="network_diagnostics_translated">Endereço ou porta traduzidos</string>
+    <string name="network_diagnostics_unchanged">Nenhuma tradução observada</string>
+    <string name="network_diagnostics_mtu">MTU da interface: %1$s</string>
+    <string name="network_diagnostics_tcp">TCP 443: %1$s</string>
+    <string name="network_diagnostics_udp">UDP STUN: %1$s</string>
+    <string name="network_diagnostics_nat">NAT: %1$s</string>
+</resources>

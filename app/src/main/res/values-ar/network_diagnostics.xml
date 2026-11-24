@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="network_diagnostics_title">تشخيص الشبكة</string>
+    <string name="network_diagnostics_summary">MTU وإمكانية الوصول عبر TCP/UDP وNAT</string>
+    <string name="network_diagnostics_warning">اختبارات Cloudflare مباشرة (1.1.1.1:443، stun.cloudflare.com:3478). يرى الخادم عنوان IP الخاص بك. النتائج لا تصف VPN. قيمة MTU تخص الواجهة لا المسار؛ ويعرض NAT التحويل المرصود فقط.</string>
+    <string name="network_diagnostics_run">بدء التشخيص</string>
+    <string name="network_diagnostics_disconnect">افصل VPN لإجراء التشخيص.</string>
+    <string name="network_diagnostics_unavailable">الشبكة غير متاحة أو تغيرت.</string>
+    <string name="network_diagnostics_unknown">غير معروف</string>
+    <string name="network_diagnostics_bytes">%1$d بايت</string>
+    <string name="network_diagnostics_ok">تم تلقي رد</string>
+    <string name="network_diagnostics_no_response">لا يوجد رد</string>
+    <string name="network_diagnostics_translated">تم تحويل العنوان أو المنفذ</string>
+    <string name="network_diagnostics_unchanged">لم يُلاحظ تحويل</string>
+    <string name="network_diagnostics_mtu">MTU الواجهة: %1$s</string>
+    <string name="network_diagnostics_tcp">TCP 443: %1$s</string>
+    <string name="network_diagnostics_udp">UDP STUN: %1$s</string>
+    <string name="network_diagnostics_nat">NAT: %1$s</string>
+</resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="network_diagnostics_title">Диагностика сети</string>
+    <string name="network_diagnostics_summary">MTU, доступность TCP/UDP и NAT</string>
+    <string name="network_diagnostics_warning">Прямые проверки Cloudflare (1.1.1.1:443, stun.cloudflare.com:3478). Сервер увидит ваш IP. Результаты не характеризуют VPN. MTU — интерфейсный, не Path MTU; NAT — только наблюдаемое преобразование.</string>
+    <string name="network_diagnostics_run">Запустить проверку</string>
+    <string name="network_diagnostics_disconnect">Отключите VPN для проверки.</string>
+    <string name="network_diagnostics_unavailable">Сеть недоступна или изменилась.</string>
+    <string name="network_diagnostics_unknown">Неизвестно</string>
+    <string name="network_diagnostics_bytes">%1$d байт</string>
+    <string name="network_diagnostics_ok">Ответ получен</string>
+    <string name="network_diagnostics_no_response">Нет ответа</string>
+    <string name="network_diagnostics_translated">Адрес или порт изменён</string>
+    <string name="network_diagnostics_unchanged">Изменение не обнаружено</string>
+    <string name="network_diagnostics_mtu">MTU интерфейса: %1$s</string>
+    <string name="network_diagnostics_tcp">TCP 443: %1$s</string>
+    <string name="network_diagnostics_udp">UDP STUN: %1$s</string>
+    <string name="network_diagnostics_nat">NAT: %1$s</string>
+</resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="network_diagnostics_title">网络诊断</string>
+    <string name="network_diagnostics_summary">MTU、TCP/UDP 可达性和 NAT</string>
+    <string name="network_diagnostics_warning">直接测试 Cloudflare（1.1.1.1:443、stun.cloudflare.com:3478）。服务器会看到您的 IP。结果不代表 VPN。MTU 是接口 MTU，而非路径 MTU；NAT 仅表示观察到的映射。</string>
+    <string name="network_diagnostics_run">开始诊断</string>
+    <string name="network_diagnostics_disconnect">请断开 VPN 后运行诊断。</string>
+    <string name="network_diagnostics_unavailable">网络不可用或已变化。</string>
+    <string name="network_diagnostics_unknown">未知</string>
+    <string name="network_diagnostics_bytes">%1$d 字节</string>
+    <string name="network_diagnostics_ok">收到响应</string>
+    <string name="network_diagnostics_no_response">无响应</string>
+    <string name="network_diagnostics_translated">地址或端口已转换</string>
+    <string name="network_diagnostics_unchanged">未观察到转换</string>
+    <string name="network_diagnostics_mtu">接口 MTU：%1$s</string>
+    <string name="network_diagnostics_tcp">TCP 443：%1$s</string>
+    <string name="network_diagnostics_udp">UDP STUN：%1$s</string>
+    <string name="network_diagnostics_nat">NAT：%1$s</string>
+</resources>

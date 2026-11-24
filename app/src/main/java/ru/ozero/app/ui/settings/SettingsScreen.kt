@@ -67,6 +67,7 @@ fun SettingsScreen(
     onOpenFptnSettings: () -> Unit = {},
     onOpenSingboxSettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
+    onOpenNetworkDiagnostics: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     BackHandler(onBack = onBack)
@@ -88,6 +89,7 @@ fun SettingsScreen(
             onOpenMasterDnsSettings = onOpenMasterDnsSettings,
             onOpenFptnSettings = onOpenFptnSettings,
             onOpenSingboxSettings = onOpenSingboxSettings,
+            onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
         ),
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
@@ -220,6 +222,7 @@ private fun ContentBody(
                 ipv6Enabled = model.ipv6Enabled,
                 onIpv6Toggle = onIpv6Toggle,
                 onOpenAllowedApps = nav.onOpenAllowedApps,
+                onOpenNetworkDiagnostics = nav.onOpenNetworkDiagnostics,
             )
         }
         item { SectionDivider() }
@@ -515,8 +518,16 @@ private fun NetworkSection(
     ipv6Enabled: Boolean,
     onIpv6Toggle: (Boolean) -> Unit,
     onOpenAllowedApps: () -> Unit,
+    onOpenNetworkDiagnostics: () -> Unit,
 ) {
     SectionHeader(R.string.settings_section_network, SettingsTestTags.SECTION_NETWORK)
+    NavRow(
+        title = stringResource(R.string.network_diagnostics_title),
+        summary = stringResource(R.string.network_diagnostics_summary),
+        tag = "settings_network_diagnostics_row",
+        enabled = true,
+        onClick = onOpenNetworkDiagnostics,
+    )
     SwitchRow(
         title = stringResource(R.string.settings_ipv6_title),
         summary = stringResource(R.string.settings_ipv6_summary),

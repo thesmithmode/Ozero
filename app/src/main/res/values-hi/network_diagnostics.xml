@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="network_diagnostics_title">नेटवर्क निदान</string>
+    <string name="network_diagnostics_summary">MTU, TCP/UDP पहुँच और NAT</string>
+    <string name="network_diagnostics_warning">Cloudflare की सीधी जाँच (1.1.1.1:443, stun.cloudflare.com:3478)। सर्वर आपका IP देखता है। परिणाम VPN का वर्णन नहीं करते। MTU इंटरफ़ेस का है, पथ का नहीं; NAT केवल देखा गया रूपांतरण है।</string>
+    <string name="network_diagnostics_run">जाँच शुरू करें</string>
+    <string name="network_diagnostics_disconnect">जाँच के लिए VPN डिस्कनेक्ट करें।</string>
+    <string name="network_diagnostics_unavailable">नेटवर्क अनुपलब्ध है या बदल गया है।</string>
+    <string name="network_diagnostics_unknown">अज्ञात</string>
+    <string name="network_diagnostics_bytes">%1$d बाइट</string>
+    <string name="network_diagnostics_ok">उत्तर मिला</string>
+    <string name="network_diagnostics_no_response">कोई उत्तर नहीं</string>
+    <string name="network_diagnostics_translated">पता या पोर्ट बदला गया</string>
+    <string name="network_diagnostics_unchanged">कोई रूपांतरण नहीं देखा गया</string>
+    <string name="network_diagnostics_mtu">इंटरफ़ेस MTU: %1$s</string>
+    <string name="network_diagnostics_tcp">TCP 443: %1$s</string>
+    <string name="network_diagnostics_udp">UDP STUN: %1$s</string>
+    <string name="network_diagnostics_nat">NAT: %1$s</string>
+</resources>
