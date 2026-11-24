@@ -541,6 +541,51 @@ class StartSequenceCoordinatorBehaviorTest {
     }
 
     @Test
+    fun `Telegram WSS TUN uses standard HEV routing and routed watchdog`() = runTest {
+        val engine = FakeEnginePlugin(id = EngineId.TGWSS, socksPort = 10812, capabilities = tunnelCapabilities())
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(trafficMode = TrafficMode.TUN, manualEngine = EngineId.TGWSS),
+        )
+        val tunFd = fixture.establishedTunFd()
+        every { fixture.tunnelGateway.start(any()) } returns 0
+
+        fixture.coordinator.run()
+
+        assertEquals(listOf(EngineConfig.TelegramWss()), engine.startedConfigs)
+        verify(exactly = 1) {
+            fixture.tunnelGateway.start(match { it.tunPfd === tunFd && it.socksPort == 10812 })
+        }
+        verify(exactly = 1) { fixture.engineWatchdog.startRoutedProbeWatchdog(EngineId.TGWSS) }
+        verify(exactly = 1) { fixture.engineWatchdog.startHealthKillswitchWatcher(EngineId.TGWSS) }
+        verify(exactly = 1) { fixture.engineWatchdog.startStagnationWatchdog(EngineId.TGWSS) }
+        verify(exactly = 0) { fixture.engineWatchdog.startPeerWatchdog(any()) }
+        assertEquals(EngineId.TGWSS, assertIs<TunnelState.Connected>(fixture.tunnelController.state.value).engineId)
+    }
+
+    @Test
+    fun `Telegram WSS proxy starts routed watchdog without creating TUN`() = runTest {
+        val engine = FakeEnginePlugin(
+            id = EngineId.TGWSS,
+            socksPort = 10812,
+            capabilities = standaloneProxyCapabilities(),
+        )
+        val fixture = startFixture(
+            engine,
+            settings = SettingsModel(trafficMode = TrafficMode.PROXY, manualEngine = EngineId.TGWSS),
+        )
+
+        fixture.coordinator.run()
+
+        assertEquals(listOf(EngineConfig.TelegramWss(tunnelMode = false)), engine.startedConfigs)
+        verify(exactly = 0) { fixture.tunnelGateway.start(any()) }
+        verify(exactly = 1) { fixture.engineWatchdog.startRoutedProbeWatchdog(EngineId.TGWSS) }
+        verify(exactly = 1) { fixture.engineWatchdog.startHealthKillswitchWatcher(EngineId.TGWSS) }
+        assertEquals(listOf("TGWSS:PROXY"), fixture.sessionRecorder.startedEngines)
+        assertEquals(EngineId.TGWSS, assertIs<TunnelState.Connected>(fixture.tunnelController.state.value).engineId)
+    }
+
+    @Test
     fun `manual TUN establish null stops chain and requests service stop`() = runTest {
         val engine = FakeEnginePlugin(id = EngineId.BYEDPI, socksPort = 2092, capabilities = tunnelCapabilities())
         val fixture = startFixture(
@@ -1285,7 +1330,8 @@ class StartSequenceCoordinatorBehaviorTest {
         override fun stats(): Flow<EngineStats> = emptyFlow()
         override suspend fun awaitReady(): EnginePlugin.ReadyResult = readyResult
         override fun buildManualConfig(settings: SettingsModel?): EngineConfig? = engineConfig()
-        override fun buildProxyConfig(settings: SettingsModel?): EngineConfig? = engineConfig()
+        override fun buildProxyConfig(settings: SettingsModel?): EngineConfig? =
+            if (id == EngineId.TGWSS) EngineConfig.TelegramWss(socksPort, tunnelMode = false) else engineConfig()
         override fun preflight(): EnginePreflight? = preflightResult?.let { result ->
             EnginePreflight { _ -> result }
         }
