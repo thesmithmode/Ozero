@@ -24,7 +24,13 @@ internal object MasqueCommand {
         "--accept-tos",
     )
 
-    fun socks(binary: File, config: File, port: Int, transport: MasqueTransport): List<String> {
+    fun socks(
+        binary: File,
+        config: File,
+        port: Int,
+        transport: MasqueTransport,
+        ipv6Enabled: Boolean = false,
+    ): List<String> {
         require(port in 1..65535) { "Invalid SOCKS port" }
         require(transport != MasqueTransport.AUTO) { "Select a concrete transport" }
         return buildList {
@@ -40,6 +46,7 @@ internal object MasqueCommand {
                     port.toString(),
                 ),
             )
+            if (!ipv6Enabled) add("--no-tunnel-ipv6")
             if (transport == MasqueTransport.H2) add("--http2")
         }
     }

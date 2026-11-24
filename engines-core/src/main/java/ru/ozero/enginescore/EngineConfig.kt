@@ -105,6 +105,15 @@ sealed class EngineConfig {
         }
     }
 
+    data class Masque(
+        val profileJson: String,
+        val transport: String,
+        val ipv6Enabled: Boolean = false,
+    ) : EngineConfig() {
+        override val engineId = EngineId.MASQUE
+        override fun toString(): String = "Masque(profile=***, transport=$transport, ipv6=$ipv6Enabled)"
+    }
+
     data class Fptn(
         val token: String = "",
         val selectedServerName: String? = null,

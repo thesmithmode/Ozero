@@ -5,6 +5,8 @@ import org.json.JSONObject
 class MasqueProfile private constructor(internal val json: String) {
     override fun toString(): String = "MasqueProfile(***)"
 
+    fun exportJson(): String = json
+
     companion object {
         const val MAX_BYTES = 64 * 1024
 

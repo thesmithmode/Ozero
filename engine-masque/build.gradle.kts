@@ -4,6 +4,7 @@ plugins {
 
 android {
     namespace = "ru.ozero.enginemasque"
+    sourceSets["main"].jniLibs.srcDir(layout.buildDirectory.dir("native"))
 
     defaultConfig {
         ndk {
@@ -14,6 +15,7 @@ android {
 
 dependencies {
     implementation(project(":common-crypto"))
+    implementation(project(":engines-core"))
     implementation(libs.bundles.coroutines)
     implementation(libs.datastore.preferences)
 

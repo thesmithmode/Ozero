@@ -19,7 +19,7 @@ class MasqueRuntime internal constructor(
     private val privateDirectory: File,
     private val launcher: MasqueProcessLauncher,
     private val readiness: MasqueReadinessProbe,
-    private val startupTimeoutMs: Long = 15_000,
+    private val startupTimeoutMs: Long = 10_000,
 ) {
     constructor(binary: File, privateDirectory: File) : this(
         binary,
@@ -61,13 +61,18 @@ class MasqueRuntime internal constructor(
         return MasqueProfile.parse(config.readText())
     }
 
-    suspend fun start(profile: MasqueProfile, port: Int, transport: MasqueTransport): MasqueTransport? =
+    suspend fun start(
+        profile: MasqueProfile,
+        port: Int,
+        transport: MasqueTransport,
+        ipv6Enabled: Boolean = false,
+    ): MasqueTransport? =
         mutex.withLock {
             require(port in 1..65535) { "Invalid SOCKS port" }
             try {
                 withContext(Dispatchers.IO) {
                     stopLocked()
-                    startLocked(profile, port, transport)
+                    startLocked(profile, port, transport, ipv6Enabled)
                 }
             } catch (e: CancellationException) {
                 withContext(NonCancellable + Dispatchers.IO) { stopLocked() }
@@ -79,9 +84,10 @@ class MasqueRuntime internal constructor(
         profile: MasqueProfile,
         port: Int,
         transport: MasqueTransport,
+        ipv6Enabled: Boolean,
     ): MasqueTransport? {
         for (attempt in transport.attempts()) {
-            val started = startAttempt(profile, port, attempt)
+            val started = startAttempt(profile, port, attempt, ipv6Enabled)
             if (started != null) {
                 session = started
                 return attempt
@@ -94,6 +100,7 @@ class MasqueRuntime internal constructor(
         profile: MasqueProfile,
         port: Int,
         transport: MasqueTransport,
+        ipv6Enabled: Boolean,
     ): Session? {
         val workspace = newWorkspace()
         val config = File(workspace, CONFIG_NAME)
@@ -101,7 +108,7 @@ class MasqueRuntime internal constructor(
         var started = false
         try {
             config.writeText(profile.json)
-            val process = launcher.launch(MasqueCommand.socks(binary, config, port, transport))
+            val process = launcher.launch(MasqueCommand.socks(binary, config, port, transport, ipv6Enabled))
             child = process
             started = awaitReady(process, workspace, port)
             return if (started) Session(process, workspace, port) else null

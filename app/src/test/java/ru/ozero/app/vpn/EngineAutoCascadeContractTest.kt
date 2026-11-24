@@ -14,6 +14,7 @@ class EngineAutoCascadeContractTest {
         EngineId.MASTERDNS to "ru.ozero.enginemasterdns.MasterDnsEngine",
         EngineId.SINGBOX to "ru.ozero.enginesingbox.SingboxEngine",
         EngineId.FPTN to "ru.ozero.enginefptn.FptnEngine",
+        EngineId.MASQUE to "ru.ozero.enginemasque.MasqueEngine",
     )
 
     @Test

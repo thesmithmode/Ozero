@@ -217,7 +217,7 @@ class StartSequenceCoordinator(
                 }
         }
         if (!usesCustomTun) deps.engineWatchdog.startHealthKillswitchWatcher(activeEngineId)
-        if (usesCustomTun && activeEngineId == EngineId.SINGBOX) {
+        if (usesCustomTun && activeEngineId == EngineId.SINGBOX || needsRoutedProbe(activeEngineId)) {
             deps.engineWatchdog.startRoutedProbeWatchdog(activeEngineId)
         } else if (usesCustomTun) {
             deps.engineWatchdog.startPeerWatchdog(activeEngineId)
@@ -263,9 +263,13 @@ class StartSequenceCoordinator(
                 PersistentLoggers.warn(TAG, "proxy healthMonitor.start threw: ${t.message}")
             }
         deps.engineWatchdog.startHealthKillswitchWatcher(engineId)
+        if (needsRoutedProbe(engineId)) deps.engineWatchdog.startRoutedProbeWatchdog(engineId)
         deps.statsLogger.start()
         return true
     }
+
+    private fun needsRoutedProbe(engineId: EngineId): Boolean =
+        deps.enginePlugins.firstOrNull { it.id == engineId }?.capabilities?.requiresRoutedProbe == true
 
     suspend fun engineNeedsCustomTun(engineId: EngineId): Boolean {
         val plugin = deps.enginePlugins.firstOrNull { it.id == engineId } ?: return false

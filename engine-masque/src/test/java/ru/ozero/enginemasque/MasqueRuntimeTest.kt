@@ -127,6 +127,7 @@ class MasqueRuntimeTest {
         assertFalse(runtime.isReady())
         assertEquals(listOf("usque"), directory.list().orEmpty().toList())
     }
+
     @Test
     fun `registration requires explicit terms and deletes temporary profile`() = runBlocking {
         val commands = mutableListOf<List<String>>()

@@ -7,4 +7,5 @@ enum class EngineId(val displayName: String, val isStub: Boolean) {
     MASTERDNS(displayName = "MasterDNS", isStub = false),
     SINGBOX(displayName = "Sing-box", isStub = false),
     FPTN(displayName = "FPTN", isStub = false),
+    MASQUE(displayName = "MASQUE", isStub = false),
 }

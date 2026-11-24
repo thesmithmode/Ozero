@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="masque_title">MASQUE</string>
+    <string name="masque_summary">HTTP/2 या HTTP/3 के माध्यम से Cloudflare WARP</string>
+    <string name="masque_registered">प्रोफ़ाइल पंजीकृत है</string>
+    <string name="masque_not_registered">कोई पंजीकृत प्रोफ़ाइल नहीं</string>
+    <string name="masque_working">प्रक्रिया जारी है…</string>
+    <string name="masque_error">प्रक्रिया विफल। कनेक्शन जाँचें और फिर प्रयास करें।</string>
+    <string name="masque_register">WARP पंजीकृत करें</string>
+    <string name="masque_clear">प्रोफ़ाइल हटाएँ</string>
+    <string name="masque_clear_warning">अगले कनेक्शन से पहले नया पंजीकरण ज़रूरी होगा।</string>
+    <string name="masque_transport">ट्रांसपोर्ट</string>
+    <string name="masque_auto">ऑटो</string>
+    <string name="masque_auto_enabled">स्वचालित मोड में शामिल करें</string>
+    <string name="masque_consent">अलग WARP प्रोफ़ाइल बनाने के लिए Cloudflare की शर्तें स्वीकार करें।</string>
+    <string name="masque_terms">Cloudflare की शर्तें</string>
+    <string name="masque_accept">स्वीकार करें और पंजीकृत करें</string>
+    <string name="masque_cancel">रद्द करें</string>
+</resources>

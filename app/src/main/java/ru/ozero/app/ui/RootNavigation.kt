@@ -18,6 +18,7 @@ import ru.ozero.app.ui.settings.LanguageScreen
 import ru.ozero.app.ui.settings.SettingsScreen
 import ru.ozero.app.ui.settings.engines.ByeDpiEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.FptnEngineSettingsScreen
+import ru.ozero.app.ui.settings.engines.MasqueSettingsScreen
 import ru.ozero.app.ui.settings.engines.MasterDnsSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkEngineSettingsScreen
 import ru.ozero.app.ui.settings.engines.UrnetworkSharedTrafficScreen
@@ -31,6 +32,7 @@ import ru.ozero.app.ui.strategy.StrategyTestScreen
 private fun engineParamsTarget(engineId: EngineId?): TopScreen = when (engineId) {
     null -> TopScreen.AutoModeSettings
     EngineId.WARP -> TopScreen.WarpEngineSettings
+    EngineId.MASQUE -> TopScreen.MasqueSettings
     EngineId.URNETWORK -> TopScreen.UrnetworkEngineSettings
     EngineId.BYEDPI -> TopScreen.ByeDpiEngineSettings
     EngineId.MASTERDNS -> TopScreen.MasterDnsSettings
@@ -66,6 +68,7 @@ fun RootNavigation(
                     onOpenByeDpiEngineSettings = { navigate(TopScreen.ByeDpiEngineSettings) },
                     onOpenUrnetworkSettings = { navigate(TopScreen.UrnetworkEngineSettings) },
                     onOpenWarpSettings = { navigate(TopScreen.WarpEngineSettings) },
+                    onOpenMasqueSettings = { navigate(TopScreen.MasqueSettings) },
                     onOpenMasterDnsSettings = { navigate(TopScreen.MasterDnsSettings) },
                     onOpenFptnSettings = { navigate(TopScreen.FptnSettings) },
                     onOpenSingboxSettings = { navigate(TopScreen.SingboxSettings) },
@@ -92,6 +95,7 @@ fun RootNavigation(
             )
             TopScreen.UrnetworkSharedTraffic -> UrnetworkSharedTrafficScreen(onBack = { back() })
             TopScreen.WarpEngineSettings -> WarpEngineSettingsScreen(onBack = { back() })
+            TopScreen.MasqueSettings -> MasqueSettingsScreen(onBack = { back() })
             TopScreen.MasterDnsSettings -> MasterDnsSettingsScreen(onBack = { back() })
             TopScreen.FptnSettings -> FptnEngineSettingsScreen(onBack = { back() })
             TopScreen.SingboxSettings -> SingboxEngineSettingsScreen(
