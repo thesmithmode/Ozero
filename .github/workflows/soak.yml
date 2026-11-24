@@ -16,6 +16,8 @@ on:
     paths:
       - '.github/soak/**'
       - '.github/scripts/**'
+      - '.github/actions/prepare-urnetwork/**'
+      - '.github/checksums/urnetwork-sdk.lock'
       - '.github/workflows/soak.yml'
       - 'app/**'
       - 'common-vpn/**'

@@ -14,6 +14,9 @@ on:
       - '.github/workflows/fptn-transport.yml'
       - '.github/actions/build-fptn/**'
       - '.github/actions/prepare-app-native/**'
+      - '.github/actions/prepare-urnetwork/**'
+      - '.github/checksums/urnetwork-sdk.lock'
+      - '.github/scripts/prepare-urnetwork-aar.sh'
 
 env:
   GH_TOKEN: ${{ github.token }}
