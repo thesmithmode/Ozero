@@ -1,37 +1,26 @@
-# Telegram WSS
+# Telegram WSS + WARP
 
-Standalone local SOCKS5 proxy for Telegram MTProto over TLS WebSocket.
-Select Proxy traffic mode and Telegram WSS manually in Ozero, start the
-connection, and use the engine settings screen to open Telegram's proxy
-configuration. The listener is bound to 127.0.0.1:10812, with no user credentials.
+A regular Ozero VPN engine: select Telegram WSS and connect using TUN mode.
+No Telegram configuration is necessary. Ozero's existing split-tunnel rules,
+DNS, IPv6 option, VPN lifecycle and killswitch apply. Proxy mode also exists.
 
-The transport accepts only explicitly mapped Telegram IPv4 DC addresses and
-selected TCP ports. Unknown destinations, UDP and unsupported MTProto headers
-are rejected. No direct TCP fallback, third-party proxy, or certificate bypass.
-The WebSocket targets Telegram's own web.telegram.org endpoints with standard TLS.
-
-The engine is intentionally excluded from TUN mode, automatic selection, and
-multi-engine chains. There is no general internet exit or UDP call support.
-Because no TUN is established in this mode, outgoing sockets use normal OS
-routing; they do not bypass other VPNs. Readiness verifies the local SOCKS5
-listener and a TLS WebSocket handshake with an approved Telegram endpoint. It
-does not prove end-to-end MTProto message delivery. Settings backup uses the existing engine
-selection and traffic mode fields.
-
-The TCP stream is framed into encrypted MTProto packets with a bounded packet
-size. For media DCs, the alternate Telegram WSS hostname is tried only if
-the initial MTProto header has not been queued for transmission. Live Android interoperability with Telegram DCs, media, and reconnects
-must be verified before release. See NOTICE for pinned protocol references.
+Known Telegram DC TCP connections use TLS WebSocket to Telegram. Other TCP,
+UDP (including DNS and calls), and unsupported Telegram transports go through
+the existing WARP SOCKS runtime, not directly to the destination. Fallback
+from WSS is allowed only before the encrypted MTProto header is queued.
+The WARP configuration is the currently selected WARP slot. A failed WARP
+startup or routed TCP/UDP probe prevents a connected state. WSS upgrade is
+also required at initial readiness. Standalone manual selection avoids
+concurrent use of the shared WARP runtime in chains and redundant auto picks.
 
 ## Release acceptance
 
-- Required CI: style, assembleDebug, all unit tests and the 95% coverage gate.
-- On an Android ARM64 device, select Proxy mode and Telegram WSS, start, and
-  open the proxy settings in Telegram. Verify login/connection, two-way text
-  messages, image/file transfer, reconnect after a network change, and stop.
-- Verify non-Telegram destinations are rejected, the SOCKS listener is removed
-  after stop, the TUN and auto-mode options cannot select this engine, and the
-  general settings backup restores the manual proxy selection.
-- Compare the engine traffic counters with a real transfer and confirm the
-  existing VPN engines still work. A successful WSS upgrade alone is not proof
-  of end-to-end compatibility.
+- Required PR CI: style, compilation, tests and unchanged coverage gates.
+- Android ARM64: verify native WARP SOCKS UDP association with actual DNS
+  datagrams, IPv4/IPv6 (when enabled), ordinary HTTPS, Telegram messages,
+  files and calls, split tunnel allowlist/blocklist, stop and network changes.
+- Verify WARP failure blocks the route rather than leaking traffic; verify
+  the WSS fallback never replays a committed MTProto session.
+- Verify backup round trip, runtime slot changes and switching to/from WARP.
+- A fake SOCKS server or a WSS upgrade alone cannot prove compatibility with
+  the pinned native binary or end-to-end Telegram delivery.

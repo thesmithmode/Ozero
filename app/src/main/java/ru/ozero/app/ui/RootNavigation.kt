@@ -105,7 +105,14 @@ fun RootNavigation(
             TopScreen.SingboxAdvancedSettings -> SingboxAdvancedSettingsScreen(onBack = { back() })
             TopScreen.TelegramWssSettings -> {
                 val state by viewModel.state.collectAsStateWithLifecycle()
-                TelegramWssSettingsScreen(state = state, onBack = { back() })
+                val trafficMode by viewModel.trafficMode.collectAsStateWithLifecycle()
+                TelegramWssSettingsScreen(
+                    state = state,
+                    trafficMode = trafficMode,
+                    onBack = { back() },
+                    onOpenSplitTunnel = { navigate(TopScreen.SplitTunnel) },
+                    onOpenWarp = { navigate(TopScreen.WarpEngineSettings) },
+                )
             }
             TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
             TopScreen.StatsHistory -> TrafficStatsScreen(onBack = { back() })

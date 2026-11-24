@@ -29,7 +29,8 @@ internal class WarpSocksRelay(private val port: Int) : Closeable {
             if (upstreamInput.readUnsignedByte() != 5 || upstreamInput.readUnsignedByte() != 0) {
                 throw IOException("WARP SOCKS authentication failed")
             }
-            upstreamOutput.write(request.encode())
+            val upstreamRequest = if (request.command == 3) SocksRequest(3, ByteArray(4), 0, 1) else request
+            upstreamOutput.write(upstreamRequest.encode())
             upstreamOutput.flush()
             val response = readResponse(upstreamInput, request.command)
             if (prefix == null) {
@@ -38,6 +39,14 @@ internal class WarpSocksRelay(private val port: Int) : Closeable {
                 output.flush()
             }
             if (response[1].toInt() != 0) return
+            if (request.command == 3) {
+                client.soTimeout = 0
+                val controlBuffer = ByteArray(256)
+                while (input.read(controlBuffer) >= 0) {
+                    if (closed.get()) break
+                }
+                return
+            }
             if (prefix != null) {
                 upstreamOutput.write(prefix)
                 upstreamOutput.flush()

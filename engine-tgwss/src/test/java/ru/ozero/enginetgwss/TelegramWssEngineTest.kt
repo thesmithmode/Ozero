@@ -1,5 +1,8 @@
 package ru.ozero.enginetgwss
 
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -12,38 +15,37 @@ import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.settings.SettingsModel
-import ru.ozero.enginescore.settings.TrafficMode
 import java.net.InetAddress
 import java.net.ServerSocket
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TelegramWssEngineTest {
+    private val warp = mockk<EnginePlugin>(relaxed = true).apply {
+        coEvery { start(EngineConfig.WarpProxy(), Upstream.None) } returns StartResult.Success(10811)
+        coEvery { awaitReady() } returns EnginePlugin.ReadyResult.Ready
+    }
+
+    private fun engine(routeReady: Boolean = true, ws: FakeTelegramWebSockets = FakeTelegramWebSockets()) =
+        TelegramWssEngine(warp, { port, _ -> TelegramWssProxy(ws, WarpSocksRelay(port)) {} }, { routeReady })
+
     @Test
-    fun `configuration requires explicit proxy selection and forbids TUN`() {
-        val engine = TelegramWssEngine()
+    fun `configuration supports TUN and proxy with TCP and UDP`() {
+        val engine = engine()
         assertEquals(EngineId.TGWSS, engine.id)
-        assertTrue(engine.id.proxyOnly)
+        assertTrue(engine.id.manualStandaloneOnly)
         assertTrue(engine.capabilities.supportsTcp)
-        assertFalse(engine.capabilities.supportsUdp)
+        assertTrue(engine.capabilities.supportsUdp)
         assertFalse(engine.capabilities.supportsUpstreamSocks)
-        assertNull(engine.buildManualConfig(SettingsModel()))
-        assertNull(engine.buildProxyConfig(null))
-        assertNull(engine.buildProxyConfig(SettingsModel(manualEngine = EngineId.TGWSS)))
-        assertNull(engine.buildProxyConfig(SettingsModel(trafficMode = TrafficMode.PROXY)))
-        assertEquals(
-            EngineConfig.TelegramWss(),
-            engine.buildProxyConfig(SettingsModel(trafficMode = TrafficMode.PROXY, manualEngine = EngineId.TGWSS)),
-        )
+        assertEquals(EngineConfig.TelegramWss(), engine.buildManualConfig(SettingsModel()))
+        assertEquals(EngineConfig.TelegramWss(tunnelMode = false), engine.buildProxyConfig(null))
     }
 
     @Test
-    fun `start probe stats restart and stop follow local listener lifecycle`() = runTest {
-        val webSockets = FakeTelegramWebSockets()
-        val engine = TelegramWssEngine { TelegramWssProxy(webSockets) {} }
+    fun `start probe stats restart and stop own WARP lifecycle`() = runTest {
+        val engine = engine()
         try {
             assertIs<ProbeResult.Failure>(engine.probe())
             assertEquals(EngineStats(), engine.stats().first())
@@ -53,19 +55,21 @@ class TelegramWssEngineTest {
             assertIs<ProbeResult.Success>(engine.probe())
             assertIs<EnginePlugin.ReadyResult.Ready>(engine.awaitReady())
             assertTrue(engine.stats().first().connectedSince > 0)
-            assertIs<ExitNodeStrategy.Unavailable>(engine.exitNodeStrategy(first.socksPort))
-            assertIs<StartResult.Success>(engine.start(EngineConfig.TelegramWss(0), Upstream.None))
+            assertEquals(ExitNodeStrategy.ViaSocks("127.0.0.1", first.socksPort), engine.exitNodeStrategy(first.socksPort))
+            assertIs<StartResult.Success>(engine.start(EngineConfig.TelegramWss(0, false), Upstream.None))
         } finally {
             engine.stop()
         }
         engine.stop()
+        coVerify(exactly = 2) { warp.stop() }
         assertIs<ProbeResult.Failure>(engine.probe())
         assertEquals(EngineStats(), engine.stats().first())
+        assertIs<ExitNodeStrategy.Unavailable>(engine.exitNodeStrategy(10812))
     }
 
     @Test
-    fun `invalid config upstream and occupied port fail without publishing session`() = runTest {
-        val engine = TelegramWssEngine()
+    fun `invalid configuration or occupied port fails and releases WARP`() = runTest {
+        val engine = engine()
         assertIs<StartResult.Failure>(engine.start(EngineConfig.Warp, Upstream.None))
         assertIs<StartResult.Failure>(
             engine.start(EngineConfig.TelegramWss(), Upstream.Socks5("127.0.0.1", 1080)),
@@ -75,6 +79,36 @@ class TelegramWssEngineTest {
             assertIs<StartResult.Failure>(engine.start(EngineConfig.TelegramWss(occupied.localPort), Upstream.None))
         }
         assertEquals(EngineStats(), engine.stats().first())
-        engine.stop()
+        coVerify(exactly = 1) { warp.stop() }
+    }
+
+    @Test
+    fun `WARP startup and readiness failure never expose a listener`() = runTest {
+        val engine = engine()
+        coEvery { warp.start(EngineConfig.WarpProxy(), Upstream.None) } returns StartResult.Failure("offline")
+        assertIs<StartResult.Failure>(engine.start(EngineConfig.TelegramWss(0), Upstream.None))
+        coEvery { warp.start(EngineConfig.WarpProxy(), Upstream.None) } returns StartResult.Success(10811)
+        coEvery { warp.awaitReady() } returns EnginePlugin.ReadyResult.Timeout("offline")
+        assertIs<StartResult.Failure>(engine.start(EngineConfig.TelegramWss(0), Upstream.None))
+        assertEquals(EngineStats(), engine.stats().first())
+        coVerify(exactly = 2) { warp.stop() }
+    }
+
+    @Test
+    fun `readiness requires routed traffic and a Telegram WSS upgrade`() = runTest {
+        val badRoute = engine(routeReady = false)
+        try {
+            assertIs<StartResult.Success>(badRoute.start(EngineConfig.TelegramWss(0), Upstream.None))
+            assertIs<EnginePlugin.ReadyResult.Timeout>(badRoute.awaitReady())
+        } finally {
+            badRoute.stop()
+        }
+        val badWss = engine(ws = FakeTelegramWebSockets(protocol = null))
+        try {
+            assertIs<StartResult.Success>(badWss.start(EngineConfig.TelegramWss(0), Upstream.None))
+            assertIs<EnginePlugin.ReadyResult.Timeout>(badWss.awaitReady())
+        } finally {
+            badWss.stop()
+        }
     }
 }

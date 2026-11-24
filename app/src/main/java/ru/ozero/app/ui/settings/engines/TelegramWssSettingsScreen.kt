@@ -31,10 +31,17 @@ import androidx.compose.ui.unit.dp
 import ru.ozero.app.R
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
+import ru.ozero.enginescore.settings.TrafficMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TelegramWssSettingsScreen(state: TunnelState, onBack: () -> Unit) {
+fun TelegramWssSettingsScreen(
+    state: TunnelState,
+    trafficMode: TrafficMode,
+    onBack: () -> Unit,
+    onOpenSplitTunnel: () -> Unit,
+    onOpenWarp: () -> Unit,
+) {
     val context = LocalContext.current
     val port = (state as? TunnelState.Connected)?.takeIf { it.engineId == EngineId.TGWSS }?.socksPort
     var openFailed by remember { mutableStateOf(false) }
@@ -56,7 +63,9 @@ fun TelegramWssSettingsScreen(state: TunnelState, onBack: () -> Unit) {
         ) {
             Text(stringResource(R.string.tgwss_summary), style = MaterialTheme.typography.bodyLarge)
             Text(stringResource(R.string.tgwss_setup))
-            if (port != null && port > 0) {
+            Button(onClick = onOpenSplitTunnel) { Text(stringResource(R.string.settings_split_tunnel_title)) }
+            Button(onClick = onOpenWarp) { Text(stringResource(R.string.settings_warp_title)) }
+            if (trafficMode == TrafficMode.PROXY && port != null && port > 0) {
                 Text(stringResource(R.string.tgwss_address, port))
                 Button(onClick = {
                     openFailed = try {
@@ -72,6 +81,8 @@ fun TelegramWssSettingsScreen(state: TunnelState, onBack: () -> Unit) {
                     Text(stringResource(R.string.tgwss_open))
                 }
                 if (openFailed) Text(stringResource(R.string.tgwss_open_failed))
+            } else if (port != null && port > 0) {
+                Text(stringResource(R.string.main_status_connected))
             } else {
                 Text(stringResource(R.string.tgwss_not_running))
             }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="tgwss_summary">وكيل محلي لتطبيق تيليجرام فقط. ليس شبكة VPN للجهاز بأكمله.</string>
-    <string name="tgwss_setup">اختر وضع الوكيل ومحرك Telegram WSS في الإعدادات. ابدأ الاتصال ثم أضف وكيل SOCKS5 في تيليجرام. مكالمات UDP غير مدعومة.</string>
+    <string name="tgwss_summary">تيليجرام عبر WSS وبقية البيانات عبر WARP. يدعم VPN والنفق المقسم.</string>
+    <string name="tgwss_setup">اختر Telegram WSS على الشاشة الرئيسية وشغّل VPN. لا حاجة لإعداد تيليجرام. استبعد التطبيقات عبر النفق المقسم. في وضع الوكيل اضبط SOCKS5 يدويا.</string>
     <string name="tgwss_address">SOCKS5: 127.0.0.1:%1$d (بدون اسم مستخدم أو كلمة مرور)</string>
     <string name="tgwss_open">فتح في تيليجرام</string>
     <string name="tgwss_open_failed">تعذر فتح تيليجرام. أدخل العنوان والمنفذ يدويا.</string>

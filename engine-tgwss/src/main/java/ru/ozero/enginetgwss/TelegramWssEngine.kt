@@ -50,7 +50,6 @@ class TelegramWssEngine internal constructor(
     private data class Session(
         val proxy: TelegramWssProxy,
         val port: Int,
-        val warpPort: Int,
         val startedAt: Long,
     )
 
@@ -83,7 +82,7 @@ class TelegramWssEngine internal constructor(
             }
             proxy = newProxy(fallback.socksPort, config.tunnelMode)
             val port = proxy.start(config.socksPort)
-            session = Session(proxy, port, fallback.socksPort, System.currentTimeMillis())
+            session = Session(proxy, port, System.currentTimeMillis())
             started = true
             StartResult.Success(port)
         } catch (cancelled: CancellationException) {
@@ -114,7 +113,7 @@ class TelegramWssEngine internal constructor(
         val current = session ?: return ProbeResult.Failure("Telegram WSS is not running")
         return try {
             val latency = Socks5HandshakeProbe.probe("127.0.0.1", current.port)
-            if (!probeWarp(current.warpPort)) {
+            if (!probeWarp(current.port)) {
                 ProbeResult.Failure("WARP TCP/UDP fallback unavailable")
             } else {
                 ProbeResult.Success(latency)
@@ -126,9 +125,16 @@ class TelegramWssEngine internal constructor(
         }
     }
 
-    override suspend fun awaitReady(): EnginePlugin.ReadyResult = when (val result = probe()) {
-        is ProbeResult.Success -> EnginePlugin.ReadyResult.Ready
-        is ProbeResult.Failure -> EnginePlugin.ReadyResult.Timeout(result.reason)
+    override suspend fun awaitReady(): EnginePlugin.ReadyResult {
+        val current = session ?: return EnginePlugin.ReadyResult.Timeout("Telegram WSS is not running")
+        val result = probe()
+        if (result is ProbeResult.Failure) return EnginePlugin.ReadyResult.Timeout(result.reason)
+        val wss = runInterruptible(Dispatchers.IO) { current.proxy.probeRemote() }
+        return if (wss != null && session === current) {
+            EnginePlugin.ReadyResult.Ready
+        } else {
+            EnginePlugin.ReadyResult.Timeout("Telegram WSS endpoint unavailable")
+        }
     }
 
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy =
