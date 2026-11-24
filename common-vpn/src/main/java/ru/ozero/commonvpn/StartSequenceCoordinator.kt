@@ -217,7 +217,7 @@ class StartSequenceCoordinator(
                 }
         }
         if (!usesCustomTun) deps.engineWatchdog.startHealthKillswitchWatcher(activeEngineId)
-        if (usesCustomTun && activeEngineId == EngineId.SINGBOX || needsRoutedProbe(activeEngineId)) {
+        if ((usesCustomTun && activeEngineId == EngineId.SINGBOX) || needsRoutedProbe(activeEngineId)) {
             deps.engineWatchdog.startRoutedProbeWatchdog(activeEngineId)
         } else if (usesCustomTun) {
             deps.engineWatchdog.startPeerWatchdog(activeEngineId)

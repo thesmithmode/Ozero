@@ -47,7 +47,7 @@ import kotlin.test.assertTrue
 class StartSequenceCoordinatorBehaviorTest {
 
     @Test
-    fun `MASQUE proxy and VPN use routed watchdog while other SOCKS engines keep existing path`() = runTest {
+    fun `MASQUE proxy and VPN use routed watchdog`() = runTest {
         for (mode in listOf(TrafficMode.PROXY, TrafficMode.TUN)) {
             val engine = FakeEnginePlugin(
                 id = EngineId.MASQUE,
@@ -67,6 +67,59 @@ class StartSequenceCoordinatorBehaviorTest {
             verify(exactly = 1) { fixture.engineWatchdog.startRoutedProbeWatchdog(EngineId.MASQUE) }
             verify(exactly = 0) { fixture.engineWatchdog.startPeerWatchdog(any()) }
             verify(exactly = if (mode == TrafficMode.TUN) 1 else 0) { fixture.tunnelGateway.start(any()) }
+        }
+    }
+
+    @Test
+    fun `existing SOCKS engines retain health monitor without routed probe watchdog`() = runTest {
+        for (id in EngineId.entries.filter { it != EngineId.MASQUE }) {
+            val engine = FakeEnginePlugin(
+                id = id,
+                socksPort = 2088,
+                capabilities = standaloneProxyCapabilities(),
+            )
+            val fixture = startFixture(
+                engine,
+                settings = SettingsModel(trafficMode = TrafficMode.PROXY, manualEngine = id),
+            )
+            fixture.coordinator.run()
+            assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+            verify(exactly = 1) { fixture.engineWatchdog.startHealthKillswitchWatcher(id) }
+            verify(exactly = 0) { fixture.engineWatchdog.startRoutedProbeWatchdog(any()) }
+            verify(exactly = 0) { fixture.engineWatchdog.startPeerWatchdog(any()) }
+        }
+    }
+
+    @Test
+    fun `existing Singbox custom TUN retains routed watchdog and Warp retains peer watchdog`() = runTest {
+        for (id in listOf(EngineId.SINGBOX, EngineId.WARP)) {
+            val engine = CustomTunEngine(id = id, socksPort = 2088)
+            val fixture = startFixture(
+                engine,
+                settings = SettingsModel(trafficMode = TrafficMode.TUN, manualEngine = id),
+            )
+            val dupFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+                every { detachFd() } returns 2205
+            }
+            val tunFd = mockk<ParcelFileDescriptor>(relaxed = true) {
+                every { fd } returns 2204
+                every { dup() } returns dupFd
+            }
+            val builder = mockk<VpnService.Builder>(relaxed = true) {
+                every { establish() } returns tunFd
+            }
+            every { fixture.tunBuilderHelper.applyEngineTunSpec(any(), any()) } returns builder
+            fixture.coordinator.run()
+            assertIs<TunnelState.Connected>(fixture.tunnelController.state.value)
+            assertEquals(listOf(2205), engine.attachedFds)
+            verify(exactly = 0) { fixture.tunnelGateway.start(any()) }
+            verify(exactly = 0) { fixture.engineWatchdog.startHealthKillswitchWatcher(any()) }
+            verify(exactly = if (id == EngineId.SINGBOX) 1 else 0) {
+                fixture.engineWatchdog.startRoutedProbeWatchdog(id)
+            }
+            verify(exactly = if (id == EngineId.WARP) 1 else 0) {
+                fixture.engineWatchdog.startPeerWatchdog(id)
+            }
         }
     }
 
@@ -1413,6 +1466,7 @@ class StartSequenceCoordinatorBehaviorTest {
 
         private fun engineConfig(): EngineConfig = when (id) {
             EngineId.WARP -> EngineConfig.WarpProxy(socksPort = socksPort)
+            EngineId.SINGBOX -> EngineConfig.Singbox(beanBlob = byteArrayOf(1), protocolType = 1, proxyMode = false)
             else -> EngineConfig.ByeDpi(socksPort = socksPort)
         }
 

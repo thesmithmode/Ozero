@@ -55,9 +55,12 @@ class AppBackupManager(
         )
     }
 
-    private suspend fun exportMasque(): BackupMasque? = masqueStore?.settings()?.first()?.let {
-        check(!it.corrupt) { "MASQUE profile is damaged" }
-        BackupMasque(it.profile?.exportJson(), it.transport.name, it.autoEnabled)
+    private suspend fun exportMasque(): BackupMasque? {
+        val settings = masqueStore?.settings()?.first() ?: return null
+        check(!settings.corrupt) { "MASQUE profile is damaged" }
+        val unconfigured = settings.profile == null && settings.transport == MasqueTransport.AUTO && settings.autoEnabled
+        if (unconfigured) return null
+        return BackupMasque(settings.profile?.exportJson(), settings.transport.name, settings.autoEnabled)
     }
 
     private fun exportSettings(prefs: Preferences, categories: Set<BackupCategory>): BackupSettings =

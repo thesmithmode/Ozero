@@ -73,6 +73,21 @@ class StartSequenceCoordinatorDecisionCoverageTest {
     }
 
     @Test
+    fun `routed probe capability is opt in and missing engine is safe`() {
+        val existing = DecisionPlugin(EngineId.WARP, manualConfig = EngineConfig.WarpProxy(2080))
+        val masque = DecisionPlugin(
+            EngineId.MASQUE,
+            manualConfig = EngineConfig.Masque("{}", "AUTO"),
+            capabilities = proxyCapabilities(providesStandalone = true).copy(requiresRoutedProbe = true),
+        )
+        val coordinator = coordinator(existing, masque)
+        assertFalse(coordinator.callPrivate<Boolean>("needsRoutedProbe", EngineId.WARP))
+        assertFalse(coordinator.callPrivate<Boolean>("needsRoutedProbe", EngineId.FPTN))
+        assertTrue(coordinator.callPrivate<Boolean>("needsRoutedProbe", EngineId.MASQUE))
+        assertFalse(coordinator().callPrivate<Boolean>("needsRoutedProbe", EngineId.MASQUE))
+    }
+
+    @Test
     fun `auto candidates skip disallowed missing config and include valid proxy configs`() = runTest {
         val valid = DecisionPlugin(
             EngineId.WARP,

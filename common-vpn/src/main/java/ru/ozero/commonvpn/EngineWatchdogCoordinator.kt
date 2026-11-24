@@ -5,6 +5,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
@@ -143,8 +144,10 @@ class EngineWatchdogCoordinator(
                 while (isActive) {
                     delay(ROUTED_PROBE_WATCHDOG_POLL_MS)
                     val result = runCatching { plugin.probe() }.getOrElse { t ->
+                        if (t is CancellationException) throw t
                         ProbeResult.Failure("probe threw: ${t.message}")
                     }
+                    ensureActive()
                     when (result) {
                         is ProbeResult.Success -> consecutiveFailures = 0
                         is ProbeResult.Failure -> {

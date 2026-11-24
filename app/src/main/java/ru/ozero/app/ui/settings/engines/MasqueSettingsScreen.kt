@@ -149,7 +149,7 @@ private fun MasqueConsentDialog(onDismiss: () -> Unit, onAccept: () -> Unit) {
         text = {
             Column {
                 Text(stringResource(R.string.masque_consent))
-                TextButton(onClick = { uriHandler.openUri("https://www.cloudflare.com/terms/") }) {
+                TextButton(onClick = { uriHandler.openUri("https://www.cloudflare.com/application/terms/") }) {
                     Text(stringResource(R.string.masque_terms))
                 }
             }
