@@ -687,6 +687,10 @@ class SplitTunnelViewModelTest {
             deletes += packageName
             flow.value = flow.value.filterNot { it.packageName == packageName }
         }
+
+        override suspend fun deleteAll() {
+            flow.value = emptyList()
+        }
     }
 
     private class FakeSettingsRepository : SettingsRepository {

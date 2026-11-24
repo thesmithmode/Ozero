@@ -18,6 +18,7 @@ class RoomSplitTunnelRulesProviderTest {
         override fun observeAll(): Flow<List<AppSplitRule>> = flow.asStateFlow()
         override suspend fun upsert(rule: AppSplitRule) = Unit
         override suspend fun delete(packageName: String) = Unit
+        override suspend fun deleteAll() = Unit
     }
 
     private fun provider(rules: List<AppSplitRule>) = RoomSplitTunnelRulesProvider(FakeDao(rules))

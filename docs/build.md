@@ -76,9 +76,11 @@ APK: `app/build/outputs/apk/release/`. Для публикации исполь�
 
 Android-подпись APK, GPG-подпись файла и Ed25519-подпись встроенного обновления — разные форматы. Release workflow создаёт APK и `.apk.sha256`, а при наличии `RELEASE_GPG_PRIVATE_KEY` — также `.apk.asc`.
 
-[GithubReleaseFetcher](../app/src/main/java/ru/ozero/app/selfupdate/GithubReleaseFetcher.kt) ожидает один APK и один asset `.apk.sig`; [ApkUpdateVerifier](../app/src/main/java/ru/ozero/app/selfupdate/ApkUpdateVerifier.kt) проверяет его как 64-байтовую Ed25519-подпись. Текущий release workflow не создаёт `.apk.sig`. Одного `UPDATE_PUBLIC_KEY_HEX`, checksum или GPG `.asc` недостаточно, чтобы такой release был доступен встроенному updater. Подготовка `.apk.sig` требует отдельного шага публикации; здесь описано существующее поведение, без изменения release pipeline.
+На текущей версии пользователи устанавливают обновления вручную. Код [GithubReleaseFetcher](../app/src/main/java/ru/ozero/app/selfupdate/GithubReleaseFetcher.kt) и [ApkUpdateVerifier](../app/src/main/java/ru/ozero/app/selfupdate/ApkUpdateVerifier.kt) подготовлен для проверки Ed25519, но экран и фоновая задача его не вызывают. Если встроенное обновление понадобится, подключать его следует после определения правил публикации стабильных и пробных сборок.
 
 ## Native source и готовая библиотека
+
+Для URnetwork CI и выпуск APK используют один [закреплённый AAR](../.github/checksums/urnetwork-sdk.lock). SHA-256 проверяется до подготовки архива, в том числе при попадании в кэш. При обновлении SDK поменяйте тег и хеш вместе.
 
 [binaries.yml](../.github/workflows/binaries.yml) собирает и публикует отдельные native-артефакты. Обновление Kotlin/C++ исходников, публикация `.so` и обновление lock — разные операции. Обычный запуск Gradle сам не пересобирает FPTN: изменение C++ в `engine-fptn/src/main/cpp` не запускает CMake. Библиотека должна быть подготовлена до упаковки APK.
 
@@ -93,6 +95,8 @@ Release публикует APK и подписи прямо из build job, бе
 ## Проверки
 
 Правила проекта в [AGENTS.md](../AGENTS.md) требуют выполнять тесты, сборки и lint через CI, если пользователь отдельно не разрешил локальный запуск. Команды выше описывают сборку для разработчика и не отменяют это правило для автоматических агентов.
+
+CI и Release показывают ELF-выравнивание библиотек внутри APK. Совместимость на Android с 16 КБ страницами нужно подтверждать запуском на таком устройстве.
 
 Для изменения транспорта к CI добавляется проверка на Android ARM64: подключение, готовность, передача трафика, reconnect, stop/start и переключение движков. Успешный sing-box soak не является проверкой native FPTN или WARP.
 
