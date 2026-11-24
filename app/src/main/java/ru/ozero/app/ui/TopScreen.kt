@@ -20,4 +20,5 @@ enum class TopScreen {
     FptnSettings,
     SingboxSettings,
     SingboxAdvancedSettings,
+    OperaSettings,
 }

@@ -105,6 +105,13 @@ sealed class EngineConfig {
         }
     }
 
+    data class Opera(
+        val region: String = "EU",
+        val selection: String = "fastest",
+    ) : EngineConfig() {
+        override val engineId = EngineId.OPERA
+    }
+
     data class Fptn(
         val token: String = "",
         val selectedServerName: String? = null,

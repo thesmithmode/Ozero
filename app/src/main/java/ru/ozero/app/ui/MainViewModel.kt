@@ -150,11 +150,13 @@ class MainViewModel @Inject constructor(
 
     val engineAutoPriority: StateFlow<List<EngineId>> =
         settingsRepository.settings
-            .map { it.engineAutoPriority }
+            .map { model ->
+                model.engineAutoPriority.filter { !it.proxyOnly || model.trafficMode == TrafficMode.PROXY }
+            }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
-                initialValue = SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY,
+                initialValue = SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY.filterNot { it.proxyOnly },
             )
 
     private val _speedHistory = MutableStateFlow<List<SpeedSample>>(emptyList())

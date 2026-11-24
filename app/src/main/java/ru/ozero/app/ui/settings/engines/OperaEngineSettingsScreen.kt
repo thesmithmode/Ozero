@@ -1,0 +1,86 @@
+package ru.ozero.app.ui.settings.engines
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ru.ozero.app.R
+import ru.ozero.engineopera.OperaRegion
+import ru.ozero.engineopera.OperaServerSelection
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OperaEngineSettingsScreen(
+    onBack: () -> Unit,
+    viewModel: OperaEngineSettingsViewModel = hiltViewModel(),
+) {
+    val model by viewModel.settings.collectAsStateWithLifecycle()
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Opera Proxy") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(stringResource(R.string.settings_opera_summary))
+            Text(stringResource(R.string.opera_region))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OperaRegion.entries.forEach { region ->
+                    FilterChip(
+                        selected = model.operaRegion == region.name,
+                        onClick = { viewModel.selectRegion(region.name) },
+                        label = { Text(region.name) },
+                    )
+                }
+            }
+            Text(stringResource(R.string.opera_selection))
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OperaServerSelection.entries.forEach { selection ->
+                    FilterChip(
+                        selected = model.operaSelection == selection.argument,
+                        onClick = { viewModel.selectServer(selection.argument) },
+                        label = {
+                            Text(
+                                stringResource(
+                                    when (selection) {
+                                        OperaServerSelection.FIRST -> R.string.opera_first
+                                        OperaServerSelection.RANDOM -> R.string.opera_random
+                                        OperaServerSelection.FASTEST -> R.string.opera_fastest
+                                    },
+                                ),
+                            )
+                        },
+                    )
+                }
+            }
+        }
+    }
+}

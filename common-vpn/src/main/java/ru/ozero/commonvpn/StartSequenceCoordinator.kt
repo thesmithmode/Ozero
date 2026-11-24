@@ -426,7 +426,7 @@ class StartSequenceCoordinator(
     }
 
     private fun engineAllowedForTrafficMode(engineId: EngineId, trafficMode: TrafficMode): Boolean {
-        if (trafficMode == TrafficMode.TUN) return true
+        if (trafficMode == TrafficMode.TUN) return !engineId.proxyOnly
         return deps.enginePlugins.firstOrNull { it.id == engineId }
             ?.capabilities
             ?.providesLocalSocksWithoutUpstream == true

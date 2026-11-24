@@ -159,6 +159,7 @@ dependencies {
     implementation(project(":engine-warp"))
     implementation(project(":shared-warp-settings"))
     implementation(project(":engine-masterdns"))
+    implementation(project(":engine-opera"))
     implementation(project(":engine-fptn"))
     implementation(project(":engine-singbox"))
     implementation(project(":singbox-process"))
