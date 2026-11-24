@@ -504,7 +504,7 @@ private fun ConnectionSection(
         tag = SettingsTestTags.MANUAL_ENGINE_AUTO,
         onClick = { onManualEngineSelect(null) },
     )
-    EngineId.entries.filter { !it.proxyOnly || trafficMode == TrafficMode.PROXY }.forEach { engine ->
+    EngineId.entries.forEach { engine ->
         RadioRow(
             selected = manualEngine == engine,
             label = engine.displayName,

@@ -12,6 +12,7 @@ import ru.ozero.engineopera.OperaProxyCommand
 import ru.ozero.engineopera.OperaProxyRuntime
 import ru.ozero.engineopera.SubprocessOperaProxyLauncher
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.singboxprocess.OperaTunBridgeImpl
 import java.io.File
 import javax.inject.Singleton
 
@@ -26,6 +27,10 @@ object OperaModule {
         val runtime = OperaProxyRuntime(
             SubprocessOperaProxyLauncher(binary, File(context.cacheDir, "opera-proxy")),
         )
-        return OperaEngine(runtime) { binary.isFile && binary.canExecute() }
+        return OperaEngine(
+            runtime = runtime,
+            tun = OperaTunBridgeImpl(context),
+            binaryAvailable = { binary.isFile && binary.canExecute() },
+        )
     }
 }

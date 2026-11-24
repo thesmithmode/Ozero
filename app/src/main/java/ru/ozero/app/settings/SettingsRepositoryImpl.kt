@@ -40,12 +40,7 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     override suspend fun setTrafficMode(mode: TrafficMode) {
-        dataStore.edit { prefs ->
-            prefs[SettingsKeys.TRAFFIC_MODE] = mode.name
-            if (mode == TrafficMode.TUN && prefs[SettingsKeys.MANUAL_ENGINE] == EngineId.OPERA.name) {
-                prefs.remove(SettingsKeys.MANUAL_ENGINE)
-            }
-        }
+        dataStore.edit { it[SettingsKeys.TRAFFIC_MODE] = mode.name }
     }
 
     override suspend fun setOperaRegion(region: String) {
@@ -60,7 +55,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setManualEngine(engine: EngineId?) {
         dataStore.edit { prefs ->
-            if (engine == null || (engine.proxyOnly && prefs[SettingsKeys.TRAFFIC_MODE] != TrafficMode.PROXY.name)) {
+            if (engine == null) {
                 prefs.remove(SettingsKeys.MANUAL_ENGINE)
             } else {
                 prefs[SettingsKeys.MANUAL_ENGINE] = engine.name
@@ -183,7 +178,7 @@ class SettingsRepositoryImpl @Inject constructor(
         ipv6Enabled = this[SettingsKeys.IPV6_ENABLED] ?: SettingsModel.DEFAULT_IPV6_ENABLED,
         autoStart = this[SettingsKeys.AUTO_START] ?: SettingsModel.DEFAULT_AUTO_START,
         trafficMode = readTrafficMode(),
-        manualEngine = readManualEngine()?.takeUnless { it.proxyOnly && readTrafficMode() == TrafficMode.TUN },
+        manualEngine = readManualEngine(),
         operaRegion = this[SettingsKeys.OPERA_REGION]?.takeIf { it in setOf("EU", "AS", "AM") } ?: "EU",
         operaSelection = this[SettingsKeys.OPERA_SELECTION]
             ?.takeIf { it in setOf("first", "random", "fastest") } ?: "fastest",

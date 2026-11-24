@@ -217,7 +217,7 @@ class StartSequenceCoordinator(
                 }
         }
         if (!usesCustomTun) deps.engineWatchdog.startHealthKillswitchWatcher(activeEngineId)
-        if (usesCustomTun && activeEngineId == EngineId.SINGBOX) {
+        if (usesCustomTun && activeEngineId in setOf(EngineId.SINGBOX, EngineId.OPERA)) {
             deps.engineWatchdog.startRoutedProbeWatchdog(activeEngineId)
         } else if (usesCustomTun) {
             deps.engineWatchdog.startPeerWatchdog(activeEngineId)
@@ -263,6 +263,7 @@ class StartSequenceCoordinator(
                 PersistentLoggers.warn(TAG, "proxy healthMonitor.start threw: ${t.message}")
             }
         deps.engineWatchdog.startHealthKillswitchWatcher(engineId)
+        if (engineId == EngineId.OPERA) deps.engineWatchdog.startRoutedProbeWatchdog(engineId)
         deps.statsLogger.start()
         return true
     }
@@ -364,7 +365,6 @@ class StartSequenceCoordinator(
     private fun resolveTargetForUi(manualEngine: EngineId?, settings: SettingsModel): EngineId? {
         if (manualEngine != null) return manualEngine
         val pluginIds = deps.enginePlugins.mapTo(mutableSetOf()) { it.id }
-            .filter { !it.proxyOnly || settings.trafficMode == TrafficMode.PROXY }
         return settings.engineAutoPriority.firstOrNull { it in pluginIds }
             ?: pluginIds.firstOrNull()
     }
@@ -427,7 +427,7 @@ class StartSequenceCoordinator(
     }
 
     private fun engineAllowedForTrafficMode(engineId: EngineId, trafficMode: TrafficMode): Boolean {
-        if (trafficMode == TrafficMode.TUN) return !engineId.proxyOnly
+        if (trafficMode == TrafficMode.TUN) return true
         return deps.enginePlugins.firstOrNull { it.id == engineId }
             ?.capabilities
             ?.providesLocalSocksWithoutUpstream == true
