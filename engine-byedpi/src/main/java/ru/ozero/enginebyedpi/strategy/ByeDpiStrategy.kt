@@ -15,5 +15,5 @@ object ByeDpiStrategiesParser {
             .map { ByeDpiStrategy(command = it) }
 
     const val DEFAULT_SNI: String = "google.com"
-    const val EXPECTED_COUNT: Int = 78
+    const val EXPECTED_COUNT: Int = 89
 }

@@ -1,8 +1,10 @@
 package ru.ozero.enginebyedpi.strategy
 
 import org.junit.jupiter.api.Test
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ByeDpiStrategiesParserTest {
@@ -64,14 +66,11 @@ class ByeDpiStrategiesParserTest {
     }
 
     @Test
-    fun `parse 78 строк из embedded asset content`() {
-        val asset = ByeDpiStrategiesParserTest::class.java.classLoader!!
-            .getResourceAsStream("byedpi_strategies.list")
-        if (asset == null) {
-            // skip — asset не подцепился через test resource
-            return
-        }
-        val content = asset.bufferedReader().readText()
+    fun `parse bundled strategies without duplicates`() {
+        val asset = assertNotNull(
+            ByeDpiStrategiesParserTest::class.java.classLoader!!.getResourceAsStream("byedpi_strategies.list"),
+        )
+        val content = asset.bufferedReader().use { it.readText() }
         val strategies = ByeDpiStrategiesParser.parse(content)
         assertEquals(ByeDpiStrategiesParser.EXPECTED_COUNT, strategies.size)
         assertTrue(strategies.all { it.command.isNotBlank() })
@@ -96,7 +95,7 @@ class ByeDpiStrategiesParserTest {
     @Test
     fun `default constants`() {
         assertEquals("google.com", ByeDpiStrategiesParser.DEFAULT_SNI)
-        assertEquals(78, ByeDpiStrategiesParser.EXPECTED_COUNT)
+        assertEquals(89, ByeDpiStrategiesParser.EXPECTED_COUNT)
     }
 
     @Test
@@ -109,5 +108,36 @@ class ByeDpiStrategiesParserTest {
             """.trimIndent(),
         )
         assertFalse(result.any { it.command.isBlank() })
+    }
+    @Test
+    fun `bundled strategy assets and test fixture stay synchronized`() {
+        val module = File(System.getProperty("user.dir") ?: ".")
+        val engineAsset = module.resolve("src/main/assets/byedpi_strategies.list").readText()
+        val appAsset = module.resolve("../app/src/main/assets/proxytest_strategies.list").readText()
+        val fixture = assertNotNull(
+            ByeDpiStrategiesParserTest::class.java.classLoader!!.getResourceAsStream("byedpi_strategies.list"),
+        ).bufferedReader().use { it.readText() }
+
+        assertEquals(engineAsset, appAsset)
+        assertEquals(engineAsset, fixture)
+        val strategies = ByeDpiStrategiesParser.parse(engineAsset)
+        assertEquals(ByeDpiStrategiesParser.EXPECTED_COUNT, strategies.size)
+        strategies.forEach { strategy ->
+            assertTrue(ByeDpiArgvValidator.isValid(strategy.command), strategy.command)
+        }
+    }
+
+    @Test
+    fun `additional bundled strategies are available to evolution as valid seeds`() {
+        val module = File(System.getProperty("user.dir") ?: ".")
+        val asset = module.resolve("src/main/assets/byedpi_strategies.list").readText()
+        val additional = ByeDpiStrategiesParser.parse(asset).takeLast(11)
+        val seeds = additional.map { it.command.replace("-n \"google.com\" ", "") }
+
+        assertEquals(11, seeds.distinct().size)
+        seeds.forEach { seed ->
+            assertTrue(seed in ByeDpiKnownSeeds.commands, seed)
+            assertTrue(ByeDpiArgvValidator.isValid(seed), seed)
+        }
     }
 }
