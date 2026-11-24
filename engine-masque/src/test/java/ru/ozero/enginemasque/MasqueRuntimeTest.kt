@@ -223,7 +223,75 @@ class MasqueRuntimeTest {
     }
 
     @Test
-    fun `invalid port binary and private directory fail before launch`() = runBlocking {
+    fun `starting again replaces the old session and does not leave stale credentials`() = runBlocking {
+        val children = mutableListOf<Child>()
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { command ->
+                File(File(command[2]).parentFile, "ready").writeText("ready")
+                Child(true).also { children.add(it) }
+            },
+            MasqueReadinessProbe { true },
+        )
+        assertEquals(MasqueTransport.H3, runtime.start(profile(), 1080, MasqueTransport.H3))
+        assertEquals(MasqueTransport.H2, runtime.start(profile(), 1081, MasqueTransport.H2, true))
+        assertFalse(children.first().alive)
+        assertTrue(runtime.isReady())
+        children.last().alive = false
+        assertFalse(runtime.isReady())
+        runtime.stop()
+        assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+    }
+
+    @Test
+    fun `failed TLS after startup marks the session unavailable`() = runBlocking {
+        var ready = true
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { command ->
+                File(File(command[2]).parentFile, "ready").writeText("ready")
+                Child(true)
+            },
+            MasqueReadinessProbe { ready },
+        )
+        assertEquals(MasqueTransport.H3, runtime.start(profile(), 1080, MasqueTransport.H3))
+        ready = false
+        assertFalse(runtime.isReady())
+        runtime.stop()
+    }
+
+    @Test
+    fun `a successful registration exit without a valid profile cannot be accepted`() = runBlocking {
+        for (content in listOf(null, "", "x".repeat(MasqueProfile.MAX_BYTES + 1))) {
+            val runtime = MasqueRuntime(
+                binary(),
+                directory,
+                MasqueProcessLauncher { command ->
+                    content?.let { File(command[2]).writeText(it) }
+                    Child(false, 0)
+                },
+                MasqueReadinessProbe { false },
+            )
+            assertThrows<IllegalStateException> { runtime.register(true) }
+            assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+        }
+        val malformed = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { command ->
+                File(command[2]).writeText("{}")
+                Child(false, 0)
+            },
+            MasqueReadinessProbe { false },
+        )
+        assertThrows<IllegalArgumentException> { malformed.register(true) }
+        assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+    }
+
+    @Test
+    fun `invalid port binary and private directory fail before launch`(): Unit = runBlocking {
         val launcher = MasqueProcessLauncher { error("Must not launch") }
         val missing = File(directory, "missing")
         val runtime = MasqueRuntime(missing, directory, launcher, MasqueReadinessProbe { false })

@@ -84,6 +84,39 @@ class MasqueProfileStoreTest {
         assertNull(store.settings().first().fingerprint())
     }
 
+    @Test
+    fun `invalid transport fails closed even with an encrypted valid profile`(@TempDir tmp: Path) = runTest {
+        val data = PreferenceDataStoreFactory.create(
+            produceFile = { tmp.resolve("masque.preferences_pb").toFile() },
+        )
+        val store = MasqueProfileStore(data)
+        store.save(MasqueProfile.parse(PROFILE))
+        val key = stringPreferencesKey("masque_transport")
+        data.edit { it[key] = "invalid" }
+        val damaged = store.settings().first()
+        assertTrue(damaged.corrupt)
+        assertNull(damaged.fingerprint())
+        assertNull(store.profiles().first())
+        store.clear()
+        assertFalse(store.settings().first().corrupt)
+        assertNull(data.data.first()[key])
+    }
+
+    @Test
+    fun `clearing credentials preserves valid transport settings`(@TempDir tmp: Path) = runTest {
+        val data = PreferenceDataStoreFactory.create(
+            produceFile = { tmp.resolve("masque.preferences_pb").toFile() },
+        )
+        val store = MasqueProfileStore(data)
+        store.restore(MasqueProfile.parse(PROFILE), MasqueTransport.H3, false)
+        store.clear()
+        val settings = store.settings().first()
+        assertNull(settings.profile)
+        assertEquals(MasqueTransport.H3, settings.transport)
+        assertFalse(settings.autoEnabled)
+        assertFalse(settings.corrupt)
+    }
+
     private companion object {
         val KEY = stringPreferencesKey("masque_profile")
         val PROFILE = """{"private_key":"test-private-key","endpoint_pub_key":"test","endpoint_v4":"192.0.2.1",

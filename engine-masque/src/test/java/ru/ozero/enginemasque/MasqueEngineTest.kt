@@ -7,6 +7,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -44,6 +45,7 @@ class MasqueEngineTest {
         assertNull(engine.buildManualConfigAwaitingStorage(null))
         current.value = MasqueSettings(profile(), MasqueTransport.H2, false)
         assertNull(engine.buildManualConfigAwaitingStorage(SettingsModel()))
+        assertNull(engine.buildManualConfigAwaitingStorage(null))
         val manual = SettingsModel(manualEngine = EngineId.MASQUE, ipv6Enabled = true)
         val expected = EngineConfig.Masque(PROFILE, "H2", true)
         assertEquals(expected, engine.buildManualConfigAwaitingStorage(manual))
@@ -74,6 +76,7 @@ class MasqueEngineTest {
             engine.exitNodeStrategy(result.socksPort),
         )
         assertTrue(engine.exitNodeStrategy(0) is ExitNodeStrategy.Unavailable)
+        assertTrue(engine.exitNodeStrategy(result.socksPort + 1) is ExitNodeStrategy.Unavailable)
         assertEquals(EnginePlugin.ReadyResult.Ready, engine.awaitReady())
         assertTrue(engine.probe() is ProbeResult.Success)
         coEvery { runtime.isReady() } returns false
@@ -108,6 +111,25 @@ class MasqueEngineTest {
         assertTrue(engine.start(config, Upstream.None) is StartResult.Failure)
         coEvery { runtime.start(any(), any(), any(), any()) } throws CancellationException("fixture")
         assertThrows<CancellationException> { engine.start(config, Upstream.None) }
+        assertEquals(EngineStats(), engine.stats().first())
+    }
+
+    @Test
+    fun `storage failures are not interpreted as a registered engine`() = runTest {
+        every { store.settings() } returns flow { error("fixture") }
+        val engine = MasqueEngine(runtime, store, backgroundScope) { true }
+        runCurrent()
+        assertNull(engine.buildManualConfig(null))
+        assertNull(engine.buildManualConfigAwaitingStorage(null))
+        assertNull(engine.buildProxyConfigAwaitingStorage(null))
+    }
+
+    @Test
+    fun `malformed profile and transport fail without launching a native process`() = runTest {
+        val engine = MasqueEngine(runtime, store, backgroundScope) { true }
+        assertTrue(engine.start(EngineConfig.Masque("{}", "H2"), Upstream.None) is StartResult.Failure)
+        assertTrue(engine.start(EngineConfig.Masque(PROFILE, "invalid"), Upstream.None) is StartResult.Failure)
+        coVerify(exactly = 0) { runtime.start(any(), any(), any(), any()) }
         assertEquals(EngineStats(), engine.stats().first())
     }
 

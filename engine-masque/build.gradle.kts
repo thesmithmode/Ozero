@@ -1,3 +1,7 @@
+import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
+import org.gradle.testing.jacoco.tasks.JacocoReport
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
     id("ozero.android.library")
 }
@@ -13,6 +17,14 @@ android {
             if (providers.gradleProperty("ozero.soak.x86_64").isPresent) abiFilters += "x86_64"
         }
     }
+}
+
+tasks.named<JacocoReport>("jacocoTestReport") {
+    classDirectories.setFrom(tasks.named<KotlinCompile>("compileDebugKotlin").flatMap { it.destinationDirectory })
+}
+
+tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    classDirectories.setFrom(tasks.named<KotlinCompile>("compileDebugKotlin").flatMap { it.destinationDirectory })
 }
 
 dependencies {

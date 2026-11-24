@@ -1797,15 +1797,17 @@ jobs:
         with:
           packages: 'platform-tools'
       - uses: gradle/actions/setup-gradle@v4
-      - name: Unit tests and coverage gate
-        run: >-
-          ./gradlew :engine-masque:testDebugUnitTest :engine-masque:jacocoTestReport
-          :engine-masque:jacocoTestCoverageVerification --stacktrace
-      - name: Verify tests were discovered
+      - name: Unit tests and coverage report
+        run: ./gradlew :engine-masque:testDebugUnitTest :engine-masque:jacocoTestReport --stacktrace
+      - name: Verify tests and production class coverage were discovered
         run: |
           python3 -m pip install --quiet defusedxml
           python3 scripts/verify-junit-nonzero.py engine-masque
+          python3 scripts/verify-masque-coverage.py
+      - name: Enforce module coverage gate
+        run: ./gradlew :engine-masque:jacocoTestCoverageVerification --stacktrace
       - name: Build MASQUE native transport
+        if: ${{ always() && !cancelled() }}
         uses: ./.github/actions/build-masque
       - name: Upload native artifact and reports
         if: always()
