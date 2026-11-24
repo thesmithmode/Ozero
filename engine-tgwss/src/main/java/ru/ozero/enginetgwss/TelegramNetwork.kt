@@ -17,9 +17,8 @@ internal class TelegramNetwork(context: Context) {
         val candidates = (listOfNotNull(manager.activeNetwork) + manager.allNetworks.toList()).distinct()
         val network = candidates.firstOrNull {
             val caps = manager.getNetworkCapabilities(it)
-            caps != null &&
-                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            val internet = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+            internet && caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN) == true
         } ?: throw UnknownHostException("No underlying network")
         network.getAllByName(hostname).toList()
     }

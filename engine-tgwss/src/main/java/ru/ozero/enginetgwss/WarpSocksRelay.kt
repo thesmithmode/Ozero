@@ -40,11 +40,7 @@ internal class WarpSocksRelay(private val port: Int) : Closeable {
             }
             if (response[1].toInt() != 0) return
             if (request.command == 3) {
-                client.soTimeout = 0
-                val controlBuffer = ByteArray(256)
-                while (input.read(controlBuffer) >= 0) {
-                    if (closed.get()) break
-                }
+                holdUdpAssociation(client, input, upstream, upstreamInput)
                 return
             }
             if (prefix != null) {
@@ -84,6 +80,32 @@ internal class WarpSocksRelay(private val port: Int) : Closeable {
         }
     }
 
+    private fun holdUdpAssociation(
+        client: Socket,
+        input: DataInputStream,
+        upstream: Socket,
+        upstreamInput: DataInputStream,
+    ) {
+        client.soTimeout = 0
+        upstream.soTimeout = 0
+        val watcher = Thread {
+            try {
+                upstreamInput.read()
+            } catch (_: IOException) {
+                Unit
+            } finally {
+                runCatching { client.close() }
+            }
+        }
+        watcher.isDaemon = true
+        watcher.start()
+        try {
+            input.read()
+        } finally {
+            runCatching { upstream.close() }
+        }
+    }
+
     override fun close() {
         closed.set(true)
         active.forEach { runCatching { it.close() } }
@@ -92,6 +114,14 @@ internal class WarpSocksRelay(private val port: Int) : Closeable {
     companion object {
         private const val TIMEOUT_MS = 10_000
         private val LOOPBACK = InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1))
+
+        private fun validateUdpAddress(type: Int, address: ByteArray, port: Int) {
+            if (type != 1 || port == 0) throw IOException("Unsupported WARP UDP relay")
+            if (address.all { it == 0.toByte() }) LOOPBACK.address.copyInto(address)
+            if (!InetAddress.getByAddress(address).isLoopbackAddress) {
+                throw IOException("WARP UDP relay is not local")
+            }
+        }
 
         internal fun readResponse(input: DataInputStream, command: Int): ByteArray {
             val version = input.readUnsignedByte()
@@ -109,13 +139,7 @@ internal class WarpSocksRelay(private val port: Int) : Closeable {
             val address = ByteArray(size).also { input.readFully(it) }
             val port = input.readUnsignedShort()
             if (command == 3 && status == 0) {
-                if (type != 1 || port == 0) throw IOException("Unsupported WARP UDP relay")
-                if (address.all { it == 0.toByte() }) {
-                    LOOPBACK.address.copyInto(address)
-                }
-                if (!InetAddress.getByAddress(address).isLoopbackAddress) {
-                    throw IOException("WARP UDP relay is not local")
-                }
+                validateUdpAddress(type, address, port)
             }
             return byteArrayOf(5, status.toByte(), 0, type.toByte()) +
                 (if (type == 3) byteArrayOf(size.toByte()) else byteArrayOf()) +

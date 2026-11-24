@@ -6,7 +6,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import ru.ozero.enginescore.EngineStats
 import ru.ozero.enginescore.PersistentLoggers
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -31,7 +30,6 @@ class TunnelStatsLogger(
     private val stopSignal: AtomicBoolean,
     private val statsJobRef: AtomicReference<Job?>,
     private val engineExtras: () -> String,
-    private val engineStatsProvider: suspend () -> EngineStats? = { null },
 ) {
 
     fun start() {
@@ -49,11 +47,14 @@ class TunnelStatsLogger(
                     delay(STATS_SAMPLE_INTERVAL_MS)
                     if (stopSignal.get()) return@launch
                     val iface = tunIfaceNameRef.get()
-                    val engineStats = engineStatsProvider()
-                    val read = if (engineStats != null) {
-                        TunnelStatsReadResult(engineStats.bytesIn, engineStats.bytesOut, "engine")
+                    val read = if (iface != null) {
+                        TunInterfaceStats.readTunStats(iface)?.let {
+                            TunnelStatsReadResult(it.rxBytes, it.txBytes, "iface=$iface")
+                        }
                     } else {
-                        readSystemStats(iface)
+                        null
+                    } ?: UidTrafficStats.read()?.let {
+                        TunnelStatsReadResult(it.rxBytes, it.txBytes, "uid")
                     }
                     if (read == null) {
                         if (tickCount % STATS_LOG_EVERY == 0) {
@@ -71,12 +72,7 @@ class TunnelStatsLogger(
                         val currentStats = tunnelController.stats.value
                         carriedRxBytes = currentStats?.rxBytes ?: 0L
                         carriedTxBytes = currentStats?.txBytes ?: 0L
-                        val initial = if (baseline == null && source == "engine") {
-                            read.copy(rxBytes = 0, txBytes = 0)
-                        } else {
-                            read
-                        }
-                        initial.also { sessionBaseline = it }
+                        read.also { sessionBaseline = it }
                     } else {
                         requireNotNull(baseline)
                     }
@@ -119,17 +115,6 @@ class TunnelStatsLogger(
             }
         }
         statsJobRef.set(job)
-    }
-
-    private fun readSystemStats(iface: String?): TunnelStatsReadResult? {
-        val tunnel = iface?.let { name ->
-            TunInterfaceStats.readTunStats(name)?.let {
-                TunnelStatsReadResult(it.rxBytes, it.txBytes, "iface=$name")
-            }
-        }
-        return tunnel ?: UidTrafficStats.read()?.let {
-            TunnelStatsReadResult(it.rxBytes, it.txBytes, "uid")
-        }
     }
 
     fun cancel() {

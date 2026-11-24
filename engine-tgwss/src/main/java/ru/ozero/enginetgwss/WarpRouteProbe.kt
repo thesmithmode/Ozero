@@ -49,11 +49,11 @@ internal object WarpRouteProbe {
             val received = DatagramPacket(ByteArray(4096), 4096)
             udp.receive(received)
             val data = received.data
-            received.length >= 22 &&
-                data[0] == 0.toByte() && data[1] == 0.toByte() && data[2] == 0.toByte() &&
-                data[3] == 1.toByte() && data.copyOfRange(4, 8).contentEquals(resolver) &&
-                data[8] == 0.toByte() && data[9] == 53.toByte() &&
-                data[10] == query[0] && data[11] == query[1] && (data[12].toInt() and 128) != 0
+            val expectedHeader = byteArrayOf(0, 0, 0, 1) + resolver + byteArrayOf(0, 53)
+            val validAddress = received.length >= 22 && data.copyOfRange(0, 10).contentEquals(expectedHeader)
+            val validId = data[10] == query[0] && data[11] == query[1]
+            val isResponse = (data[12].toInt() and 128) != 0
+            validAddress && validId && isResponse
         }
     }
 

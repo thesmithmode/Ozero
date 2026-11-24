@@ -189,10 +189,8 @@ class TelegramWssProxy internal constructor(
 
         override fun onOpen(webSocket: WebSocket, response: Response) {
             synchronized(lock) {
-                if (!expired && !closed.get() &&
-                    response.header("Sec-WebSocket-Protocol") == "binary" &&
-                    webSocket.send(init.toByteString())
-                ) {
+                val accepted = !expired && !closed.get() && response.header("Sec-WebSocket-Protocol") == "binary"
+                if (accepted && webSocket.send(init.toByteString())) {
                     committed = true
                     sent.addAndGet(init.size.toLong())
                 } else {

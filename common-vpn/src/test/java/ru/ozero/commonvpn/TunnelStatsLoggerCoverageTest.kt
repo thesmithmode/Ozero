@@ -14,7 +14,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
-import ru.ozero.enginescore.EngineStats
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
@@ -63,34 +62,6 @@ class TunnelStatsLoggerCoverageTest {
             assertEquals(50, controller.stats.value?.rxBytes)
             assertEquals(80, controller.stats.value?.txBytes)
             verify(exactly = 2) { notification.notifyStats(any()) }
-            verify(exactly = 0) { UidTrafficStats.read() }
-        } finally {
-            stopLogger(logger)
-        }
-    }
-
-    @Test
-    fun `proxy engine counters take precedence and include bytes before first sample`() = runTest {
-        val controller = connectedController()
-        var counters = EngineStats(bytesIn = 100, bytesOut = 200)
-        val logger = logger(
-            scope = backgroundScope,
-            controller = controller,
-            engineStatsProvider = { counters },
-        )
-        mockkObject(UidTrafficStats)
-        every { UidTrafficStats.read() } returns UidTrafficStats.Snapshot(1000, 2000)
-        try {
-            logger.start()
-            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
-            runCurrent()
-            assertEquals(100L, controller.stats.value?.rxBytes)
-            assertEquals(200L, controller.stats.value?.txBytes)
-            counters = EngineStats(bytesIn = 150, bytesOut = 280)
-            advanceTimeBy(TunnelStatsLogger.STATS_SAMPLE_INTERVAL_MS)
-            runCurrent()
-            assertEquals(150L, controller.stats.value?.rxBytes)
-            assertEquals(280L, controller.stats.value?.txBytes)
             verify(exactly = 0) { UidTrafficStats.read() }
         } finally {
             stopLogger(logger)
@@ -421,7 +392,6 @@ class TunnelStatsLoggerCoverageTest {
         iface: String? = null,
         stopSignal: AtomicBoolean = AtomicBoolean(false),
         statsJobRef: AtomicReference<Job?> = AtomicReference(null),
-        engineStatsProvider: suspend () -> EngineStats? = { null },
     ): TunnelStatsLogger = TunnelStatsLogger(
         scope = scope,
         tunnelController = controller,
@@ -430,7 +400,6 @@ class TunnelStatsLoggerCoverageTest {
         stopSignal = stopSignal,
         statsJobRef = statsJobRef,
         engineExtras = { "extra" },
-        engineStatsProvider = engineStatsProvider,
     )
 
     private fun connectedController(): TunnelController = TunnelController().apply {

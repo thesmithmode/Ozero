@@ -14,15 +14,17 @@ class ChainOrchestrator(
     suspend fun start(steps: List<ChainStep>): ChainResult = mutex.withLock {
         require(steps.isNotEmpty()) { "ChainOrchestrator.start: steps empty — single-engine = chain of 1" }
 
+        val standaloneIndex = steps.indexOfFirst { it.engineId.manualStandaloneOnly }
+        if (steps.size > 1 && standaloneIndex >= 0) {
+            return@withLock rollback(standaloneIndex, "engine supports standalone mode only")
+        }
+
         var upstream: Upstream = Upstream.None
         var lastSocksPort = 0
 
         steps.forEachIndexed { idx, step ->
             val plugin = engines.firstOrNull { it.id == step.engineId }
                 ?: return@withLock rollback(idx, "engine ${step.engineId} not found in registry")
-            if (steps.size > 1 && step.engineId.manualStandaloneOnly) {
-                return@withLock rollback(idx, "engine ${step.engineId} supports standalone mode only")
-            }
             if (steps.size > 1 && idx == 0 && !plugin.capabilities.providesLocalSocksWithoutUpstream) {
                 PersistentLoggers.warn(TAG, "step $idx ${step.engineId} has no standalone local SOCKS port")
                 return@withLock rollback(

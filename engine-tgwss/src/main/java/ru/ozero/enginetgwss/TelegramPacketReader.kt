@@ -35,14 +35,17 @@ internal class TelegramPacketReader(
             0xef -> if (lengthHeader == 1) {
                 (firstPlain and 0x7f) * 4
             } else {
-                ((plain[0].toInt() and 0xff) or
+                val words = (plain[0].toInt() and 0xff) or
                     ((plain[1].toInt() and 0xff) shl 8) or
-                    ((plain[2].toInt() and 0xff) shl 16)) * 4
+                    ((plain[2].toInt() and 0xff) shl 16)
+                words * 4
             }
-            else -> firstPlain or
-                ((plain[0].toInt() and 0xff) shl 8) or
-                ((plain[1].toInt() and 0xff) shl 16) or
-                ((plain[2].toInt() and 0x7f) shl 24)
+            else -> {
+                firstPlain or
+                    ((plain[0].toInt() and 0xff) shl 8) or
+                    ((plain[1].toInt() and 0xff) shl 16) or
+                    ((plain[2].toInt() and 0x7f) shl 24)
+            }
         }
         if (length !in 1..MAX_PAYLOAD) throw IOException("Invalid MTProto packet length")
         val payload = ByteArray(length).also { input.readFully(it) }
