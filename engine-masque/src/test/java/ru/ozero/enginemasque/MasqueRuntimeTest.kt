@@ -157,6 +157,7 @@ class MasqueRuntimeTest {
 
     @Test
     fun `registration rejects child failure and deletes temporary profile`() = runBlocking {
+        val failures = mutableListOf<String>()
         val runtime = MasqueRuntime(
             binary(),
             directory,
@@ -165,8 +166,10 @@ class MasqueRuntimeTest {
                 Child(false)
             },
             MasqueReadinessProbe { false },
+            reportFailure = { failures.add(it) },
         )
         assertThrows<IllegalStateException> { runtime.register(true) }
+        assertEquals(listOf("registration process exited with code 1"), failures)
         assertEquals(listOf("usque"), directory.list().orEmpty().toList())
     }
 

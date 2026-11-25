@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="masque_title">MASQUE</string>
-    <string name="masque_summary">Cloudflare WARP через HTTP/2 или HTTP/3</string>
+    <string name="masque_summary">Сначала зарегистрируйте профиль Cloudflare WARP, затем подключитесь. В режиме «Авто» приложение пробует HTTP/3, затем HTTP/2.</string>
     <string name="masque_registered">Профиль зарегистрирован</string>
     <string name="masque_not_registered">Профиль не зарегистрирован</string>
     <string name="masque_working">Выполняется операция…</string>
-    <string name="masque_error">Не удалось выполнить операцию. Проверьте подключение и повторите.</string>
+    <string name="masque_error">Операция с профилем не удалась. Проверьте, что интернет работает, и повторите. Подробности доступны в журнале приложения.</string>
     <string name="masque_register">Зарегистрировать WARP</string>
     <string name="masque_clear">Удалить профиль</string>
     <string name="masque_clear_warning">Для следующего подключения потребуется новая регистрация.</string>

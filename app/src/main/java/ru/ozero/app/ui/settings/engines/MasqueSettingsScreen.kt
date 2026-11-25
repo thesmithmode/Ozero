@@ -15,6 +15,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +64,7 @@ fun MasqueSettingsScreen(onBack: () -> Unit, viewModel: MasqueSettingsViewModel 
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             MasqueAccountSection(state, onRegister = { consent = true }, onClear = { clear = true })
+            HorizontalDivider()
             MasqueTransportSection(state, viewModel::selectTransport, viewModel::setAutoEnabled)
         }
     }
@@ -119,10 +121,10 @@ private fun MasqueTransportSection(
                 selected = state.transport == transport,
                 onClick = { onTransport(transport) },
                 label = {
-                    val label = if (transport == MasqueTransport.AUTO) {
-                        stringResource(R.string.masque_auto)
-                    } else {
-                        transport.name
+                    val label = when (transport) {
+                        MasqueTransport.AUTO -> stringResource(R.string.masque_auto)
+                        MasqueTransport.H3 -> "HTTP/3"
+                        MasqueTransport.H2 -> "HTTP/2"
                     }
                     Text(label)
                 },

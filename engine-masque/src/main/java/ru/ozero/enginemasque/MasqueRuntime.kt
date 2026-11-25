@@ -58,10 +58,22 @@ class MasqueRuntime internal constructor(
             while (process.alive) delay(100)
             process.exitCode()
         }
-        check(code == 0 && config.isFile && config.length() in 1..MasqueProfile.MAX_BYTES.toLong()) {
-            "MASQUE registration failed"
+        val failure = when {
+            code == null -> "registration timed out"
+            code != 0 -> "registration process exited with code $code"
+            !config.isFile || config.length() !in 1..MasqueProfile.MAX_BYTES.toLong() -> "registration produced no usable profile"
+            else -> null
         }
-        return MasqueProfile.parse(config.readText())
+        if (failure != null) {
+            reportFailure(failure)
+            error(failure)
+        }
+        return try {
+            MasqueProfile.parse(config.readText())
+        } catch (e: IllegalArgumentException) {
+            reportFailure("registration returned an invalid profile")
+            throw e
+        }
     }
 
     suspend fun start(

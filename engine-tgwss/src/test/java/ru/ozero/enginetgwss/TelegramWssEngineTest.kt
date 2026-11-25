@@ -118,7 +118,7 @@ class TelegramWssEngineTest {
     }
 
     @Test
-    fun `readiness requires routed traffic and a Telegram WSS upgrade`() = runTest {
+    fun `readiness requires routed traffic and permits WARP fallback on the first failed upgrade`() = runTest {
         val badRoute = engine(routeReady = false)
         try {
             assertIs<StartResult.Success>(badRoute.start(EngineConfig.TelegramWss(0), Upstream.None))
@@ -129,8 +129,8 @@ class TelegramWssEngineTest {
         val badWss = engine(ws = FakeTelegramWebSockets(protocol = null))
         try {
             assertIs<StartResult.Success>(badWss.start(EngineConfig.TelegramWss(0), Upstream.None))
-            assertIs<ProbeResult.Failure>(badWss.probe())
-            assertIs<EnginePlugin.ReadyResult.Timeout>(badWss.awaitReady())
+            assertIs<EnginePlugin.ReadyResult.Ready>(badWss.awaitReady())
+            assertIs<ProbeResult.Success>(badWss.probe())
         } finally {
             badWss.stop()
         }
