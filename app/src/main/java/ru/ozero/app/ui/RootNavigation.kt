@@ -62,76 +62,87 @@ fun RootNavigation(
     BackHandler(enabled = backStack.isNotEmpty()) { back() }
     val stateHolder = rememberSaveableStateHolder()
     stateHolder.SaveableStateProvider(key = screen.name) {
-        when (screen) {
-            TopScreen.Settings ->
-                SettingsScreen(
-                    onBack = { back() },
-                    onOpenAllowedApps = { navigate(TopScreen.SplitTunnel) },
-                    onOpenServers = { navigate(TopScreen.Servers) },
-                    onOpenAbout = { navigate(TopScreen.About) },
-                    onOpenLogs = { navigate(TopScreen.Logs) },
-                    onOpenByeDpiEngineSettings = { navigate(TopScreen.ByeDpiEngineSettings) },
-                    onOpenUrnetworkSettings = { navigate(TopScreen.UrnetworkEngineSettings) },
-                    onOpenWarpSettings = { navigate(TopScreen.WarpEngineSettings) },
-                    onOpenMasqueSettings = { navigate(TopScreen.MasqueSettings) },
-                    onOpenMasterDnsSettings = { navigate(TopScreen.MasterDnsSettings) },
-                    onOpenFptnSettings = { navigate(TopScreen.FptnSettings) },
-                    onOpenSingboxSettings = { navigate(TopScreen.SingboxSettings) },
-                    onOpenTelegramWssSettings = { navigate(TopScreen.TelegramWssSettings) },
-                    onOpenOperaSettings = { navigate(TopScreen.OperaSettings) },
-                    onOpenStatsHistory = { navigate(TopScreen.StatsHistory) },
-                    onOpenBackup = { navigate(TopScreen.Backup) },
-                    onOpenAutoModeSettings = { navigate(TopScreen.AutoModeSettings) },
-                    onOpenLanguage = { navigate(TopScreen.Language) },
-                )
-            TopScreen.AutoModeSettings -> AutoModeSettingsScreen(onBack = { back() })
-            TopScreen.Language -> LanguageScreen(onBack = { back() })
-            TopScreen.Backup -> BackupScreen(onBack = { back() })
-            TopScreen.Logs -> LogsScreen(onBack = { back() })
-            TopScreen.SplitTunnel -> SplitTunnelScreen(onBack = { back() })
-            TopScreen.Servers -> ServersScreen(onBack = { back() })
-            TopScreen.About -> AboutScreen(onBack = { back() })
-            TopScreen.ByeDpiEngineSettings ->
-                ByeDpiEngineSettingsScreen(
-                    onBack = { back() },
-                    onOpenStrategyTest = { navigate(TopScreen.StrategyTest) },
-                )
-            TopScreen.UrnetworkEngineSettings -> UrnetworkEngineSettingsScreen(
+        NavigationContent(screen, viewModel, onConnectClick, ::navigate, ::back)
+    }
+}
+
+@Composable
+private fun NavigationContent(
+    screen: TopScreen,
+    viewModel: MainViewModel,
+    onConnectClick: () -> Unit,
+    navigate: (TopScreen) -> Unit,
+    back: () -> Unit,
+) {
+    when (screen) {
+        TopScreen.Settings ->
+            SettingsScreen(
                 onBack = { back() },
-                onOpenSharedTraffic = { navigate(TopScreen.UrnetworkSharedTraffic) },
+                onOpenAllowedApps = { navigate(TopScreen.SplitTunnel) },
+                onOpenServers = { navigate(TopScreen.Servers) },
+                onOpenAbout = { navigate(TopScreen.About) },
+                onOpenLogs = { navigate(TopScreen.Logs) },
+                onOpenByeDpiEngineSettings = { navigate(TopScreen.ByeDpiEngineSettings) },
+                onOpenUrnetworkSettings = { navigate(TopScreen.UrnetworkEngineSettings) },
+                onOpenWarpSettings = { navigate(TopScreen.WarpEngineSettings) },
+                onOpenMasqueSettings = { navigate(TopScreen.MasqueSettings) },
+                onOpenMasterDnsSettings = { navigate(TopScreen.MasterDnsSettings) },
+                onOpenFptnSettings = { navigate(TopScreen.FptnSettings) },
+                onOpenSingboxSettings = { navigate(TopScreen.SingboxSettings) },
+                onOpenTelegramWssSettings = { navigate(TopScreen.TelegramWssSettings) },
+                onOpenOperaSettings = { navigate(TopScreen.OperaSettings) },
+                onOpenStatsHistory = { navigate(TopScreen.StatsHistory) },
+                onOpenBackup = { navigate(TopScreen.Backup) },
+                onOpenAutoModeSettings = { navigate(TopScreen.AutoModeSettings) },
+                onOpenLanguage = { navigate(TopScreen.Language) },
             )
-            TopScreen.UrnetworkSharedTraffic -> UrnetworkSharedTrafficScreen(onBack = { back() })
-            TopScreen.WarpEngineSettings -> WarpEngineSettingsScreen(onBack = { back() })
-            TopScreen.MasqueSettings -> MasqueSettingsScreen(onBack = { back() })
-            TopScreen.MasterDnsSettings -> MasterDnsSettingsScreen(onBack = { back() })
-            TopScreen.FptnSettings -> FptnEngineSettingsScreen(onBack = { back() })
-            TopScreen.OperaSettings -> OperaEngineSettingsScreen(onBack = { back() })
-            TopScreen.SingboxSettings -> SingboxEngineSettingsScreen(
+        TopScreen.AutoModeSettings -> AutoModeSettingsScreen(onBack = { back() })
+        TopScreen.Language -> LanguageScreen(onBack = { back() })
+        TopScreen.Backup -> BackupScreen(onBack = { back() })
+        TopScreen.Logs -> LogsScreen(onBack = { back() })
+        TopScreen.SplitTunnel -> SplitTunnelScreen(onBack = { back() })
+        TopScreen.Servers -> ServersScreen(onBack = { back() })
+        TopScreen.About -> AboutScreen(onBack = { back() })
+        TopScreen.ByeDpiEngineSettings ->
+            ByeDpiEngineSettingsScreen(
                 onBack = { back() },
-                onOpenAdvanced = { navigate(TopScreen.SingboxAdvancedSettings) },
+                onOpenStrategyTest = { navigate(TopScreen.StrategyTest) },
             )
-            TopScreen.SingboxAdvancedSettings -> SingboxAdvancedSettingsScreen(onBack = { back() })
-            TopScreen.TelegramWssSettings -> {
-                val state by viewModel.state.collectAsStateWithLifecycle()
-                val trafficMode by viewModel.trafficMode.collectAsStateWithLifecycle()
-                TelegramWssSettingsScreen(
-                    state = state,
-                    trafficMode = trafficMode,
-                    onBack = { back() },
-                    onOpenSplitTunnel = { navigate(TopScreen.SplitTunnel) },
-                    onOpenWarp = { navigate(TopScreen.WarpEngineSettings) },
-                )
-            }
-            TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
-            TopScreen.StatsHistory -> TrafficStatsScreen(onBack = { back() })
-            TopScreen.Main ->
-                MainScreen(
-                    viewModel = viewModel,
-                    onConnectClick = onConnectClick,
-                    onOpenSettings = { navigate(TopScreen.Settings) },
-                    onOpenSplitTunnel = { navigate(TopScreen.SplitTunnel) },
-                    onOpenEngineParams = { engineId -> navigate(engineParamsTarget(engineId)) },
-                )
+        TopScreen.UrnetworkEngineSettings -> UrnetworkEngineSettingsScreen(
+            onBack = { back() },
+            onOpenSharedTraffic = { navigate(TopScreen.UrnetworkSharedTraffic) },
+        )
+        TopScreen.UrnetworkSharedTraffic -> UrnetworkSharedTrafficScreen(onBack = { back() })
+        TopScreen.WarpEngineSettings -> WarpEngineSettingsScreen(onBack = { back() })
+        TopScreen.MasqueSettings -> MasqueSettingsScreen(onBack = { back() })
+        TopScreen.MasterDnsSettings -> MasterDnsSettingsScreen(onBack = { back() })
+        TopScreen.FptnSettings -> FptnEngineSettingsScreen(onBack = { back() })
+        TopScreen.OperaSettings -> OperaEngineSettingsScreen(onBack = { back() })
+        TopScreen.SingboxSettings -> SingboxEngineSettingsScreen(
+            onBack = { back() },
+            onOpenAdvanced = { navigate(TopScreen.SingboxAdvancedSettings) },
+        )
+        TopScreen.SingboxAdvancedSettings -> SingboxAdvancedSettingsScreen(onBack = { back() })
+        TopScreen.TelegramWssSettings -> {
+            val state by viewModel.state.collectAsStateWithLifecycle()
+            val trafficMode by viewModel.trafficMode.collectAsStateWithLifecycle()
+            TelegramWssSettingsScreen(
+                state = state,
+                trafficMode = trafficMode,
+                onBack = { back() },
+                onOpenSplitTunnel = { navigate(TopScreen.SplitTunnel) },
+                onOpenWarp = { navigate(TopScreen.WarpEngineSettings) },
+            )
         }
+        TopScreen.StrategyTest -> StrategyTestScreen(onBack = { back() })
+        TopScreen.StatsHistory -> TrafficStatsScreen(onBack = { back() })
+        TopScreen.Main ->
+            MainScreen(
+                viewModel = viewModel,
+                onConnectClick = onConnectClick,
+                onOpenSettings = { navigate(TopScreen.Settings) },
+                onOpenSplitTunnel = { navigate(TopScreen.SplitTunnel) },
+                onOpenEngineParams = { engineId -> navigate(engineParamsTarget(engineId)) },
+            )
     }
 }
