@@ -160,7 +160,8 @@ public final class GfVpnRuntime implements AutoCloseable {
     }
 
     private boolean receive(Message message) {
-        if (message.what != GfVpnProcessService.RESULT || pending == null || closed) return true;
+        if (message.sendingUid != context.getApplicationInfo().uid ||
+            message.what != GfVpnProcessService.RESULT || pending == null || closed) return true;
         Bundle data = message.getData();
         if (data.getInt("requestId") != sequence) return true;
         int operation = pendingOperation;

@@ -44,6 +44,18 @@ final class GfVpnTun {
         }
     }
 
+    boolean isAttached() { return attached != null; }
+
+    boolean isRunning() {
+        if (!started || attached == null) return false;
+        try {
+            long[] stats = TProxyService.TProxyGetStats();
+            return stats != null && stats.length >= 4;
+        } catch (RuntimeException | LinkageError unavailable) {
+            return false;
+        }
+    }
+
     void stop() throws IOException {
         try {
             if (started) TProxyService.TProxyStopService();

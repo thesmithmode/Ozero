@@ -24,3 +24,5 @@ Remaining gates before a selectable engine:
   conditions, and establish authorization to distribute the SDK if desired.
 
 No production support or runtime success is claimed.
+
+Full VPN device acceptance: run `ru.ozero.app.soak.SoakTest#runGfVpnTunSmoke` with `OZERO_GFVPN_SMOKE=1`, `OZERO_GFVPN_SMOKE_URL` and `OZERO_GFVPN_SMOKE_MARKER` (a controlled HTTPS test page and expected content). This verifies three starts/stops and external test-UID HTTPS routing, not merely SOCKS readiness. The user must grant Android VPN consent first. A separate process is not a security sandbox: the imported closed-source SDK runs with the application UID. The bridge remains experimental until ARM64 tests and provider authorization are verified.

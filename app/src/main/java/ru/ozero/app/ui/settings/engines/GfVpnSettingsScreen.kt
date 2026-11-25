@@ -2,6 +2,8 @@ package ru.ozero.app.ui.settings.engines
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -53,12 +55,13 @@ fun GfVpnSettingsScreen(onBack: () -> Unit) {
         }
     }
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         OutlinedButton(onClick = onBack) { Text(stringResource(R.string.gfvpn_back)) }
         Text("gfVPN", style = MaterialTheme.typography.headlineSmall)
         Text(stringResource(R.string.gfvpn_summary))
+        Text(stringResource(R.string.gfvpn_trust_warning), style = MaterialTheme.typography.bodySmall)
         Text(stringResource(if (installed) R.string.gfvpn_installed else R.string.gfvpn_missing))
         if (!installed) {
             Button(onClick = { picker.launch(arrayOf("*/*")) }, enabled = !importing) {

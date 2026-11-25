@@ -15,6 +15,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -44,7 +45,7 @@ fun TelegramWssSettingsScreen(
 ) {
     val context = LocalContext.current
     val port = (state as? TunnelState.Connected)?.takeIf { it.engineId == EngineId.TGWSS }?.socksPort
-    var openFailed by remember { mutableStateOf(false) }
+    var openFailed by remember(port) { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -63,8 +64,6 @@ fun TelegramWssSettingsScreen(
         ) {
             Text(stringResource(R.string.tgwss_summary), style = MaterialTheme.typography.bodyLarge)
             Text(stringResource(R.string.tgwss_setup))
-            Button(onClick = onOpenSplitTunnel) { Text(stringResource(R.string.settings_split_tunnel_title)) }
-            Button(onClick = onOpenWarp) { Text(stringResource(R.string.settings_warp_title)) }
             if (trafficMode == TrafficMode.PROXY && port != null && port > 0) {
                 Text(stringResource(R.string.tgwss_address, port))
                 Button(onClick = {
@@ -82,10 +81,14 @@ fun TelegramWssSettingsScreen(
                 }
                 if (openFailed) Text(stringResource(R.string.tgwss_open_failed))
             } else if (port != null && port > 0) {
-                Text(stringResource(R.string.main_status_connected))
+                Text(stringResource(R.string.main_status_connected), style = MaterialTheme.typography.titleMedium)
             } else {
                 Text(stringResource(R.string.tgwss_not_running))
             }
+            OutlinedButton(onClick = onOpenSplitTunnel) {
+                Text(stringResource(R.string.settings_split_tunnel_title))
+            }
+            OutlinedButton(onClick = onOpenWarp) { Text(stringResource(R.string.settings_warp_title)) }
         }
     }
 }

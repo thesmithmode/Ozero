@@ -117,6 +117,7 @@ public final class GfVpnProcessService extends Service {
                     try { tun.stop(); } finally { sdk.stop(); }
                     break;
                 case PROBE:
+                    if (tun.isAttached() && !tun.isRunning()) throw new java.io.IOException("HEV unavailable");
                     response.putLong("latencyMs", sdk.probe());
                     break;
                 case NETWORK_CHANGED:

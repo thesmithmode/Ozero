@@ -40,7 +40,7 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val state = MutableStateFlow(EngineStats())
     private val connectivity = app.getSystemService(ConnectivityManager::class.java)
-    private var runtime: GfVpnRuntime? = null
+    @Volatile private var runtime: GfVpnRuntime? = null
     private var callback: ConnectivityManager.NetworkCallback? = null
     private var attached = false
 
@@ -88,7 +88,6 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
                 prefs.edit().putString("client-id", it).apply()
             }
             next.start("RU", identifier).awaitResult()
-            observeNetworks(next)
             StartResult.Success(0)
         } catch (cancelled: CancellationException) {
             reset()
@@ -105,8 +104,10 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
         try {
             ParcelFileDescriptor.fromFd(tunFd).use { current.attachTun(it).awaitResult() }
             // The coordinator retains ownership on failure, transfers it only on success.
-            ParcelFileDescriptor.adoptFd(tunFd).close()
+            // Attach is already successful; the original fd must not be returned to the caller.
+            runCatching { ParcelFileDescriptor.adoptFd(tunFd).close() }
             attached = true
+            runCatching { observeNetworks(current) }
             state.value = EngineStats(connectedSince = System.currentTimeMillis())
             TunAttachResult.Success
         } catch (cancelled: CancellationException) {
@@ -137,17 +138,22 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
     override fun stats() = state
 
     override suspend fun stop() {
-        mutex.withLock {
-            val current = runtime
-            try {
-                if (current != null) withTimeoutOrNull(1800) { current.stop().awaitResult() }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                // Process teardown is the final fallback.
-            } finally {
-                reset()
-            }
+        // A blocked probe/network callback cannot prevent the remote process from being aborted.
+        val owner = runtime
+        if (!mutex.tryLock()) {
+            owner?.close()
+            mutex.withLock { if (runtime === owner) reset() }
+            return
+        }
+        try {
+            if (runtime === owner && owner != null) withTimeoutOrNull(1500) { owner.stop().awaitResult() }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Process teardown is the final fallback.
+        } finally {
+            if (runtime === owner) reset()
+            mutex.unlock()
         }
     }
 
@@ -167,7 +173,7 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
     private fun notifyChanged(owner: GfVpnRuntime) {
         scope.launch {
             mutex.withLock {
-                if (runtime === owner) {
+                if (runtime === owner && attached) {
                     try {
                         owner.networkChanged().awaitResult()
                     } catch (cancelled: CancellationException) {

@@ -7,4 +7,5 @@
     <string name="gfvpn_import">Import APK</string>
     <string name="gfvpn_importing">Importing…</string>
     <string name="gfvpn_import_failed">Import failed. Check APK version, device architecture and available storage.</string>
+    <string name="gfvpn_trust_warning">Import only if you trust this closed-source APK. Process separation contains crashes, not access to app data.</string>
 </resources>

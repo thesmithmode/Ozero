@@ -123,6 +123,7 @@ class MainScreenLabelsTest {
     @Test
     fun `Telegram WSS probing shows connecting`() {
         assertEquals(R.string.main_status_connecting, probingLabelRes(EngineId.TGWSS, false))
+        assertEquals(R.string.main_status_connecting, probingLabelRes(EngineId.GFVPN, false))
     }
 
     @Test

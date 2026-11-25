@@ -112,10 +112,9 @@ class OperaEngine(
         }
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult =
-        if (probe() is ProbeResult.Success) {
-            EnginePlugin.ReadyResult.Ready
-        } else {
-            EnginePlugin.ReadyResult.Timeout("Opera route unavailable")
+        when (val result = probe()) {
+            is ProbeResult.Success -> EnginePlugin.ReadyResult.Ready
+            is ProbeResult.Failure -> EnginePlugin.ReadyResult.Timeout(result.reason)
         }
 
     override suspend fun stop() = lifecycle.stop { stopLocked() }
@@ -146,7 +145,7 @@ class OperaEngine(
             try {
                 dnsProbe(current.port)
             } catch (e: IOException) {
-                return ProbeResult.Failure("Opera routed DNS unavailable", cause = e)
+                return ProbeResult.Failure("Opera routed DNS unavailable: ${e.javaClass.simpleName}", cause = e)
             }
         }
         return if (active === current) result else ProbeResult.Failure("Opera session changed")

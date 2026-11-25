@@ -11,8 +11,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -53,18 +55,19 @@ fun OperaEngineSettingsScreen(
             modifier = Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(stringResource(R.string.settings_opera_summary))
+            Text(stringResource(R.string.settings_opera_summary), style = MaterialTheme.typography.bodyMedium)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(stringResource(R.string.settings_auto_mode_open_title), modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.masque_auto_enabled), modifier = Modifier.weight(1f))
                 Switch(
                     checked = EngineId.OPERA in model.engineAutoPriority,
                     onCheckedChange = viewModel::setAutoEnabled,
                 )
             }
-            Text(stringResource(R.string.opera_region))
+            HorizontalDivider()
+            Text(stringResource(R.string.opera_region), style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OperaRegion.entries.forEach { region ->
                     FilterChip(
@@ -74,7 +77,7 @@ fun OperaEngineSettingsScreen(
                     )
                 }
             }
-            Text(stringResource(R.string.opera_selection))
+            Text(stringResource(R.string.opera_selection), style = MaterialTheme.typography.titleMedium)
             Column(modifier = Modifier.fillMaxWidth()) {
                 OperaServerSelection.entries.forEach { selection ->
                     FilterChip(
