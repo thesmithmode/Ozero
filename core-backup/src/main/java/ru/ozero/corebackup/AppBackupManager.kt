@@ -9,6 +9,9 @@ import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
 import ru.ozero.enginescore.settings.SettingsKeys
 import ru.ozero.enginefptn.FptnConfigStore
+import ru.ozero.enginemasque.MasqueProfile
+import ru.ozero.enginemasque.MasqueProfileStore
+import ru.ozero.enginemasque.MasqueTransport
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkLocationSelection
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
@@ -31,6 +34,7 @@ class AppBackupManager(
     private val fptnStore: FptnConfigStore? = null,
     private val strategyProvider: StrategyBackupProvider? = null,
     private val urnetworkDeviceIdentity: UrnetworkDeviceIdentity? = null,
+    private val masqueStore: MasqueProfileStore? = null,
 ) {
 
     suspend fun export(categories: Set<BackupCategory> = BackupCategory.ALL): AppBackupData {
@@ -47,7 +51,18 @@ class AppBackupManager(
             warpSlots = warpSlots,
             splitRules = splitRules,
             strategy = strategy,
+            masque = if (BackupCategory.MASQUE in categories) exportMasque() else null,
         )
+    }
+
+    private suspend fun exportMasque(): BackupMasque? {
+        val settings = masqueStore?.settings()?.first() ?: return null
+        check(!settings.corrupt) { "MASQUE profile is damaged" }
+        val unconfigured = settings.profile == null &&
+            settings.transport == MasqueTransport.AUTO &&
+            settings.autoEnabled
+        if (unconfigured) return null
+        return BackupMasque(settings.profile?.exportJson(), settings.transport.name, settings.autoEnabled)
     }
 
     private fun exportSettings(prefs: Preferences, categories: Set<BackupCategory>): BackupSettings =
@@ -88,6 +103,15 @@ class AppBackupManager(
             appMode = fromCategory(
                 BackupCategory.GENERAL_SETTINGS in categories,
             ) { prefs[SettingsKeys.APP_MODE] },
+            operaRegion = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { prefs[SettingsKeys.OPERA_REGION] },
+            operaSelection = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { prefs[SettingsKeys.OPERA_SELECTION] },
+            operaAutoEnabled = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { prefs[SettingsKeys.OPERA_AUTO_ENABLED] },
             engineAutoPriority = fromCategory(
                 BackupCategory.GENERAL_SETTINGS in categories,
             ) { prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] },
@@ -140,6 +164,9 @@ class AppBackupManager(
         }
 
     suspend fun import(data: AppBackupData, categories: Set<BackupCategory> = BackupCategory.ALL) {
+        val masque = data.masque?.takeIf { BackupCategory.MASQUE in categories }
+        val masqueProfile = masque?.profileJson?.let(MasqueProfile::parse)
+        val masqueTransport = masque?.transport?.let(MasqueTransport::valueOf)
         val importedSettings = data.settings
         ozeroSettings.edit { prefs ->
             if (BackupCategory.GENERAL_SETTINGS in categories) importGeneral(prefs, importedSettings)
@@ -154,6 +181,9 @@ class AppBackupManager(
         }
         if (BackupCategory.STRATEGY in categories) data.strategy?.let { strategyProvider?.import(it) }
         if (BackupCategory.SPLIT_TUNNEL in categories) importSplitTunnel(data)
+        if (masque != null && masqueTransport != null) {
+            masqueStore?.restore(masqueProfile, masqueTransport, masque.autoEnabled)
+        }
     }
 
     private fun importGeneral(prefs: MutablePreferences, s: BackupSettings) {
@@ -164,13 +194,17 @@ class AppBackupManager(
         s.appMode?.let { prefs[SettingsKeys.APP_MODE] = it }
         s.engineAutoPriority?.let { prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = it }
         s.trafficMode?.let { prefs[SettingsKeys.TRAFFIC_MODE] = it }
+        s.operaRegion?.takeIf { it in setOf("EU", "AS", "AM") }?.let { prefs[SettingsKeys.OPERA_REGION] = it }
+        s.operaSelection?.takeIf { it in setOf("first", "random", "fastest") }
+            ?.let { prefs[SettingsKeys.OPERA_SELECTION] = it }
+        s.operaAutoEnabled?.let { prefs[SettingsKeys.OPERA_AUTO_ENABLED] = it }
     }
 
     private suspend fun importSplitTunnel(data: AppBackupData) {
+        splitRuleDao.replaceAll(data.splitRules.map { AppSplitRule(it.packageName, it.isExcluded) })
         data.settings.splitMode?.let { mode ->
             ozeroSettings.edit { prefs -> prefs[SettingsKeys.SPLIT_MODE] = mode }
         }
-        importSplit(data.splitRules)
     }
 
     private suspend fun importFptnToken(s: BackupSettings) {
@@ -220,17 +254,6 @@ class AppBackupManager(
                     UrnetworkLocationSelection(countryCode = it.countryCode, region = it.region, city = it.city)
                 } ?: current.selectedLocation,
             )
-        }
-    }
-
-    private suspend fun importSplit(rules: List<BackupSplitRule>) {
-        val existingRules = splitRuleDao.observeAll().first()
-        val backupPackages = rules.map { it.packageName }.toSet()
-        for (existing in existingRules) {
-            if (existing.packageName !in backupPackages) splitRuleDao.delete(existing.packageName)
-        }
-        for (rule in rules) {
-            splitRuleDao.upsert(AppSplitRule(packageName = rule.packageName, isExcluded = rule.isExcluded))
         }
     }
 

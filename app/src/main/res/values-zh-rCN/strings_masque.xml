@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="masque_title">MASQUE</string>
+    <string name="masque_summary">通过 HTTP/2 或 HTTP/3 使用 Cloudflare WARP</string>
+    <string name="masque_registered">已注册配置</string>
+    <string name="masque_not_registered">未注册配置</string>
+    <string name="masque_working">正在处理…</string>
+    <string name="masque_error">操作失败。请检查连接后重试。</string>
+    <string name="masque_register">注册 WARP</string>
+    <string name="masque_clear">删除配置</string>
+    <string name="masque_clear_warning">再次连接前需要重新注册。</string>
+    <string name="masque_transport">传输协议</string>
+    <string name="masque_auto">自动</string>
+    <string name="masque_auto_enabled">加入自动模式</string>
+    <string name="masque_consent">接受 Cloudflare 条款以创建独立的 WARP 配置。</string>
+    <string name="masque_terms">Cloudflare 条款</string>
+    <string name="masque_accept">接受并注册</string>
+    <string name="masque_cancel">取消</string>
+</resources>

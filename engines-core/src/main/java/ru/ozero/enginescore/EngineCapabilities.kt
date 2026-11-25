@@ -9,4 +9,5 @@ data class EngineCapabilities(
     val supportsUpstreamSocks: Boolean,
     val providesLocalSocks: Boolean = true,
     val providesLocalSocksWithoutUpstream: Boolean = providesLocalSocks,
+    val requiresRoutedProbe: Boolean = false,
 )

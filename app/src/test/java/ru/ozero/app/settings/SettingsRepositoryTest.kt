@@ -134,11 +134,72 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `setManualEngine accepts every EngineId value`() = runTest {
+    fun `setManualEngine accepts every EngineId value in proxy mode`() = runTest {
+        repository.setTrafficMode(TrafficMode.PROXY)
         EngineId.entries.forEach { engine ->
             repository.setManualEngine(engine)
             assertEquals(engine, repository.settings.first().manualEngine)
         }
+    }
+
+    @Test
+    fun `Opera selection is retained in both traffic modes`() = runTest {
+        repository.setManualEngine(EngineId.OPERA)
+        assertEquals(EngineId.OPERA, repository.settings.first().manualEngine)
+        repository.setTrafficMode(TrafficMode.PROXY)
+        repository.setManualEngine(EngineId.OPERA)
+        assertEquals(EngineId.OPERA, repository.settings.first().manualEngine)
+        repository.setTrafficMode(TrafficMode.TUN)
+        assertEquals(EngineId.OPERA, repository.settings.first().manualEngine)
+    }
+
+    @Test
+    fun `Opera automatic routing requires explicit consent even for legacy priorities`() = runTest {
+        assertFalse(EngineId.OPERA in repository.settings.first().engineAutoPriority)
+        dataStore.edit { it[SettingsKeys.ENGINE_AUTO_PRIORITY] = "OPERA,WARP" }
+        assertFalse(EngineId.OPERA in repository.settings.first().engineAutoPriority)
+        repository.setEngineAutoPriority(listOf(EngineId.OPERA, EngineId.WARP))
+        assertFalse(EngineId.OPERA in repository.settings.first().engineAutoPriority)
+        repository.setOperaAutoEnabled(true)
+        assertEquals(EngineId.OPERA, repository.settings.first().engineAutoPriority.last())
+        repository.setEngineAutoPriority(listOf(EngineId.OPERA, EngineId.WARP))
+        assertEquals(EngineId.OPERA, repository.settings.first().engineAutoPriority.first())
+        repository.setOperaAutoEnabled(true)
+        assertEquals(EngineId.OPERA, repository.settings.first().engineAutoPriority.first())
+        repository.setOperaAutoEnabled(false)
+        assertFalse(EngineId.OPERA in repository.settings.first().engineAutoPriority)
+        assertEquals(false, dataStore.data.first()[SettingsKeys.OPERA_AUTO_ENABLED])
+        repository.setManualEngine(EngineId.OPERA)
+        assertEquals(EngineId.OPERA, repository.settings.first().manualEngine)
+    }
+
+    @Test
+    fun `Opera settings persist and invalid stored values use defaults`() = runTest {
+        repository.setOperaRegion("AS")
+        repository.setOperaSelection("random")
+        assertEquals("AS", repository.settings.first().operaRegion)
+        assertEquals("random", repository.settings.first().operaSelection)
+        dataStore.edit { prefs ->
+            prefs[SettingsKeys.OPERA_REGION] = "bad"
+            prefs[SettingsKeys.OPERA_SELECTION] = "bad"
+        }
+        assertEquals("EU", repository.settings.first().operaRegion)
+        assertEquals("fastest", repository.settings.first().operaSelection)
+    }
+
+    @Test
+    fun `Telegram WSS works in TUN and proxy mode without entering auto priority`() = runTest {
+        repository.setManualEngine(EngineId.TGWSS)
+        assertEquals(EngineId.TGWSS, repository.settings.first().manualEngine)
+        repository.setTrafficMode(TrafficMode.PROXY)
+        repository.setManualEngine(EngineId.TGWSS)
+        assertEquals(EngineId.TGWSS, repository.settings.first().manualEngine)
+        repository.setEngineAutoPriority(listOf(EngineId.TGWSS, EngineId.WARP))
+        assertFalse(EngineId.TGWSS in repository.settings.first().engineAutoPriority)
+        dataStore.edit { prefs -> prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = "TGWSS,WARP" }
+        assertFalse(EngineId.TGWSS in repository.settings.first().engineAutoPriority)
+        repository.setTrafficMode(TrafficMode.TUN)
+        assertEquals(EngineId.TGWSS, repository.settings.first().manualEngine)
     }
 
     @Test
@@ -161,12 +222,13 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `engineAutoPriority default содержит все non-stub engines в этом порядке`() = runTest {
+    fun `engineAutoPriority defaults exclude opt in and standalone engines`() = runTest {
         val current = repository.settings.first()
         assertEquals(
             listOf(
                 EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
                 EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+                EngineId.MASQUE,
             ),
             current.engineAutoPriority,
         )
@@ -179,6 +241,7 @@ class SettingsRepositoryTest {
             listOf(
                 EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
                 EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+                EngineId.MASQUE,
             ),
             repository.settings.first().engineAutoPriority,
         )
@@ -195,6 +258,7 @@ class SettingsRepositoryTest {
             listOf(
                 EngineId.BYEDPI, EngineId.FPTN, EngineId.WARP,
                 EngineId.URNETWORK, EngineId.MASTERDNS, EngineId.SINGBOX,
+                EngineId.MASQUE,
             ),
             repository.settings.first().engineAutoPriority,
         )
@@ -229,6 +293,7 @@ class SettingsRepositoryTest {
             listOf(
                 EngineId.WARP, EngineId.BYEDPI, EngineId.URNETWORK,
                 EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+                EngineId.MASQUE,
             ),
             repository.settings.first().engineAutoPriority,
         )

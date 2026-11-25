@@ -32,6 +32,8 @@ class EngineSettingsRestartObserver(
         val customDnsServers: List<String>,
         val engineAutoPriority: List<EngineId>?,
         val byedpiUiSettings: ByeDpiUiSettings = ByeDpiUiSettings.DEFAULT,
+        val operaRegion: String = "EU",
+        val operaSelection: String = "fastest",
     )
 
     data class Trigger(val previous: Snapshot, val snapshot: Snapshot)
@@ -54,6 +56,8 @@ class EngineSettingsRestartObserver(
                     trafficMode = it.trafficMode,
                     customDnsServers = it.customDnsServers,
                     engineAutoPriority = if (it.manualEngine == null) it.engineAutoPriority else null,
+                    operaRegion = it.operaRegion,
+                    operaSelection = it.operaSelection,
                 )
             }
             .distinctUntilChanged()
@@ -78,9 +82,10 @@ class EngineSettingsRestartObserver(
         val snapshot = trigger.snapshot
         val state = vpnStateProvider()
         if (state is TunnelState.Connected) {
+            val unchangedOperaDns = state.engineId == EngineId.OPERA && trigger.onlyCustomDnsChanged()
             if (
-                snapshot.targetEngine() == state.engineId &&
-                snapshot.sameRuntimeFor(state.engineId, trigger.previous)
+                unchangedOperaDns ||
+                (snapshot.targetEngine() == state.engineId && snapshot.sameRuntimeFor(state.engineId, trigger.previous))
             ) {
                 PersistentLoggers.debug(
                     TAG,
@@ -107,6 +112,7 @@ class EngineSettingsRestartObserver(
                 return
             }
         }
+        if (currentEngine == EngineId.OPERA && trigger.onlyCustomDnsChanged()) return
         if (startupAcceptedSnapshot == snapshot) return
         if (canAcceptStartupSnapshot(currentEngine, trigger)) {
             startupAcceptedSnapshot = snapshot
@@ -115,6 +121,9 @@ class EngineSettingsRestartObserver(
         startupAcceptedSnapshot = null
         onRestartConnected(snapshot)
     }
+
+    private fun Trigger.onlyCustomDnsChanged(): Boolean =
+        previous.copy(customDnsServers = snapshot.customDnsServers) == snapshot
 
     private fun Snapshot.targetEngine(): EngineId? = manualEngine ?: engineAutoPriority?.firstOrNull()
 
@@ -129,15 +138,16 @@ class EngineSettingsRestartObserver(
     }
 
     private fun Snapshot.sameRuntimeFor(engineId: EngineId, other: Snapshot): Boolean {
-        val commonRuntimeMatches = ipv6Enabled == other.ipv6Enabled &&
-            trafficMode == other.trafficMode &&
-            customDnsServers == other.customDnsServers
+        val transportMatches = ipv6Enabled == other.ipv6Enabled && trafficMode == other.trafficMode
+        val commonRuntimeMatches = transportMatches && customDnsServers == other.customDnsServers
         return when (engineId) {
             EngineId.BYEDPI ->
                 byedpiWinningArgs == other.byedpiWinningArgs &&
                     byedpiUseUiMode == other.byedpiUseUiMode &&
                     byedpiUiSettings == other.byedpiUiSettings &&
                     commonRuntimeMatches
+            EngineId.OPERA ->
+                operaRegion == other.operaRegion && operaSelection == other.operaSelection && transportMatches
             else -> commonRuntimeMatches
         }
     }

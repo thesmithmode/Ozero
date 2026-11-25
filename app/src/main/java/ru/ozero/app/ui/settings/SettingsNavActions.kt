@@ -8,6 +8,7 @@ data class SettingsNavActions(
     val onOpenByeDpiEngineSettings: () -> Unit = {},
     val onOpenUrnetworkSettings: () -> Unit = {},
     val onOpenWarpSettings: () -> Unit = {},
+    val onOpenMasqueSettings: () -> Unit = {},
     val onOpenStatsHistory: () -> Unit = {},
     val onOpenBackup: () -> Unit = {},
     val onOpenAutoModeSettings: () -> Unit = {},
@@ -15,4 +16,6 @@ data class SettingsNavActions(
     val onOpenMasterDnsSettings: () -> Unit = {},
     val onOpenFptnSettings: () -> Unit = {},
     val onOpenSingboxSettings: () -> Unit = {},
+    val onOpenOperaSettings: () -> Unit = {},
+    val onOpenTelegramWssSettings: () -> Unit = {},
 )

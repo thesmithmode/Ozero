@@ -43,6 +43,29 @@ class SettingsRepositoryImpl @Inject constructor(
         dataStore.edit { it[SettingsKeys.TRAFFIC_MODE] = mode.name }
     }
 
+    override suspend fun setOperaAutoEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            val priority = prefs.readEngineAutoPriority()
+            val next = if (enabled) {
+                (priority + EngineId.OPERA).distinct()
+            } else {
+                priority.filterNot { it == EngineId.OPERA }
+            }
+            prefs[SettingsKeys.OPERA_AUTO_ENABLED] = enabled
+            prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = next.joinToString(",") { it.name }
+        }
+    }
+
+    override suspend fun setOperaRegion(region: String) {
+        require(region in setOf("EU", "AS", "AM"))
+        dataStore.edit { it[SettingsKeys.OPERA_REGION] = region }
+    }
+
+    override suspend fun setOperaSelection(selection: String) {
+        require(selection in setOf("first", "random", "fastest"))
+        dataStore.edit { it[SettingsKeys.OPERA_SELECTION] = selection }
+    }
+
     override suspend fun setManualEngine(engine: EngineId?) {
         dataStore.edit { prefs ->
             if (engine == null) {
@@ -55,7 +78,10 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setEngineAutoPriority(priority: List<EngineId>) {
         dataStore.edit { prefs ->
-            val cleaned = priority.distinct().filter { !it.isStub }
+            val operaEnabled = prefs[SettingsKeys.OPERA_AUTO_ENABLED] == true
+            val cleaned = priority.distinct().filter {
+                !it.isStub && !it.manualStandaloneOnly && (it != EngineId.OPERA || operaEnabled)
+            }
             if (cleaned.isEmpty()) {
                 prefs.remove(SettingsKeys.ENGINE_AUTO_PRIORITY)
             } else {
@@ -169,6 +195,9 @@ class SettingsRepositoryImpl @Inject constructor(
         autoStart = this[SettingsKeys.AUTO_START] ?: SettingsModel.DEFAULT_AUTO_START,
         trafficMode = readTrafficMode(),
         manualEngine = readManualEngine(),
+        operaRegion = this[SettingsKeys.OPERA_REGION]?.takeIf { it in setOf("EU", "AS", "AM") } ?: "EU",
+        operaSelection = this[SettingsKeys.OPERA_SELECTION]
+            ?.takeIf { it in setOf("first", "random", "fastest") } ?: "fastest",
         engineAutoPriority = readEngineAutoPriority(),
         urnetworkEnabled = this[SettingsKeys.URNETWORK_ENABLED] ?: SettingsModel.DEFAULT_URNETWORK_ENABLED,
         urnetworkJwt = this[SettingsKeys.URNETWORK_JWT],
@@ -230,14 +259,21 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     private fun Preferences.readEngineAutoPriority(): List<EngineId> {
-        val raw = this[SettingsKeys.ENGINE_AUTO_PRIORITY]
-            ?: return SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
+        val operaEnabled = this[SettingsKeys.OPERA_AUTO_ENABLED] == true
+        val defaults = if (operaEnabled) {
+            SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY + EngineId.OPERA
+        } else {
+            SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
+        }
+        val raw = this[SettingsKeys.ENGINE_AUTO_PRIORITY] ?: return defaults
         val parsed = raw.split(",")
             .mapNotNull { name -> runCatching { EngineId.valueOf(name.trim()) }.getOrNull() }
-            .filter { !it.isStub }
+            .filter { !it.isStub && !it.manualStandaloneOnly && (it != EngineId.OPERA || operaEnabled) }
             .distinct()
-        if (parsed.isEmpty()) return SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
-        val missing = EngineId.entries.filter { !it.isStub && it !in parsed }
+        if (parsed.isEmpty()) return defaults
+        val missing = EngineId.entries.filter {
+            !it.isStub && !it.manualStandaloneOnly && it !in parsed && (it != EngineId.OPERA || operaEnabled)
+        }
         return parsed + missing
     }
 

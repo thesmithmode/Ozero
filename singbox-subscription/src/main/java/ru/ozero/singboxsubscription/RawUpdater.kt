@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.room.withTransaction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -22,9 +24,9 @@ import java.net.UnknownHostException
 import java.security.cert.CertPathValidatorException
 import java.security.cert.CertificateException
 import java.util.concurrent.ConcurrentHashMap
+import javax.net.ssl.SSLException
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLPeerUnverifiedException
-import kotlin.coroutines.resume
 import ru.ozero.singboxconfig.BeanSupportDecision
 import ru.ozero.singboxconfig.BeanSupportError
 import ru.ozero.singboxconfig.ConfigBuilder
@@ -54,7 +56,8 @@ class RawUpdater(
     private val systemCaOkHttpClient: OkHttpClient = okHttpClient,
     private val insecureOkHttpClient: OkHttpClient = okHttpClient,
     private val database: SingboxDatabase? = null,
-    private val onProfilesRemoved: suspend (Set<Long>) -> Unit = {},
+    private val reconcileCommittedSelections: suspend () -> Unit = {},
+    private val fallbackClient: (OkHttpClient) -> OkHttpClient? = { null },
 ) {
     private val refreshLocks = ConcurrentHashMap<Long, Mutex>()
 
@@ -68,6 +71,7 @@ class RawUpdater(
         group: SubscriptionGroup,
         allowInsecureRetry: Boolean,
     ): Result<Int> = withContext(Dispatchers.IO) {
+        reconcileSelections().exceptionOrNull()?.let { return@withContext Result.failure(it) }
         val lastAttemptAt = System.currentTimeMillis()
         val refreshGeneration = beginRefresh(group.id, lastAttemptAt)
             ?: return@withContext Result.failure(SubscriptionRefreshStaleException())
@@ -82,114 +86,87 @@ class RawUpdater(
                 .header("User-Agent", USER_AGENT)
                 .header("Accept", "text/plain, application/json, application/yaml, text/yaml, */*")
                 .build()
-            executeRequest(group, request, allowInsecureRetry).use { response ->
-                if (!response.isSuccessful) {
-                    throw SubscriptionHttpException(response.code)
-                }
-                val body = response.body?.readUtf8Limited(MAX_SUBSCRIPTION_BYTES) ?: ""
-                Log.i(
-                    TAG,
-                    "refresh response groupId=${group.id} generation=$refreshGeneration " +
-                        "http=${response.code} bodyChars=${body.length}",
-                )
-                val subInfo = SubscriptionInfoParser.parse(response.header("Subscription-Userinfo"))
+            val response = executeRequest(group, request, allowInsecureRetry)
+            val body = response.body
+            Log.i(
+                TAG,
+                "refresh response groupId=${group.id} generation=$refreshGeneration " +
+                    "http=${response.code} bodyChars=${body.length}",
+            )
+            val subInfo = SubscriptionInfoParser.parse(response.userInfo)
 
-                val parsedBeans = Base64BundleParser.parse(body)
-                    .ifEmpty { RawShareLinksParser.parse(body) }
-                if (parsedBeans.isEmpty()) throw SubscriptionNoProfilesException()
-                val parsedWindow = parsedBeans.take(MAX_PROFILES_PER_GROUP)
-                logSupportDiagnostics(group.id, parsedWindow)
-                val beans = parsedWindow.filter { ConfigBuilder.supportDecision(it) is BeanSupportDecision.Supported }
-                if (beans.isEmpty()) throw SubscriptionNoProfilesException()
+            val parsedBeans = Base64BundleParser.parse(body)
+                .ifEmpty { RawShareLinksParser.parse(body) }
+            if (parsedBeans.isEmpty()) throw SubscriptionNoProfilesException()
+            val parsedWindow = parsedBeans.take(MAX_PROFILES_PER_GROUP)
+            logSupportDiagnostics(group.id, parsedWindow)
+            val beans = parsedWindow.filter { ConfigBuilder.supportDecision(it) is BeanSupportDecision.Supported }
+            if (beans.isEmpty()) throw SubscriptionNoProfilesException()
 
-                val profiles = beans.mapIndexed { idx, bean ->
-                    ProxyProfile(
-                        groupId = group.id,
-                        name = bean.name.ifBlank { "Server ${idx + 1}" },
-                        beanBlob = KryoSerializer.serialize(bean),
-                        protocolType = protocolTypeOf(bean),
-                        userOrder = idx,
-                    )
-                }.distinctBy { it.stableFullIdentityKey() }
-                val existingProfiles = profileDao.getAutoCandidatesByGroupId(group.id, MAX_PROFILES_PER_GROUP)
-                val incomingBaseKeyCounts = profiles
-                    .groupingBy { it.stableBaseIdentityKey() }
-                    .eachCount()
-                val existingByBaseIdentity = existingProfiles
-                    .groupBy { it.stableBaseIdentityKey() }
-                    .mapValues { (_, matches) -> matches.toMutableList() }
-                val existingByFullIdentity = existingProfiles
-                    .groupBy { it.stableFullIdentityKey() }
-                    .mapValues { (_, matches) -> matches.toMutableList() }
-                val profilesWithStableIds = profiles.map { profile ->
-                    val baseKey = profile.stableBaseIdentityKey()
-                    val useFullKey = (incomingBaseKeyCounts[baseKey] ?: 0) > 1 ||
-                        ((existingByBaseIdentity[baseKey]?.size ?: 0) > 1)
-                    val matched = if (useFullKey) {
-                        existingByFullIdentity[profile.stableFullIdentityKey()]?.removeFirstOrNull()
-                    } else {
-                        existingByBaseIdentity[baseKey]?.removeFirstOrNull()
-                    }
-                    if (matched != null) {
-                        profile.copy(
-                            id = matched.id,
-                            latencyMs = matched.latencyMs,
-                            probeError = matched.probeError,
-                            lastProbeAt = matched.lastProbeAt,
-                        )
-                    } else {
-                        profile
-                    }
-                }
-                val currentGroup = groupDao.getById(group.id)
-                    ?: group.copy(lastAttemptAt = lastAttemptAt, refreshGeneration = refreshGeneration)
-                val usedBytes = subInfo?.let { it.uploadBytes + it.downloadBytes } ?: currentGroup.bytesUsed
-                val remainingBytes = subInfo?.let {
-                    maxOf(0L, it.totalBytes - it.uploadBytes - it.downloadBytes)
-                } ?: currentGroup.bytesRemaining
-                val updatedGroup = currentGroup.copy(
-                    lastUpdated = System.currentTimeMillis(),
-                    lastAttemptAt = lastAttemptAt,
-                    lastRefreshErrorCode = null,
-                    lastServerCount = profilesWithStableIds.size,
-                    bytesUsed = usedBytes,
-                    bytesRemaining = remainingBytes,
-                    expiryDate = subInfo?.expiryTimestamp ?: currentGroup.expiryDate,
+            val profiles = beans.mapIndexed { idx, bean ->
+                ProxyProfile(
+                    groupId = group.id,
+                    name = bean.name.ifBlank { "Server ${idx + 1}" },
+                    beanBlob = KryoSerializer.serialize(bean),
+                    protocolType = protocolTypeOf(bean),
+                    userOrder = idx,
                 )
-                val committed = if (database != null) {
-                    var didCommit = false
-                    var removedProfileIds = emptySet<Long>()
-                    database.withTransaction {
-                        val current = groupDao.getById(group.id)
-                        if (current?.refreshGeneration == refreshGeneration) {
-                            removedProfileIds = profileDao.replaceForGroupAndReturnRemovedIds(
-                                group.id,
-                                profilesWithStableIds,
-                            )
-                            didCommit = groupDao.commitRefresh(
-                                id = group.id,
-                                refreshGeneration = refreshGeneration,
-                                lastUpdated = updatedGroup.lastUpdated,
-                                lastAttemptAt = updatedGroup.lastAttemptAt,
-                                lastRefreshErrorCode = updatedGroup.lastRefreshErrorCode,
-                                lastServerCount = updatedGroup.lastServerCount,
-                                bytesUsed = updatedGroup.bytesUsed,
-                                bytesRemaining = updatedGroup.bytesRemaining,
-                                expiryDate = updatedGroup.expiryDate,
-                            ) == 1
-                        }
-                    }
-                    if (didCommit && removedProfileIds.isNotEmpty()) onProfilesRemoved(removedProfileIds)
-                    didCommit
+            }.distinctBy { it.stableFullIdentityKey() }
+            val existingProfiles = profileDao.getAutoCandidatesByGroupId(group.id, MAX_PROFILES_PER_GROUP)
+            val incomingBaseKeyCounts = profiles
+                .groupingBy { it.stableBaseIdentityKey() }
+                .eachCount()
+            val existingByBaseIdentity = existingProfiles
+                .groupBy { it.stableBaseIdentityKey() }
+                .mapValues { (_, matches) -> matches.toMutableList() }
+            val existingByFullIdentity = existingProfiles
+                .groupBy { it.stableFullIdentityKey() }
+                .mapValues { (_, matches) -> matches.toMutableList() }
+            val profilesWithStableIds = profiles.map { profile ->
+                val baseKey = profile.stableBaseIdentityKey()
+                val useFullKey = (incomingBaseKeyCounts[baseKey] ?: 0) > 1 ||
+                    ((existingByBaseIdentity[baseKey]?.size ?: 0) > 1)
+                val matched = if (useFullKey) {
+                    existingByFullIdentity[profile.stableFullIdentityKey()]?.removeFirstOrNull()
                 } else {
-                    if (groupDao.getById(group.id)?.refreshGeneration != refreshGeneration) {
-                        false
-                    } else {
-                        val removedProfileIds = profileDao.replaceForGroupAndReturnRemovedIds(
+                    existingByBaseIdentity[baseKey]?.removeFirstOrNull()
+                }
+                if (matched != null) {
+                    profile.copy(
+                        id = matched.id,
+                        latencyMs = matched.latencyMs,
+                        probeError = matched.probeError,
+                        lastProbeAt = matched.lastProbeAt,
+                    )
+                } else {
+                    profile
+                }
+            }
+            val currentGroup = groupDao.getById(group.id)
+                ?: group.copy(lastAttemptAt = lastAttemptAt, refreshGeneration = refreshGeneration)
+            val usedBytes = subInfo?.let { it.uploadBytes + it.downloadBytes } ?: currentGroup.bytesUsed
+            val remainingBytes = subInfo?.let {
+                maxOf(0L, it.totalBytes - it.uploadBytes - it.downloadBytes)
+            } ?: currentGroup.bytesRemaining
+            val updatedGroup = currentGroup.copy(
+                lastUpdated = System.currentTimeMillis(),
+                lastAttemptAt = lastAttemptAt,
+                lastRefreshErrorCode = null,
+                lastServerCount = profilesWithStableIds.size,
+                bytesUsed = usedBytes,
+                bytesRemaining = remainingBytes,
+                expiryDate = subInfo?.expiryTimestamp ?: currentGroup.expiryDate,
+            )
+            val committed = if (database != null) {
+                var didCommit = false
+                database.withTransaction {
+                    val current = groupDao.getById(group.id)
+                    if (current?.refreshGeneration == refreshGeneration) {
+                        profileDao.replaceForGroup(
                             group.id,
                             profilesWithStableIds,
                         )
-                        val didCommit = groupDao.commitRefresh(
+                        didCommit = groupDao.commitRefresh(
                             id = group.id,
                             refreshGeneration = refreshGeneration,
                             lastUpdated = updatedGroup.lastUpdated,
@@ -200,23 +177,40 @@ class RawUpdater(
                             bytesRemaining = updatedGroup.bytesRemaining,
                             expiryDate = updatedGroup.expiryDate,
                         ) == 1
-                        if (didCommit && removedProfileIds.isNotEmpty()) {
-                            onProfilesRemoved(removedProfileIds)
-                        }
-                        didCommit
                     }
                 }
-                if (!committed) {
-                    Log.i(TAG, "refresh superseded groupId=${group.id} generation=$refreshGeneration")
-                    return@use 0
+                didCommit
+            } else {
+                if (groupDao.getById(group.id)?.refreshGeneration != refreshGeneration) {
+                    false
+                } else {
+                    profileDao.replaceForGroup(
+                        group.id,
+                        profilesWithStableIds,
+                    )
+                    groupDao.commitRefresh(
+                        id = group.id,
+                        refreshGeneration = refreshGeneration,
+                        lastUpdated = updatedGroup.lastUpdated,
+                        lastAttemptAt = updatedGroup.lastAttemptAt,
+                        lastRefreshErrorCode = updatedGroup.lastRefreshErrorCode,
+                        lastServerCount = updatedGroup.lastServerCount,
+                        bytesUsed = updatedGroup.bytesUsed,
+                        bytesRemaining = updatedGroup.bytesRemaining,
+                        expiryDate = updatedGroup.expiryDate,
+                    ) == 1
                 }
-                Log.i(
-                    TAG,
-                    "refresh committed groupId=${group.id} generation=$refreshGeneration " +
-                        "servers=${profilesWithStableIds.size}",
-                )
-                profilesWithStableIds.size
             }
+            if (!committed) {
+                Log.i(TAG, "refresh superseded groupId=${group.id} generation=$refreshGeneration")
+                return@runCatching 0
+            }
+            Log.i(
+                TAG,
+                "refresh committed groupId=${group.id} generation=$refreshGeneration " +
+                    "servers=${profilesWithStableIds.size}",
+            )
+            profilesWithStableIds.size
         }.recoverCatching { e ->
             throw normalizeError(e)
         }
@@ -226,7 +220,20 @@ class RawUpdater(
         result.exceptionOrNull()?.let { failure ->
             recordRefreshFailure(group.id, refreshGeneration, lastAttemptAt, failure)
         }
+        if (result.isSuccess && result.getOrThrow() > 0) {
+            return@withContext reconcileSelections().map { result.getOrThrow() }
+        }
         result
+    }
+
+    private suspend fun reconcileSelections(): Result<Unit> = try {
+        reconcileCommittedSelections()
+        Result.success(Unit)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Log.w(TAG, "subscription selection reconciliation pending: ${e.javaClass.simpleName}")
+        Result.failure(IOException("Subscription selection reconciliation pending", e))
     }
 
     private suspend fun beginRefresh(groupId: Long, attemptAt: Long): Long? {
@@ -282,9 +289,22 @@ class RawUpdater(
         group: SubscriptionGroup,
         request: Request,
         allowInsecureRetry: Boolean,
-    ): Response =
+    ): SubscriptionResponse {
+        val client = httpClientFor(group, allowInsecureRetry)
+        return try {
+            executeCall(client, request)
+        } catch (failure: IOException) {
+            currentCoroutineContext().ensureActive()
+            if ((!group.isBuiltin && allowInsecureRetry) || !failure.canRetryViaLocalProxy()) throw failure
+            val retryClient = fallbackClient(client) ?: throw failure
+            Log.i(TAG, "refresh retry via local proxy groupId=${group.id}")
+            executeCall(retryClient, request)
+        }
+    }
+
+    private suspend fun executeCall(client: OkHttpClient, request: Request): SubscriptionResponse =
         suspendCancellableCoroutine { continuation ->
-            val call = httpClientFor(group, allowInsecureRetry).newCall(request)
+            val call = client.newCall(request)
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
                 override fun onFailure(call: Call, error: IOException) {
@@ -294,12 +314,24 @@ class RawUpdater(
                 override fun onResponse(call: Call, response: Response) {
                     if (!continuation.isActive) {
                         response.close()
-                    } else {
-                        continuation.resume(response) { _, pendingResponse, _ -> pendingResponse.close() }
+                        return
                     }
+                    val result = runCatching {
+                        response.use {
+                            if (!it.isSuccessful) throw SubscriptionHttpException(it.code)
+                            SubscriptionResponse(
+                                code = it.code,
+                                body = it.body?.readUtf8Limited(MAX_SUBSCRIPTION_BYTES) ?: "",
+                                userInfo = it.header("Subscription-Userinfo"),
+                            )
+                        }
+                    }
+                    continuation.resumeWith(result)
                 }
             })
         }
+
+    private data class SubscriptionResponse(val code: Int, val body: String, val userInfo: String?)
 
     companion object {
         private const val TAG = "RawUpdater"
@@ -420,8 +452,6 @@ class RawUpdater(
                 message.orEmpty().containsCertificateFailureText()
         }
 
-        private fun Throwable.causeChain(): Sequence<Throwable> = generateSequence(this) { it.cause }
-
         private fun String.containsCertificateFailureText(): Boolean {
             val text = lowercase()
             return text.contains("chain validation failed") ||
@@ -440,6 +470,17 @@ class RawUpdater(
         }
     }
 }
+
+private fun IOException.canRetryViaLocalProxy(): Boolean = causeChain().none {
+    it is SubscriptionHttpException ||
+        it is SubscriptionBodyTooLargeException ||
+        it is SSLException ||
+        it is CertificateException ||
+        it is CertPathValidatorException ||
+        it is CancellationException
+}
+
+private fun Throwable.causeChain(): Sequence<Throwable> = generateSequence(this) { it.cause }
 
 private fun ResponseBody.readUtf8Limited(maxBytes: Long): String {
     val declaredLength = contentLength()

@@ -4,7 +4,12 @@ package ru.ozero.singboxsubscription
 
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient
@@ -13,6 +18,7 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -26,6 +32,8 @@ import java.security.cert.CertPathValidatorException
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
 import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.io.IOException
 import javax.net.ssl.SSLHandshakeException
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -89,6 +97,223 @@ class RawUpdaterTest {
         assertEquals(2, profileDao.profiles.size)
         assertTrue(profileDao.profiles.all { it.groupId == g.id })
         assertEquals("mihomo/1.19.23", server.takeRequest().getHeader("User-Agent"))
+    }
+
+    @Test
+    fun `should retry network failure through available local proxy using selected trust client`() = runBlocking {
+        val direct = OkHttpClient.Builder().addInterceptor { throw UnknownHostException("unreachable") }.build()
+        val retries = AtomicInteger()
+        server.enqueue(MockResponse().setBody(vless1).addHeader("Subscription-Userinfo", "total=1000; upload=100"))
+        rawUpdater = RawUpdater(
+            okHttpClient = direct,
+            groupDao = groupDao,
+            profileDao = profileDao,
+            fallbackClient = { selected ->
+                assertTrue(selected === direct)
+                retries.incrementAndGet()
+                OkHttpClient()
+            },
+        )
+        val g = group()
+
+        assertEquals(1, rawUpdater.refresh(g).getOrThrow())
+        assertEquals(1, retries.get())
+        assertEquals(1, profileDao.profiles.size)
+        assertEquals("mihomo/1.19.23", server.takeRequest().getHeader("User-Agent"))
+    }
+
+    @Test
+    fun `should not consult fallback when first request succeeds`() = runBlocking {
+        server.enqueue(MockResponse().setBody(vless1))
+        rawUpdater = RawUpdater(
+            OkHttpClient(),
+            groupDao,
+            profileDao,
+            fallbackClient = { error("unexpected retry") },
+        )
+
+        assertEquals(1, rawUpdater.refresh(group()).getOrThrow())
+    }
+
+    @Test
+    fun `should keep certificate failure on original trust route`() = runBlocking {
+        val direct = OkHttpClient.Builder().addInterceptor { throw SSLHandshakeException("certificate") }.build()
+        val retries = AtomicInteger()
+        rawUpdater = RawUpdater(
+            direct,
+            groupDao,
+            profileDao,
+            fallbackClient = {
+                retries.incrementAndGet()
+                OkHttpClient()
+            },
+        )
+
+        assertTrue(rawUpdater.refresh(group()).isFailure)
+        assertEquals(0, retries.get())
+    }
+
+    @Test
+    fun `should not retry HTTP errors or invalid subscription content`() = runBlocking {
+        val retries = AtomicInteger()
+        rawUpdater = RawUpdater(
+            OkHttpClient(),
+            groupDao,
+            profileDao,
+            fallbackClient = {
+                retries.incrementAndGet()
+                OkHttpClient()
+            },
+        )
+        val g = group()
+        server.enqueue(MockResponse().setResponseCode(403))
+        server.enqueue(MockResponse().setBody("not a subscription"))
+        server.enqueue(MockResponse().setBody("x").setHeader("Content-Length", 16L * 1024 * 1024 + 1))
+
+        repeat(3) { assertTrue(rawUpdater.refresh(g).isFailure) }
+        assertEquals(0, retries.get())
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test
+    fun `should preserve direct failure when no local proxy is available`() = runBlocking {
+        val direct = OkHttpClient.Builder().addInterceptor { throw UnknownHostException("unreachable") }.build()
+        val retries = AtomicInteger()
+        rawUpdater = RawUpdater(
+            direct,
+            groupDao,
+            profileDao,
+            fallbackClient = {
+                retries.incrementAndGet()
+                null
+            },
+        )
+
+        assertTrue(rawUpdater.refresh(group()).exceptionOrNull() is UnknownHostException)
+        assertEquals(1, retries.get())
+    }
+
+    @Test
+    fun `should stop after one failed fallback`() = runBlocking {
+        val direct = OkHttpClient.Builder().addInterceptor { throw UnknownHostException("unreachable") }.build()
+        val retries = AtomicInteger()
+        val fallbackCalls = AtomicInteger()
+        rawUpdater = RawUpdater(
+            direct,
+            groupDao,
+            profileDao,
+            fallbackClient = {
+                retries.incrementAndGet()
+                OkHttpClient.Builder().addInterceptor {
+                    fallbackCalls.incrementAndGet()
+                    throw IOException("proxy unavailable")
+                }.build()
+            },
+        )
+
+        assertTrue(rawUpdater.refresh(group()).isFailure)
+        assertEquals(1, retries.get())
+        assertEquals(1, fallbackCalls.get())
+        assertEquals(0, profileDao.profiles.size)
+    }
+
+    @Test
+    fun `should not send explicitly insecure retry through proxy`() = runBlocking {
+        val insecure = OkHttpClient.Builder().addInterceptor { throw UnknownHostException("unreachable") }.build()
+        val retries = AtomicInteger()
+        rawUpdater = RawUpdater(
+            OkHttpClient(),
+            groupDao,
+            profileDao,
+            insecureOkHttpClient = insecure,
+            fallbackClient = {
+                retries.incrementAndGet()
+                OkHttpClient()
+            },
+        )
+
+        assertTrue(rawUpdater.refresh(group().copy(isBuiltin = false), allowInsecureRetry = true).isFailure)
+        assertEquals(0, retries.get())
+    }
+
+    @Test
+    fun `should retry interrupted response body through fallback`() = runBlocking {
+        val retries = AtomicInteger()
+        val fallbackCalls = AtomicInteger()
+        val direct = OkHttpClient.Builder().retryOnConnectionFailure(false).build()
+        server.enqueue(
+            MockResponse()
+                .setBody("x".repeat(32_768))
+                .setSocketPolicy(SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY),
+        )
+        server.enqueue(MockResponse().setBody(vless1))
+        rawUpdater = RawUpdater(
+            direct,
+            groupDao,
+            profileDao,
+            fallbackClient = {
+                retries.incrementAndGet()
+                OkHttpClient.Builder().addInterceptor { chain ->
+                    fallbackCalls.incrementAndGet()
+                    chain.proceed(chain.request())
+                }.build()
+            },
+        )
+
+        assertEquals(1, rawUpdater.refresh(group()).getOrThrow())
+        assertEquals(1, retries.get())
+        assertEquals(1, fallbackCalls.get())
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `should cancel pending direct request without retry`() = runBlocking {
+        val enqueued = CompletableDeferred<Unit>()
+        val pendingCall = mockk<Call>(relaxed = true)
+        every { pendingCall.enqueue(any()) } answers {
+            enqueued.complete(Unit)
+            Unit
+        }
+        val client = mockk<OkHttpClient>()
+        every { client.newCall(any()) } returns pendingCall
+        rawUpdater = RawUpdater(
+            client,
+            groupDao,
+            profileDao,
+            fallbackClient = { error("cancel must not retry") },
+        )
+        val g = group()
+        val job = launch { rawUpdater.refresh(g) }
+
+        withTimeout(5_000) { enqueued.await() }
+        job.cancelAndJoin()
+
+        verify(exactly = 1) { pendingCall.cancel() }
+        assertTrue(job.isCancelled)
+        assertEquals(0, profileDao.profiles.size)
+    }
+
+    @Test
+    fun `should cancel pending fallback request without saving profiles`() = runBlocking {
+        val enqueued = CompletableDeferred<Unit>()
+        val pendingCall = mockk<Call>(relaxed = true)
+        every { pendingCall.enqueue(any()) } answers {
+            enqueued.complete(Unit)
+            Unit
+        }
+        val proxy = mockk<OkHttpClient>()
+        every { proxy.newCall(any()) } returns pendingCall
+        val direct = OkHttpClient.Builder().addInterceptor { throw UnknownHostException("unreachable") }.build()
+        rawUpdater = RawUpdater(direct, groupDao, profileDao, fallbackClient = { proxy })
+        val g = group()
+        val job = launch { rawUpdater.refresh(g) }
+
+        withTimeout(5_000) { enqueued.await() }
+        job.cancelAndJoin()
+
+        verify(exactly = 1) { pendingCall.cancel() }
+        assertTrue(job.isCancelled)
+        assertEquals(0, profileDao.profiles.size)
     }
 
     @Test
@@ -1187,29 +1412,73 @@ class RawUpdaterTest {
     }
 
     @Test
-    fun `should report removed profile ids after successful replacement`() = runBlocking {
-        val removedIds = mutableSetOf<Long>()
-        rawUpdater = RawUpdater(
-            okHttpClient = OkHttpClient(),
-            groupDao = groupDao,
-            profileDao = profileDao,
-            onProfilesRemoved = { removedIds += it },
-        )
+    fun `committed refresh retries reconciliation from persisted rows before another download`() = runBlocking {
         val g = group()
+        val staleId = 901L
         profileDao.profiles.add(
             ru.ozero.singboxroom.entity.ProxyProfile(
-                id = 901L,
+                id = staleId,
                 groupId = g.id,
                 name = "Removed",
                 beanBlob = byteArrayOf(9, 0, 1),
                 protocolType = RawUpdater.PROTOCOL_VLESS,
             ),
         )
+        var selectedId: Long? = staleId
+        var failCleanup = true
+        val reconcile: suspend () -> Unit = {
+            if (selectedId != null && profileDao.getById(checkNotNull(selectedId)) == null) {
+                if (failCleanup) throw IOException("fixture")
+                selectedId = null
+            }
+        }
+        rawUpdater = RawUpdater(
+            OkHttpClient(), groupDao, profileDao, reconcileCommittedSelections = reconcile,
+        )
         server.enqueue(MockResponse().setBody(vless1))
 
         val result = rawUpdater.refresh(g)
 
-        assertTrue(result.isSuccess)
-        assertEquals(setOf(901L), removedIds)
+        assertTrue(result.isFailure)
+        assertTrue(isTransientSubscriptionRefreshFailure(checkNotNull(result.exceptionOrNull())))
+        assertEquals(staleId, selectedId)
+        assertEquals(null, profileDao.getById(staleId))
+        val committed = groupDao.getById(g.id)
+        assertEquals(null, committed?.lastRefreshErrorCode)
+        assertEquals(1, committed?.lastServerCount)
+
+        rawUpdater = RawUpdater(
+            OkHttpClient(), groupDao, profileDao, reconcileCommittedSelections = reconcile,
+        )
+        assertTrue(rawUpdater.refresh(g).isFailure)
+        assertEquals(1, server.requestCount)
+
+        failCleanup = false
+        server.enqueue(MockResponse().setResponseCode(503))
+        assertTrue(rawUpdater.refresh(g).isFailure)
+        assertEquals(null, selectedId)
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `cancelled selection reconciliation after commit preserves successful database state`() = runBlocking {
+        val g = group()
+        var reconciliations = 0
+        rawUpdater = RawUpdater(
+            OkHttpClient(),
+            groupDao,
+            profileDao,
+            reconcileCommittedSelections = {
+                if (++reconciliations == 2) throw kotlinx.coroutines.CancellationException("fixture")
+            },
+        )
+        server.enqueue(MockResponse().setBody(vless1))
+
+        val failure = runCatching { rawUpdater.refresh(g) }.exceptionOrNull()
+
+        assertTrue(failure is kotlinx.coroutines.CancellationException)
+        assertEquals(1, profileDao.profiles.size)
+        assertEquals(null, groupDao.getById(g.id)?.lastRefreshErrorCode)
+        assertEquals(1, groupDao.getById(g.id)?.lastServerCount)
     }
 }

@@ -10,7 +10,7 @@
 | Контракты движков | `engines-core`: `EnginePlugin`, конфигурации, capabilities, readiness и socket protection |
 | VPN | `common-vpn`: сервис, TUN, запуск, остановка, переключение, watchdog и состояние туннеля |
 | Общие компоненты | `common-dns`, `common-net`, `common-crypto`, `core-storage`, `core-backup` |
-| Транспорты | `engine-byedpi`, `engine-warp`, `engine-fptn`, `engine-urnetwork`, `engine-masterdns`, `engine-singbox` |
+| Транспорты | `engine-byedpi`, `engine-warp`, `engine-fptn`, `engine-urnetwork`, `engine-masterdns`, `engine-singbox`, `engine-opera`, `engine-masque` |
 | WARP | `shared-warp-settings`: общая модель конфигурации и AWG-параметры |
 | sing-box | `singbox-process`, `singbox-core`, `singbox-fmt`, `singbox-config`, `singbox-room`, `singbox-subscription` |
 
@@ -33,6 +33,8 @@
 - sing-box использует runtime-модуль `singbox-process`, libbox и сервис в процессе `:engine_singbox`. URnetwork и sing-box используют общую подготовку `go.Seq`; классы `go/*` удаляются из дублирующих SDK-артефактов.
 - FPTN использует Kotlin-обвязку HTTPS/WebSocket и JNI-библиотеку `libfptn_native_lib.so`.
 - MasterDNS запускает нативный клиент как subprocess.
+- Opera Proxy запускает закреплённый ARM64 subprocess с локальным TCP SOCKS5. Для TUN используется libbox в отдельном процессе `:engine_opera_tun`: DNS через DoH и Opera, TCP через Opera, прочий UDP отклоняется.
+- MASQUE запускает отдельный usque subprocess с SOCKS5, H2/H3 и проверкой трафика; профиль хранится зашифрованным.
 
 Изоляция WARP нужна для совместимости Go runtimes. Native-библиотеки загружаются лениво; правила загрузки и порядка остановки сохраняются в [AGENTS.md](../AGENTS.md).
 
@@ -42,7 +44,7 @@
 
 Kill-switch и IPv6 routing принадлежат общей VPN-логике; их поведение зависит от режима, настроек и поддержки транспорта. Fail-closed и отсутствие обхода туннеля требуют проверки при изменениях маршрутизации и lifecycle.
 
-Встроенное обновление APK проверяет Ed25519-подпись через `ApkUpdateVerifier`. Подписки sing-box имеют отдельный HTTP/TLS pipeline; проверка APK не означает Ed25519-подпись произвольной импортированной подписки.
+Обновления APK устанавливаются вручную. Код проверки подписи Ed25519 (`ApkUpdateVerifier`) сейчас не подключён к приложению. Подписки sing-box загружаются через отдельный HTTP/TLS pipeline. При сетевой ошибке возможна одна резервная попытка через SOCKS5 на loopback-порту активного движка с тем же TLS-клиентом. При отсутствии SOCKS-порта, переключении движка, ошибке сертификата, HTTP-ошибке или явном insecure retry резервный маршрут не используется. Маршрутизация TUN и kill-switch не изменяются.
 
 ## Где проверять изменения
 

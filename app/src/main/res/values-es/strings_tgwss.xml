@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tgwss_summary">Telegram mediante WSS y el resto del tráfico mediante WARP. Admite VPN y túnel dividido.</string>
+    <string name="tgwss_setup">Selecciona Telegram WSS en la pantalla principal y conecta la VPN. No es necesario configurar Telegram. Usa el túnel dividido para excluir aplicaciones. En modo Proxy, configura SOCKS5 manualmente.</string>
+    <string name="tgwss_address">SOCKS5: 127.0.0.1:%1$d (sin usuario ni contraseña)</string>
+    <string name="tgwss_open">Abrir en Telegram</string>
+    <string name="tgwss_open_failed">No se pudo abrir Telegram. Introduce la dirección y el puerto manualmente.</string>
+    <string name="tgwss_not_running">El proxy local no está activo.</string>
+</resources>

@@ -1,0 +1,31 @@
+name: Build pinned MASQUE transport
+description: Build usque from the pinned source revision and verify the Android executable
+inputs:
+  abi:
+    description: Android ABI to build
+    required: false
+    default: arm64-v8a
+  ndk-path:
+    description: Existing Android NDK r27c path; install pinned NDK when omitted
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.3'
+        cache: false
+    - name: Setup Android NDK for MASQUE
+      id: masque-ndk
+      if: inputs.ndk-path == ''
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r27c
+        add-to-path: false
+    - name: Build pinned usque
+      shell: bash
+      env:
+        MASQUE_ABI: ${{ inputs.abi }}
+        MASQUE_NDK_PATH: ${{ inputs.ndk-path || steps.masque-ndk.outputs.ndk-path }}
+      run: bash scripts/build-masque-binary.sh "$MASQUE_ABI"

@@ -61,6 +61,14 @@ class EnginePluginRegistrationTest {
     }
 
     @Test
+    fun `OperaModule registers isolated EnginePlugin`() {
+        val src = module("OperaModule.kt")
+        assertTrue(src.contains("@IntoSet") && src.contains(": EnginePlugin"))
+        assertTrue(src.contains("@InstallIn(SingletonComponent::class)"))
+        assertTrue(src.contains("SubprocessOperaProxyLauncher"))
+    }
+
+    @Test
     fun `все модули InstallIn SingletonComponent`() {
         listOf("EnginesModule.kt", "UrnetworkModule.kt", "WarpModule.kt").forEach { name ->
             val src = module(name)

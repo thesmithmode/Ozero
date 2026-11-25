@@ -99,6 +99,8 @@ android {
     }
 
     packaging {
+        jniLibs.keepDebugSymbols += "**/libopera_proxy.so"
+        jniLibs.keepDebugSymbols += "**/libusque.so"
         resources {
             excludes +=
                 setOf(
@@ -113,9 +115,17 @@ android {
     }
 }
 
+tasks.matching { it.name == "packageDebug" || it.name == "packageRelease" }.configureEach {
+    supportedAbis.forEach { abi ->
+        inputs.file(rootProject.file("engine-masque/build/native/$abi/libusque.so"))
+            .withPropertyName("masqueNative_$abi")
+    }
+}
+
 gradle.taskGraph.whenReady {
     val isRelease = allTasks.any { it.name.endsWith("Release") && it.name.contains("assemble") }
     if (!isRelease) return@whenReady
+    check(!soakX86_64) { "Release APK must contain ARM64 only" }
     val key = providers.environmentVariable("UPDATE_PUBLIC_KEY_HEX").orNull
     val placeholder = "0000000000000000000000000000000000000000000000000000000000000000"
     if (key.isNullOrBlank() || key == placeholder) {
@@ -157,10 +167,13 @@ dependencies {
     implementation(project(":engine-byedpi"))
     implementation(project(":engine-urnetwork"))
     implementation(project(":engine-warp"))
+    implementation(project(":engine-masque"))
     implementation(project(":shared-warp-settings"))
     implementation(project(":engine-masterdns"))
+    implementation(project(":engine-opera"))
     implementation(project(":engine-fptn"))
     implementation(project(":engine-singbox"))
+    implementation(project(":engine-tgwss"))
     implementation(project(":singbox-process"))
     implementation(project(":singbox-core"))
     implementation(project(":singbox-fmt"))

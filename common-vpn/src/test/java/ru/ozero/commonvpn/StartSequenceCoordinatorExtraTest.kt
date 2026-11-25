@@ -2350,6 +2350,9 @@ class StartSequenceCoordinatorExtraTest {
                 proxyMode = true,
             )
             EngineId.FPTN -> EngineConfig.Fptn(token = "test")
+            EngineId.TGWSS -> EngineConfig.TelegramWss(socksPort = socksPort)
+            EngineId.OPERA -> EngineConfig.Opera(proxyMode = true)
+            EngineId.MASQUE -> EngineConfig.Masque(profileJson = "{}", transport = "AUTO")
         }
     }
 

@@ -3,6 +3,7 @@ package ru.ozero.enginewarp
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import java.io.IOException
+import java.net.URI
 import java.util.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -608,33 +609,18 @@ class WarpAutoConfigTest {
     }
 
     @Test
-    fun `default mirrors список содержит CYBERPORTAL_X URLs (sentinel против регрессии endpoint)`() {
+    fun `default mirrors use unique supported HTTPS registration endpoints`() {
         val urls = ProxyWarpAutoConfig.DEFAULT_MIRRORS
-        assertTrue(urls.size >= 70, "Список зеркал из CYBERPORTAL_X-1.0.2 содержит 78 URL")
-        assertTrue(
-            urls.none { it.contains("api.cloudflareclient.com") },
-            "api.cloudflareclient.com блокируется ТСПУ в РФ — НЕ должен быть в списке зеркал",
-        )
-        assertTrue(
-            urls.all { it.endsWith("/api/warp") || it.endsWith("/api/generate") },
-            "Все зеркала используют поддерживаемые endpoints",
-        )
-        assertTrue(
-            urls.any { it.endsWith("/api/generate") },
-            "Список включает публичные generator mirrors из справочных сайтов",
-        )
-        assertTrue(
-            urls.any { it.contains("netlify.app") },
-            "Часть зеркал hosted на Netlify",
-        )
-        assertTrue(
-            urls.any { it.contains("vercel.app") },
-            "Часть зеркал hosted на Vercel",
-        )
-        assertTrue(
-            urls.any { it.contains("cyberportal.workers.dev") },
-            "Часть зеркал на Cloudflare Workers",
-        )
+        assertTrue(urls.isNotEmpty())
+        assertEquals(urls.size, urls.distinct().size)
+        val endpoints = urls.map { URI(it) }
+        assertTrue(endpoints.all { it.scheme.equals("https", ignoreCase = true) && !it.host.isNullOrBlank() })
+        assertTrue(endpoints.all { it.userInfo == null && it.fragment == null && it.query == null })
+        assertTrue(endpoints.none { it.host?.trimEnd('.').equals("api.cloudflareclient.com", ignoreCase = true) })
+        assertTrue(endpoints.all { it.rawPath == "/api/warp" || it.rawPath == "/api/generate" })
+        assertTrue(endpoints.any { it.rawPath == "/api/generate" })
+        assertTrue(endpoints.any { it.host.equals("warp.cyberportal.workers.dev", ignoreCase = true) })
+        assertTrue(urls.contains("https://warp-gen.cyb-portal.org/api/warp"))
     }
 
     @Test

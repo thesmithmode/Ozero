@@ -64,12 +64,35 @@ class StartSequenceCoordinatorDecisionCoverageTest {
             proxyConfig = EngineConfig.ByeDpi(socksPort = 2081),
             capabilities = proxyCapabilities(providesStandalone = false),
         )
-        val coordinator = coordinator(proxyOnly, notStandalone)
+        val opera = DecisionPlugin(
+            EngineId.OPERA,
+            manualConfig = EngineConfig.Opera(),
+            proxyConfig = EngineConfig.Opera(proxyMode = true),
+            capabilities = proxyCapabilities(providesStandalone = true),
+        )
+        val coordinator = coordinator(proxyOnly, notStandalone, opera)
 
+        assertTrue(coordinator.engineAllowed(EngineId.OPERA, TrafficMode.TUN))
+        assertTrue(coordinator.engineAllowed(EngineId.OPERA, TrafficMode.PROXY))
         assertTrue(coordinator.engineAllowed(EngineId.BYEDPI, TrafficMode.TUN))
         assertTrue(coordinator.engineAllowed(EngineId.WARP, TrafficMode.PROXY))
         assertFalse(coordinator.engineAllowed(EngineId.BYEDPI, TrafficMode.PROXY))
         assertFalse(coordinator.engineAllowed(EngineId.MASTERDNS, TrafficMode.PROXY))
+    }
+
+    @Test
+    fun `routed probe capability is opt in and missing engine is safe`() {
+        val existing = DecisionPlugin(EngineId.WARP, manualConfig = EngineConfig.WarpProxy(2080))
+        val masque = DecisionPlugin(
+            EngineId.MASQUE,
+            manualConfig = EngineConfig.Masque("{}", "AUTO"),
+            capabilities = proxyCapabilities(providesStandalone = true).copy(requiresRoutedProbe = true),
+        )
+        val coordinator = coordinator(existing, masque)
+        assertFalse(coordinator.callPrivate<Boolean>("needsRoutedProbe", EngineId.WARP))
+        assertFalse(coordinator.callPrivate<Boolean>("needsRoutedProbe", EngineId.FPTN))
+        assertTrue(coordinator.callPrivate<Boolean>("needsRoutedProbe", EngineId.MASQUE))
+        assertFalse(coordinator().callPrivate<Boolean>("needsRoutedProbe", EngineId.MASQUE))
     }
 
     @Test
@@ -103,6 +126,23 @@ class StartSequenceCoordinatorDecisionCoverageTest {
         )
 
         assertEquals(listOf(EngineId.WARP), candidates.map { it.first })
+    }
+
+    @Test
+    fun `Telegram WSS supports TUN and proxy but is excluded from auto priority`() = runTest {
+        val telegram = DecisionPlugin(
+            EngineId.TGWSS,
+            manualConfig = EngineConfig.TelegramWss(),
+            proxyConfig = EngineConfig.TelegramWss(),
+            capabilities = proxyCapabilities(providesStandalone = true),
+        )
+        val coordinator = coordinator(telegram)
+        val settings = SettingsModel(engineAutoPriority = listOf(EngineId.TGWSS))
+        assertTrue(coordinator.engineAllowed(EngineId.TGWSS, TrafficMode.TUN))
+        assertTrue(coordinator.engineAllowed(EngineId.TGWSS, TrafficMode.PROXY))
+        assertTrue(coordinator.autoCandidates(settings, TrafficMode.TUN).isEmpty())
+        assertTrue(coordinator.autoCandidates(settings, TrafficMode.PROXY).isEmpty())
+        assertEquals(null, coordinator.resolveTarget(null, settings))
     }
 
     @Test

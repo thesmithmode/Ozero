@@ -32,7 +32,7 @@ Each engine is isolated in a dedicated Gradle module and plugged in through the 
 - Unified `EnginePlugin` interface — the app does not depend on transport internals
 - Extensible plugin system
 - Internal kill-switch: traffic is blocked on engine failure (fail-closed)
-- The in-app updater implements Ed25519 verification; publication of the required `.apk.sig` is not configured yet — see [signature formats](docs/build.md#подписи-опубликованного-обновления) (Russian)
+- Releases are installed manually. Ed25519 update verification is currently disconnected from the UI and background checks. See [signature formats](docs/build.md#подписи-опубликованного-обновления) (Russian).
 - Build hardening: R8 minify + shrink, class obfuscation
 - Per-engine UI with settings, no shared configuration screen
 

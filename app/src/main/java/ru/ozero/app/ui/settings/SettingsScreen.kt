@@ -59,6 +59,7 @@ fun SettingsScreen(
     onOpenByeDpiEngineSettings: () -> Unit = {},
     onOpenUrnetworkSettings: () -> Unit = {},
     onOpenWarpSettings: () -> Unit = {},
+    onOpenMasqueSettings: () -> Unit = {},
     onOpenStatsHistory: () -> Unit = {},
     onOpenBackup: () -> Unit = {},
     onOpenAutoModeSettings: () -> Unit = {},
@@ -66,6 +67,8 @@ fun SettingsScreen(
     onOpenMasterDnsSettings: () -> Unit = {},
     onOpenFptnSettings: () -> Unit = {},
     onOpenSingboxSettings: () -> Unit = {},
+    onOpenOperaSettings: () -> Unit = {},
+    onOpenTelegramWssSettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -81,6 +84,7 @@ fun SettingsScreen(
             onOpenByeDpiEngineSettings = onOpenByeDpiEngineSettings,
             onOpenUrnetworkSettings = onOpenUrnetworkSettings,
             onOpenWarpSettings = onOpenWarpSettings,
+            onOpenMasqueSettings = onOpenMasqueSettings,
             onOpenStatsHistory = onOpenStatsHistory,
             onOpenBackup = onOpenBackup,
             onOpenAutoModeSettings = onOpenAutoModeSettings,
@@ -88,6 +92,8 @@ fun SettingsScreen(
             onOpenMasterDnsSettings = onOpenMasterDnsSettings,
             onOpenFptnSettings = onOpenFptnSettings,
             onOpenSingboxSettings = onOpenSingboxSettings,
+            onOpenTelegramWssSettings = onOpenTelegramWssSettings,
+            onOpenOperaSettings = onOpenOperaSettings,
         ),
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
@@ -209,9 +215,12 @@ private fun ContentBody(
                 onOpenByeDpi = nav.onOpenByeDpiEngineSettings,
                 onOpenUrnetwork = nav.onOpenUrnetworkSettings,
                 onOpenWarp = nav.onOpenWarpSettings,
+                onOpenMasque = nav.onOpenMasqueSettings,
                 onOpenMasterDns = nav.onOpenMasterDnsSettings,
                 onOpenFptn = nav.onOpenFptnSettings,
                 onOpenSingbox = nav.onOpenSingboxSettings,
+                onOpenTelegramWss = nav.onOpenTelegramWssSettings,
+                onOpenOpera = nav.onOpenOperaSettings,
             )
         }
         item { SectionDivider() }
@@ -391,14 +400,18 @@ private fun BackupSection(onOpenBackup: () -> Unit) {
     )
 }
 
+@Suppress("LongParameterList")
 @Composable
 private fun EnginesSection(
     onOpenByeDpi: () -> Unit,
     onOpenUrnetwork: () -> Unit,
     onOpenWarp: () -> Unit,
+    onOpenMasque: () -> Unit,
     onOpenMasterDns: () -> Unit,
     onOpenFptn: () -> Unit,
     onOpenSingbox: () -> Unit,
+    onOpenOpera: () -> Unit,
+    onOpenTelegramWss: () -> Unit,
 ) {
     NavRow(
         title = stringResource(R.string.settings_byedpi_title),
@@ -422,6 +435,13 @@ private fun EnginesSection(
         enabled = true,
     )
     NavRow(
+        title = stringResource(R.string.masque_title),
+        summary = stringResource(R.string.masque_summary),
+        tag = "settings_masque_row",
+        onClick = onOpenMasque,
+        enabled = true,
+    )
+    NavRow(
         title = stringResource(R.string.settings_masterdns_title),
         summary = stringResource(R.string.settings_masterdns_summary),
         tag = "settings_masterdns_row",
@@ -440,6 +460,20 @@ private fun EnginesSection(
         summary = stringResource(R.string.settings_singbox_summary),
         tag = "settings_singbox_row",
         onClick = onOpenSingbox,
+        enabled = true,
+    )
+    NavRow(
+        title = "Telegram WSS",
+        summary = stringResource(R.string.tgwss_summary),
+        tag = "settings_tgwss_row",
+        onClick = onOpenTelegramWss,
+        enabled = true,
+    )
+    NavRow(
+        title = "Opera Proxy",
+        summary = stringResource(R.string.settings_opera_summary),
+        tag = "settings_opera_row",
+        onClick = onOpenOpera,
         enabled = true,
     )
 }

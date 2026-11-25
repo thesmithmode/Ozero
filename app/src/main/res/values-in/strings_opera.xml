@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_opera_summary">VPN dan SOCKS5 melalui Opera. TCP dan DNS melalui Cloudflare DoH; UDP lainnya tidak didukung.</string>
+    <string name="opera_region">Wilayah</string>
+    <string name="opera_selection">Pilihan server</string>
+    <string name="opera_first">Pertama tersedia</string>
+    <string name="opera_random">Acak</string>
+    <string name="opera_fastest">Tercepat</string>
+</resources>

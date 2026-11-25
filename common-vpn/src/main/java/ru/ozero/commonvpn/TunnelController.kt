@@ -29,6 +29,7 @@ class TunnelController(
     private val _switching = MutableStateFlow<SwitchingTransition?>(null)
     val switching: StateFlow<SwitchingTransition?> = _switching.asStateFlow()
     private val lock = Any()
+    private var socksRoute: TunnelSocksRoute? = null
     private var switchingWatchdogJob: Job? = null
     private var sessionStartMs: Long = 0L
     private var prevTxBytes: Long = 0L
@@ -37,6 +38,20 @@ class TunnelController(
     private var sessionBaseline: TunnelStats? = null
     private var smoothedBpsIn: Double = 0.0
     private var smoothedBpsOut: Double = 0.0
+
+    fun activeSocksRoute(): TunnelSocksRoute? = synchronized(lock) {
+        val connected = _state.value as? TunnelState.Connected ?: return@synchronized null
+        if (connected.socksPort !in 1..65535 || _killswitchActive.value || _switching.value != null) {
+            return@synchronized null
+        }
+        socksRoute ?: TunnelSocksRoute(connected.socksPort).also { socksRoute = it }
+    }
+
+    private fun invalidateSocksRoute() {
+        val route = socksRoute
+        socksRoute = null
+        route?.invalidate()
+    }
 
     fun onProbing(engineId: EngineId? = null) = transition(TunnelState.Probing(engineId))
 
@@ -67,13 +82,14 @@ class TunnelController(
         transition(TunnelState.Failed(engineId, reason), markError = true)
     }
 
-    fun onKillswitchEngaged(engineId: EngineId, reason: String) {
+    fun onKillswitchEngaged(engineId: EngineId, reason: String): Unit = synchronized(lock) {
+        invalidateSocksRoute()
         transition(TunnelState.Failed(engineId, reason), markError = true)
         _killswitchActive.value = true
         PersistentLoggers.warn(TAG, "killswitch engaged: engine=$engineId reason=$reason")
     }
 
-    fun onKillswitchReleased() {
+    fun onKillswitchReleased(): Unit = synchronized(lock) {
         if (_killswitchActive.compareAndSet(true, false)) {
             PersistentLoggers.info(TAG, "killswitch released")
         }
@@ -81,7 +97,8 @@ class TunnelController(
 
     fun onDisconnecting() = transition(TunnelState.Disconnecting)
 
-    fun onSwitchingStarted(from: EngineId?, to: EngineId?) {
+    fun onSwitchingStarted(from: EngineId?, to: EngineId?): Unit = synchronized(lock) {
+        invalidateSocksRoute()
         val transition = SwitchingTransition(from, to)
         val timeoutMs = switchingTimeoutFor(to)
         _switching.value = transition
@@ -108,6 +125,7 @@ class TunnelController(
 
     fun reset() {
         synchronized(lock) {
+            invalidateSocksRoute()
             _stats.value = null
             _rawStats.value = null
             _stagnant.value = false
@@ -186,6 +204,7 @@ class TunnelController(
             } else {
                 PersistentLoggers.info(TAG, "${name(current)} → ${name(target)}")
             }
+            invalidateSocksRoute()
             _state.value = target
             val sw = _switching.value
             if (sw != null) {
@@ -218,6 +237,8 @@ class TunnelController(
     private fun switchingTimeoutFor(target: EngineId?): Long = when {
         switchingTimeoutMs != SWITCHING_TIMEOUT_MS -> switchingTimeoutMs
         target == EngineId.FPTN -> FPTN_SWITCHING_TIMEOUT_MS
+        target == EngineId.OPERA || target == EngineId.MASQUE -> EXTENDED_SWITCHING_TIMEOUT_MS
+        target == EngineId.TGWSS -> TGWSS_SWITCHING_TIMEOUT_MS
         else -> switchingTimeoutMs
     }
 
@@ -257,5 +278,7 @@ class TunnelController(
         const val EWMA_ALPHA = 0.4
         const val SWITCHING_TIMEOUT_MS = 12_000L
         const val FPTN_SWITCHING_TIMEOUT_MS = 25_000L
+        const val EXTENDED_SWITCHING_TIMEOUT_MS = 75_000L
+        const val TGWSS_SWITCHING_TIMEOUT_MS = 135_000L
     }
 }

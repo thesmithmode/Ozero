@@ -90,5 +90,16 @@ object ByeDpiKnownSeeds {
         "-d1 -s3+s -a1",
         "-o3 -d7 -a1",
         "-d7 -s2 -a1",
+        "-d1 -d3+s -s6+s -d6+s -s7+s -d8+s -s10+s -a1 -t12 -At,s -r3",
+        "-r-1+s -o20+sm -s3:7+sm -d5:3+sm -f300+s -Qr -f-1 -a1",
+        "-o2 -O4 -s1 -q1 -a1 -Ar -s5 -o1+s -f1+s -r20+s -a1",
+        "-r5+s -s25+s -a1 -At,r,s -s50 -r5+s -s50+s -a1",
+        "-d1 -d3+s -s6+s -d9+s -s20+s -d25+s -s30+s -a1",
+        "-f-1 -Qr -s2+s -r3 -o20 -t4 -a1",
+        "-f64+se -t5 -a1",
+        "-o1 -f-1 -r-5+se -a1",
+        "-s5+s -s35+s -m4 -a1",
+        "-f-1+sm -t7 -m2 -a1",
+        "-o1 -r-5+se -a1",
     )
 }

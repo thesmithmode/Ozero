@@ -4,9 +4,13 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -15,6 +19,10 @@ import ru.ozero.corestorage.entity.AppSplitRule
 import ru.ozero.enginescore.settings.SettingsKeys
 import ru.ozero.enginefptn.FptnConfig
 import ru.ozero.enginefptn.FptnConfigStore
+import ru.ozero.enginemasque.MasqueProfile
+import ru.ozero.enginemasque.MasqueProfileStore
+import ru.ozero.enginemasque.MasqueSettings
+import ru.ozero.enginemasque.MasqueTransport
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkLocationSelection
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
@@ -26,6 +34,7 @@ import ru.ozero.enginewarp.WarpConfig
 import ru.ozero.enginewarp.WarpConfigSlot
 import ru.ozero.enginewarp.WarpConfigSlotStore
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -79,6 +88,86 @@ class AppBackupManagerTest {
     )
 
     @Test
+    fun `Opera settings survive export and import`() = runTest {
+        ozeroDs.edit { prefs ->
+            prefs[SettingsKeys.OPERA_REGION] = "AS"
+            prefs[SettingsKeys.OPERA_SELECTION] = "random"
+            prefs[SettingsKeys.OPERA_AUTO_ENABLED] = true
+        }
+        val exported = manager.export()
+        assertEquals("AS", exported.settings.operaRegion)
+        assertEquals("random", exported.settings.operaSelection)
+        assertEquals(true, exported.settings.operaAutoEnabled)
+        ozeroDs.edit { prefs ->
+            prefs.remove(SettingsKeys.OPERA_REGION)
+            prefs.remove(SettingsKeys.OPERA_SELECTION)
+            prefs.remove(SettingsKeys.OPERA_AUTO_ENABLED)
+        }
+        manager.import(exported)
+        assertEquals("AS", ozeroDs.data.first()[SettingsKeys.OPERA_REGION])
+        assertEquals("random", ozeroDs.data.first()[SettingsKeys.OPERA_SELECTION])
+        assertEquals(true, ozeroDs.data.first()[SettingsKeys.OPERA_AUTO_ENABLED])
+        assertNull(manager.export(setOf(BackupCategory.WARP)).settings.operaRegion)
+        assertNull(manager.export(setOf(BackupCategory.WARP)).settings.operaAutoEnabled)
+    }
+
+    @Test
+    fun `unused MASQUE leaves existing backup format unchanged`() = runTest {
+        val store = mockk<MasqueProfileStore>(relaxed = true)
+        every { store.settings() } returns flowOf(MasqueSettings())
+        val integrated = AppBackupManager(
+            ozeroDs, warpStore, urnStore, splitDao, fptnStore,
+            urnetworkDeviceIdentity = urnIdentity,
+            masqueStore = store,
+        )
+        val old = manager.export()
+        val new = integrated.export()
+        assertNull(new.masque)
+        assertEquals(old.copy(exportedAt = new.exportedAt), new)
+        assertFalse(AppBackupSerializer.serialize(new).contains("\"masque\""))
+    }
+
+    @Test
+    fun `MASQUE backup never touches other categories and old backups never restore MASQUE`() = runTest {
+        val store = mockk<MasqueProfileStore>(relaxed = true)
+        every { store.settings() } returns flowOf(MasqueSettings(corrupt = true))
+        val integrated = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, fptnStore, masqueStore = store)
+        ozeroDs.edit { it[SettingsKeys.IPV6_ENABLED] = true }
+        assertEquals(true, integrated.export(setOf(BackupCategory.GENERAL_SETTINGS)).settings.ipv6Enabled)
+        assertFailsWith<IllegalStateException> { integrated.export() }
+        val legacy = makeMinimalBackup()
+        integrated.import(legacy)
+        coVerify(exactly = 0) { store.restore(any(), any(), any()) }
+        val invalid = legacy.copy(masque = BackupMasque("invalid", "H2", false))
+        integrated.import(invalid, setOf(BackupCategory.GENERAL_SETTINGS))
+        assertFailsWith<IllegalArgumentException> { integrated.import(invalid) }
+        assertEquals(true, ozeroDs.data.first()[SettingsKeys.IPV6_ENABLED])
+    }
+
+    @Test
+    fun `MASQUE category exports registered profile or changed settings and imports independently`() = runTest {
+        val store = mockk<MasqueProfileStore>(relaxed = true)
+        val json = """{"private_key":"test","endpoint_pub_key":"test","endpoint_v4":"192.0.2.1",
+            |"ipv4":"192.0.2.2","ipv6":"2001:db8::1","id":"test","access_token":"test"}
+        """.trimMargin()
+        val profile = MasqueProfile.parse(json)
+        val integrated = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, fptnStore, masqueStore = store)
+        every { store.settings() } returns flowOf(MasqueSettings(profile = profile))
+        val categories = setOf(BackupCategory.MASQUE)
+        assertEquals(BackupMasque(json, "AUTO", true), integrated.export(categories).masque)
+        every { store.settings() } returns flowOf(MasqueSettings(transport = MasqueTransport.H2))
+        assertEquals(BackupMasque(null, "H2", true), integrated.export(categories).masque)
+        every { store.settings() } returns flowOf(MasqueSettings(autoEnabled = false))
+        assertEquals(BackupMasque(null, "AUTO", false), integrated.export(categories).masque)
+        val data = makeMinimalBackup().copy(masque = BackupMasque(json, "H2", false))
+        integrated.import(data, categories)
+        coVerify(exactly = 1) {
+            store.restore(match<MasqueProfile> { it.exportJson() == json }, MasqueTransport.H2, false)
+        }
+        assertNull(ozeroDs.data.first()[SettingsKeys.MANUAL_ENGINE])
+    }
+
+    @Test
     fun `export — настройки из DataStore попадают в backup`() = runTest {
         ozeroDs.edit { prefs ->
             prefs[SettingsKeys.SPLIT_MODE] = "per_app"
@@ -103,6 +192,25 @@ class AppBackupManagerTest {
         assertEquals("""{"a":1}""", data.settings.bydpiUiSettingsJson)
         assertEquals("DE", data.settings.urnetworkCountryCode)
         assertNull(data.settings.fptnToken)
+    }
+
+    @Test
+    fun `Telegram WSS selection and proxy mode round trip through general settings backup`() = runTest {
+        ozeroDs.edit { prefs ->
+            prefs[SettingsKeys.MANUAL_ENGINE] = "TGWSS"
+            prefs[SettingsKeys.TRAFFIC_MODE] = "PROXY"
+        }
+        val exported = manager.export(setOf(BackupCategory.GENERAL_SETTINGS))
+        assertEquals("TGWSS", exported.settings.manualEngine)
+        assertEquals("PROXY", exported.settings.trafficMode)
+        ozeroDs.edit { prefs ->
+            prefs.remove(SettingsKeys.MANUAL_ENGINE)
+            prefs[SettingsKeys.TRAFFIC_MODE] = "TUN"
+        }
+        manager.import(exported, setOf(BackupCategory.GENERAL_SETTINGS))
+        val restored = ozeroDs.data.first()
+        assertEquals("TGWSS", restored[SettingsKeys.MANUAL_ENGINE])
+        assertEquals("PROXY", restored[SettingsKeys.TRAFFIC_MODE])
     }
 
     @Test
@@ -671,6 +779,18 @@ class AppBackupManagerTest {
     }
 
     @Test
+    fun `failed replacement preserves split tunnel mode`() = runTest {
+        ozeroDs.edit { it[SettingsKeys.SPLIT_MODE] = "BLOCKLIST" }
+        splitDao.failReplacement = true
+        val backup = makeMinimalBackup()
+        val data = backup.copy(settings = backup.settings.copy(splitMode = "ALLOWLIST"))
+
+        assertFailsWith<IllegalStateException> { manager.import(data, setOf(BackupCategory.SPLIT_TUNNEL)) }
+
+        assertEquals("BLOCKLIST", ozeroDs.data.first()[SettingsKeys.SPLIT_MODE])
+    }
+
+    @Test
     fun `export then import — полный roundtrip с категориями ALL`() = runTest {
         ozeroDs.edit { prefs ->
             prefs[SettingsKeys.SPLIT_MODE] = "per_app"
@@ -869,6 +989,7 @@ class AppBackupManagerTest {
 
     private class FakeSplitRuleDao : AppSplitRuleDao {
         val rules = MutableStateFlow<List<AppSplitRule>>(emptyList())
+        var failReplacement = false
         override suspend fun upsert(rule: AppSplitRule) {
             val current = rules.value.toMutableList()
             current.removeAll { it.packageName == rule.packageName }
@@ -878,6 +999,15 @@ class AppBackupManagerTest {
         override fun observeAll(): Flow<List<AppSplitRule>> = rules
         override suspend fun delete(packageName: String) {
             rules.value = rules.value.filter { it.packageName != packageName }
+        }
+
+        override suspend fun deleteAll() {
+            rules.value = emptyList()
+        }
+
+        override suspend fun replaceAll(rules: List<AppSplitRule>) {
+            check(!failReplacement)
+            this.rules.value = rules.associateBy { it.packageName }.values.toList()
         }
     }
 

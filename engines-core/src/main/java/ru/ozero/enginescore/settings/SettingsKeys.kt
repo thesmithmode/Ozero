@@ -13,6 +13,9 @@ object SettingsKeys {
     val TRAFFIC_MODE = stringPreferencesKey("traffic_mode")
     val MANUAL_ENGINE = stringPreferencesKey("manual_engine")
     val ENGINE_AUTO_PRIORITY = stringPreferencesKey("engine_auto_priority")
+    val OPERA_AUTO_ENABLED = booleanPreferencesKey("opera_auto_enabled")
+    val OPERA_REGION = stringPreferencesKey("opera_region")
+    val OPERA_SELECTION = stringPreferencesKey("opera_selection")
 
     val BATTERY_PROMPT_SHOWN = booleanPreferencesKey("battery_prompt_shown")
 

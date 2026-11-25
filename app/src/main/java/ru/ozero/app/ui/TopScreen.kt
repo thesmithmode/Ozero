@@ -10,6 +10,7 @@ enum class TopScreen {
     ByeDpiEngineSettings,
     UrnetworkEngineSettings,
     WarpEngineSettings,
+    MasqueSettings,
     StrategyTest,
     StatsHistory,
     Backup,
@@ -20,4 +21,6 @@ enum class TopScreen {
     FptnSettings,
     SingboxSettings,
     SingboxAdvancedSettings,
+    OperaSettings,
+    TelegramWssSettings,
 }

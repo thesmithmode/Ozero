@@ -168,13 +168,19 @@ jobs:
           set -euo pipefail
           READELF="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
           SO="common-vpn/src/main/jniLibs/arm64-v8a/libhev-ozero-socks5-tunnel.so"
-          ALIGN_HEX=$("$READELF" -lW "$SO" | awk '/^[[:space:]]*LOAD/ && !found {print $NF; found=1}')
-          ALIGN_DEC=$(printf '%d' "$ALIGN_HEX")
-          if [ "$ALIGN_DEC" -lt 16384 ]; then
-            echo "::error::$SO LOAD alignment=$ALIGN_HEX (<0x4000) — Android 15 16KB pages откажется грузить"
+          alignments=$("$READELF" -lW "$SO" | awk '/^[[:space:]]*LOAD[[:space:]]/ {print $NF}')
+          if [ -z "$alignments" ]; then
+            echo "::error::$SO has no ELF LOAD segments"
             exit 1
           fi
-          echo "arm64-v8a: LOAD alignment=$ALIGN_HEX — Android 15 16KB compatible"
+          while IFS= read -r alignment; do
+            alignment_bytes=$(printf '%d' "$alignment")
+            if [ "$alignment_bytes" -lt 16384 ]; then
+              echo "::error::$SO LOAD alignment=$alignment (<0x4000)"
+              exit 1
+            fi
+          done <<< "$alignments"
+          echo "All ARM64 libhev LOAD segments are aligned to at least 16 KB"
 
       - name: Decode keystore
         env:
@@ -187,28 +193,8 @@ jobs:
           printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
           echo "OZERO_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
 
-      - name: Download URnetwork AAR (urnetwork-sdk only — Portal Tor parity)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          mkdir -p engine-urnetwork/libs
-          TAG=$(gh release list --limit 100 --json tagName \
-            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
-            | head -n1 | tr -d '"')
-          if [ -z "$TAG" ]; then
-            echo "::error::no urnetwork-sdk release found"
-            exit 1
-          fi
-          gh release download "$TAG" -p "*" -D engine-urnetwork/libs --clobber
-          for aar in engine-urnetwork/libs/*.aar; do
-            [ -f "$aar" ] || continue
-            tmpdir=$(mktemp -d)
-            unzip -o "$aar" -d "$tmpdir/aar-exploded"
-            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
-            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
-            rm -rf "$tmpdir"
-          done
+      - name: Prepare URnetwork AAR
+        uses: ./.github/actions/prepare-urnetwork
 
       - name: Download and explode Singbox AAR
         env:
@@ -236,6 +222,11 @@ jobs:
       - name: Build FPTN native transport
         uses: ./.github/actions/build-fptn
 
+      - name: Build MASQUE native transport
+        uses: ./.github/actions/build-masque
+        with:
+          ndk-path: ${{ steps.ndk.outputs.ndk-path }}
+
       - name: Build signed release APK
         env:
           OZERO_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
@@ -246,6 +237,13 @@ jobs:
           UPDATE_GITHUB_REPO: ${{ github.event.repository.name }}
           OZERO_VERSION_NAME: ${{ needs.resolve-version.outputs.tag }}
         run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: Verify packaged MASQUE transport
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/release -name '*.apk' -print -quit)
+          bash scripts/verify-masque-apk.sh "$APK" arm64-v8a
+          unzip -Z1 "$APK" | awk '/^lib\// && $0 !~ /^lib\/arm64-v8a\// { invalid=1 } END { exit invalid }'
 
       - name: Assert APK versionCode matches gradle.properties
         run: |
@@ -268,6 +266,11 @@ jobs:
             exit 1
           fi
           echo "APK versionCode=$VC OK"
+
+      - name: Report 16 KB alignment in the ARM64 release APK
+        run: |
+          APK=$(find app/build/outputs/apk/release -name '*.apk' -print -quit)
+          python3 .github/scripts/report-apk-elf-alignment.py "$APK"
 
       - name: Assert APK содержит libhev-ozero-socks5-tunnel.so (arm64-v8a)
         run: |
@@ -339,6 +342,18 @@ jobs:
           fi
           echo "APK contains MasterDNS subprocess binary"
 
+      - name: Verify APK Opera Proxy binary matches pinned ARM64 release
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
+          test -n "$APK"
+          TEMP=$(mktemp)
+          trap 'rm -f "$TEMP"' EXIT
+          unzip -p "$APK" lib/arm64-v8a/libopera_proxy.so > "$TEMP"
+          cmp engine-opera/src/main/jniLibs/arm64-v8a/libopera_proxy.so "$TEMP"
+          readelf -h "$TEMP" | grep -E 'Machine:.*AArch64'
+          readelf -h "$TEMP" | grep -E 'Type:.*DYN'
+
       - name: Assert WARP libam-go.so SHA256 == PORTAL_WG_v1.4.3 reference
         run: |
           set -euo pipefail
@@ -396,7 +411,7 @@ jobs:
             "Lru/ozero/app/ui/strategy/StrategyScanService;"
           )
           for cls in "${REQUIRED_CLASSES[@]}"; do
-            if ! grep -aor "$cls" "$WORK"/classes*.dex | head -n1 | grep -q "$cls"; then
+            if ! grep -aFq -- "$cls" "$WORK"/classes*.dex; then
               echo "::error::В classes.dex отсутствует $cls — R8 удалил/переупаковал, native abort гарантирован"
               exit 1
             fi
@@ -414,7 +429,7 @@ jobs:
             "StubUrnetworkSdkBridge"
           )
           for cls in "${FORBIDDEN_CLASSES[@]}"; do
-            if grep -aor "$cls" "$WORK"/classes*.dex | head -n1 | grep -q "$cls"; then
+            if grep -aFq -- "$cls" "$WORK"/classes*.dex; then
               echo "::error::В classes.dex обнаружен $cls — stub классы запрещены в релизе"
               exit 1
             fi

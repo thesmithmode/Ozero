@@ -273,29 +273,25 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Test
-    fun `slow FPTN restart is success when connected inside auth plus ready budget`() = runTest {
-        val startServiceActions = mutableListOf<String?>()
-        val tunnelController = TunnelController()
-        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
-        tunnelController.onSwitchingStarted(from = EngineId.WARP, to = EngineId.FPTN)
-        val coordinator = coordinator(
-            context = recordingContext(startServiceActions) {
-                tunnelController.setState(TunnelState.Disconnecting)
-            },
-            tunnelController = tunnelController,
-        )
-
-        val restart = launch {
-            assertTrue(coordinator.restartVpnIfRunning("settings changed"))
+    fun `slow engine restart succeeds inside its startup budget`() = runTest {
+        for (target in listOf(EngineId.FPTN, EngineId.OPERA, EngineId.MASQUE, EngineId.TGWSS)) {
+            val actions = mutableListOf<String?>()
+            val controller = TunnelController()
+            controller.setState(TunnelState.Connected(EngineId.WARP, 51820))
+            controller.onSwitchingStarted(from = EngineId.WARP, to = target)
+            val coordinator = coordinator(
+                context = recordingContext(actions) { controller.setState(TunnelState.Disconnecting) },
+                tunnelController = controller,
+            )
+            val restart = launch { assertTrue(coordinator.restartVpnIfRunning("settings changed")) }
+            runCurrent()
+            advanceTimeBy(30_000)
+            assertTrue(restart.isActive)
+            controller.setState(TunnelState.Connected(target, 0))
+            restart.join()
+            assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), actions)
+            assertTrue(controller.switching.value == null)
         }
-        runCurrent()
-        advanceTimeBy(30_000)
-        assertTrue(restart.isActive)
-        tunnelController.setState(TunnelState.Connected(EngineId.FPTN, 0))
-        restart.join()
-
-        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
-        assertTrue(tunnelController.switching.value == null)
     }
 
     @Test

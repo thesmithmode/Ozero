@@ -224,12 +224,14 @@ jobs:
           bash -n build-tools/build_naive.sh
           bash -n build-tools/build_tor.sh
           bash -n tools/build-urnetwork-aar.sh
+          bash -n .github/scripts/prepare-urnetwork-aar.sh
           bash -n scripts/build_wireguard_android.sh
           shellcheck -S warning build-tools/build_hysteria2.sh
           shellcheck -S warning build-tools/build_amneziawg.sh
           shellcheck -S warning build-tools/build_naive.sh
           shellcheck -S warning build-tools/build_tor.sh
           shellcheck -S warning tools/build-urnetwork-aar.sh
+          shellcheck -S warning .github/scripts/prepare-urnetwork-aar.sh
           shellcheck -S warning scripts/build_wireguard_android.sh
 
       - name: Validate Dockerfile syntax (hadolint)
@@ -270,43 +272,8 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
-      - name: Get URnetwork AAR tag
-        id: aar-tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          TAG=$(gh release list --limit 100 --json tagName \
-            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
-            | head -n1 | tr -d '"')
-          if [ -z "$TAG" ]; then
-            echo "::error::no urnetwork-sdk release found"
-            exit 1
-          fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Cache URnetwork AAR
-        uses: actions/cache@v6
-        id: aar-cache
-        with:
-          path: engine-urnetwork/libs
-          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}-go-stripped-v1
-
-      - name: Download URnetwork AAR
-        if: steps.aar-cache.outputs.cache-hit != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p engine-urnetwork/libs
-          gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
-          for aar in engine-urnetwork/libs/*.aar; do
-            [ -f "$aar" ] || continue
-            tmpdir=$(mktemp -d)
-            unzip -o "$aar" -d "$tmpdir/aar-exploded"
-            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
-            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
-            rm -rf "$tmpdir"
-          done
+      - name: Prepare URnetwork AAR
+        uses: ./.github/actions/prepare-urnetwork
 
       - name: Cache Singbox libs
         uses: actions/cache@v6
@@ -316,7 +283,7 @@ jobs:
             singbox-core/libs
             singbox-core/libs-stubs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v6
+          key: singbox-libbox-1.13.12-exploded-v7-sha256-7a5fa900e73352a18d55ef7ae55427e3e60ba7208b5848ccf64ec5acdf154867
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -326,6 +293,7 @@ jobs:
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
           .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
+          .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -339,6 +307,9 @@ jobs:
           if [ -d /tmp/aar-exploded/jni ]; then
             cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
           fi
+
+      - name: Build MASQUE native transport
+        uses: ./.github/actions/build-masque
 
       - name: coverage verification first
         run: >
@@ -465,44 +436,8 @@ jobs:
       - name: Download native binaries
         run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
 
-      - name: Get URnetwork AAR tag
-        id: aar-tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          TAG=$(gh release list --limit 100 --json tagName \
-            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
-            | head -n1 | tr -d '"')
-          if [ -z "$TAG" ]; then
-            echo "::error::no urnetwork-sdk release found"
-            exit 1
-          fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Cache URnetwork AAR
-        uses: actions/cache@v6
-        id: aar-cache
-        with:
-          path: engine-urnetwork/libs
-          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}-go-stripped-v1
-
-      - name: Download URnetwork AAR (urnetwork-sdk only — Portal Tor parity)
-        if: steps.aar-cache.outputs.cache-hit != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p engine-urnetwork/libs
-          gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
-          for aar in engine-urnetwork/libs/*.aar; do
-            [ -f "$aar" ] || continue
-            tmpdir=$(mktemp -d)
-            unzip -o "$aar" -d "$tmpdir/aar-exploded"
-            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
-            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
-            rm -rf "$tmpdir"
-          done
-          ls -la engine-urnetwork/libs/
+      - name: Prepare URnetwork AAR
+        uses: ./.github/actions/prepare-urnetwork
 
       - name: Cache Singbox libs
         uses: actions/cache@v6
@@ -539,8 +474,17 @@ jobs:
           ls -la singbox-core/libs/
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
+      - name: Build MASQUE native transport
+        uses: ./.github/actions/build-masque
+
       - name: assembleDebug
         run: ./gradlew assembleDebug --stacktrace
+
+      - name: Verify packaged MASQUE transport
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)
+          bash scripts/verify-masque-apk.sh "$APK" arm64-v8a
 
       - name: Assert APK contains MasterDNS subprocess binary
         run: |
@@ -562,8 +506,25 @@ jobs:
           fi
           echo "APK contains MasterDNS subprocess binary"
 
+      - name: Verify APK Opera Proxy binary matches pinned ARM64 release
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/debug -name '*.apk' | head -n1)
+          test -n "$APK"
+          TEMP=$(mktemp)
+          trap 'rm -f "$TEMP"' EXIT
+          unzip -p "$APK" lib/arm64-v8a/libopera_proxy.so > "$TEMP"
+          cmp engine-opera/src/main/jniLibs/arm64-v8a/libopera_proxy.so "$TEMP"
+          readelf -h "$TEMP" | grep -E 'Machine:.*AArch64'
+          readelf -h "$TEMP" | grep -E 'Type:.*DYN'
+
       - name: lintVitalAnalyzeRelease (smoke — release-path lint without keystore)
         run: ./gradlew :app:lintVitalAnalyzeRelease --stacktrace
+
+      - name: Report 16 KB alignment in the ARM64 debug APK
+        run: |
+          APK=$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)
+          python3 .github/scripts/report-apk-elf-alignment.py "$APK"
 
       - name: Upload debug APK
         if: always()
@@ -606,43 +567,8 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
-      - name: Get URnetwork AAR tag
-        id: aar-tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          TAG=$(gh release list --limit 100 --json tagName \
-            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
-            | head -n1 | tr -d '"')
-          if [ -z "$TAG" ]; then
-            echo "::error::no urnetwork-sdk release found"
-            exit 1
-          fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Cache URnetwork AAR
-        uses: actions/cache@v6
-        id: aar-cache
-        with:
-          path: engine-urnetwork/libs
-          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}-go-stripped-v1
-
-      - name: Download URnetwork AAR
-        if: steps.aar-cache.outputs.cache-hit != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p engine-urnetwork/libs
-          gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
-          for aar in engine-urnetwork/libs/*.aar; do
-            [ -f "$aar" ] || continue
-            tmpdir=$(mktemp -d)
-            unzip -o "$aar" -d "$tmpdir/aar-exploded"
-            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
-            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
-            rm -rf "$tmpdir"
-          done
+      - name: Prepare URnetwork AAR
+        uses: ./.github/actions/prepare-urnetwork
 
       - name: Cache Singbox libs
         uses: actions/cache@v6
@@ -853,43 +779,8 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
-      - name: Get URnetwork AAR tag
-        id: aar-tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          TAG=$(gh release list --limit 100 --json tagName \
-            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
-            | head -n1 | tr -d '"')
-          if [ -z "$TAG" ]; then
-            echo "::error::no urnetwork-sdk release found"
-            exit 1
-          fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Cache URnetwork AAR
-        uses: actions/cache@v6
-        id: aar-cache
-        with:
-          path: engine-urnetwork/libs
-          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}-go-stripped-v1
-
-      - name: Download URnetwork AAR
-        if: steps.aar-cache.outputs.cache-hit != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p engine-urnetwork/libs
-          gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
-          for aar in engine-urnetwork/libs/*.aar; do
-            [ -f "$aar" ] || continue
-            tmpdir=$(mktemp -d)
-            unzip -o "$aar" -d "$tmpdir/aar-exploded"
-            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
-            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
-            rm -rf "$tmpdir"
-          done
+      - name: Prepare URnetwork AAR
+        uses: ./.github/actions/prepare-urnetwork
 
       - name: testDebugUnitTest + coverage
         run: ./gradlew :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport :engine-urnetwork:jacocoTestCoverageVerification --stacktrace --continue
@@ -1008,12 +899,12 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification --stacktrace --continue
+        run: ./gradlew :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification :engine-opera:testDebugUnitTest :engine-opera:jacocoTestReport :engine-opera:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
           python3 -m pip install --quiet defusedxml
-          python3 scripts/verify-junit-nonzero.py engine-fptn
+          python3 scripts/verify-junit-nonzero.py engine-fptn engine-opera
 
       - name: Upload coverage report
         if: always()
@@ -1021,7 +912,9 @@ jobs:
         continue-on-error: true
         with:
           name: jacoco-engine-fptn
-          path: engine-fptn/build/reports/jacoco/**
+          path: |
+            engine-fptn/build/reports/jacoco/**
+            engine-opera/build/reports/jacoco/**
           retention-days: 14
 
       - name: Upload test reports
@@ -1030,7 +923,9 @@ jobs:
         continue-on-error: true
         with:
           name: test-reports-engine-fptn
-          path: engine-fptn/build/reports/tests/**
+          path: |
+            engine-fptn/build/reports/tests/**
+            engine-opera/build/reports/tests/**
           retention-days: 14
 
   test-engines-urnetwork-byedpi:
@@ -1086,43 +981,8 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
-      - name: Get URnetwork AAR tag
-        id: aar-tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          TAG=$(gh release list --limit 100 --json tagName \
-            | grep -oE '"urnetwork-sdk-[a-f0-9]{8}"' \
-            | head -n1 | tr -d '"')
-          if [ -z "$TAG" ]; then
-            echo "::error::no urnetwork-sdk release found"
-            exit 1
-          fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Cache URnetwork AAR
-        uses: actions/cache@v6
-        id: aar-cache
-        with:
-          path: engine-urnetwork/libs
-          key: urnetwork-aar-${{ steps.aar-tag.outputs.tag }}-go-stripped-v1
-
-      - name: Download URnetwork AAR
-        if: steps.aar-cache.outputs.cache-hit != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p engine-urnetwork/libs
-          gh release download "${{ steps.aar-tag.outputs.tag }}" -p "*" -D engine-urnetwork/libs --clobber
-          for aar in engine-urnetwork/libs/*.aar; do
-            [ -f "$aar" ] || continue
-            tmpdir=$(mktemp -d)
-            unzip -o "$aar" -d "$tmpdir/aar-exploded"
-            zip -d "$tmpdir/aar-exploded/classes.jar" 'go/*.class' 2>/dev/null || true
-            (cd "$tmpdir/aar-exploded" && zip -r9 "$GITHUB_WORKSPACE/$aar" .)
-            rm -rf "$tmpdir"
-          done
+      - name: Prepare URnetwork AAR
+        uses: ./.github/actions/prepare-urnetwork
 
       - name: testDebugUnitTest + coverage
         run: >
@@ -1133,13 +993,14 @@ jobs:
           :common-dns:testDebugUnitTest :common-dns:jacocoTestReport :common-dns:jacocoTestCoverageVerification
           :common-crypto:testDebugUnitTest :common-crypto:jacocoTestReport :common-crypto:jacocoTestCoverageVerification
           :common-net:testDebugUnitTest :common-net:jacocoTestReport :common-net:jacocoTestCoverageVerification
+          :engine-tgwss:testDebugUnitTest :engine-tgwss:jacocoTestReport :engine-tgwss:jacocoTestCoverageVerification
           --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
           python3 -m pip install --quiet defusedxml
           python3 scripts/verify-junit-nonzero.py \
-          core-storage core-backup engines-core common-dns common-crypto common-net
+          core-storage core-backup engines-core common-dns common-crypto common-net engine-tgwss
 
       - name: Upload coverage reports
         if: always()
@@ -1154,6 +1015,7 @@ jobs:
             common-dns/build/reports/jacoco/**
             common-crypto/build/reports/jacoco/**
             common-net/build/reports/jacoco/**
+            engine-tgwss/build/reports/jacoco/**
           retention-days: 14
 
       - name: Upload test reports
@@ -1169,6 +1031,7 @@ jobs:
             common-dns/build/reports/tests/**
             common-crypto/build/reports/tests/**
             common-net/build/reports/tests/**
+            engine-tgwss/build/reports/tests/**
           retention-days: 14
 
   test-engine-masterdns:
@@ -1362,7 +1225,7 @@ jobs:
             singbox-core/libs
             singbox-core/libs-stubs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v6
+          key: singbox-libbox-1.13.12-exploded-v7-sha256-7a5fa900e73352a18d55ef7ae55427e3e60ba7208b5848ccf64ec5acdf154867
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -1372,6 +1235,7 @@ jobs:
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
           .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
+          .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -1454,7 +1318,7 @@ jobs:
             singbox-core/libs
             singbox-core/libs-stubs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v6
+          key: singbox-libbox-1.13.12-exploded-v7-sha256-7a5fa900e73352a18d55ef7ae55427e3e60ba7208b5848ccf64ec5acdf154867
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -1464,6 +1328,7 @@ jobs:
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
           .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
+          .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -1546,7 +1411,7 @@ jobs:
             singbox-core/libs
             singbox-core/libs-stubs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v6
+          key: singbox-libbox-1.13.12-exploded-v7-sha256-7a5fa900e73352a18d55ef7ae55427e3e60ba7208b5848ccf64ec5acdf154867
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -1556,6 +1421,7 @@ jobs:
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
           .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
+          .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -1638,7 +1504,7 @@ jobs:
             singbox-core/libs
             singbox-core/libs-stubs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v6
+          key: singbox-libbox-1.13.12-exploded-v7-sha256-7a5fa900e73352a18d55ef7ae55427e3e60ba7208b5848ccf64ec5acdf154867
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -1648,6 +1514,7 @@ jobs:
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
           .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
+          .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -1730,7 +1597,7 @@ jobs:
             singbox-core/libs
             singbox-core/libs-stubs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v6
+          key: singbox-libbox-1.13.12-exploded-v7-sha256-7a5fa900e73352a18d55ef7ae55427e3e60ba7208b5848ccf64ec5acdf154867
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -1740,6 +1607,7 @@ jobs:
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
           .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
+          .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -1822,7 +1690,7 @@ jobs:
             singbox-core/libs
             singbox-core/libs-stubs
             singbox-core/src/main/jniLibs
-          key: singbox-libbox-1.13.12-exploded-v6
+          key: singbox-libbox-1.13.12-exploded-v7-sha256-7a5fa900e73352a18d55ef7ae55427e3e60ba7208b5848ccf64ec5acdf154867
 
       - name: Download and explode Singbox AAR
         if: steps.singbox-aar-cache.outputs.cache-hit != 'true'
@@ -1832,6 +1700,7 @@ jobs:
           set -euo pipefail
           TMPAAR=/tmp/libbox.aar
           .github/scripts/download-libbox-aar.sh "$TMPAAR" "1.13.12"
+          .github/scripts/verify-libbox-aar.sh "$TMPAAR" "1.13.12"
           mkdir -p singbox-core/libs
           unzip -o "$TMPAAR" classes.jar -d /tmp
           cp /tmp/classes.jar singbox-core/libs/libbox.jar
@@ -1926,6 +1795,49 @@ jobs:
           path: shared-warp-settings/build/reports/tests/**
           retention-days: 14
 
+  test-engine-masque:
+    name: Tests — engine-masque
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests and coverage report
+        run: ./gradlew :engine-masque:testDebugUnitTest :engine-masque:jacocoTestReport --stacktrace
+      - name: Verify tests and production class coverage were discovered
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py engine-masque
+          python3 scripts/verify-masque-coverage.py
+      - name: Enforce module coverage gate
+        run: ./gradlew :engine-masque:jacocoTestCoverageVerification --stacktrace
+      - name: Build MASQUE native transport
+        if: ${{ always() && !cancelled() }}
+        uses: ./.github/actions/build-masque
+      - name: Upload native artifact and reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: masque-native-and-reports
+          path: |
+            engine-masque/build/native/**
+            engine-masque/build/reports/**
+          retention-days: 14
+
   test-singbox-and-extra-modules:
     name: Tests — singbox + extra modules
     runs-on: ubuntu-latest
@@ -1933,6 +1845,7 @@ jobs:
     needs:
       - detect-open-pr-for-same-sha
       - test-engine-masterdns
+      - test-engine-masque
       - test-engine-singbox
       - test-singbox-process
       - test-singbox-core
@@ -1950,6 +1863,7 @@ jobs:
         run: |
           set -euo pipefail
           test "${{ needs.test-engine-masterdns.result }}" = "success"
+          test "${{ needs.test-engine-masque.result }}" = "success"
           test "${{ needs.test-engine-singbox.result }}" = "success"
           test "${{ needs.test-singbox-process.result }}" = "success"
           test "${{ needs.test-singbox-core.result }}" = "success"

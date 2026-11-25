@@ -25,6 +25,9 @@ internal object BackupSettingsSerializer {
         s.bydpiDefaultAccepted?.let { obj.put("bydpiDefaultAccepted", it) }
         s.urnetworkCountryCode?.let { obj.put("urnetworkCountryCode", it) }
         s.fptnToken?.let { obj.put("fptnToken", it) }
+        s.operaRegion?.let { obj.put("operaRegion", it) }
+        s.operaSelection?.let { obj.put("operaSelection", it) }
+        s.operaAutoEnabled?.let { obj.put("operaAutoEnabled", it) }
         return obj
     }
 
@@ -49,5 +52,8 @@ internal object BackupSettingsSerializer {
             bydpiDefaultAccepted = s.booleanOrNull("bydpiDefaultAccepted"),
             urnetworkCountryCode = s.optString("urnetworkCountryCode").takeIf { it.isNotEmpty() },
             fptnToken = s.optString("fptnToken").takeIf { it.isNotEmpty() },
+            operaRegion = s.optString("operaRegion").takeIf { it in setOf("EU", "AS", "AM") },
+            operaSelection = s.optString("operaSelection").takeIf { it in setOf("first", "random", "fastest") },
+            operaAutoEnabled = s.booleanOrNull("operaAutoEnabled"),
         )
 }

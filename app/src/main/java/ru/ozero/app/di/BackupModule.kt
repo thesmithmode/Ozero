@@ -13,6 +13,7 @@ import ru.ozero.corebackup.AppBackupManager
 import ru.ozero.corebackup.StrategyBackupProvider
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.enginefptn.FptnConfigStore
+import ru.ozero.enginemasque.MasqueProfileStore
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.auth.UrnetworkDeviceIdentity
 import ru.ozero.enginewarp.WarpConfigSlotStore
@@ -42,6 +43,7 @@ object BackupModule {
         fptnStore: FptnConfigStore,
         strategyProvider: StrategyBackupProvider,
         urnetworkDeviceIdentity: UrnetworkDeviceIdentity,
+        masqueStore: MasqueProfileStore,
     ): AppBackupManager = AppBackupManager(
         ozeroSettings = ozeroSettings,
         warpSlotStore = warpSlotStore,
@@ -50,5 +52,6 @@ object BackupModule {
         fptnStore = fptnStore,
         strategyProvider = strategyProvider,
         urnetworkDeviceIdentity = urnetworkDeviceIdentity,
+        masqueStore = masqueStore,
     )
 }
