@@ -273,6 +273,31 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Test
+    fun `slow Opera restart can connect after the normal startup deadline`() = runTest {
+        val startServiceActions = mutableListOf<String?>()
+        val tunnelController = TunnelController()
+        tunnelController.setState(TunnelState.Connected(EngineId.OPERA, 1080))
+        val coordinator = coordinator(
+            context = recordingContext(startServiceActions) {
+                tunnelController.setState(TunnelState.Disconnecting)
+            },
+            tunnelController = tunnelController,
+        )
+
+        val restart = launch {
+            assertTrue(coordinator.restartVpnIfRunning("settings changed"))
+        }
+        runCurrent()
+        advanceTimeBy(25_001)
+        assertTrue(restart.isActive)
+        tunnelController.setState(TunnelState.Connected(EngineId.OPERA, 1081))
+        restart.join()
+
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
+        assertTrue(tunnelController.switching.value == null)
+    }
+
+    @Test
     fun `slow FPTN restart is success when connected inside auth plus ready budget`() = runTest {
         val startServiceActions = mutableListOf<String?>()
         val tunnelController = TunnelController()

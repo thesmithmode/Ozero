@@ -232,6 +232,26 @@ class EngineSettingsRestartObserverRuntimeTest {
         job.cancel()
     }
 
+    @Test
+    fun `Opera ignores unrelated DNS changes in manual and automatic fallback modes`() = runTest(dispatcher) {
+        val state = MutableStateFlow<TunnelState>(TunnelState.Connected(EngineId.OPERA, 1080))
+        val restarts = mutableListOf<EngineSettingsRestartObserver.Snapshot>()
+        val observer = newObserver(state) { restarts += it }
+        val manual = snapshot(manualEngine = EngineId.OPERA, customDnsServers = listOf("1.1.1.1"))
+        val auto = manual.copy(manualEngine = null, engineAutoPriority = listOf(EngineId.WARP, EngineId.OPERA))
+        for (previous in listOf(manual, auto)) {
+            val changed = previous.copy(customDnsServers = listOf("8.8.8.8"))
+            observer.handle(trigger(previous, changed))
+        }
+        assertTrue(restarts.isEmpty())
+
+        val regionChanged = manual.copy(operaRegion = "AS")
+        observer.handle(trigger(manual, regionChanged))
+        val ipv6Changed = manual.copy(ipv6Enabled = true)
+        observer.handle(trigger(manual, ipv6Changed))
+        assertEquals(listOf(regionChanged, ipv6Changed), restarts)
+    }
+
     private fun newObserver(
         state: MutableStateFlow<TunnelState>,
         onRestartConnected: (EngineSettingsRestartObserver.Snapshot) -> Unit,

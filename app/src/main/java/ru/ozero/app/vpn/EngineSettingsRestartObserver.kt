@@ -82,9 +82,11 @@ class EngineSettingsRestartObserver(
         val snapshot = trigger.snapshot
         val state = vpnStateProvider()
         if (state is TunnelState.Connected) {
+            val unchangedOperaDns = state.engineId == EngineId.OPERA &&
+                trigger.previous.copy(customDnsServers = snapshot.customDnsServers) == snapshot
             if (
-                snapshot.targetEngine() == state.engineId &&
-                snapshot.sameRuntimeFor(state.engineId, trigger.previous)
+                unchangedOperaDns ||
+                (snapshot.targetEngine() == state.engineId && snapshot.sameRuntimeFor(state.engineId, trigger.previous))
             ) {
                 PersistentLoggers.debug(
                     TAG,
@@ -133,9 +135,8 @@ class EngineSettingsRestartObserver(
     }
 
     private fun Snapshot.sameRuntimeFor(engineId: EngineId, other: Snapshot): Boolean {
-        val commonRuntimeMatches = ipv6Enabled == other.ipv6Enabled &&
-            trafficMode == other.trafficMode &&
-            customDnsServers == other.customDnsServers
+        val transportMatches = ipv6Enabled == other.ipv6Enabled && trafficMode == other.trafficMode
+        val commonRuntimeMatches = transportMatches && customDnsServers == other.customDnsServers
         return when (engineId) {
             EngineId.BYEDPI ->
                 byedpiWinningArgs == other.byedpiWinningArgs &&
@@ -143,7 +144,7 @@ class EngineSettingsRestartObserver(
                     byedpiUiSettings == other.byedpiUiSettings &&
                     commonRuntimeMatches
             EngineId.OPERA ->
-                operaRegion == other.operaRegion && operaSelection == other.operaSelection && commonRuntimeMatches
+                operaRegion == other.operaRegion && operaSelection == other.operaSelection && transportMatches
             else -> commonRuntimeMatches
         }
     }
