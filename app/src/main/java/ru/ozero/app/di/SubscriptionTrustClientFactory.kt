@@ -53,7 +53,6 @@ object SubscriptionTrustClientFactory {
         return client.newBuilder()
             .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", state.socksPort)))
             .connectionPool(ConnectionPool(0, 1, TimeUnit.SECONDS))
-            .followSslRedirects(false)
             .retryOnConnectionFailure(false)
             .build()
     }

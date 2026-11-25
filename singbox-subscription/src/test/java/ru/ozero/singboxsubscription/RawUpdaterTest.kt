@@ -197,18 +197,23 @@ class RawUpdaterTest {
     fun `should stop after one failed fallback`() = runBlocking {
         val direct = OkHttpClient.Builder().addInterceptor { throw UnknownHostException("unreachable") }.build()
         val retries = AtomicInteger()
+        val fallbackCalls = AtomicInteger()
         rawUpdater = RawUpdater(
             direct,
             groupDao,
             profileDao,
             fallbackClient = {
                 retries.incrementAndGet()
-                OkHttpClient.Builder().addInterceptor { throw IOException("proxy unavailable") }.build()
+                OkHttpClient.Builder().addInterceptor {
+                    fallbackCalls.incrementAndGet()
+                    throw IOException("proxy unavailable")
+                }.build()
             },
         )
 
         assertTrue(rawUpdater.refresh(group()).isFailure)
         assertEquals(1, retries.get())
+        assertEquals(1, fallbackCalls.get())
         assertEquals(0, profileDao.profiles.size)
     }
 
@@ -234,6 +239,7 @@ class RawUpdaterTest {
     @Test
     fun `should retry interrupted response body through fallback`() = runBlocking {
         val retries = AtomicInteger()
+        val fallbackCalls = AtomicInteger()
         val direct = OkHttpClient.Builder().retryOnConnectionFailure(false).build()
         server.enqueue(
             MockResponse()
@@ -247,12 +253,16 @@ class RawUpdaterTest {
             profileDao,
             fallbackClient = {
                 retries.incrementAndGet()
-                OkHttpClient()
+                OkHttpClient.Builder().addInterceptor { chain ->
+                    fallbackCalls.incrementAndGet()
+                    chain.proceed(chain.request())
+                }.build()
             },
         )
 
         assertEquals(1, rawUpdater.refresh(group()).getOrThrow())
         assertEquals(1, retries.get())
+        assertEquals(1, fallbackCalls.get())
         assertEquals(2, server.requestCount)
     }
 

@@ -3,6 +3,7 @@ package ru.ozero.app.di
 import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Test
 import ru.ozero.commonvpn.TunnelController
+import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -43,8 +44,15 @@ class SubscriptionTrustClientFactoryTest {
         assertSame(original.sslSocketFactory, retry.sslSocketFactory)
         assertSame(original.hostnameVerifier, retry.hostnameVerifier)
         assertEquals(original.callTimeoutMillis, retry.callTimeoutMillis)
-        assertFalse(retry.followSslRedirects)
+        assertEquals(original.followSslRedirects, retry.followSslRedirects)
         assertFalse(retry.retryOnConnectionFailure)
+    }
+
+    @Test
+    fun `fallback preserves explicitly disabled SSL redirects`() {
+        val original = OkHttpClient.Builder().followSslRedirects(false).build()
+        val retry = assertNotNull(SubscriptionTrustClientFactory.forActiveProxy(original, connectedController(1080)))
+        assertFalse(retry.followSslRedirects)
     }
 
     @Test
@@ -65,6 +73,14 @@ class SubscriptionTrustClientFactoryTest {
         val killed = connectedController(1080)
         killed.onKillswitchEngaged(EngineId.BYEDPI, "test")
         assertNull(SubscriptionTrustClientFactory.forActiveProxy(client, killed))
+        killed.onProbing()
+        killed.onConnecting(EngineId.BYEDPI)
+        killed.onEngineStarted(EngineId.BYEDPI, 1080)
+        assertEquals(TunnelState.Connected(EngineId.BYEDPI, 1080), killed.state.value)
+        assertEquals(true, killed.killswitchActive.value)
+        assertNull(SubscriptionTrustClientFactory.forActiveProxy(client, killed))
+        killed.onKillswitchReleased()
+        assertNotNull(SubscriptionTrustClientFactory.forActiveProxy(client, killed))
         val disconnecting = connectedController(1080)
         disconnecting.onDisconnecting()
         assertNull(SubscriptionTrustClientFactory.forActiveProxy(client, disconnecting))
