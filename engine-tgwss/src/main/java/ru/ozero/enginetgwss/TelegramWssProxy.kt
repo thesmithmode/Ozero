@@ -48,7 +48,6 @@ class TelegramWssProxy internal constructor(
             .followRedirects(false)
             .followSslRedirects(false)
             .connectTimeout(5, TimeUnit.SECONDS)
-            .pingInterval(20, TimeUnit.SECONDS)
             .build(),
         warpPort,
     )

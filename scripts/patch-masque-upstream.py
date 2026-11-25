@@ -10,6 +10,15 @@ def replace_once(path, old, new):
 
 
 root = Path(sys.argv[1])
+register = root / "cmd" / "register.go"
+replace_once(register, '\t"log"\n', '\t"log"\n\t"os"\n')
+for failure, code in (
+    ("Failed to register", 20),
+    ("Failed to generate key pair", 21),
+    ("Failed to enroll key", 22),
+    ("Failed to save config", 23),
+):
+    replace_once(register, f'log.Fatalf("{failure}: %v", err)', f'os.Exit({code})')
 replace_once(
     root / "config" / "config.go",
     "file, err := os.Create(configPath)",

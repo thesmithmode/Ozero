@@ -157,6 +157,7 @@ class MasqueRuntimeTest {
 
     @Test
     fun `registration rejects child failure and deletes temporary profile`() = runBlocking {
+        val failures = mutableListOf<String>()
         val runtime = MasqueRuntime(
             binary(),
             directory,
@@ -165,9 +166,34 @@ class MasqueRuntimeTest {
                 Child(false)
             },
             MasqueReadinessProbe { false },
+            reportFailure = { failures.add(it) },
         )
         assertThrows<IllegalStateException> { runtime.register(true) }
+        assertEquals(listOf("registration process exited with code 1"), failures)
         assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+    }
+
+    @Test
+    fun `native registration exit codes name the failed stage`() = runBlocking {
+        val stages = mapOf(
+            20 to "Cloudflare registration request failed",
+            21 to "MASQUE key generation failed",
+            22 to "Cloudflare key enrollment failed",
+            23 to "MASQUE could not save the registered profile",
+        )
+        val executable = binary()
+        for ((code, stage) in stages) {
+            val failures = mutableListOf<String>()
+            val runtime = MasqueRuntime(
+                executable,
+                directory,
+                MasqueProcessLauncher { Child(false, code) },
+                MasqueReadinessProbe { false },
+                reportFailure = { failures.add(it) },
+            )
+            assertThrows<IllegalStateException> { runtime.register(true) }
+            assertEquals(listOf(stage), failures)
+        }
     }
 
     @Test

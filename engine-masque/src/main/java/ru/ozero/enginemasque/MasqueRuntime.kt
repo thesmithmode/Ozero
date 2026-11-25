@@ -53,15 +53,36 @@ class MasqueRuntime internal constructor(
         }
     }
 
+    private fun registrationExitReason(code: Int): String = when (code) {
+        20 -> "Cloudflare registration request failed"
+        21 -> "MASQUE key generation failed"
+        22 -> "Cloudflare key enrollment failed"
+        23 -> "MASQUE could not save the registered profile"
+        else -> "registration process exited with code $code"
+    }
+
     private suspend fun readRegistration(process: MasqueProcess, config: File): MasqueProfile {
         val code = withTimeoutOrNull(registrationTimeoutMs) {
             while (process.alive) delay(100)
             process.exitCode()
         }
-        check(code == 0 && config.isFile && config.length() in 1..MasqueProfile.MAX_BYTES.toLong()) {
-            "MASQUE registration failed"
+        val failure = when {
+            code == null -> "registration timed out"
+            code != 0 -> registrationExitReason(code)
+            !config.isFile || config.length() !in 1..MasqueProfile.MAX_BYTES.toLong() ->
+                "registration produced no usable profile"
+            else -> null
         }
-        return MasqueProfile.parse(config.readText())
+        if (failure != null) {
+            reportFailure(failure)
+            error(failure)
+        }
+        return try {
+            MasqueProfile.parse(config.readText())
+        } catch (e: IllegalArgumentException) {
+            reportFailure("registration returned an invalid profile")
+            throw e
+        }
     }
 
     suspend fun start(
