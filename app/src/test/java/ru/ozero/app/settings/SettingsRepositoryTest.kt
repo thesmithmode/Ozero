@@ -154,6 +154,24 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `Opera automatic routing requires explicit consent even for legacy priorities`() = runTest {
+        assertFalse(EngineId.OPERA in repository.settings.first().engineAutoPriority)
+        dataStore.edit { it[SettingsKeys.ENGINE_AUTO_PRIORITY] = "OPERA,WARP" }
+        assertFalse(EngineId.OPERA in repository.settings.first().engineAutoPriority)
+        repository.setEngineAutoPriority(listOf(EngineId.OPERA, EngineId.WARP))
+        assertFalse(EngineId.OPERA in repository.settings.first().engineAutoPriority)
+        repository.setOperaAutoEnabled(true)
+        assertEquals(EngineId.OPERA, repository.settings.first().engineAutoPriority.last())
+        repository.setEngineAutoPriority(listOf(EngineId.OPERA, EngineId.WARP))
+        assertEquals(EngineId.OPERA, repository.settings.first().engineAutoPriority.first())
+        repository.setOperaAutoEnabled(false)
+        assertFalse(EngineId.OPERA in repository.settings.first().engineAutoPriority)
+        assertEquals(false, dataStore.data.first()[SettingsKeys.OPERA_AUTO_ENABLED])
+        repository.setManualEngine(EngineId.OPERA)
+        assertEquals(EngineId.OPERA, repository.settings.first().manualEngine)
+    }
+
+    @Test
     fun `Opera settings persist and invalid stored values use defaults`() = runTest {
         repository.setOperaRegion("AS")
         repository.setOperaSelection("random")
@@ -202,12 +220,12 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `engineAutoPriority default содержит все non-stub engines в этом порядке`() = runTest {
+    fun `engineAutoPriority defaults exclude opt in and standalone engines`() = runTest {
         val current = repository.settings.first()
         assertEquals(
             listOf(
                 EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
-                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN, EngineId.OPERA,
+                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
             ),
             current.engineAutoPriority,
         )
@@ -219,7 +237,7 @@ class SettingsRepositoryTest {
         assertEquals(
             listOf(
                 EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
-                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN, EngineId.OPERA,
+                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
             ),
             repository.settings.first().engineAutoPriority,
         )
@@ -235,7 +253,7 @@ class SettingsRepositoryTest {
         assertEquals(
             listOf(
                 EngineId.BYEDPI, EngineId.FPTN, EngineId.WARP,
-                EngineId.URNETWORK, EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.OPERA,
+                EngineId.URNETWORK, EngineId.MASTERDNS, EngineId.SINGBOX,
             ),
             repository.settings.first().engineAutoPriority,
         )
@@ -269,7 +287,7 @@ class SettingsRepositoryTest {
         assertEquals(
             listOf(
                 EngineId.WARP, EngineId.BYEDPI, EngineId.URNETWORK,
-                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN, EngineId.OPERA,
+                EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
             ),
             repository.settings.first().engineAutoPriority,
         )

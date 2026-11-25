@@ -43,6 +43,15 @@ class SettingsRepositoryImpl @Inject constructor(
         dataStore.edit { it[SettingsKeys.TRAFFIC_MODE] = mode.name }
     }
 
+    override suspend fun setOperaAutoEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            val priority = prefs.readEngineAutoPriority().filterNot { it == EngineId.OPERA }
+            val next = if (enabled) priority + EngineId.OPERA else priority
+            prefs[SettingsKeys.OPERA_AUTO_ENABLED] = enabled
+            prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = next.joinToString(",") { it.name }
+        }
+    }
+
     override suspend fun setOperaRegion(region: String) {
         require(region in setOf("EU", "AS", "AM"))
         dataStore.edit { it[SettingsKeys.OPERA_REGION] = region }
@@ -65,7 +74,10 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setEngineAutoPriority(priority: List<EngineId>) {
         dataStore.edit { prefs ->
-            val cleaned = priority.distinct().filter { !it.isStub && !it.manualStandaloneOnly }
+            val operaEnabled = prefs[SettingsKeys.OPERA_AUTO_ENABLED] == true
+            val cleaned = priority.distinct().filter {
+                !it.isStub && !it.manualStandaloneOnly && (it != EngineId.OPERA || operaEnabled)
+            }
             if (cleaned.isEmpty()) {
                 prefs.remove(SettingsKeys.ENGINE_AUTO_PRIORITY)
             } else {
@@ -243,14 +255,21 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     private fun Preferences.readEngineAutoPriority(): List<EngineId> {
-        val raw = this[SettingsKeys.ENGINE_AUTO_PRIORITY]
-            ?: return SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
+        val operaEnabled = this[SettingsKeys.OPERA_AUTO_ENABLED] == true
+        val defaults = if (operaEnabled) {
+            SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY + EngineId.OPERA
+        } else {
+            SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
+        }
+        val raw = this[SettingsKeys.ENGINE_AUTO_PRIORITY] ?: return defaults
         val parsed = raw.split(",")
             .mapNotNull { name -> runCatching { EngineId.valueOf(name.trim()) }.getOrNull() }
-            .filter { !it.isStub && !it.manualStandaloneOnly }
+            .filter { !it.isStub && !it.manualStandaloneOnly && (it != EngineId.OPERA || operaEnabled) }
             .distinct()
-        if (parsed.isEmpty()) return SettingsModel.DEFAULT_ENGINE_AUTO_PRIORITY
-        val missing = EngineId.entries.filter { !it.isStub && !it.manualStandaloneOnly && it !in parsed }
+        if (parsed.isEmpty()) return defaults
+        val missing = EngineId.entries.filter {
+            !it.isStub && !it.manualStandaloneOnly && it !in parsed && (it != EngineId.OPERA || operaEnabled)
+        }
         return parsed + missing
     }
 
