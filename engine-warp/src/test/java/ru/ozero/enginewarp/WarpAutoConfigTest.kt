@@ -619,7 +619,7 @@ class WarpAutoConfigTest {
         assertTrue(endpoints.none { it.host.equals("api.cloudflareclient.com", ignoreCase = true) })
         assertTrue(endpoints.all { it.path == "/api/warp" || it.path == "/api/generate" })
         assertTrue(endpoints.any { it.path == "/api/generate" })
-        assertTrue(endpoints.any { it.host.equals("cyberportal.workers.dev", ignoreCase = true) })
+        assertTrue(endpoints.any { it.host.equals("warp.cyberportal.workers.dev", ignoreCase = true) })
         assertTrue(urls.contains("https://warp-gen.cyb-portal.org/api/warp"))
     }
 
