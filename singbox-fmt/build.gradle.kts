@@ -8,10 +8,9 @@ android {
 
 dependencies {
     implementation(libs.kryo)
-    implementation(libs.bundles.coroutines)
 
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)
-    testImplementation(libs.bundles.testing.unit)
+    testImplementation(libs.kotlin.test)
     testImplementation(libs.json)
 }
