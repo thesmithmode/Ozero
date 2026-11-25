@@ -199,7 +199,10 @@ class OperaEngineTest {
         val plugin = engine(dnsProbe = { throw IOException("DNS failure") })
         plugin.start(EngineConfig.Opera(), Upstream.None)
         assertEquals(TunAttachResult.Success, plugin.attachTun(42))
-        assertTrue(plugin.awaitReady() is EnginePlugin.ReadyResult.Timeout)
+        assertEquals(
+            EnginePlugin.ReadyResult.Timeout("Opera routed DNS unavailable: IOException"),
+            plugin.awaitReady(),
+        )
         plugin.stop()
         plugin.start(EngineConfig.Opera(proxyMode = true), Upstream.None)
         assertEquals(EnginePlugin.ReadyResult.Ready, plugin.awaitReady())
