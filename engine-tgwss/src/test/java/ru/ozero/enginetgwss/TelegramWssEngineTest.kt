@@ -80,7 +80,10 @@ class TelegramWssEngineTest {
         )
         val loopback = InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1))
         ServerSocket(0, 1, loopback).use { occupied ->
-            assertIs<StartResult.Failure>(engine.start(EngineConfig.TelegramWss(occupied.localPort), Upstream.None))
+            val failure = assertIs<StartResult.Failure>(
+                engine.start(EngineConfig.TelegramWss(occupied.localPort), Upstream.None),
+            )
+            assertEquals("Telegram WSS failed to start local proxy: BindException", failure.reason)
         }
         assertEquals(EngineStats(), engine.stats().first())
         coVerify(exactly = 1) { warp.stop() }

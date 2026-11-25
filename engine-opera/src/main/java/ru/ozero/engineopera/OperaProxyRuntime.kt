@@ -43,17 +43,19 @@ class OperaProxyRuntime(
                 }
             }
             val current = checkNotNull(launched)
-            val ready = withTimeoutOrNull(timeoutMs) {
-                awaitRoute(current)
-                true
-            } ?: false
+            val ready = withTimeoutOrNull(timeoutMs) { awaitRoute(current) } == true
             mutex.withLock {
                 if (ready && session === current && current.process.alive) {
                     current.ready = true
                     StartResult.Success(current.port)
                 } else {
+                    val reason = when {
+                        session !== current -> "opera startup interrupted"
+                        !current.process.alive -> "opera process exited before readiness"
+                        else -> "opera routed readiness timed out"
+                    }
                     stopIfCurrent(current)
-                    StartResult.Failure("opera readiness timeout or process stopped")
+                    StartResult.Failure(reason)
                 }
             }
         } catch (e: CancellationException) {
@@ -87,17 +89,17 @@ class OperaProxyRuntime(
         }
     }
 
-    private suspend fun awaitRoute(current: Session) {
+    private suspend fun awaitRoute(current: Session): Boolean {
         while (isCurrent(current)) {
             try {
                 routedProbe(current.port)
-                if (isCurrent(current)) return
-            } catch (e: IOException) {
-                if (!isCurrent(current)) throw e
+                return isCurrent(current)
+            } catch (_: IOException) {
+                if (!isCurrent(current)) return false
                 delay(retryDelayMs)
             }
         }
-        throw IOException("opera process stopped")
+        return false
     }
 
     private suspend fun isCurrent(current: Session): Boolean =

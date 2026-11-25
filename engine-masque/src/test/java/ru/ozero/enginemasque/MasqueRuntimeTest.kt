@@ -65,13 +65,16 @@ class MasqueRuntimeTest {
 
     @Test
     fun `manual mode returns null on early process failure`() = runBlocking {
+        val failures = mutableListOf<String>()
         val runtime = MasqueRuntime(
             binary(),
             directory,
             MasqueProcessLauncher { Child(false) },
             MasqueReadinessProbe { error("Dead process cannot be ready") },
+            reportFailure = { failures.add(it) },
         )
         assertNull(runtime.start(profile(), 1080, MasqueTransport.H3))
+        assertEquals(listOf("startup H3 IPv4: process exited before readiness"), failures)
         assertFalse(runtime.isReady())
         assertEquals(listOf("usque"), directory.list().orEmpty().toList())
     }
@@ -193,19 +196,45 @@ class MasqueRuntimeTest {
 
     @Test
     fun `launch failure cleans workspace and falls back`() = runBlocking {
+        val failures = mutableListOf<String>()
         val runtime = MasqueRuntime(
             binary(),
             directory,
             MasqueProcessLauncher { command ->
-                if ("--http2" !in command) throw IOException("fixture")
+                if ("--http2" !in command) throw IOException("private profile path")
                 File(File(command[2]).parentFile, "ready").writeText("ready")
                 Child(true)
             },
             MasqueReadinessProbe { true },
+            reportFailure = { failures.add(it) },
         )
         assertEquals(MasqueTransport.H2, runtime.start(profile(), 1080, MasqueTransport.AUTO))
+        assertEquals(listOf("startup H3 IPv4: IOException"), failures)
         runtime.stop()
         assertEquals(listOf("usque"), directory.list().orEmpty().toList())
+    }
+
+    @Test
+    fun `IPv6 launch failure reports its family without private details`() = runBlocking {
+        val failures = mutableListOf<String>()
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { command ->
+                if ("--ipv6" in command) throw IOException("private profile path")
+                Child(false)
+            },
+            MasqueReadinessProbe { error("Dead process cannot be ready") },
+            reportFailure = { failures.add(it) },
+        )
+        val config = MasqueProfile.parse(JSONObject(profile().json).put("endpoint_v6", "2001:db8::3").toString())
+
+        assertNull(runtime.start(config, 1080, MasqueTransport.H3))
+
+        assertEquals(
+            listOf("startup H3 IPv4: process exited before readiness", "startup H3 IPv6: IOException"),
+            failures,
+        )
     }
 
     @Test

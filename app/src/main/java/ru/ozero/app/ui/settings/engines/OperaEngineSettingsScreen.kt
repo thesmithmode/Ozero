@@ -43,7 +43,7 @@ fun OperaEngineSettingsScreen(
                 title = { Text("Opera Proxy") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.settings_back))
                     }
                 },
             )

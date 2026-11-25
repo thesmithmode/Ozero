@@ -51,7 +51,7 @@ class OperaProxyRuntimeTest {
             routedProbe = { error("must not probe dead process") },
             allocatePort = { 12345 },
         )
-        assertTrue(runtime.start(OperaProxyConfig()) is StartResult.Failure)
+        assertEquals(StartResult.Failure("opera process exited before readiness"), runtime.start(OperaProxyConfig()))
         assertTrue(runtime.probe() is ProbeResult.Failure)
     }
 
@@ -66,7 +66,7 @@ class OperaProxyRuntimeTest {
             retryDelayMs = 10,
         )
         assertEquals(
-            StartResult.Failure("opera readiness timeout or process stopped"),
+            StartResult.Failure("opera routed readiness timed out"),
             runtime.start(OperaProxyConfig()),
         )
         assertFalse(process.alive)

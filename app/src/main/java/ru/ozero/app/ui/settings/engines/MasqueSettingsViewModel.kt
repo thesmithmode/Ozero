@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import ru.ozero.enginemasque.MasqueProfileStore
 import ru.ozero.enginemasque.MasqueRuntime
 import ru.ozero.enginemasque.MasqueTransport
+import ru.ozero.enginescore.PersistentLoggers
 import javax.inject.Inject
 
 data class MasqueSettingsUiState(
@@ -41,21 +42,24 @@ class MasqueSettingsViewModel @Inject constructor(
             error = it.corrupt,
             loaded = true,
         )
-    }.catch { emit(MasqueSettingsUiState(error = true, loaded = true)) }
+    }.catch {
+        PersistentLoggers.warn("MasqueSettings", "read settings failed: ${it.javaClass.simpleName}")
+        emit(MasqueSettingsUiState(error = true, loaded = true))
+    }
 
     val state = combine(saved, busy, error) { current, running, failed ->
         current.copy(busy = running, error = current.error || failed)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MasqueSettingsUiState())
 
-    fun register() = perform { store.save(runtime.register(acceptedTerms = true)) }
+    fun register() = perform("register profile") { store.save(runtime.register(acceptedTerms = true)) }
 
-    fun clear() = perform { store.clear() }
+    fun clear() = perform("clear profile") { store.clear() }
 
-    fun selectTransport(transport: MasqueTransport) = perform { store.setTransport(transport) }
+    fun selectTransport(transport: MasqueTransport) = perform("save transport") { store.setTransport(transport) }
 
-    fun setAutoEnabled(enabled: Boolean) = perform { store.setAutoEnabled(enabled) }
+    fun setAutoEnabled(enabled: Boolean) = perform("save auto mode") { store.setAutoEnabled(enabled) }
 
-    private fun perform(action: suspend () -> Unit) {
+    private fun perform(operation: String, action: suspend () -> Unit) {
         if (!busy.compareAndSet(false, true)) return
         error.value = false
         viewModelScope.launch {
@@ -63,7 +67,8 @@ class MasqueSettingsViewModel @Inject constructor(
                 action()
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                PersistentLoggers.warn("MasqueSettings", "$operation failed: ${e.javaClass.simpleName}")
                 error.value = true
             } finally {
                 busy.value = false

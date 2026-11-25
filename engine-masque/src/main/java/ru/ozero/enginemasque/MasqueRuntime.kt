@@ -9,6 +9,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import ru.ozero.enginescore.PersistentLoggers
 import java.io.File
 import java.io.IOException
 import java.util.UUID
@@ -21,6 +22,7 @@ class MasqueRuntime internal constructor(
     private val readiness: MasqueReadinessProbe,
     private val startupTimeoutMs: Long = 6_000,
     private val registrationTimeoutMs: Long = 45_000,
+    private val reportFailure: (String) -> Unit = { PersistentLoggers.warn("MasqueRuntime", it) },
 ) {
     constructor(binary: File, privateDirectory: File) : this(
         binary,
@@ -113,14 +115,19 @@ class MasqueRuntime internal constructor(
         val config = File(workspace, CONFIG_NAME)
         var child: MasqueProcess? = null
         var started = false
+        val attempt = "startup $transport IPv${if (endpointIpv6) 6 else 4}"
         try {
             config.writeText(profile.json)
             val command = MasqueCommand.socks(binary, config, port, transport, ipv6Enabled, endpointIpv6)
             val process = launcher.launch(command)
             child = process
             started = awaitReady(process, workspace, port)
-            return if (started) Session(process, workspace, port) else null
-        } catch (_: IOException) {
+            if (started) return Session(process, workspace, port)
+            val reason = if (process.alive) "readiness timed out" else "process exited before readiness"
+            reportFailure("$attempt: $reason")
+            return null
+        } catch (e: IOException) {
+            reportFailure("$attempt: ${e.javaClass.simpleName}")
             return null
         } finally {
             if (!started) {
