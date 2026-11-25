@@ -29,6 +29,7 @@ class OperaTunBridgeImpl(
     private val startRpcTimeoutMs: Long = START_RPC_TIMEOUT_MS,
     private val abandonedCleanupTimeoutMs: Long = STOP_TIMEOUT_MS,
     private val readinessRpcTimeoutMs: Long = READINESS_RPC_TIMEOUT_MS,
+    private val stopRpcTimeoutMs: Long = STOP_TIMEOUT_MS,
 ) : OperaTunBridge {
     private data class Session(
         val connection: ServiceConnection,
@@ -47,14 +48,16 @@ class OperaTunBridgeImpl(
     private val mutex = Mutex()
     private var session: Session? = null
     private val pendingStart = AtomicReference<PendingStart?>(null)
+    private val pendingStop = AtomicReference<CompletableDeferred<Unit>?>(null)
     private val protector = object : ISingboxProtector.Stub() {
         override fun protect(socket: ParcelFileDescriptor): Boolean =
             socket.use { VpnSocketProtectorHolder.protect(it.fd) }
     }
 
     override suspend fun start(tunFd: Int, config: String): Boolean = mutex.withLock {
-        if (pendingStart.get() != null) return@withLock false
+        if (pendingStart.get() != null || pendingStop.get() != null) return@withLock false
         stopLocked()
+        if (pendingStop.get() != null) return@withLock false
         val remoteResult = CompletableDeferred<ISingboxEngineProcess?>()
         val connection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName, service: IBinder) {
@@ -157,7 +160,21 @@ class OperaTunBridgeImpl(
     private suspend fun stopLocked() = withContext(NonCancellable + Dispatchers.IO) {
         val current = session
         session = null
-        if (current != null) release(current)
+        if (current != null) {
+            val finished = CompletableDeferred<Unit>()
+            pendingStop.set(finished)
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    release(current)
+                } finally {
+                    pendingStop.compareAndSet(finished, null)
+                    finished.complete(Unit)
+                }
+            }
+            if (withTimeoutOrNull(stopRpcTimeoutMs) { finished.await() } == null) {
+                unbindOnce(current)
+            }
+        }
     }
 
     private fun release(current: Session) {
