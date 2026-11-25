@@ -102,7 +102,6 @@ object SingboxModule {
         db: SingboxDatabase,
         groupDao: SubscriptionGroupDao,
         profileDao: ProxyProfileDao,
-        proxyChainDao: ProxyChainDao,
         @SingboxPrefs dataStore: DataStore<Preferences>,
         tunnelController: TunnelController,
     ): RawUpdater =
@@ -114,16 +113,7 @@ object SingboxModule {
             insecureOkHttpClient = SubscriptionTrustClientFactory.createInsecure(),
             database = db,
             fallbackClient = { SubscriptionTrustClientFactory.forActiveProxy(it, tunnelController) },
-            onProfilesRemoved = { removedProfileIds ->
-                proxyChainDao.deleteByProfileIds(removedProfileIds)
-                dataStore.edit { prefs ->
-                    val selectedProfileId = prefs[SingboxProbeService.SELECTED_PROFILE_KEY]
-                    if (selectedProfileId != null && selectedProfileId in removedProfileIds) {
-                        prefs.remove(SingboxProbeService.SELECTED_PROFILE_KEY)
-                        prefs.remove(SingboxProbeService.BEAN_KEY)
-                    }
-                }
-            },
+            reconcileCommittedSelections = { reconcileSubscriptionSelection(dataStore, profileDao) },
         )
 
     @Provides

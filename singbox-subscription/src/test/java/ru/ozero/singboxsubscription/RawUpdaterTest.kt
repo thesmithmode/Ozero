@@ -1412,29 +1412,73 @@ class RawUpdaterTest {
     }
 
     @Test
-    fun `should report removed profile ids after successful replacement`() = runBlocking {
-        val removedIds = mutableSetOf<Long>()
-        rawUpdater = RawUpdater(
-            okHttpClient = OkHttpClient(),
-            groupDao = groupDao,
-            profileDao = profileDao,
-            onProfilesRemoved = { removedIds += it },
-        )
+    fun `committed refresh retries reconciliation from persisted rows before another download`() = runBlocking {
         val g = group()
+        val staleId = 901L
         profileDao.profiles.add(
             ru.ozero.singboxroom.entity.ProxyProfile(
-                id = 901L,
+                id = staleId,
                 groupId = g.id,
                 name = "Removed",
                 beanBlob = byteArrayOf(9, 0, 1),
                 protocolType = RawUpdater.PROTOCOL_VLESS,
             ),
         )
+        var selectedId: Long? = staleId
+        var failCleanup = true
+        val reconcile: suspend () -> Unit = {
+            if (selectedId != null && profileDao.getById(checkNotNull(selectedId)) == null) {
+                if (failCleanup) throw IOException("fixture")
+                selectedId = null
+            }
+        }
+        rawUpdater = RawUpdater(
+            OkHttpClient(), groupDao, profileDao, reconcileCommittedSelections = reconcile,
+        )
         server.enqueue(MockResponse().setBody(vless1))
 
         val result = rawUpdater.refresh(g)
 
-        assertTrue(result.isSuccess)
-        assertEquals(setOf(901L), removedIds)
+        assertTrue(result.isFailure)
+        assertTrue(isTransientSubscriptionRefreshFailure(checkNotNull(result.exceptionOrNull())))
+        assertEquals(staleId, selectedId)
+        assertEquals(null, profileDao.getById(staleId))
+        val committed = groupDao.getById(g.id)
+        assertEquals(null, committed?.lastRefreshErrorCode)
+        assertEquals(1, committed?.lastServerCount)
+
+        rawUpdater = RawUpdater(
+            OkHttpClient(), groupDao, profileDao, reconcileCommittedSelections = reconcile,
+        )
+        assertTrue(rawUpdater.refresh(g).isFailure)
+        assertEquals(1, server.requestCount)
+
+        failCleanup = false
+        server.enqueue(MockResponse().setResponseCode(503))
+        assertTrue(rawUpdater.refresh(g).isFailure)
+        assertEquals(null, selectedId)
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `cancelled selection reconciliation after commit preserves successful database state`() = runBlocking {
+        val g = group()
+        var reconciliations = 0
+        rawUpdater = RawUpdater(
+            OkHttpClient(),
+            groupDao,
+            profileDao,
+            reconcileCommittedSelections = {
+                if (++reconciliations == 2) throw kotlinx.coroutines.CancellationException("fixture")
+            },
+        )
+        server.enqueue(MockResponse().setBody(vless1))
+
+        val failure = runCatching { rawUpdater.refresh(g) }.exceptionOrNull()
+
+        assertTrue(failure is kotlinx.coroutines.CancellationException)
+        assertEquals(1, profileDao.profiles.size)
+        assertEquals(null, groupDao.getById(g.id)?.lastRefreshErrorCode)
+        assertEquals(1, groupDao.getById(g.id)?.lastServerCount)
     }
 }
