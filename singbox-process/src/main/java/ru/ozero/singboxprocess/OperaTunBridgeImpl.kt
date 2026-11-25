@@ -140,17 +140,13 @@ class OperaTunBridgeImpl(
 
     private suspend fun queryRuntime(current: Session): Boolean {
         val pending = CompletableDeferred<Boolean>()
-        val query = if (current.readiness.compareAndSet(null, pending)) {
+        val query = checkNotNull(current.readiness.updateAndGet { it ?: pending })
+        if (query === pending) {
             CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    pending.complete(runCatching { current.remote.runtimeRunning() }.getOrDefault(false))
-                } finally {
-                    current.readiness.compareAndSet(pending, null)
-                }
+                val running = runCatching { current.remote.runtimeRunning() }.getOrDefault(false)
+                current.readiness.compareAndSet(pending, null)
+                pending.complete(running)
             }
-            pending
-        } else {
-            current.readiness.get() ?: return false
         }
         return withTimeoutOrNull(readinessRpcTimeoutMs) { query.await() } == true
     }
