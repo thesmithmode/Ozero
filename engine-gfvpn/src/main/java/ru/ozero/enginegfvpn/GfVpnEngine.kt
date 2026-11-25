@@ -21,6 +21,7 @@ import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.TunAttachResult
@@ -40,7 +41,10 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val state = MutableStateFlow(EngineStats())
     private val connectivity = app.getSystemService(ConnectivityManager::class.java)
-    @Volatile private var runtime: GfVpnRuntime? = null
+
+    @Volatile
+    private var runtime: GfVpnRuntime? = null
+
     private var callback: ConnectivityManager.NetworkCallback? = null
     private var attached = false
 
@@ -115,6 +119,7 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
             throw cancelled
         } catch (error: Exception) {
             reset()
+            PersistentLoggers.warn("GfVpnEngine", "TUN attachment failed: ${error.javaClass.simpleName}")
             TunAttachResult.Failure("gfVPN TUN attachment failed")
         }
     }
@@ -132,8 +137,11 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
     }
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult =
-        if (probe() is ProbeResult.Success) EnginePlugin.ReadyResult.Ready
-        else EnginePlugin.ReadyResult.Timeout("gfVPN route unavailable")
+        if (probe() is ProbeResult.Success) {
+            EnginePlugin.ReadyResult.Ready
+        } else {
+            EnginePlugin.ReadyResult.Timeout("gfVPN route unavailable")
+        }
 
     override fun stats() = state
 
@@ -198,8 +206,11 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
 
     private suspend fun <T> CompletableFuture<T>.awaitResult(): T = suspendCancellableCoroutine { continuation ->
         whenComplete { value, error ->
-            if (error != null) continuation.resumeWithException(error)
-            else continuation.resume(value)
+            if (error != null) {
+                continuation.resumeWithException(error)
+            } else {
+                continuation.resume(value)
+            }
         }
         continuation.invokeOnCancellation { cancel(true) }
     }
