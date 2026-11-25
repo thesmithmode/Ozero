@@ -215,6 +215,29 @@ class MasqueRuntimeTest {
     }
 
     @Test
+    fun `IPv6 launch failure reports its family without private details`() = runBlocking {
+        val failures = mutableListOf<String>()
+        val runtime = MasqueRuntime(
+            binary(),
+            directory,
+            MasqueProcessLauncher { command ->
+                if ("--ipv6" in command) throw IOException("private profile path")
+                Child(false)
+            },
+            MasqueReadinessProbe { error("Dead process cannot be ready") },
+            reportFailure = { failures.add(it) },
+        )
+        val config = MasqueProfile.parse(JSONObject(profile().json).put("endpoint_v6", "2001:db8::3").toString())
+
+        assertNull(runtime.start(config, 1080, MasqueTransport.H3))
+
+        assertEquals(
+            listOf("startup H3 IPv4: process exited before readiness", "startup H3 IPv6: IOException"),
+            failures,
+        )
+    }
+
+    @Test
     fun `registration timeout closes child and cleans workspace`() = runBlocking {
         val child = Child(true)
         val runtime = MasqueRuntime(

@@ -115,6 +115,7 @@ class MasqueRuntime internal constructor(
         val config = File(workspace, CONFIG_NAME)
         var child: MasqueProcess? = null
         var started = false
+        val attempt = "startup $transport IPv${if (endpointIpv6) 6 else 4}"
         try {
             config.writeText(profile.json)
             val command = MasqueCommand.socks(binary, config, port, transport, ipv6Enabled, endpointIpv6)
@@ -123,10 +124,10 @@ class MasqueRuntime internal constructor(
             started = awaitReady(process, workspace, port)
             if (started) return Session(process, workspace, port)
             val reason = if (process.alive) "readiness timed out" else "process exited before readiness"
-            reportFailure("startup $transport IPv${if (endpointIpv6) 6 else 4}: $reason")
+            reportFailure("$attempt: $reason")
             return null
         } catch (e: IOException) {
-            reportFailure("startup $transport IPv${if (endpointIpv6) 6 else 4}: ${e.javaClass.simpleName}")
+            reportFailure("$attempt: ${e.javaClass.simpleName}")
             return null
         } finally {
             if (!started) {
