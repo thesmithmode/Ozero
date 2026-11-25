@@ -16,6 +16,10 @@ class OperaEngineSettingsViewModel @Inject constructor(
 ) : ViewModel() {
     val settings = repository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsModel.DEFAULT)
 
+    fun setAutoEnabled(enabled: Boolean) {
+        viewModelScope.launch { repository.setOperaAutoEnabled(enabled) }
+    }
+
     fun selectRegion(region: String) {
         viewModelScope.launch { repository.setOperaRegion(region) }
     }

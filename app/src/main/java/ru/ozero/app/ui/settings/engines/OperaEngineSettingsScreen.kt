@@ -14,16 +14,19 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
+import ru.ozero.enginescore.EngineId
 import ru.ozero.engineopera.OperaRegion
 import ru.ozero.engineopera.OperaServerSelection
 
@@ -51,6 +54,16 @@ fun OperaEngineSettingsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(stringResource(R.string.settings_opera_summary))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.settings_auto_mode_open_title), modifier = Modifier.weight(1f))
+                Switch(
+                    checked = EngineId.OPERA in model.engineAutoPriority,
+                    onCheckedChange = viewModel::setAutoEnabled,
+                )
+            }
             Text(stringResource(R.string.opera_region))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OperaRegion.entries.forEach { region ->

@@ -92,18 +92,23 @@ class AppBackupManagerTest {
         ozeroDs.edit { prefs ->
             prefs[SettingsKeys.OPERA_REGION] = "AS"
             prefs[SettingsKeys.OPERA_SELECTION] = "random"
+            prefs[SettingsKeys.OPERA_AUTO_ENABLED] = true
         }
         val exported = manager.export()
         assertEquals("AS", exported.settings.operaRegion)
         assertEquals("random", exported.settings.operaSelection)
+        assertEquals(true, exported.settings.operaAutoEnabled)
         ozeroDs.edit { prefs ->
             prefs.remove(SettingsKeys.OPERA_REGION)
             prefs.remove(SettingsKeys.OPERA_SELECTION)
+            prefs.remove(SettingsKeys.OPERA_AUTO_ENABLED)
         }
         manager.import(exported)
         assertEquals("AS", ozeroDs.data.first()[SettingsKeys.OPERA_REGION])
         assertEquals("random", ozeroDs.data.first()[SettingsKeys.OPERA_SELECTION])
+        assertEquals(true, ozeroDs.data.first()[SettingsKeys.OPERA_AUTO_ENABLED])
         assertNull(manager.export(setOf(BackupCategory.WARP)).settings.operaRegion)
+        assertNull(manager.export(setOf(BackupCategory.WARP)).settings.operaAutoEnabled)
     }
 
     @Test

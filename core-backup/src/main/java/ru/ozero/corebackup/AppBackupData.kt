@@ -81,6 +81,7 @@ data class BackupSettings(
     val fptnToken: String? = null,
     val operaRegion: String? = null,
     val operaSelection: String? = null,
+    val operaAutoEnabled: Boolean? = null,
 )
 
 data class BackupUrnetwork(

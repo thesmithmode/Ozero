@@ -34,7 +34,6 @@ data class SettingsModel(
         val DEFAULT_MANUAL_ENGINE: EngineId? = null
         val DEFAULT_ENGINE_AUTO_PRIORITY: List<EngineId> = listOf(
             EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI, EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
-            EngineId.OPERA,
             EngineId.MASQUE,
         )
         const val DEFAULT_URNETWORK_ENABLED: Boolean = false

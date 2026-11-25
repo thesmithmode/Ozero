@@ -32,7 +32,6 @@ class SettingsModelCoverageTest {
                 EngineId.MASTERDNS,
                 EngineId.SINGBOX,
                 EngineId.FPTN,
-                EngineId.OPERA,
                 EngineId.MASQUE,
             ),
             model.engineAutoPriority,

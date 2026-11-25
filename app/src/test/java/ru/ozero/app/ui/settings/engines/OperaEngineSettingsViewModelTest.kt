@@ -31,14 +31,17 @@ class OperaEngineSettingsViewModelTest {
             coEvery { repo.setOperaSelection(any()) } coAnswers {
                 state.value = state.value.copy(operaSelection = firstArg())
             }
+            coEvery { repo.setOperaAutoEnabled(any()) } returns Unit
             val model = OperaEngineSettingsViewModel(repo)
             advanceUntilIdle()
             assertEquals("EU", model.settings.value.operaRegion)
             model.selectRegion("AM")
             model.selectServer("random")
+            model.setAutoEnabled(true)
             advanceUntilIdle()
             coVerify(exactly = 1) { repo.setOperaRegion("AM") }
             coVerify(exactly = 1) { repo.setOperaSelection("random") }
+            coVerify(exactly = 1) { repo.setOperaAutoEnabled(true) }
             assertEquals("AM", model.settings.value.operaRegion)
             assertEquals("random", model.settings.value.operaSelection)
         } finally {
