@@ -69,7 +69,8 @@ class MasqueRuntime internal constructor(
         val failure = when {
             code == null -> "registration timed out"
             code != 0 -> registrationExitReason(code)
-            !config.isFile || config.length() !in 1..MasqueProfile.MAX_BYTES.toLong() -> "registration produced no usable profile"
+            !config.isFile || config.length() !in 1..MasqueProfile.MAX_BYTES.toLong() ->
+                "registration produced no usable profile"
             else -> null
         }
         if (failure != null) {
