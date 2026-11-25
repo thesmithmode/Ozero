@@ -174,6 +174,29 @@ class MasqueRuntimeTest {
     }
 
     @Test
+    fun `native registration exit codes name the failed stage`() = runBlocking {
+        val stages = mapOf(
+            20 to "Cloudflare registration request failed",
+            21 to "MASQUE key generation failed",
+            22 to "Cloudflare key enrollment failed",
+            23 to "MASQUE could not save the registered profile",
+        )
+        val executable = binary()
+        for ((code, stage) in stages) {
+            val failures = mutableListOf<String>()
+            val runtime = MasqueRuntime(
+                executable,
+                directory,
+                MasqueProcessLauncher { Child(false, code) },
+                MasqueReadinessProbe { false },
+                reportFailure = { failures.add(it) },
+            )
+            assertThrows<IllegalStateException> { runtime.register(true) }
+            assertEquals(listOf(stage), failures)
+        }
+    }
+
+    @Test
     fun `IPv6 endpoint fallback is independent from inner IPv6`() = runBlocking {
         val commands = mutableListOf<List<String>>()
         val runtime = MasqueRuntime(
