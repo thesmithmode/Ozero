@@ -899,7 +899,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification :engine-opera:testDebugUnitTest :engine-opera:jacocoTestReport :engine-opera:jacocoTestCoverageVerification --stacktrace --continue
+        run: ./gradlew :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification :engine-opera:testDebugUnitTest :engine-opera:jacocoTestReport :engine-opera:jacocoTestCoverageVerification :engine-gfvpn:testDebugUnitTest --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
