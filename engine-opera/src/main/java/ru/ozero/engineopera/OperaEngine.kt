@@ -60,7 +60,7 @@ class OperaEngine(
     override suspend fun tunSpec(): TunSpec = OperaTunConfig.spec()
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult =
-        lifecycle.run<StartResult>(StartResult.Failure("Opera is stopping")) {
+        lifecycle.run<StartResult>(StartResult.Failure("Opera is stopping"), onCancelled = ::stopLocked) {
             if (config !is EngineConfig.Opera || upstream !is Upstream.None) {
                 return@run StartResult.Failure("invalid Opera configuration or unsupported upstream")
             }
@@ -78,15 +78,15 @@ class OperaEngine(
         }
 
     override suspend fun attachTun(tunFd: Int): TunAttachResult =
-        lifecycle.run<TunAttachResult>(TunAttachResult.Failure("Opera is stopping")) {
-            val current = active ?: return@run TunAttachResult.Failure("Opera not started")
+        lifecycle.attach<TunAttachResult>(TunAttachResult.Failure("Opera is stopping")) {
+            val current = active ?: return@attach TunAttachResult.Failure("Opera not started")
             if (current.config.proxyMode || current.attached) {
-                return@run TunAttachResult.Failure("Opera TUN attachment not expected")
+                return@attach TunAttachResult.Failure("Opera TUN attachment not expected")
             }
             try {
                 if (!tun.start(tunFd, OperaTunConfig.build(current.port, current.config.ipv6Enabled))) {
                     stopLocked()
-                    return@run TunAttachResult.Failure("Opera TUN runtime failed")
+                    return@attach TunAttachResult.Failure("Opera TUN runtime failed")
                 }
                 runCatching { closeFd(tunFd) }
                     .onFailure { PersistentLoggers.warn("OperaEngine", "TUN fd close failed: ${it.javaClass.simpleName}") }

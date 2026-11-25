@@ -1,10 +1,13 @@
 package ru.ozero.engineopera
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.job
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 internal class OperaLifecycle {
     private val lifecycle = Mutex()
@@ -13,24 +16,35 @@ internal class OperaLifecycle {
     private var operation: Job? = null
     private var stopping = false
 
-    suspend fun <T> run(rejected: T, block: suspend () -> T): T = coroutineScope {
-        val job = coroutineContext.job
-        lifecycle.withLock {
-            val accepted = synchronized(lock) {
-                if (stopping) {
-                    false
-                } else {
-                    operation = job
-                    true
+    suspend fun <T> run(
+        rejected: T,
+        onCancelled: suspend () -> Unit = {},
+        block: suspend () -> T,
+    ): T = lifecycle.withLock {
+        var accepted = false
+        try {
+            coroutineScope {
+                val job = coroutineContext.job
+                accepted = synchronized(lock) {
+                    if (stopping) {
+                        false
+                    } else {
+                        operation = job
+                        true
+                    }
                 }
+                if (accepted) block() else rejected
             }
-            if (!accepted) return@withLock rejected
-            try {
-                block()
-            } finally {
-                synchronized(lock) { operation = null }
-            }
+        } catch (e: CancellationException) {
+            if (accepted) withContext(NonCancellable) { onCancelled() }
+            throw e
+        } finally {
+            synchronized(lock) { operation = null }
         }
+    }
+
+    suspend fun <T> attach(rejected: T, block: suspend () -> T): T = lifecycle.withLock {
+        if (synchronized(lock) { stopping }) rejected else block()
     }
 
     suspend fun stop(block: suspend () -> Unit) = stopGate.withLock {
