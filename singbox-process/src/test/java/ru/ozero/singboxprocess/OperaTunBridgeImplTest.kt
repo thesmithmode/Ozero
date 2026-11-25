@@ -13,6 +13,7 @@ import io.mockk.slot
 import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -220,6 +221,39 @@ class OperaTunBridgeImplTest {
             unblock.countDown()
             assertTrue(returned.await(1, TimeUnit.SECONDS))
             assertFalse(bridge.isRunning())
+        } finally {
+            unblock.countDown()
+            unmockkStatic(ParcelFileDescriptor::class)
+        }
+    }
+
+    @Test
+    fun `stop does not wait for an in-flight health query and ignores its late result`() = runBlocking {
+        val f = Fixture()
+        val entered = CompletableDeferred<Unit>()
+        val unblock = CountDownLatch(1)
+        val calls = AtomicInteger()
+        mockkStatic(ParcelFileDescriptor::class)
+        every { ParcelFileDescriptor.fromFd(42) } returns f.fd
+        every { f.remote.runtimeRunning() } answers {
+            if (calls.incrementAndGet() > 1) {
+                entered.complete(Unit)
+                check(unblock.await(5, TimeUnit.SECONDS))
+            }
+            true
+        }
+        try {
+            val bridge = OperaTunBridgeImpl(f.context, readinessRpcTimeoutMs = 4_000)
+            assertTrue(bridge.start(42, "{}"))
+            val health = async { bridge.isRunning() }
+            withTimeout(2_000) { entered.await() }
+
+            withTimeout(2_000) { bridge.stop() }
+            verify(exactly = 1) { f.remote.stopAndWait(any(), 3000L) }
+            verify(exactly = 1) { f.context.unbindService(any()) }
+            assertFalse(bridge.isRunning())
+            unblock.countDown()
+            assertFalse(withTimeout(2_000) { health.await() })
         } finally {
             unblock.countDown()
             unmockkStatic(ParcelFileDescriptor::class)

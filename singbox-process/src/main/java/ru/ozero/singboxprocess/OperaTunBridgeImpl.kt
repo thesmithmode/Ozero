@@ -133,9 +133,10 @@ class OperaTunBridgeImpl(
         }
     }
 
-    override suspend fun isRunning(): Boolean = mutex.withLock {
-        val current = session ?: return@withLock false
-        withContext(Dispatchers.IO) { queryRuntime(current) }
+    override suspend fun isRunning(): Boolean {
+        val current = mutex.withLock { session } ?: return false
+        val running = withContext(Dispatchers.IO) { queryRuntime(current) }
+        return running && mutex.withLock { session === current }
     }
 
     private suspend fun queryRuntime(current: Session): Boolean {
