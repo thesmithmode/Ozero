@@ -61,7 +61,7 @@ adb shell am instrument \
   -e OZERO_SOAK_VLESS_REALITY "'$OZERO_SOAK_VLESS_REALITY'" \
   -e OZERO_SOAK_REALITY_TARGET "$OZERO_SOAK_REALITY_TARGET" \
   -e OZERO_SOAK_REALITY_MARKER "$OZERO_SOAK_REALITY_MARKER" \
-  -e class ru.ozero.app.soak.SoakTest \
+  -e class 'ru.ozero.app.soak.SoakTest#runSingboxTunSoak' \
   ru.ozero.app.test/androidx.test.runner.AndroidJUnitRunner \
   > "$RUNNER_TEMP/soak-output.txt" 2>&1 || instrument_status=$?
 
