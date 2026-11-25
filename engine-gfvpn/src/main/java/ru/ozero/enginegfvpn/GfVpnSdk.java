@@ -86,6 +86,8 @@ final class GfVpnSdk {
         set(config, "setForceConfigCountry", country);
         set(config, "setClientIdentifier", clientIdentifier);
         set(config, "setServerSelection", "auto");
+        set(config, "setNodeRotationEnabled", "true");
+        set(config, "setUseCachedNodes", "true");
         set(config, "setUseRemoteConfig", "true");
         set(config, "setSplitTunnelEnabled", "false");
         // Unauthenticated local SOCKS is not acceptable as a default.
@@ -106,7 +108,9 @@ final class GfVpnSdk {
             session = new Session((int) port, username, password);
             return session;
         } catch (Exception | LinkageError failure) {
-            try { stop(); } catch (Exception | LinkageError ignored) { }
+            try { stop(); } catch (Exception | LinkageError ignored) {
+                android.os.Process.killProcess(android.os.Process.myPid());
+            }
             throw failure;
         }
     }

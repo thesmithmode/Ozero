@@ -10,7 +10,8 @@ For an explicitly authorized development build, copy the two read-only files
 into the app's private files/gfvpn-sdk directory. Do not add them to Git or
 release assets. The bridge independently validates the hashes before loading.
 It loads the matching gomobile classes using a separate classloader in the
-private :engine_gfvpn process.
+private :engine_gfvpn process. GfVpnRuntime provides the asynchronous host-side
+session API, request deadlines, owner-death cancellation and hard process reset.
 
 Remaining gates before a selectable engine:
 - Test on ARM64 Android; validate JNI classloader compatibility and native
