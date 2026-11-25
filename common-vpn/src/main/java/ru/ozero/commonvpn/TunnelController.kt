@@ -82,14 +82,14 @@ class TunnelController(
         transition(TunnelState.Failed(engineId, reason), markError = true)
     }
 
-    fun onKillswitchEngaged(engineId: EngineId, reason: String) = synchronized(lock) {
+    fun onKillswitchEngaged(engineId: EngineId, reason: String): Unit = synchronized(lock) {
         invalidateSocksRoute()
         transition(TunnelState.Failed(engineId, reason), markError = true)
         _killswitchActive.value = true
         PersistentLoggers.warn(TAG, "killswitch engaged: engine=$engineId reason=$reason")
     }
 
-    fun onKillswitchReleased() = synchronized(lock) {
+    fun onKillswitchReleased(): Unit = synchronized(lock) {
         if (_killswitchActive.compareAndSet(true, false)) {
             PersistentLoggers.info(TAG, "killswitch released")
         }
@@ -97,7 +97,7 @@ class TunnelController(
 
     fun onDisconnecting() = transition(TunnelState.Disconnecting)
 
-    fun onSwitchingStarted(from: EngineId?, to: EngineId?) = synchronized(lock) {
+    fun onSwitchingStarted(from: EngineId?, to: EngineId?): Unit = synchronized(lock) {
         invalidateSocksRoute()
         val transition = SwitchingTransition(from, to)
         val timeoutMs = switchingTimeoutFor(to)

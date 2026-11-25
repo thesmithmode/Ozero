@@ -188,7 +188,7 @@ class RawUpdater(
                         group.id,
                         profilesWithStableIds,
                     )
-                    val didCommit = groupDao.commitRefresh(
+                    groupDao.commitRefresh(
                         id = group.id,
                         refreshGeneration = refreshGeneration,
                         lastUpdated = updatedGroup.lastUpdated,
@@ -199,7 +199,6 @@ class RawUpdater(
                         bytesRemaining = updatedGroup.bytesRemaining,
                         expiryDate = updatedGroup.expiryDate,
                     ) == 1
-                    didCommit
                 }
             }
             if (!committed) {
