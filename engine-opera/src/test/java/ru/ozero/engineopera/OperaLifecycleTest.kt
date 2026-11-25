@@ -1,0 +1,56 @@
+package ru.ozero.engineopera
+
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class OperaLifecycleTest {
+    @Test
+    fun `stop cancels the current operation and rejects queued startup during cleanup`() = runTest {
+        val lifecycle = OperaLifecycle()
+        val entered = CompletableDeferred<Unit>()
+        var cancelled = false
+        val running = launch {
+            lifecycle.run(false, onCancelled = { cancelled = true }) {
+                entered.complete(Unit)
+                awaitCancellation()
+            }
+        }
+        entered.await()
+        val attaching = launch {
+            assertEquals("rejected", lifecycle.attach("rejected") { error("must not attach during stop") })
+        }
+        val queued = launch {
+            assertEquals("rejected", lifecycle.run("rejected") { error("must not start during stop") })
+        }
+        runCurrent()
+        var stopped = false
+        lifecycle.stop { stopped = true }
+        running.join()
+        queued.join()
+        attaching.join()
+        assertTrue(running.isCancelled)
+        assertTrue(cancelled)
+        assertTrue(stopped)
+        assertEquals("started", lifecycle.run("rejected") { "started" })
+    }
+
+    @Test
+    fun `stop without startup performs cleanup and allows next operation`() = runTest {
+        val lifecycle = OperaLifecycle()
+        var stops = 0
+        lifecycle.stop { stops++ }
+        assertEquals(1, stops)
+        assertEquals(42, lifecycle.run(-1) { 42 })
+        assertEquals(43, lifecycle.attach(-1) { 43 })
+        lifecycle.stop { stops++ }
+        assertEquals(2, stops)
+    }
+}
