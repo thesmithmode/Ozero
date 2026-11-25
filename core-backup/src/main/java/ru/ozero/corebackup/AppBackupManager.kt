@@ -9,6 +9,9 @@ import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
 import ru.ozero.enginescore.settings.SettingsKeys
 import ru.ozero.enginefptn.FptnConfigStore
+import ru.ozero.enginemasque.MasqueProfile
+import ru.ozero.enginemasque.MasqueProfileStore
+import ru.ozero.enginemasque.MasqueTransport
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkLocationSelection
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
@@ -31,6 +34,7 @@ class AppBackupManager(
     private val fptnStore: FptnConfigStore? = null,
     private val strategyProvider: StrategyBackupProvider? = null,
     private val urnetworkDeviceIdentity: UrnetworkDeviceIdentity? = null,
+    private val masqueStore: MasqueProfileStore? = null,
 ) {
 
     suspend fun export(categories: Set<BackupCategory> = BackupCategory.ALL): AppBackupData {
@@ -47,7 +51,18 @@ class AppBackupManager(
             warpSlots = warpSlots,
             splitRules = splitRules,
             strategy = strategy,
+            masque = if (BackupCategory.MASQUE in categories) exportMasque() else null,
         )
+    }
+
+    private suspend fun exportMasque(): BackupMasque? {
+        val settings = masqueStore?.settings()?.first() ?: return null
+        check(!settings.corrupt) { "MASQUE profile is damaged" }
+        val unconfigured = settings.profile == null &&
+            settings.transport == MasqueTransport.AUTO &&
+            settings.autoEnabled
+        if (unconfigured) return null
+        return BackupMasque(settings.profile?.exportJson(), settings.transport.name, settings.autoEnabled)
     }
 
     private fun exportSettings(prefs: Preferences, categories: Set<BackupCategory>): BackupSettings =
@@ -149,6 +164,9 @@ class AppBackupManager(
         }
 
     suspend fun import(data: AppBackupData, categories: Set<BackupCategory> = BackupCategory.ALL) {
+        val masque = data.masque?.takeIf { BackupCategory.MASQUE in categories }
+        val masqueProfile = masque?.profileJson?.let(MasqueProfile::parse)
+        val masqueTransport = masque?.transport?.let(MasqueTransport::valueOf)
         val importedSettings = data.settings
         ozeroSettings.edit { prefs ->
             if (BackupCategory.GENERAL_SETTINGS in categories) importGeneral(prefs, importedSettings)
@@ -163,6 +181,9 @@ class AppBackupManager(
         }
         if (BackupCategory.STRATEGY in categories) data.strategy?.let { strategyProvider?.import(it) }
         if (BackupCategory.SPLIT_TUNNEL in categories) importSplitTunnel(data)
+        if (masque != null && masqueTransport != null) {
+            masqueStore?.restore(masqueProfile, masqueTransport, masque.autoEnabled)
+        }
     }
 
     private fun importGeneral(prefs: MutablePreferences, s: BackupSettings) {

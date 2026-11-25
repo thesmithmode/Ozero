@@ -8,6 +8,7 @@ data class SettingsNavActions(
     val onOpenByeDpiEngineSettings: () -> Unit = {},
     val onOpenUrnetworkSettings: () -> Unit = {},
     val onOpenWarpSettings: () -> Unit = {},
+    val onOpenMasqueSettings: () -> Unit = {},
     val onOpenStatsHistory: () -> Unit = {},
     val onOpenBackup: () -> Unit = {},
     val onOpenAutoModeSettings: () -> Unit = {},

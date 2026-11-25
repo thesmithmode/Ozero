@@ -226,6 +226,7 @@ class SettingsRepositoryTest {
             listOf(
                 EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
                 EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+                EngineId.MASQUE,
             ),
             current.engineAutoPriority,
         )
@@ -238,6 +239,7 @@ class SettingsRepositoryTest {
             listOf(
                 EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
                 EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+                EngineId.MASQUE,
             ),
             repository.settings.first().engineAutoPriority,
         )
@@ -254,6 +256,7 @@ class SettingsRepositoryTest {
             listOf(
                 EngineId.BYEDPI, EngineId.FPTN, EngineId.WARP,
                 EngineId.URNETWORK, EngineId.MASTERDNS, EngineId.SINGBOX,
+                EngineId.MASQUE,
             ),
             repository.settings.first().engineAutoPriority,
         )
@@ -288,6 +291,7 @@ class SettingsRepositoryTest {
             listOf(
                 EngineId.WARP, EngineId.BYEDPI, EngineId.URNETWORK,
                 EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
+                EngineId.MASQUE,
             ),
             repository.settings.first().engineAutoPriority,
         )

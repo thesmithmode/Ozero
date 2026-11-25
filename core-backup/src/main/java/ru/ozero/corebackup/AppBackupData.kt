@@ -8,10 +8,19 @@ data class AppBackupData(
     val warpSlots: List<BackupWarpSlot>,
     val splitRules: List<BackupSplitRule>,
     val strategy: BackupStrategy? = null,
+    val masque: BackupMasque? = null,
 ) {
     companion object {
         const val CURRENT_VERSION = 4
     }
+}
+
+data class BackupMasque(
+    val profileJson: String?,
+    val transport: String,
+    val autoEnabled: Boolean,
+) {
+    override fun toString(): String = "BackupMasque(profile=***, transport=$transport, autoEnabled=$autoEnabled)"
 }
 
 data class BackupStrategy(

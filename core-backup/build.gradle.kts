@@ -12,6 +12,7 @@ dependencies {
 
     implementation(project(":engines-core"))
     implementation(project(":engine-warp"))
+    implementation(project(":engine-masque"))
     implementation(project(":engine-urnetwork"))
     implementation(project(":engine-fptn"))
     implementation(project(":core-storage"))

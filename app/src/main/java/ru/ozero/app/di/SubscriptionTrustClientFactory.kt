@@ -7,11 +7,13 @@ import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
+import okhttp3.Call
 import okhttp3.ConnectionPool
 import okhttp3.ConnectionSpec
+import okhttp3.EventListener
 import okhttp3.OkHttpClient
 import ru.ozero.commonvpn.TunnelController
-import ru.ozero.commonvpn.TunnelState
+import ru.ozero.commonvpn.TunnelSocksRoute
 
 object SubscriptionTrustClientFactory {
     fun createSystem(): OkHttpClient = timeoutBuilder().build()
@@ -46,16 +48,29 @@ object SubscriptionTrustClientFactory {
     }
 
     internal fun forActiveProxy(client: OkHttpClient, controller: TunnelController): OkHttpClient? {
-        val state = controller.state.value as? TunnelState.Connected ?: return null
-        if (state.socksPort !in 1..65535 || controller.killswitchActive.value || controller.switching.value != null) {
-            return null
-        }
+        val route = controller.activeSocksRoute() ?: return null
         return client.newBuilder()
-            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", state.socksPort)))
+            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", route.port)))
+            .eventListenerFactory { RouteBoundCallListener(route, it) }
             .connectionPool(ConnectionPool(0, 1, TimeUnit.SECONDS))
-            .followSslRedirects(false)
             .retryOnConnectionFailure(false)
             .build()
+    }
+
+    private class RouteBoundCallListener(private val route: TunnelSocksRoute, call: Call) : EventListener() {
+        private val cancel: () -> Unit = { call.cancel() }
+
+        override fun callStart(call: Call) {
+            if (!route.register(cancel)) call.cancel()
+        }
+
+        override fun callEnd(call: Call) {
+            route.unregister(cancel)
+        }
+
+        override fun callFailed(call: Call, ioe: java.io.IOException) {
+            route.unregister(cancel)
+        }
     }
 
     private fun timeoutBuilder(): OkHttpClient.Builder = OkHttpClient.Builder()

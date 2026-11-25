@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="masque_title">MASQUE</string>
+    <string name="masque_summary">HTTP/2 または HTTP/3 経由の Cloudflare WARP</string>
+    <string name="masque_registered">プロファイル登録済み</string>
+    <string name="masque_not_registered">未登録</string>
+    <string name="masque_working">処理中…</string>
+    <string name="masque_error">処理に失敗しました。接続を確認して再試行してください。</string>
+    <string name="masque_register">WARP を登録</string>
+    <string name="masque_clear">プロファイルを削除</string>
+    <string name="masque_clear_warning">次回の接続前に再登録が必要です。</string>
+    <string name="masque_transport">トランスポート</string>
+    <string name="masque_auto">自動</string>
+    <string name="masque_auto_enabled">自動モードに含める</string>
+    <string name="masque_consent">個別の WARP プロファイルを作成するには Cloudflare の利用規約に同意してください。</string>
+    <string name="masque_terms">Cloudflare の利用規約</string>
+    <string name="masque_accept">同意して登録</string>
+    <string name="masque_cancel">キャンセル</string>
+</resources>

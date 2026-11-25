@@ -222,6 +222,11 @@ jobs:
       - name: Build FPTN native transport
         uses: ./.github/actions/build-fptn
 
+      - name: Build MASQUE native transport
+        uses: ./.github/actions/build-masque
+        with:
+          ndk-path: ${{ steps.ndk.outputs.ndk-path }}
+
       - name: Build signed release APK
         env:
           OZERO_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
@@ -232,6 +237,13 @@ jobs:
           UPDATE_GITHUB_REPO: ${{ github.event.repository.name }}
           OZERO_VERSION_NAME: ${{ needs.resolve-version.outputs.tag }}
         run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: Verify packaged MASQUE transport
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/release -name '*.apk' -print -quit)
+          bash scripts/verify-masque-apk.sh "$APK" arm64-v8a
+          unzip -Z1 "$APK" | awk '/^lib\// && $0 !~ /^lib\/arm64-v8a\// { invalid=1 } END { exit invalid }'
 
       - name: Assert APK versionCode matches gradle.properties
         run: |

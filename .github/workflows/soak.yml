@@ -231,6 +231,17 @@ jobs:
           cp "$SRC/libs/x86_64/libhev-socks5-tunnel.so" "$OUT/libhev-ozero-socks5-tunnel.so"
           test -s "$OUT/libhev-ozero-socks5-tunnel.so"
 
+      - name: Build MASQUE native transport
+        uses: ./.github/actions/build-masque
+        with:
+          ndk-path: ${{ steps.ndk.outputs.ndk-path }}
+
+      - name: Build MASQUE x86_64 transport
+        uses: ./.github/actions/build-masque
+        with:
+          abi: x86_64
+          ndk-path: ${{ steps.ndk.outputs.ndk-path }}
+
       - name: Build x86_64 debug and instrumentation APKs
         run: |
           set -euo pipefail
@@ -243,6 +254,8 @@ jobs:
           APK="app/build/outputs/apk/debug/app-debug.apk"
           unzip -l "$APK" | grep -q 'lib/x86_64/libbox.so'
           unzip -l "$APK" | grep -q 'lib/x86_64/libhev-ozero-socks5-tunnel.so'
+          bash scripts/verify-masque-apk.sh "$APK" x86_64
+          bash scripts/verify-masque-apk.sh "$APK" arm64-v8a
 
       - name: Resolve soak parameters
         env:
@@ -296,6 +309,7 @@ jobs:
           path: |
             soak-metrics.json
             ${{ runner.temp }}/soak-output.txt
+            ${{ runner.temp }}/masque-native-smoke.txt
             ${{ runner.temp }}/soak-logcat.txt
             singbox-server.log
             soak-http.log

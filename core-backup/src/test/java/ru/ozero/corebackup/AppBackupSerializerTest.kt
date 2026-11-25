@@ -195,6 +195,16 @@ class AppBackupSerializerTest {
     )
 
     @Test
+    fun `MASQUE backup round trips and is a separate category`() {
+        val masque = BackupMasque("profile-fixture", "H2", false)
+        val data = minimalBackupData.copy(masque = masque)
+        assertEquals(data, AppBackupSerializer.deserializeAuto(AppBackupSerializer.serializeEncrypted(data)))
+        assertTrue(BackupCategory.MASQUE in BackupCategory.availableIn(data))
+        assertFalse(BackupCategory.MASQUE in BackupCategory.availableIn(minimalBackupData))
+        assertFalse(masque.toString().contains("profile-fixture"))
+    }
+
+    @Test
     fun `serialize and deserialize preserve nested backup data`() {
         assertEquals(fullBackupData, AppBackupSerializer.deserialize(AppBackupSerializer.serialize(fullBackupData)))
     }

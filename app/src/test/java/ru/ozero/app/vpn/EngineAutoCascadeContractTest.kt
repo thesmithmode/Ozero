@@ -16,6 +16,7 @@ class EngineAutoCascadeContractTest {
         EngineId.FPTN to "ru.ozero.enginefptn.FptnEngine",
         EngineId.OPERA to "ru.ozero.engineopera.OperaEngine",
         EngineId.TGWSS to "ru.ozero.enginetgwss.TelegramWssEngine",
+        EngineId.MASQUE to "ru.ozero.enginemasque.MasqueEngine",
     )
 
     @Test

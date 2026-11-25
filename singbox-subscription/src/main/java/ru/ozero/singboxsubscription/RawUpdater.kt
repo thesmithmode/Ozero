@@ -56,7 +56,7 @@ class RawUpdater(
     private val systemCaOkHttpClient: OkHttpClient = okHttpClient,
     private val insecureOkHttpClient: OkHttpClient = okHttpClient,
     private val database: SingboxDatabase? = null,
-    private val onProfilesRemoved: suspend (Set<Long>) -> Unit = {},
+    private val reconcileCommittedSelections: suspend () -> Unit = {},
     private val fallbackClient: (OkHttpClient) -> OkHttpClient? = { null },
 ) {
     private val refreshLocks = ConcurrentHashMap<Long, Mutex>()
@@ -71,6 +71,7 @@ class RawUpdater(
         group: SubscriptionGroup,
         allowInsecureRetry: Boolean,
     ): Result<Int> = withContext(Dispatchers.IO) {
+        reconcileSelections().exceptionOrNull()?.let { return@withContext Result.failure(it) }
         val lastAttemptAt = System.currentTimeMillis()
         val refreshGeneration = beginRefresh(group.id, lastAttemptAt)
             ?: return@withContext Result.failure(SubscriptionRefreshStaleException())
@@ -158,11 +159,10 @@ class RawUpdater(
             )
             val committed = if (database != null) {
                 var didCommit = false
-                var removedProfileIds = emptySet<Long>()
                 database.withTransaction {
                     val current = groupDao.getById(group.id)
                     if (current?.refreshGeneration == refreshGeneration) {
-                        removedProfileIds = profileDao.replaceForGroupAndReturnRemovedIds(
+                        profileDao.replaceForGroup(
                             group.id,
                             profilesWithStableIds,
                         )
@@ -179,17 +179,16 @@ class RawUpdater(
                         ) == 1
                     }
                 }
-                if (didCommit && removedProfileIds.isNotEmpty()) onProfilesRemoved(removedProfileIds)
                 didCommit
             } else {
                 if (groupDao.getById(group.id)?.refreshGeneration != refreshGeneration) {
                     false
                 } else {
-                    val removedProfileIds = profileDao.replaceForGroupAndReturnRemovedIds(
+                    profileDao.replaceForGroup(
                         group.id,
                         profilesWithStableIds,
                     )
-                    val didCommit = groupDao.commitRefresh(
+                    groupDao.commitRefresh(
                         id = group.id,
                         refreshGeneration = refreshGeneration,
                         lastUpdated = updatedGroup.lastUpdated,
@@ -200,10 +199,6 @@ class RawUpdater(
                         bytesRemaining = updatedGroup.bytesRemaining,
                         expiryDate = updatedGroup.expiryDate,
                     ) == 1
-                    if (didCommit && removedProfileIds.isNotEmpty()) {
-                        onProfilesRemoved(removedProfileIds)
-                    }
-                    didCommit
                 }
             }
             if (!committed) {
@@ -225,7 +220,20 @@ class RawUpdater(
         result.exceptionOrNull()?.let { failure ->
             recordRefreshFailure(group.id, refreshGeneration, lastAttemptAt, failure)
         }
+        if (result.isSuccess && result.getOrThrow() > 0) {
+            return@withContext reconcileSelections().map { result.getOrThrow() }
+        }
         result
+    }
+
+    private suspend fun reconcileSelections(): Result<Unit> = try {
+        reconcileCommittedSelections()
+        Result.success(Unit)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Log.w(TAG, "subscription selection reconciliation pending: ${e.javaClass.simpleName}")
+        Result.failure(IOException("Subscription selection reconciliation pending", e))
     }
 
     private suspend fun beginRefresh(groupId: Long, attemptAt: Long): Long? {
