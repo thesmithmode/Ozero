@@ -1,12 +1,17 @@
 package ru.ozero.app.di
 
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.security.KeyStore
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
+import okhttp3.ConnectionPool
 import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
+import ru.ozero.commonvpn.TunnelController
+import ru.ozero.commonvpn.TunnelState
 
 object SubscriptionTrustClientFactory {
     fun createSystem(): OkHttpClient = timeoutBuilder().build()
@@ -37,6 +42,19 @@ object SubscriptionTrustClientFactory {
         return timeoutBuilder()
             .sslSocketFactory(context.socketFactory, trustManager)
             .hostnameVerifier { _, _ -> true }
+            .build()
+    }
+
+    internal fun forActiveProxy(client: OkHttpClient, controller: TunnelController): OkHttpClient? {
+        val state = controller.state.value as? TunnelState.Connected ?: return null
+        if (state.socksPort !in 1..65535 || controller.killswitchActive.value || controller.switching.value != null) {
+            return null
+        }
+        return client.newBuilder()
+            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", state.socksPort)))
+            .connectionPool(ConnectionPool(0, 1, TimeUnit.SECONDS))
+            .followSslRedirects(false)
+            .retryOnConnectionFailure(false)
             .build()
     }
 

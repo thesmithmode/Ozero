@@ -22,4 +22,5 @@ enum class TopScreen {
     SingboxSettings,
     SingboxAdvancedSettings,
     OperaSettings,
+    TelegramWssSettings,
 }

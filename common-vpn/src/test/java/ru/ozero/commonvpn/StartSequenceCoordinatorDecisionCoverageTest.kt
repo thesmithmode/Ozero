@@ -129,6 +129,23 @@ class StartSequenceCoordinatorDecisionCoverageTest {
     }
 
     @Test
+    fun `Telegram WSS supports TUN and proxy but is excluded from auto priority`() = runTest {
+        val telegram = DecisionPlugin(
+            EngineId.TGWSS,
+            manualConfig = EngineConfig.TelegramWss(),
+            proxyConfig = EngineConfig.TelegramWss(),
+            capabilities = proxyCapabilities(providesStandalone = true),
+        )
+        val coordinator = coordinator(telegram)
+        val settings = SettingsModel(engineAutoPriority = listOf(EngineId.TGWSS))
+        assertTrue(coordinator.engineAllowed(EngineId.TGWSS, TrafficMode.TUN))
+        assertTrue(coordinator.engineAllowed(EngineId.TGWSS, TrafficMode.PROXY))
+        assertTrue(coordinator.autoCandidates(settings, TrafficMode.TUN).isEmpty())
+        assertTrue(coordinator.autoCandidates(settings, TrafficMode.PROXY).isEmpty())
+        assertEquals(null, coordinator.resolveTarget(null, settings))
+    }
+
+    @Test
     fun `auto candidates use effective settings default priority`() = runTest {
         val byedpi = DecisionPlugin(
             EngineId.BYEDPI,

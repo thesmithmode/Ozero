@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tgwss_summary">Telegram 使用 WSS，其他流量使用 WARP。支持常规 VPN 和分流。</string>
+    <string name="tgwss_setup">在主界面选择 Telegram WSS 并连接 VPN，无需配置 Telegram。通过分流排除应用。代理模式下需要手动配置 SOCKS5。</string>
+    <string name="tgwss_address">SOCKS5: 127.0.0.1:%1$d（无需用户名或密码）</string>
+    <string name="tgwss_open">在 Telegram 中打开</string>
+    <string name="tgwss_open_failed">无法打开 Telegram。请手动输入地址和端口。</string>
+    <string name="tgwss_not_running">本地代理未运行。</string>
+</resources>

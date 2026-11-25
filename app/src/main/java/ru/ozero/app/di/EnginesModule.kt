@@ -1,14 +1,18 @@
 package ru.ozero.app.di
 
+import android.content.Context
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import ru.ozero.enginebyedpi.ByeDpiEngine
 import ru.ozero.enginebyedpi.ByeDpiProxy
 import ru.ozero.enginebyedpi.ByeDpiProxyContract
 import ru.ozero.enginescore.EnginePlugin
+import ru.ozero.enginetgwss.TelegramWssEngine
+import ru.ozero.enginewarp.EngineWarp
 import javax.inject.Singleton
 
 @Module
@@ -27,4 +31,10 @@ object EnginesModule {
     @Singleton
     @IntoSet
     fun provideByeDpiEngine(byeDpiEngine: ByeDpiEngine): EnginePlugin = byeDpiEngine
+
+    @Provides
+    @Singleton
+    @IntoSet
+    fun provideTelegramWssEngine(@ApplicationContext context: Context, warp: EngineWarp): EnginePlugin =
+        TelegramWssEngine(context, warp)
 }

@@ -118,6 +118,24 @@ class ChainOrchestratorProxyChainTest {
         assertEquals(wg, passedConfig.wireGuardConfig)
     }
 
+    @Test
+    fun `Telegram WSS can start alone but cannot be a chain head or tail`() = runTest {
+        val telegram = FakePlugin(EngineId.TGWSS, listOf(StartResult.Success(10812)))
+        val singbox = FakePlugin(EngineId.SINGBOX, listOf(StartResult.Success(1080)))
+        val orchestrator = ChainOrchestrator(setOf(telegram, singbox))
+        val tgStep = ChainStep(EngineId.TGWSS, EngineConfig.TelegramWss())
+        val otherStep = ChainStep(EngineId.SINGBOX, EngineConfig.Singbox(ByteArray(0), 0))
+        assertIs<ChainResult.Failure>(orchestrator.start(listOf(tgStep, otherStep)))
+        assertEquals(0, telegram.startCalls.size)
+        assertIs<ChainResult.Failure>(orchestrator.start(listOf(otherStep, tgStep)))
+        assertEquals(0, singbox.stopCalls)
+        assertEquals(0, singbox.startCalls.size)
+        assertEquals(0, telegram.startCalls.size)
+        val result = assertIs<ChainResult.Success>(orchestrator.start(listOf(tgStep)))
+        assertEquals(10812, result.finalSocksPort)
+        orchestrator.stop()
+    }
+
     private class FakePlugin(
         override val id: EngineId,
         private val startResults: List<StartResult>,

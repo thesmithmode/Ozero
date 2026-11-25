@@ -1,11 +1,19 @@
 package ru.ozero.app.di
 
+import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Test
+import ru.ozero.commonvpn.TunnelController
+import ru.ozero.enginescore.EngineId
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.security.KeyStore
 import java.security.cert.CertificateFactory
 import java.util.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertNotNull
+import kotlin.test.assertFalse
+import kotlin.test.assertSame
 
 class SubscriptionTrustClientFactoryTest {
     @Test
@@ -22,6 +30,50 @@ class SubscriptionTrustClientFactoryTest {
         assertEquals(cert, systemOnly.getCertificate("system:0"))
         assertNull(systemOnly.getCertificate("user:0"))
         assertEquals(listOf("system:0"), systemOnly.aliases().toList())
+    }
+
+    @Test
+    fun `active proxy clones trust settings and uses only loopback SOCKS`() {
+        val controller = connectedController(1080)
+        val original = OkHttpClient()
+
+        val retry = assertNotNull(SubscriptionTrustClientFactory.forActiveProxy(original, controller))
+
+        assertEquals(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", 1080)), retry.proxy)
+        assertSame(original.sslSocketFactory, retry.sslSocketFactory)
+        assertSame(original.hostnameVerifier, retry.hostnameVerifier)
+        assertEquals(original.callTimeoutMillis, retry.callTimeoutMillis)
+        assertFalse(retry.followSslRedirects)
+        assertFalse(retry.retryOnConnectionFailure)
+    }
+
+    @Test
+    fun `no proxy during idle or direct TUN or invalid port`() {
+        val client = OkHttpClient()
+        assertNull(SubscriptionTrustClientFactory.forActiveProxy(client, TunnelController()))
+        for (port in listOf(-1, 0, 65536)) {
+            assertNull(SubscriptionTrustClientFactory.forActiveProxy(client, connectedController(port)))
+        }
+    }
+
+    @Test
+    fun `no proxy during switching or kill switch or disconnect`() {
+        val client = OkHttpClient()
+        val switching = connectedController(1080)
+        switching.onSwitchingStarted(EngineId.BYEDPI, EngineId.WARP)
+        assertNull(SubscriptionTrustClientFactory.forActiveProxy(client, switching))
+        val killed = connectedController(1080)
+        killed.onKillswitchEngaged(EngineId.BYEDPI, "test")
+        assertNull(SubscriptionTrustClientFactory.forActiveProxy(client, killed))
+        val disconnecting = connectedController(1080)
+        disconnecting.onDisconnecting()
+        assertNull(SubscriptionTrustClientFactory.forActiveProxy(client, disconnecting))
+    }
+
+    private fun connectedController(port: Int): TunnelController = TunnelController().apply {
+        onProbing()
+        onConnecting(EngineId.BYEDPI)
+        onEngineStarted(EngineId.BYEDPI, port)
     }
 
     private companion object {

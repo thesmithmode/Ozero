@@ -993,13 +993,14 @@ jobs:
           :common-dns:testDebugUnitTest :common-dns:jacocoTestReport :common-dns:jacocoTestCoverageVerification
           :common-crypto:testDebugUnitTest :common-crypto:jacocoTestReport :common-crypto:jacocoTestCoverageVerification
           :common-net:testDebugUnitTest :common-net:jacocoTestReport :common-net:jacocoTestCoverageVerification
+          :engine-tgwss:testDebugUnitTest :engine-tgwss:jacocoTestReport :engine-tgwss:jacocoTestCoverageVerification
           --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
           python3 -m pip install --quiet defusedxml
           python3 scripts/verify-junit-nonzero.py \
-          core-storage core-backup engines-core common-dns common-crypto common-net
+          core-storage core-backup engines-core common-dns common-crypto common-net engine-tgwss
 
       - name: Upload coverage reports
         if: always()
@@ -1014,6 +1015,7 @@ jobs:
             common-dns/build/reports/jacoco/**
             common-crypto/build/reports/jacoco/**
             common-net/build/reports/jacoco/**
+            engine-tgwss/build/reports/jacoco/**
           retention-days: 14
 
       - name: Upload test reports
@@ -1029,6 +1031,7 @@ jobs:
             common-dns/build/reports/tests/**
             common-crypto/build/reports/tests/**
             common-net/build/reports/tests/**
+            engine-tgwss/build/reports/tests/**
           retention-days: 14
 
   test-engine-masterdns:

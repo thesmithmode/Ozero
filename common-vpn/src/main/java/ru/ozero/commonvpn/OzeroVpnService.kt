@@ -223,7 +223,7 @@ class OzeroVpnService : android.net.VpnService() {
             throw t
         }
         socketProtector = ru.ozero.enginescore.VpnSocketProtector { fd -> protect(fd) }
-        ru.ozero.enginescore.VpnSocketProtectorHolder.bind(socketProtector!!)
+        ru.ozero.enginescore.VpnSocketProtectorHolder.bind(socketProtector!!, this::protect)
         runtimeFailureRouter.bind(runtimeFailureHandler)
         acquireLocks()
         observeKillswitchSetting()

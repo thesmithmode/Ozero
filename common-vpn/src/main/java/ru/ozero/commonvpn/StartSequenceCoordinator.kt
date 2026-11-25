@@ -218,7 +218,7 @@ class StartSequenceCoordinator(
         }
         if (!usesCustomTun) deps.engineWatchdog.startHealthKillswitchWatcher(activeEngineId)
         val customRoutedProbe = usesCustomTun && activeEngineId in setOf(EngineId.SINGBOX, EngineId.OPERA)
-        if (customRoutedProbe || needsRoutedProbe(activeEngineId)) {
+        if (customRoutedProbe || activeEngineId.manualStandaloneOnly || needsRoutedProbe(activeEngineId)) {
             deps.engineWatchdog.startRoutedProbeWatchdog(activeEngineId)
         } else if (usesCustomTun) {
             deps.engineWatchdog.startPeerWatchdog(activeEngineId)
@@ -264,7 +264,7 @@ class StartSequenceCoordinator(
                 PersistentLoggers.warn(TAG, "proxy healthMonitor.start threw: ${t.message}")
             }
         deps.engineWatchdog.startHealthKillswitchWatcher(engineId)
-        if (engineId == EngineId.OPERA || needsRoutedProbe(engineId)) {
+        if (engineId == EngineId.OPERA || engineId.manualStandaloneOnly || needsRoutedProbe(engineId)) {
             deps.engineWatchdog.startRoutedProbeWatchdog(engineId)
         }
         deps.statsLogger.start()
@@ -370,7 +370,7 @@ class StartSequenceCoordinator(
 
     private fun resolveTargetForUi(manualEngine: EngineId?, settings: SettingsModel): EngineId? {
         if (manualEngine != null) return manualEngine
-        val pluginIds = deps.enginePlugins.mapTo(mutableSetOf()) { it.id }
+        val pluginIds = deps.enginePlugins.filterNot { it.id.manualStandaloneOnly }.mapTo(mutableSetOf()) { it.id }
         return settings.engineAutoPriority.firstOrNull { it in pluginIds }
             ?: pluginIds.firstOrNull()
     }
@@ -388,6 +388,7 @@ class StartSequenceCoordinator(
     ): List<Pair<EngineId, EngineConfig>> {
         val candidates = mutableListOf<Pair<EngineId, EngineConfig>>()
         for (id in settings.engineAutoPriority) {
+            if (id.manualStandaloneOnly) continue
             if (!engineAllowedForTrafficMode(id, trafficMode)) continue
             val config = buildEngineConfig(id, settings, trafficMode) ?: continue
             candidates += id to config

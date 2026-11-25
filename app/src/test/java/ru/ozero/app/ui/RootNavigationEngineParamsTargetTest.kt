@@ -18,6 +18,7 @@ class RootNavigationEngineParamsTargetTest {
         assertEquals(TopScreen.MasterDnsSettings, target(EngineId.MASTERDNS))
         assertEquals(TopScreen.FptnSettings, target(EngineId.FPTN))
         assertEquals(TopScreen.SingboxSettings, target(EngineId.SINGBOX))
+        assertEquals(TopScreen.TelegramWssSettings, target(EngineId.TGWSS))
         assertEquals(TopScreen.OperaSettings, target(EngineId.OPERA))
     }
 
