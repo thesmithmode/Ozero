@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="masque_title">MASQUE</string>
+    <string name="masque_summary">Cloudflare WARP عبر HTTP/2 أو HTTP/3</string>
+    <string name="masque_registered">تم تسجيل الملف</string>
+    <string name="masque_not_registered">لا يوجد ملف مسجل</string>
+    <string name="masque_working">جارٍ التنفيذ…</string>
+    <string name="masque_error">فشلت العملية. تحقق من الاتصال وحاول مجددًا.</string>
+    <string name="masque_register">تسجيل WARP</string>
+    <string name="masque_clear">حذف الملف</string>
+    <string name="masque_clear_warning">يلزم التسجيل مجددًا قبل الاتصال التالي.</string>
+    <string name="masque_transport">النقل</string>
+    <string name="masque_auto">تلقائي</string>
+    <string name="masque_auto_enabled">التضمين في الوضع التلقائي</string>
+    <string name="masque_consent">وافق على شروط Cloudflare لإنشاء ملف WARP مستقل.</string>
+    <string name="masque_terms">شروط Cloudflare</string>
+    <string name="masque_accept">الموافقة والتسجيل</string>
+    <string name="masque_cancel">إلغاء</string>
+</resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="masque_title">MASQUE</string>
+    <string name="masque_summary">Cloudflare WARP через HTTP/2 или HTTP/3</string>
+    <string name="masque_registered">Профиль зарегистрирован</string>
+    <string name="masque_not_registered">Профиль не зарегистрирован</string>
+    <string name="masque_working">Выполняется операция…</string>
+    <string name="masque_error">Не удалось выполнить операцию. Проверьте подключение и повторите.</string>
+    <string name="masque_register">Зарегистрировать WARP</string>
+    <string name="masque_clear">Удалить профиль</string>
+    <string name="masque_clear_warning">Для следующего подключения потребуется новая регистрация.</string>
+    <string name="masque_transport">Транспорт</string>
+    <string name="masque_auto">Авто</string>
+    <string name="masque_auto_enabled">Использовать в авторежиме</string>
+    <string name="masque_consent">Для создания отдельного профиля WARP необходимо принять условия Cloudflare.</string>
+    <string name="masque_terms">Условия Cloudflare</string>
+    <string name="masque_accept">Принять и зарегистрировать</string>
+    <string name="masque_cancel">Отмена</string>
+</resources>

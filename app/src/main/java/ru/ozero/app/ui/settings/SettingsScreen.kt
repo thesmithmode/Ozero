@@ -59,6 +59,7 @@ fun SettingsScreen(
     onOpenByeDpiEngineSettings: () -> Unit = {},
     onOpenUrnetworkSettings: () -> Unit = {},
     onOpenWarpSettings: () -> Unit = {},
+    onOpenMasqueSettings: () -> Unit = {},
     onOpenStatsHistory: () -> Unit = {},
     onOpenBackup: () -> Unit = {},
     onOpenAutoModeSettings: () -> Unit = {},
@@ -83,6 +84,7 @@ fun SettingsScreen(
             onOpenByeDpiEngineSettings = onOpenByeDpiEngineSettings,
             onOpenUrnetworkSettings = onOpenUrnetworkSettings,
             onOpenWarpSettings = onOpenWarpSettings,
+            onOpenMasqueSettings = onOpenMasqueSettings,
             onOpenStatsHistory = onOpenStatsHistory,
             onOpenBackup = onOpenBackup,
             onOpenAutoModeSettings = onOpenAutoModeSettings,
@@ -213,6 +215,7 @@ private fun ContentBody(
                 onOpenByeDpi = nav.onOpenByeDpiEngineSettings,
                 onOpenUrnetwork = nav.onOpenUrnetworkSettings,
                 onOpenWarp = nav.onOpenWarpSettings,
+                onOpenMasque = nav.onOpenMasqueSettings,
                 onOpenMasterDns = nav.onOpenMasterDnsSettings,
                 onOpenFptn = nav.onOpenFptnSettings,
                 onOpenSingbox = nav.onOpenSingboxSettings,
@@ -397,11 +400,13 @@ private fun BackupSection(onOpenBackup: () -> Unit) {
     )
 }
 
+@Suppress("LongParameterList")
 @Composable
 private fun EnginesSection(
     onOpenByeDpi: () -> Unit,
     onOpenUrnetwork: () -> Unit,
     onOpenWarp: () -> Unit,
+    onOpenMasque: () -> Unit,
     onOpenMasterDns: () -> Unit,
     onOpenFptn: () -> Unit,
     onOpenSingbox: () -> Unit,
@@ -427,6 +432,13 @@ private fun EnginesSection(
         summary = stringResource(R.string.settings_warp_summary),
         tag = "settings_warp_row",
         onClick = onOpenWarp,
+        enabled = true,
+    )
+    NavRow(
+        title = stringResource(R.string.masque_title),
+        summary = stringResource(R.string.masque_summary),
+        tag = "settings_masque_row",
+        onClick = onOpenMasque,
         enabled = true,
     )
     NavRow(

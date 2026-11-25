@@ -8,6 +8,7 @@ import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -218,6 +219,40 @@ class EngineWatchdogCoordinatorCoverageTest {
 
             assertEquals(3, plugin.probeCalls)
             assertEquals(1, stopCount.get())
+        } finally {
+            watchdog.cancelWatchers()
+        }
+    }
+
+    @Test
+    fun `cancelling routed probe after two failures never stops a healthy replacement session`() = runTest {
+        val plugin = mockk<EnginePlugin>(relaxed = true)
+        every { plugin.id } returns EngineId.MASQUE
+        var calls = 0
+        coEvery { plugin.probe() } coAnswers {
+            if (++calls < 3) ProbeResult.Failure("offline") else awaitCancellation()
+        }
+        val controller = connectedController(EngineId.MASQUE)
+        val stops = AtomicReference(0)
+        val watchdog = watchdog(
+            scope = backgroundScope,
+            plugins = setOf(plugin),
+            controller = controller,
+            tunFd = mockk(relaxed = true),
+            killswitch = false,
+            stopCount = stops,
+        )
+        try {
+            watchdog.startRoutedProbeWatchdog(plugin.id)
+            repeat(3) {
+                advanceTimeBy(EngineWatchdogCoordinator.ROUTED_PROBE_WATCHDOG_POLL_MS)
+                runCurrent()
+            }
+            assertEquals(3, calls)
+            watchdog.cancelWatchers()
+            runCurrent()
+            assertEquals(0, stops.get())
+            assertIs<TunnelState.Connected>(controller.state.value)
         } finally {
             watchdog.cancelWatchers()
         }

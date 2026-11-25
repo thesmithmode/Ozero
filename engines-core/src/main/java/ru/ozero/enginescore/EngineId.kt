@@ -9,4 +9,5 @@ enum class EngineId(val displayName: String, val isStub: Boolean, val manualStan
     FPTN(displayName = "FPTN", isStub = false),
     OPERA(displayName = "Opera Proxy", isStub = false),
     TGWSS(displayName = "Telegram WSS", isStub = false, manualStandaloneOnly = true),
+    MASQUE(displayName = "MASQUE", isStub = false),
 }

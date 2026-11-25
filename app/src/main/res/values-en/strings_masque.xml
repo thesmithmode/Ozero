@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="masque_title">MASQUE</string>
+    <string name="masque_summary">Cloudflare WARP over HTTP/2 or HTTP/3</string>
+    <string name="masque_registered">Profile registered</string>
+    <string name="masque_not_registered">No registered profile</string>
+    <string name="masque_working">Working…</string>
+    <string name="masque_error">Operation failed. Check your connection and try again.</string>
+    <string name="masque_register">Register WARP</string>
+    <string name="masque_clear">Delete profile</string>
+    <string name="masque_clear_warning">A new registration will be needed before connecting again.</string>
+    <string name="masque_transport">Transport</string>
+    <string name="masque_auto">Auto</string>
+    <string name="masque_auto_enabled">Include in automatic mode</string>
+    <string name="masque_consent">Accept the Cloudflare terms to create a separate WARP profile.</string>
+    <string name="masque_terms">Cloudflare terms</string>
+    <string name="masque_accept">Accept and register</string>
+    <string name="masque_cancel">Cancel</string>
+</resources>

@@ -4,9 +4,13 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -15,6 +19,10 @@ import ru.ozero.corestorage.entity.AppSplitRule
 import ru.ozero.enginescore.settings.SettingsKeys
 import ru.ozero.enginefptn.FptnConfig
 import ru.ozero.enginefptn.FptnConfigStore
+import ru.ozero.enginemasque.MasqueProfile
+import ru.ozero.enginemasque.MasqueProfileStore
+import ru.ozero.enginemasque.MasqueSettings
+import ru.ozero.enginemasque.MasqueTransport
 import ru.ozero.engineurnetwork.UrnetworkConfigStore
 import ru.ozero.engineurnetwork.UrnetworkLocationSelection
 import ru.ozero.engineurnetwork.UrnetworkProvideControlMode
@@ -96,6 +104,62 @@ class AppBackupManagerTest {
         assertEquals("AS", ozeroDs.data.first()[SettingsKeys.OPERA_REGION])
         assertEquals("random", ozeroDs.data.first()[SettingsKeys.OPERA_SELECTION])
         assertNull(manager.export(setOf(BackupCategory.WARP)).settings.operaRegion)
+    }
+
+    @Test
+    fun `unused MASQUE leaves existing backup format unchanged`() = runTest {
+        val store = mockk<MasqueProfileStore>(relaxed = true)
+        every { store.settings() } returns flowOf(MasqueSettings())
+        val integrated = AppBackupManager(
+            ozeroDs, warpStore, urnStore, splitDao, fptnStore,
+            urnetworkDeviceIdentity = urnIdentity,
+            masqueStore = store,
+        )
+        val old = manager.export()
+        val new = integrated.export()
+        assertNull(new.masque)
+        assertEquals(old.copy(exportedAt = new.exportedAt), new)
+        assertFalse(AppBackupSerializer.serialize(new).contains("\"masque\""))
+    }
+
+    @Test
+    fun `MASQUE backup never touches other categories and old backups never restore MASQUE`() = runTest {
+        val store = mockk<MasqueProfileStore>(relaxed = true)
+        every { store.settings() } returns flowOf(MasqueSettings(corrupt = true))
+        val integrated = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, fptnStore, masqueStore = store)
+        ozeroDs.edit { it[SettingsKeys.IPV6_ENABLED] = true }
+        assertEquals(true, integrated.export(setOf(BackupCategory.GENERAL_SETTINGS)).settings.ipv6Enabled)
+        assertFailsWith<IllegalStateException> { integrated.export() }
+        val legacy = makeMinimalBackup()
+        integrated.import(legacy)
+        coVerify(exactly = 0) { store.restore(any(), any(), any()) }
+        val invalid = legacy.copy(masque = BackupMasque("invalid", "H2", false))
+        integrated.import(invalid, setOf(BackupCategory.GENERAL_SETTINGS))
+        assertFailsWith<IllegalArgumentException> { integrated.import(invalid) }
+        assertEquals(true, ozeroDs.data.first()[SettingsKeys.IPV6_ENABLED])
+    }
+
+    @Test
+    fun `MASQUE category exports registered profile or changed settings and imports independently`() = runTest {
+        val store = mockk<MasqueProfileStore>(relaxed = true)
+        val json = """{"private_key":"test","endpoint_pub_key":"test","endpoint_v4":"192.0.2.1",
+            |"ipv4":"192.0.2.2","ipv6":"2001:db8::1","id":"test","access_token":"test"}
+        """.trimMargin()
+        val profile = MasqueProfile.parse(json)
+        val integrated = AppBackupManager(ozeroDs, warpStore, urnStore, splitDao, fptnStore, masqueStore = store)
+        every { store.settings() } returns flowOf(MasqueSettings(profile = profile))
+        val categories = setOf(BackupCategory.MASQUE)
+        assertEquals(BackupMasque(json, "AUTO", true), integrated.export(categories).masque)
+        every { store.settings() } returns flowOf(MasqueSettings(transport = MasqueTransport.H2))
+        assertEquals(BackupMasque(null, "H2", true), integrated.export(categories).masque)
+        every { store.settings() } returns flowOf(MasqueSettings(autoEnabled = false))
+        assertEquals(BackupMasque(null, "AUTO", false), integrated.export(categories).masque)
+        val data = makeMinimalBackup().copy(masque = BackupMasque(json, "H2", false))
+        integrated.import(data, categories)
+        coVerify(exactly = 1) {
+            store.restore(match<MasqueProfile> { it.exportJson() == json }, MasqueTransport.H2, false)
+        }
+        assertNull(ozeroDs.data.first()[SettingsKeys.MANUAL_ENGINE])
     }
 
     @Test

@@ -79,6 +79,9 @@ jobs:
             cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
           fi
 
+      - name: Build MASQUE native transport
+        uses: ./.github/actions/build-masque
+
       - name: Build for CodeQL analysis
         run: ./gradlew assembleDebug --no-daemon
 

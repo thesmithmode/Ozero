@@ -33,6 +33,7 @@ class SettingsModelCoverageTest {
                 EngineId.SINGBOX,
                 EngineId.FPTN,
                 EngineId.OPERA,
+                EngineId.MASQUE,
             ),
             model.engineAutoPriority,
         )

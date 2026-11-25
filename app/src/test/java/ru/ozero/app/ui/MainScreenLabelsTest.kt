@@ -107,6 +107,7 @@ class MainScreenLabelsTest {
     @Test
     fun `probing warp shows probing warp`() {
         assertEquals(R.string.main_status_probing_warp, probingLabelRes(EngineId.WARP, false))
+        assertEquals(R.string.main_status_connecting, probingLabelRes(EngineId.MASQUE, false))
     }
 
     @Test

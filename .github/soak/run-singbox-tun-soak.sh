@@ -43,6 +43,10 @@ pull_metrics() {
 ensure_adb
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell am instrument -w -e class ru.ozero.app.soak.MasqueNativeSmokeTest \
+  ru.ozero.app.test/androidx.test.runner.AndroidJUnitRunner > "$RUNNER_TEMP/masque-native-smoke.txt" 2>&1
+cat "$RUNNER_TEMP/masque-native-smoke.txt"
+grep -Fq 'OK (1 test)' "$RUNNER_TEMP/masque-native-smoke.txt"
 adb shell appops set ru.ozero.app ACTIVATE_VPN allow
 boot_id_before=$(adb shell cat /proc/sys/kernel/random/boot_id | tr -d '\r')
 test -n "$boot_id_before"

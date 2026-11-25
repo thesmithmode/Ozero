@@ -12,6 +12,7 @@ class RootNavigationEngineParamsTargetTest {
 
         assertEquals(TopScreen.AutoModeSettings, target(null))
         assertEquals(TopScreen.WarpEngineSettings, target(EngineId.WARP))
+        assertEquals(TopScreen.MasqueSettings, target(EngineId.MASQUE))
         assertEquals(TopScreen.UrnetworkEngineSettings, target(EngineId.URNETWORK))
         assertEquals(TopScreen.ByeDpiEngineSettings, target(EngineId.BYEDPI))
         assertEquals(TopScreen.MasterDnsSettings, target(EngineId.MASTERDNS))

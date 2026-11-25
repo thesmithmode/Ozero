@@ -308,6 +308,9 @@ jobs:
             cp -r /tmp/aar-exploded/jni/* singbox-core/src/main/jniLibs/
           fi
 
+      - name: Build MASQUE native transport
+        uses: ./.github/actions/build-masque
+
       - name: coverage verification first
         run: >
           ./gradlew
@@ -471,8 +474,17 @@ jobs:
           ls -la singbox-core/libs/
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
+      - name: Build MASQUE native transport
+        uses: ./.github/actions/build-masque
+
       - name: assembleDebug
         run: ./gradlew assembleDebug --stacktrace
+
+      - name: Verify packaged MASQUE transport
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)
+          bash scripts/verify-masque-apk.sh "$APK" arm64-v8a
 
       - name: Assert APK contains MasterDNS subprocess binary
         run: |
@@ -1783,6 +1795,49 @@ jobs:
           path: shared-warp-settings/build/reports/tests/**
           retention-days: 14
 
+  test-engine-masque:
+    name: Tests — engine-masque
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - detect-open-pr-for-same-sha
+      - kotlin-style
+    if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests and coverage report
+        run: ./gradlew :engine-masque:testDebugUnitTest :engine-masque:jacocoTestReport --stacktrace
+      - name: Verify tests and production class coverage were discovered
+        run: |
+          python3 -m pip install --quiet defusedxml
+          python3 scripts/verify-junit-nonzero.py engine-masque
+          python3 scripts/verify-masque-coverage.py
+      - name: Enforce module coverage gate
+        run: ./gradlew :engine-masque:jacocoTestCoverageVerification --stacktrace
+      - name: Build MASQUE native transport
+        if: ${{ always() && !cancelled() }}
+        uses: ./.github/actions/build-masque
+      - name: Upload native artifact and reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: masque-native-and-reports
+          path: |
+            engine-masque/build/native/**
+            engine-masque/build/reports/**
+          retention-days: 14
+
   test-singbox-and-extra-modules:
     name: Tests — singbox + extra modules
     runs-on: ubuntu-latest
@@ -1790,6 +1845,7 @@ jobs:
     needs:
       - detect-open-pr-for-same-sha
       - test-engine-masterdns
+      - test-engine-masque
       - test-engine-singbox
       - test-singbox-process
       - test-singbox-core
@@ -1807,6 +1863,7 @@ jobs:
         run: |
           set -euo pipefail
           test "${{ needs.test-engine-masterdns.result }}" = "success"
+          test "${{ needs.test-engine-masque.result }}" = "success"
           test "${{ needs.test-engine-singbox.result }}" = "success"
           test "${{ needs.test-singbox-process.result }}" = "success"
           test "${{ needs.test-singbox-core.result }}" = "success"

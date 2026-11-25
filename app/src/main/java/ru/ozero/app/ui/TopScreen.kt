@@ -10,6 +10,7 @@ enum class TopScreen {
     ByeDpiEngineSettings,
     UrnetworkEngineSettings,
     WarpEngineSettings,
+    MasqueSettings,
     StrategyTest,
     StatsHistory,
     Backup,
