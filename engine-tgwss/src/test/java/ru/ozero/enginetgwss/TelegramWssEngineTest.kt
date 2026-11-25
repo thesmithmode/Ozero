@@ -59,6 +59,7 @@ class TelegramWssEngineTest {
                 ExitNodeStrategy.ViaSocks("127.0.0.1", first.socksPort),
                 engine.exitNodeStrategy(first.socksPort),
             )
+            assertIs<ExitNodeStrategy.Unavailable>(engine.exitNodeStrategy(0))
             assertIs<StartResult.Success>(engine.start(EngineConfig.TelegramWss(0, false), Upstream.None))
         } finally {
             engine.stop()
@@ -109,6 +110,7 @@ class TelegramWssEngineTest {
         val badWss = engine(ws = FakeTelegramWebSockets(protocol = null))
         try {
             assertIs<StartResult.Success>(badWss.start(EngineConfig.TelegramWss(0), Upstream.None))
+            assertIs<ProbeResult.Failure>(badWss.probe())
             assertIs<EnginePlugin.ReadyResult.Timeout>(badWss.awaitReady())
         } finally {
             badWss.stop()
