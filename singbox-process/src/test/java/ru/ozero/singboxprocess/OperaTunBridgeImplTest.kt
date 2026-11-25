@@ -275,6 +275,7 @@ class OperaTunBridgeImplTest {
         every { f.remote.stopAndWait(any(), any()) } answers {
             entered.countDown()
             check(unblock.await(5, TimeUnit.SECONDS))
+            true
         }
         try {
             val bridge = OperaTunBridgeImpl(f.context, stopRpcTimeoutMs = 200)
