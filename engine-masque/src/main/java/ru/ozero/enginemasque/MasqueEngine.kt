@@ -85,8 +85,8 @@ class MasqueEngine(
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
-            StartResult.Failure("MASQUE start failed")
+        } catch (e: Exception) {
+            StartResult.Failure("MASQUE start failed: ${e.javaClass.simpleName}")
         }
     }
 

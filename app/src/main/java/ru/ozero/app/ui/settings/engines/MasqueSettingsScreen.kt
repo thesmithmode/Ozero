@@ -52,7 +52,7 @@ fun MasqueSettingsScreen(onBack: () -> Unit, viewModel: MasqueSettingsViewModel 
                 title = { Text(stringResource(R.string.masque_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.settings_back))
                     }
                 },
             )

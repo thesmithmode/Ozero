@@ -77,14 +77,17 @@ class TelegramWssEngine internal constructor(
         closeSession()
         var proxy: TelegramWssProxy? = null
         var started = false
+        var stage = "start WARP fallback"
         try {
             val fallback = warp.start(EngineConfig.WarpProxy(), Upstream.None)
             if (fallback !is StartResult.Success || fallback.socksPort <= 0) {
                 return@withLock StartResult.Failure("WARP fallback could not start")
             }
+            stage = "check WARP fallback readiness"
             if (warp.awaitReady() != EnginePlugin.ReadyResult.Ready) {
                 return@withLock StartResult.Failure("WARP fallback not ready")
             }
+            stage = "start local proxy"
             proxy = newProxy(fallback.socksPort, config.tunnelMode)
             val port = proxy.start(config.socksPort)
             session = Session(proxy, port, System.currentTimeMillis())
@@ -93,7 +96,7 @@ class TelegramWssEngine internal constructor(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            StartResult.Failure("Telegram WSS start failed", failure)
+            StartResult.Failure("Telegram WSS failed to $stage: ${failure.javaClass.simpleName}")
         } finally {
             if (!started) {
                 try {

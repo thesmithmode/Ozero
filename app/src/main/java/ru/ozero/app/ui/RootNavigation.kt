@@ -4,7 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -45,21 +45,25 @@ private fun engineParamsTarget(engineId: EngineId?): TopScreen = when (engineId)
     EngineId.OPERA -> TopScreen.OperaSettings
 }
 
+internal val screenHistorySaver = listSaver<List<TopScreen>, String>(
+    save = { screens -> screens.map { it.name } },
+    restore = { names -> names.map(TopScreen::valueOf) },
+)
+
 @Composable
 fun RootNavigation(
     viewModel: MainViewModel,
     onConnectClick: () -> Unit,
 ) {
-    var screen by rememberSaveable { mutableStateOf(TopScreen.Main) }
-    val backStack = remember { mutableListOf<TopScreen>() }
+    var history by rememberSaveable(stateSaver = screenHistorySaver) { mutableStateOf(listOf(TopScreen.Main)) }
+    val screen = history.last()
     fun navigate(target: TopScreen) {
-        backStack.add(screen)
-        screen = target
+        history = history + target
     }
     fun back() {
-        screen = if (backStack.isNotEmpty()) backStack.removeAt(backStack.size - 1) else TopScreen.Main
+        if (history.size > 1) history = history.dropLast(1)
     }
-    BackHandler(enabled = backStack.isNotEmpty()) { back() }
+    BackHandler(enabled = history.size > 1) { back() }
     val stateHolder = rememberSaveableStateHolder()
     stateHolder.SaveableStateProvider(key = screen.name) {
         NavigationContent(screen, viewModel, onConnectClick, ::navigate, ::back)
