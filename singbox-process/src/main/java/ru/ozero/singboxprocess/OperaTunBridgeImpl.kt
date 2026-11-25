@@ -28,12 +28,14 @@ class OperaTunBridgeImpl(
     private val context: Context,
     private val startRpcTimeoutMs: Long = START_RPC_TIMEOUT_MS,
     private val abandonedCleanupTimeoutMs: Long = STOP_TIMEOUT_MS,
+    private val readinessRpcTimeoutMs: Long = READINESS_RPC_TIMEOUT_MS,
 ) : OperaTunBridge {
     private data class Session(
         val connection: ServiceConnection,
         val remote: ISingboxEngineProcess,
         val owner: Long,
         val unbound: AtomicBoolean = AtomicBoolean(false),
+        val readiness: AtomicReference<CompletableDeferred<Boolean>?> = AtomicReference(null),
     )
 
     private class PendingStart(val session: Session) {
@@ -116,12 +118,12 @@ class OperaTunBridgeImpl(
         CoroutineScope(Dispatchers.IO).launch {
             val current = attempt.session
             try {
-                val ready = runCatching {
+                val started = runCatching {
                     duplicate.use { current.remote.startWithConfig(current.owner, it, config, protector) }
-                    current.remote.runtimeRunning()
                 }.onFailure {
                     PersistentLoggers.warn("OperaTunBridge", "TUN start failed: ${it.javaClass.simpleName}")
-                }.getOrDefault(false)
+                }.isSuccess
+                val ready = started && !attempt.accepted.isCompleted && queryRuntime(current)
                 attempt.ready.complete(ready)
                 if (!attempt.accepted.await()) release(current)
             } finally {
@@ -133,9 +135,24 @@ class OperaTunBridgeImpl(
 
     override suspend fun isRunning(): Boolean = mutex.withLock {
         val current = session ?: return@withLock false
-        withContext(Dispatchers.IO) {
-            runCatching { current.remote.runtimeRunning() }.getOrDefault(false)
+        withContext(Dispatchers.IO) { queryRuntime(current) }
+    }
+
+    private suspend fun queryRuntime(current: Session): Boolean {
+        val pending = CompletableDeferred<Boolean>()
+        val query = if (current.readiness.compareAndSet(null, pending)) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    pending.complete(runCatching { current.remote.runtimeRunning() }.getOrDefault(false))
+                } finally {
+                    current.readiness.compareAndSet(pending, null)
+                }
+            }
+            pending
+        } else {
+            current.readiness.get() ?: return false
         }
+        return withTimeoutOrNull(readinessRpcTimeoutMs) { query.await() } == true
     }
 
     override suspend fun stop() = mutex.withLock { stopLocked() }
@@ -170,6 +187,7 @@ class OperaTunBridgeImpl(
     private companion object {
         const val BIND_TIMEOUT_MS = 5_000L
         const val START_RPC_TIMEOUT_MS = 18_000L
+        const val READINESS_RPC_TIMEOUT_MS = 2_000L
         const val STOP_TIMEOUT_MS = 3_000L
     }
 }
