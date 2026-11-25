@@ -53,6 +53,23 @@ class TunnelControllerStateTest : TunnelControllerTestBase() {
     }
 
     @Test
+    fun `new transport switching timeout covers startup and fallback`() = runTest {
+        val targets = listOf(
+            EngineId.OPERA to TunnelController.EXTENDED_SWITCHING_TIMEOUT_MS,
+            EngineId.MASQUE to TunnelController.EXTENDED_SWITCHING_TIMEOUT_MS,
+            EngineId.TGWSS to TunnelController.TGWSS_SWITCHING_TIMEOUT_MS,
+        )
+        for ((engine, timeout) in targets) {
+            val ctl = TunnelController(watchdogScope = backgroundScope)
+            ctl.onSwitchingStarted(from = EngineId.WARP, to = engine)
+            testScheduler.advanceTimeBy(30_000)
+            assertNotNull(ctl.switching.value)
+            testScheduler.advanceTimeBy(timeout - 30_000 + 1)
+            assertNull(ctl.switching.value)
+        }
+    }
+
+    @Test
     fun fullHappyPath_idleProbingConnectingConnectedDisconnectingIdle() {
         controller.onProbing()
         assertIs<TunnelState.Probing>(controller.state.value)

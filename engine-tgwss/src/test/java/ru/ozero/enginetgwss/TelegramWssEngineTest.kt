@@ -99,6 +99,22 @@ class TelegramWssEngineTest {
     }
 
     @Test
+    fun `established WSS can degrade to healthy WARP without failing the VPN`() = runTest {
+        val ws = FakeTelegramWebSockets()
+        val engine = engine(ws = ws)
+        try {
+            assertIs<StartResult.Success>(engine.start(EngineConfig.TelegramWss(0), Upstream.None))
+            assertIs<EnginePlugin.ReadyResult.Ready>(engine.awaitReady())
+            ws.protocol = null
+            assertIs<ProbeResult.Success>(engine.probe())
+            ws.protocol = "binary"
+            assertIs<ProbeResult.Success>(engine.probe())
+        } finally {
+            engine.stop()
+        }
+    }
+
+    @Test
     fun `readiness requires routed traffic and a Telegram WSS upgrade`() = runTest {
         val badRoute = engine(routeReady = false)
         try {

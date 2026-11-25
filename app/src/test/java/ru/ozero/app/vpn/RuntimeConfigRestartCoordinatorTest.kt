@@ -299,6 +299,34 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Test
+    fun `new transport restart waits for fallback and readiness`() = runTest {
+        for (target in listOf(EngineId.MASQUE, EngineId.TGWSS)) {
+            val actions = mutableListOf<String?>()
+            val tunnelController = TunnelController()
+            tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
+            tunnelController.onSwitchingStarted(from = EngineId.WARP, to = target)
+            val coordinator = coordinator(
+                context = recordingContext(actions) {
+                    tunnelController.setState(TunnelState.Disconnecting)
+                },
+                tunnelController = tunnelController,
+            )
+
+            val restart = launch {
+                assertTrue(coordinator.restartVpnIfRunning("settings changed"))
+            }
+            runCurrent()
+            advanceTimeBy(30_000)
+            assertTrue(restart.isActive)
+            tunnelController.setState(TunnelState.Connected(target, 1080))
+            restart.join()
+
+            assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), actions)
+            assertTrue(tunnelController.switching.value == null)
+        }
+    }
+
+    @Test
     fun `restart times out waiting for stop and resets queue state`() = runTest {
         val startServiceActions = mutableListOf<String?>()
         val tunnelController = TunnelController()
