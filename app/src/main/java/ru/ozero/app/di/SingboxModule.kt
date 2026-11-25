@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.app.vpn.singboxRuntimeFingerprint
 import ru.ozero.commonvpn.RuntimeFailureRouter
+import ru.ozero.commonvpn.TunnelController
 import ru.ozero.enginesingbox.SingboxEngine
 import ru.ozero.enginesingbox.SingboxPrefs
 import ru.ozero.enginescore.EngineId
@@ -103,6 +104,7 @@ object SingboxModule {
         profileDao: ProxyProfileDao,
         proxyChainDao: ProxyChainDao,
         @SingboxPrefs dataStore: DataStore<Preferences>,
+        tunnelController: TunnelController,
     ): RawUpdater =
         RawUpdater(
             okHttpClient = SubscriptionTrustClientFactory.createSystem(),
@@ -111,6 +113,7 @@ object SingboxModule {
             systemCaOkHttpClient = SubscriptionTrustClientFactory.create(),
             insecureOkHttpClient = SubscriptionTrustClientFactory.createInsecure(),
             database = db,
+            fallbackClient = { SubscriptionTrustClientFactory.forActiveProxy(it, tunnelController) },
             onProfilesRemoved = { removedProfileIds ->
                 proxyChainDao.deleteByProfileIds(removedProfileIds)
                 dataStore.edit { prefs ->
