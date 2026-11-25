@@ -10,7 +10,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
 internal class FakeTelegramWebSockets(
-    private val protocol: String? = "binary",
+    @Volatile var protocol: String? = "binary",
     private val connectFails: Boolean = false,
     private val rejectedHosts: Set<String> = emptySet(),
 ) : WebSocket.Factory {

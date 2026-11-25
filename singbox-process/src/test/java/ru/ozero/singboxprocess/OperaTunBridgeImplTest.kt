@@ -36,6 +36,7 @@ class OperaTunBridgeImplTest {
 
         init {
             every { binder.queryLocalInterface(any()) } returns remote
+            every { binder.isBinderAlive } returns true
             every { remote.runtimeRunning() } returns true
             every { remote.stopAndWait(any(), any()) } returns true
             every { context.bindService(any<Intent>(), any<ServiceConnection>(), any<Int>()) } answers {
@@ -294,6 +295,84 @@ class OperaTunBridgeImplTest {
             }
             verify(exactly = 1) { f.context.unbindService(connection.captured) }
             bridge.stop()
+        } finally {
+            unblock.countDown()
+            unmockkStatic(ParcelFileDescriptor::class)
+        }
+    }
+
+    @Test
+    fun `dead binder permits retry even before abandoned startup returns`() = runBlocking {
+        val first = Fixture()
+        val next = Fixture()
+        val entered = CountDownLatch(1)
+        val unblock = CountDownLatch(1)
+        val returned = CountDownLatch(1)
+        mockkStatic(ParcelFileDescriptor::class)
+        every { ParcelFileDescriptor.fromFd(42) } returns first.fd
+        every { ParcelFileDescriptor.fromFd(43) } returns next.fd
+        every { first.remote.startWithConfig(any(), first.fd, "{}", any()) } answers {
+            entered.countDown()
+            check(unblock.await(5, TimeUnit.SECONDS))
+            returned.countDown()
+        }
+        try {
+            val bridge = OperaTunBridgeImpl(first.context, startRpcTimeoutMs = 200, abandonedCleanupTimeoutMs = 100)
+            assertFalse(bridge.start(42, "{}"))
+            assertTrue(entered.await(1, TimeUnit.SECONDS))
+            assertFalse(bridge.start(43, "{}"))
+            every { first.binder.isBinderAlive } returns false
+            every { first.context.bindService(any<Intent>(), any<ServiceConnection>(), any<Int>()) } answers {
+                secondArg<ServiceConnection>().onServiceConnected(next.name, next.binder)
+                true
+            }
+            assertTrue(bridge.start(43, "{}"))
+            unblock.countDown()
+            assertTrue(returned.await(1, TimeUnit.SECONDS))
+            assertTrue(bridge.isRunning())
+            verify(exactly = 0) { next.remote.stopAndWait(any(), any()) }
+            bridge.stop()
+            verify(exactly = 1) { next.remote.stopAndWait(any(), any()) }
+        } finally {
+            unblock.countDown()
+            unmockkStatic(ParcelFileDescriptor::class)
+        }
+    }
+
+    @Test
+    fun `dead binder permits retry even before abandoned stop returns`() = runBlocking {
+        val first = Fixture()
+        val next = Fixture()
+        val entered = CountDownLatch(1)
+        val unblock = CountDownLatch(1)
+        val returned = CountDownLatch(1)
+        mockkStatic(ParcelFileDescriptor::class)
+        every { ParcelFileDescriptor.fromFd(42) } returns first.fd
+        every { ParcelFileDescriptor.fromFd(43) } returns next.fd
+        every { first.remote.stopAndWait(any(), any()) } answers {
+            entered.countDown()
+            check(unblock.await(5, TimeUnit.SECONDS))
+            returned.countDown()
+            true
+        }
+        try {
+            val bridge = OperaTunBridgeImpl(first.context, stopRpcTimeoutMs = 200)
+            assertTrue(bridge.start(42, "{}"))
+            bridge.stop()
+            assertTrue(entered.await(1, TimeUnit.SECONDS))
+            assertFalse(bridge.start(43, "{}"))
+            every { first.binder.isBinderAlive } returns false
+            every { first.context.bindService(any<Intent>(), any<ServiceConnection>(), any<Int>()) } answers {
+                secondArg<ServiceConnection>().onServiceConnected(next.name, next.binder)
+                true
+            }
+            assertTrue(bridge.start(43, "{}"))
+            unblock.countDown()
+            assertTrue(returned.await(1, TimeUnit.SECONDS))
+            assertTrue(bridge.isRunning())
+            verify(exactly = 0) { next.remote.stopAndWait(any(), any()) }
+            bridge.stop()
+            verify(exactly = 1) { next.remote.stopAndWait(any(), any()) }
         } finally {
             unblock.countDown()
             unmockkStatic(ParcelFileDescriptor::class)

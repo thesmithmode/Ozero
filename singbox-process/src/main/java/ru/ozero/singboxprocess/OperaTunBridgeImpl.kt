@@ -34,6 +34,7 @@ class OperaTunBridgeImpl(
     private data class Session(
         val connection: ServiceConnection,
         val remote: ISingboxEngineProcess,
+        val binder: IBinder,
         val owner: Long,
         val unbound: AtomicBoolean = AtomicBoolean(false),
         val readiness: AtomicReference<CompletableDeferred<Boolean>?> = AtomicReference(null),
@@ -45,23 +46,29 @@ class OperaTunBridgeImpl(
         val finished = CompletableDeferred<Unit>()
     }
 
+    private class PendingStop(val session: Session) {
+        val finished = CompletableDeferred<Unit>()
+    }
+
     private val mutex = Mutex()
     private var session: Session? = null
     private val pendingStart = AtomicReference<PendingStart?>(null)
-    private val pendingStop = AtomicReference<CompletableDeferred<Unit>?>(null)
+    private val pendingStop = AtomicReference<PendingStop?>(null)
     private val protector = object : ISingboxProtector.Stub() {
         override fun protect(socket: ParcelFileDescriptor): Boolean =
             socket.use { VpnSocketProtectorHolder.protect(it.fd) }
     }
 
     override suspend fun start(tunFd: Int, config: String): Boolean = mutex.withLock {
+        clearDeadPending()
         if (pendingStart.get() != null || pendingStop.get() != null) return@withLock false
         stopLocked()
+        clearDeadPending()
         if (pendingStop.get() != null) return@withLock false
-        val remoteResult = CompletableDeferred<ISingboxEngineProcess?>()
+        val remoteResult = CompletableDeferred<IBinder?>()
         val connection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName, service: IBinder) {
-                remoteResult.complete(ISingboxEngineProcess.Stub.asInterface(service))
+                remoteResult.complete(service)
             }
 
             override fun onServiceDisconnected(name: ComponentName) {
@@ -86,8 +93,9 @@ class OperaTunBridgeImpl(
                 Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT,
             )
             if (!bound) return@withLock false
-            val connected = withTimeoutOrNull(BIND_TIMEOUT_MS) { remoteResult.await() } ?: return@withLock false
-            val current = Session(connection, connected, owner)
+            val binder = withTimeoutOrNull(BIND_TIMEOUT_MS) { remoteResult.await() } ?: return@withLock false
+            if (!binder.isBinderAlive) return@withLock false
+            val current = Session(connection, ISingboxEngineProcess.Stub.asInterface(binder), binder, owner)
             val startup = PendingStart(current)
             val duplicate = ParcelFileDescriptor.fromFd(tunFd)
             attempt = startup
@@ -113,6 +121,20 @@ class OperaTunBridgeImpl(
                         if (finished == null) unbindOnce(startup.session)
                     }
                 }
+            }
+        }
+    }
+
+    private fun clearDeadPending() {
+        pendingStart.get()?.let { pending ->
+            if (!pending.session.binder.isBinderAlive && pendingStart.compareAndSet(pending, null)) {
+                pending.accepted.complete(false)
+                unbindOnce(pending.session)
+            }
+        }
+        pendingStop.get()?.let { pending ->
+            if (!pending.session.binder.isBinderAlive && pendingStop.compareAndSet(pending, null)) {
+                unbindOnce(pending.session)
             }
         }
     }
@@ -161,17 +183,17 @@ class OperaTunBridgeImpl(
         val current = session
         session = null
         if (current != null) {
-            val finished = CompletableDeferred<Unit>()
-            pendingStop.set(finished)
+            val pending = PendingStop(current)
+            pendingStop.set(pending)
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     release(current)
                 } finally {
-                    pendingStop.compareAndSet(finished, null)
-                    finished.complete(Unit)
+                    pendingStop.compareAndSet(pending, null)
+                    pending.finished.complete(Unit)
                 }
             }
-            if (withTimeoutOrNull(stopRpcTimeoutMs) { finished.await() } == null) {
+            if (withTimeoutOrNull(stopRpcTimeoutMs) { pending.finished.await() } == null) {
                 unbindOnce(current)
             }
         }
@@ -179,6 +201,7 @@ class OperaTunBridgeImpl(
 
     private fun release(current: Session) {
         try {
+            if (!current.binder.isBinderAlive) return
             if (!current.remote.stopAndWait(current.owner, STOP_TIMEOUT_MS)) {
                 PersistentLoggers.warn("OperaTunBridge", "TUN stop was not acknowledged")
             }

@@ -17,12 +17,14 @@ import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
 import ru.ozero.enginescore.ExitNodeStrategy
+import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.probe.Socks5HandshakeProbe
 import ru.ozero.enginescore.settings.SettingsModel
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class TelegramWssEngine internal constructor(
     private val warp: EnginePlugin,
@@ -52,6 +54,8 @@ class TelegramWssEngine internal constructor(
         val proxy: TelegramWssProxy,
         val port: Int,
         val startedAt: Long,
+        val wssEstablished: AtomicBoolean = AtomicBoolean(false),
+        val wssHealthy: AtomicBoolean = AtomicBoolean(false),
     )
 
     private val mutex = Mutex()
@@ -119,10 +123,22 @@ class TelegramWssEngine internal constructor(
             val started = System.nanoTime()
             Socks5HandshakeProbe.probe("127.0.0.1", current.port)
             if (!probeWarp(current.port) || session !== current) {
-                ProbeResult.Failure("WARP TCP/UDP fallback unavailable")
-            } else {
-                ProbeResult.Success(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started))
+                return ProbeResult.Failure("WARP TCP/UDP fallback unavailable")
             }
+            val wss = runInterruptible(Dispatchers.IO) { current.proxy.probeRemote() }
+            if (session !== current) return ProbeResult.Failure("Telegram WSS session changed")
+            if (wss != null) {
+                current.wssEstablished.set(true)
+                current.wssHealthy.set(true)
+            } else {
+                if (!current.wssEstablished.get()) {
+                    return ProbeResult.Failure("Telegram WSS endpoint unavailable")
+                }
+                if (current.wssHealthy.compareAndSet(true, false)) {
+                    PersistentLoggers.warn("TelegramWssEngine", "WSS unavailable; WARP fallback remains healthy")
+                }
+            }
+            ProbeResult.Success(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
@@ -132,18 +148,18 @@ class TelegramWssEngine internal constructor(
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
         val current = session ?: return EnginePlugin.ReadyResult.Timeout("Telegram WSS is not running")
-        val result = probe()
-        if (result is ProbeResult.Failure) return EnginePlugin.ReadyResult.Timeout(result.reason)
-        val wss = runInterruptible(Dispatchers.IO) { current.proxy.probeRemote() }
-        return if (wss != null && session === current) {
-            EnginePlugin.ReadyResult.Ready
-        } else {
-            EnginePlugin.ReadyResult.Timeout("Telegram WSS endpoint unavailable")
+        return when (val result = probe()) {
+            is ProbeResult.Success -> if (session === current && current.wssHealthy.get()) {
+                EnginePlugin.ReadyResult.Ready
+            } else {
+                EnginePlugin.ReadyResult.Timeout("Telegram WSS endpoint unavailable")
+            }
+            is ProbeResult.Failure -> EnginePlugin.ReadyResult.Timeout(result.reason)
         }
     }
 
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy =
-        session?.let { ExitNodeStrategy.ViaSocks("127.0.0.1", it.port) }
+        session?.takeIf { it.port == socksPort }?.let { ExitNodeStrategy.ViaSocks("127.0.0.1", it.port) }
             ?: ExitNodeStrategy.Unavailable("Telegram WSS is not running")
 
     override fun stats(): Flow<EngineStats> = flow {

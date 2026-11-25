@@ -167,6 +167,8 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
     private fun restartStartTimeoutMs(target: EngineId?): Long = when (target) {
         EngineId.FPTN -> FPTN_RESTART_START_TIMEOUT_MS
         EngineId.OPERA -> OPERA_RESTART_START_TIMEOUT_MS
+        EngineId.MASQUE -> MASQUE_RESTART_START_TIMEOUT_MS
+        EngineId.TGWSS -> TGWSS_RESTART_START_TIMEOUT_MS
         else -> RESTART_START_TIMEOUT_MS
     }
 
@@ -186,6 +188,8 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         // and the next Connected restarts again, because the start is not cancelled.
         const val FPTN_RESTART_START_TIMEOUT_MS = 60_000L
         const val OPERA_RESTART_START_TIMEOUT_MS = 60_000L
+        const val MASQUE_RESTART_START_TIMEOUT_MS = 60_000L
+        const val TGWSS_RESTART_START_TIMEOUT_MS = 120_000L
         const val RESTART_SETTLE_TIMEOUT_MS = 15_000L
     }
 }
