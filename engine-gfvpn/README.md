@@ -1,6 +1,6 @@
 # gfVPN integration experiment
 
-This module is intentionally not connected to the app or release packaging.
+The module is included in Ozero debug builds for explicit device verification, but is not connected to selectable engines or release packaging.
 It contains only original bridge code, not the proprietary SDK, configurations
 or credentials. The locally supplied APK is pinned to the exact analyzed version.
 
@@ -12,6 +12,8 @@ release assets. The bridge independently validates the hashes before loading.
 It loads the matching gomobile classes using a separate classloader in the
 private :engine_gfvpn process. GfVpnRuntime provides the asynchronous host-side
 session API, request deadlines, owner-death cancellation and hard process reset.
+
+To run the real SDK smoke test on an attached ARM64 device, install the Ozero debug APK and its androidTest APK, then run `bash engine-gfvpn/device-smoke.sh /path/to/local.apk`. The test is opt-in; normal CI does not certify the closed native SDK. The script refuses to overwrite an existing SDK directory.
 
 Remaining gates before a selectable engine:
 - Test on ARM64 Android; validate JNI classloader compatibility and native

@@ -125,7 +125,8 @@ class OzeroApp : Application(), Configuration.Provider {
         } else {
             readProcessNameLegacy() ?: return false
         }
-        return name.endsWith(":engine_singbox") || name.endsWith(":engine_opera_tun")
+        return name.endsWith(":engine_singbox") || name.endsWith(":engine_opera_tun") ||
+            name.endsWith(":engine_gfvpn")
     }
 
     private fun isEngineWarpProcess(): Boolean {
