@@ -54,7 +54,8 @@ class TelegramWssEngine internal constructor(
         val proxy: TelegramWssProxy,
         val port: Int,
         val startedAt: Long,
-        val wssUnavailable: AtomicBoolean = AtomicBoolean(false),
+        val wssEstablished: AtomicBoolean = AtomicBoolean(false),
+        val wssHealthy: AtomicBoolean = AtomicBoolean(false),
     )
 
     private val mutex = Mutex()
@@ -130,9 +131,15 @@ class TelegramWssEngine internal constructor(
             val wss = runInterruptible(Dispatchers.IO) { current.proxy.probeRemote() }
             if (session !== current) return ProbeResult.Failure("Telegram WSS session changed")
             if (wss != null) {
-                current.wssUnavailable.set(false)
-            } else if (current.wssUnavailable.compareAndSet(false, true)) {
-                PersistentLoggers.warn("TelegramWssEngine", "WSS upgrade unavailable; using verified WARP fallback")
+                current.wssEstablished.set(true)
+                current.wssHealthy.set(true)
+            } else {
+                if (!current.wssEstablished.get()) {
+                    return ProbeResult.Failure("Telegram WSS endpoint unavailable")
+                }
+                if (current.wssHealthy.compareAndSet(true, false)) {
+                    PersistentLoggers.warn("TelegramWssEngine", "WSS unavailable; WARP fallback remains healthy")
+                }
             }
             ProbeResult.Success(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started))
         } catch (cancelled: CancellationException) {
@@ -143,8 +150,13 @@ class TelegramWssEngine internal constructor(
     }
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult {
+        val current = session ?: return EnginePlugin.ReadyResult.Timeout("Telegram WSS is not running")
         return when (val result = probe()) {
-            is ProbeResult.Success -> EnginePlugin.ReadyResult.Ready
+            is ProbeResult.Success -> if (session === current && current.wssHealthy.get()) {
+                EnginePlugin.ReadyResult.Ready
+            } else {
+                EnginePlugin.ReadyResult.Timeout("Telegram WSS endpoint unavailable")
+            }
             is ProbeResult.Failure -> EnginePlugin.ReadyResult.Timeout(result.reason)
         }
     }

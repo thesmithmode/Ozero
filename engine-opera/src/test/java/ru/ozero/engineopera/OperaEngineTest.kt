@@ -20,7 +20,6 @@ import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.settings.SettingsModel
 import java.io.IOException
-import java.net.SocketTimeoutException
 
 class OperaEngineTest {
     private class FakeProcess : OperaProxyProcess {
@@ -208,21 +207,6 @@ class OperaEngineTest {
         plugin.start(EngineConfig.Opera(proxyMode = true), Upstream.None)
         assertEquals(EnginePlugin.ReadyResult.Ready, plugin.awaitReady())
         plugin.stop()
-    }
-
-    @Test
-    fun `TUN retries one routed DNS timeout and still requires a DNS response`() = runTest {
-        var attempts = 0
-        val plugin = engine(dnsProbe = { if (++attempts == 1) throw SocketTimeoutException() })
-        try {
-            plugin.start(EngineConfig.Opera(), Upstream.None)
-            assertEquals(TunAttachResult.Success, plugin.attachTun(42))
-
-            assertEquals(EnginePlugin.ReadyResult.Ready, plugin.awaitReady())
-            assertEquals(2, attempts)
-        } finally {
-            plugin.stop()
-        }
     }
 
     @Test

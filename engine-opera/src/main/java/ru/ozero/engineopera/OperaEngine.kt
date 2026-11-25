@@ -21,7 +21,6 @@ import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
 import ru.ozero.enginescore.settings.SettingsModel
 import java.io.IOException
-import java.net.SocketTimeoutException
 
 class OperaEngine(
     private val runtime: OperaProxyRuntime,
@@ -144,20 +143,12 @@ class OperaEngine(
         val result = runtime.probe()
         if (result is ProbeResult.Success && !current.config.proxyMode) {
             try {
-                checkRoutedDns(current.port)
+                dnsProbe(current.port)
             } catch (e: IOException) {
                 return ProbeResult.Failure("Opera routed DNS unavailable: ${e.javaClass.simpleName}", cause = e)
             }
         }
         return if (active === current) result else ProbeResult.Failure("Opera session changed")
-    }
-
-    private suspend fun checkRoutedDns(port: Int) {
-        try {
-            dnsProbe(port)
-        } catch (_: SocketTimeoutException) {
-            dnsProbe(port)
-        }
     }
 
     override fun stats(): Flow<EngineStats> = currentStats
