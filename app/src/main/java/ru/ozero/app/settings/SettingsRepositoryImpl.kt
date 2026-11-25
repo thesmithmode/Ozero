@@ -45,8 +45,8 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setOperaAutoEnabled(enabled: Boolean) {
         dataStore.edit { prefs ->
-            val priority = prefs.readEngineAutoPriority().filterNot { it == EngineId.OPERA }
-            val next = if (enabled) priority + EngineId.OPERA else priority
+            val priority = prefs.readEngineAutoPriority()
+            val next = if (enabled) (priority + EngineId.OPERA).distinct() else priority.filterNot { it == EngineId.OPERA }
             prefs[SettingsKeys.OPERA_AUTO_ENABLED] = enabled
             prefs[SettingsKeys.ENGINE_AUTO_PRIORITY] = next.joinToString(",") { it.name }
         }

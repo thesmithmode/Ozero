@@ -164,6 +164,8 @@ class SettingsRepositoryTest {
         assertEquals(EngineId.OPERA, repository.settings.first().engineAutoPriority.last())
         repository.setEngineAutoPriority(listOf(EngineId.OPERA, EngineId.WARP))
         assertEquals(EngineId.OPERA, repository.settings.first().engineAutoPriority.first())
+        repository.setOperaAutoEnabled(true)
+        assertEquals(EngineId.OPERA, repository.settings.first().engineAutoPriority.first())
         repository.setOperaAutoEnabled(false)
         assertFalse(EngineId.OPERA in repository.settings.first().engineAutoPriority)
         assertEquals(false, dataStore.data.first()[SettingsKeys.OPERA_AUTO_ENABLED])
