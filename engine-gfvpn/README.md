@@ -15,7 +15,7 @@ private :engine_gfvpn process.
 Remaining gates before a selectable engine:
 - Test on ARM64 Android; validate JNI classloader compatibility and native
   startup/stop/restart, including bounded shutdown and process death.
-- Implement authenticated SOCKS5 credentials handoff and routed readiness.
+- The private IPC now passes SOCKS credentials only to the same app UID and implements a routed HTTPS probe. Validate both with the actual SDK, including native timeout recovery.
 - Connect Ozero's TUN/HEV, DNS and split routing, fail-closed lifecycle, network
   change callbacks and engine UI. No other engine may load this runtime.
 - Verify live configuration updates and transport behavior under real network

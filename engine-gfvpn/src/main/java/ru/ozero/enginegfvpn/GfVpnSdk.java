@@ -6,8 +6,6 @@ import dalvik.system.DexClassLoader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.security.MessageDigest;
 
 /** Runtime bridge for the exact locally supplied SDK. Never bundles third-party code. */
@@ -18,6 +16,18 @@ final class GfVpnSdk {
     private Class<?> api;
     private Class<?> configType;
     private boolean active;
+    private Session session;
+
+    static final class Session {
+        final int port;
+        final String username;
+        final String password;
+        Session(int port, String username, String password) {
+            this.port = port;
+            this.username = username;
+            this.password = password;
+        }
+    }
 
     GfVpnSdk(Context context) {
         this.context = context.getApplicationContext();
@@ -62,7 +72,7 @@ final class GfVpnSdk {
         api = loadedApi;
     }
 
-    synchronized int start(String country, String clientIdentifier) throws Exception {
+    synchronized Session start(String country, String clientIdentifier) throws Exception {
         if (active) throw new IllegalStateException("Already started");
         load();
         if (!java.util.Arrays.asList("RU", "CN", "IR", "TM", "INT").contains(country)) {
@@ -88,7 +98,13 @@ final class GfVpnSdk {
             if (error != null) throw new IOException("SDK startup failed");
             long port = (Long) result.getClass().getMethod("getPort").invoke(result);
             if (port < 1 || port > 65535) throw new IOException("SDK returned invalid SOCKS port");
-            return (int) port;
+            String username = (String) result.getClass().getMethod("getSocksUsername").invoke(result);
+            String password = (String) result.getClass().getMethod("getSocksPassword").invoke(result);
+            if (username == null || username.isEmpty() || password == null || password.isEmpty()) {
+                throw new IOException("SDK returned no SOCKS authentication credentials");
+            }
+            session = new Session((int) port, username, password);
+            return session;
         } catch (Exception | LinkageError failure) {
             try { stop(); } catch (Exception | LinkageError ignored) { }
             throw failure;
@@ -103,6 +119,12 @@ final class GfVpnSdk {
         if (!active) return;
         api.getMethod("stop").invoke(null);
         active = false;
+        session = null;
+    }
+
+    synchronized long probe() throws Exception {
+        if (!active || session == null) throw new IllegalStateException("Not started");
+        return GfVpnSocksProbe.probe(session.port, session.username, session.password);
     }
 
     synchronized void networkChanged() throws Exception {
