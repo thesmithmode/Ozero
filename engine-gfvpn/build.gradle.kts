@@ -6,6 +6,8 @@ android {
 }
 
 dependencies {
+    implementation(project(":common-vpn"))
+    implementation(project(":engines-core"))
     testImplementation(libs.bundles.junit5)
     testRuntimeOnly(libs.junit.jupiter.engine)
 }

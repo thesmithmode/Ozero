@@ -10,6 +10,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
+import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
@@ -75,6 +76,30 @@ public final class GfVpnRuntime implements AutoCloseable {
         return result;
     }
 
+    /** Duplicates the caller's TUN fd; ownership of the original stays with the caller. */
+    public CompletableFuture<Void> attachTun(ParcelFileDescriptor descriptor) {
+        Bundle input = new Bundle();
+        try {
+            input.putParcelable("tun", descriptor.dup());
+        } catch (IOException failure) {
+            CompletableFuture<Void> result = new CompletableFuture<>();
+            result.completeExceptionally(failure);
+            return result;
+        }
+        CompletableFuture<Void> result = request(GfVpnProcessService.ATTACH_TUN, input, 15000).thenApply(data -> null);
+        result.whenComplete((value, error) -> { if (error != null) close(); });
+        return result;
+    }
+
+    private static void closeInput(Bundle input) {
+        if (input == null) return;
+        ParcelFileDescriptor descriptor = input.getParcelable("tun");
+        if (descriptor != null) {
+            try { descriptor.close(); } catch (IOException ignored) { }
+            input.remove("tun");
+        }
+    }
+
     public CompletableFuture<Long> probe() {
         CompletableFuture<Bundle> raw = request(GfVpnProcessService.PROBE, new Bundle(), 15000);
         CompletableFuture<Long> result = raw.thenApply(data -> data.getLong("latencyMs"));
@@ -100,8 +125,9 @@ public final class GfVpnRuntime implements AutoCloseable {
         CompletableFuture<Bundle> result = new CompletableFuture<>();
         result.whenComplete((value, error) -> { if (result.isCancelled()) close(); });
         main.post(() -> {
-            if (result.isCancelled()) return;
+            if (result.isCancelled()) { closeInput(input); return; }
             if (closed || pending != null || (operation == GfVpnProcessService.START ? started : !started)) {
+                closeInput(input);
                 result.completeExceptionally(new IOException("Invalid runtime state"));
                 return;
             }
@@ -130,6 +156,7 @@ public final class GfVpnRuntime implements AutoCloseable {
         message.replyTo = replies;
         message.setData(pendingInput);
         try { remote.send(message); } catch (RemoteException failure) { fail(failure); }
+        finally { closeInput(pendingInput); }
     }
 
     private boolean receive(Message message) {
@@ -152,6 +179,7 @@ public final class GfVpnRuntime implements AutoCloseable {
     private CompletableFuture<Bundle> clearPending() {
         CompletableFuture<Bundle> result = pending;
         pending = null;
+        closeInput(pendingInput);
         pendingInput = null;
         if (deadline != null) main.removeCallbacks(deadline);
         deadline = null;

@@ -126,6 +126,11 @@ final class GfVpnSdk {
         session = null;
     }
 
+    synchronized Session requireSession() throws java.io.IOException {
+        if (!active || session == null) throw new java.io.IOException("SDK not started");
+        return session;
+    }
+
     synchronized long probe() throws Exception {
         if (!active || session == null) throw new IllegalStateException("Not started");
         return GfVpnSocksProbe.probe(session.port, session.username, session.password);

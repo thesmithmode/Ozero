@@ -10,6 +10,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.Process;
+import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -25,12 +26,14 @@ public final class GfVpnProcessService extends Service {
     public static final int RESULT = 4;
     public static final int PROBE = 5;
     public static final int ABORT = 6;
+    public static final int ATTACH_TUN = 7;
     private final ScheduledExecutorService watchdog = Executors.newSingleThreadScheduledExecutor();
     private final AtomicBoolean closing = new AtomicBoolean();
     private HandlerThread worker;
     private Handler work;
     private Messenger messenger;
     private GfVpnSdk sdk;
+    private GfVpnTun tun;
     private IBinder owner;
     private boolean pending;
     private final IBinder.DeathRecipient ownerDeath = this::terminate;
@@ -38,6 +41,7 @@ public final class GfVpnProcessService extends Service {
     @Override public void onCreate() {
         super.onCreate();
         sdk = new GfVpnSdk(this);
+        tun = new GfVpnTun(this);
         worker = new HandlerThread("gfvpn-worker");
         worker.start();
         work = new Handler(worker.getLooper());
@@ -99,8 +103,18 @@ public final class GfVpnProcessService extends Service {
                     response.putString("username", session.username);
                     response.putString("password", session.password);
                     break;
+                case ATTACH_TUN:
+                    ParcelFileDescriptor descriptor = input.getParcelable("tun");
+                    if (descriptor == null) throw new java.io.IOException("Missing TUN descriptor");
+                    try {
+                        tun.start(descriptor, sdk.requireSession());
+                    } catch (Exception | LinkageError error) {
+                        try { descriptor.close(); } catch (java.io.IOException ignored) { }
+                        throw error;
+                    }
+                    break;
                 case STOP:
-                    sdk.stop();
+                    try { tun.stop(); } finally { sdk.stop(); }
                     break;
                 case PROBE:
                     response.putLong("latencyMs", sdk.probe());
@@ -122,7 +136,7 @@ public final class GfVpnProcessService extends Service {
             pending = false;
             reply(target, id, response);
             // Never reuse an unverified or stopped native runtime.
-            if (operation == STOP || (operation == START && !response.getBoolean("ok"))) terminate();
+            if (operation == STOP || ((operation == START || operation == ATTACH_TUN) && !response.getBoolean("ok"))) terminate();
         });
     }
 
