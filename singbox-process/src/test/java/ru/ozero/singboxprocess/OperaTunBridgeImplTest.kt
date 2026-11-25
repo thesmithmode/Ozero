@@ -11,9 +11,14 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
 import ru.ozero.enginesingbox.ISingboxEngineProcess
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -82,6 +87,41 @@ class OperaTunBridgeImplTest {
         every { f.context.bindService(any<Intent>(), any<ServiceConnection>(), any<Int>()) } returns true
         assertFalse(bridge.start(42, "{}"))
         verify(exactly = 2) { f.context.unbindService(any()) }
+    }
+
+    @Test
+    fun `blocked startup returns failure without allowing a new session before late cleanup`() = runBlocking {
+        val f = Fixture()
+        val entered = CountDownLatch(1)
+        val unblock = CountDownLatch(1)
+        val stopped = CompletableDeferred<Unit>()
+        mockkStatic(ParcelFileDescriptor::class)
+        every { ParcelFileDescriptor.fromFd(42) } returns f.fd
+        every { f.remote.startWithConfig(any(), f.fd, "{}", any()) } answers {
+            entered.countDown()
+            check(unblock.await(5, TimeUnit.SECONDS))
+        }
+        every { f.remote.stopAndWait(any(), any()) } answers {
+            stopped.complete(Unit)
+            true
+        }
+        try {
+            val bridge = OperaTunBridgeImpl(f.context, startRpcTimeoutMs = 100, abandonedCleanupTimeoutMs = 100)
+            assertFalse(bridge.start(42, "{}"))
+            assertTrue(entered.await(1, TimeUnit.SECONDS))
+            assertFalse(bridge.isRunning())
+            assertFalse(bridge.start(42, "{}"))
+            verify(exactly = 1) { f.context.bindService(any<Intent>(), any<ServiceConnection>(), any<Int>()) }
+            verify(exactly = 1) { f.context.unbindService(any()) }
+
+            unblock.countDown()
+            withTimeout(5_000) { stopped.await() }
+            verify(exactly = 1) { f.remote.stopAndWait(any(), 3000L) }
+            verify(exactly = 1) { f.fd.close() }
+        } finally {
+            unblock.countDown()
+            unmockkStatic(ParcelFileDescriptor::class)
+        }
     }
 
     @Test

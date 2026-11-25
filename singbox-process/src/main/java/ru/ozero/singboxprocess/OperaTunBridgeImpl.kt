@@ -7,8 +7,10 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -19,22 +21,37 @@ import ru.ozero.enginescore.VpnSocketProtectorHolder
 import ru.ozero.enginesingbox.ISingboxEngineProcess
 import ru.ozero.enginesingbox.ISingboxProtector
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
-class OperaTunBridgeImpl(private val context: Context) : OperaTunBridge {
+class OperaTunBridgeImpl(
+    private val context: Context,
+    private val startRpcTimeoutMs: Long = START_RPC_TIMEOUT_MS,
+    private val abandonedCleanupTimeoutMs: Long = STOP_TIMEOUT_MS,
+) : OperaTunBridge {
     private data class Session(
         val connection: ServiceConnection,
         val remote: ISingboxEngineProcess,
         val owner: Long,
+        val unbound: AtomicBoolean = AtomicBoolean(false),
     )
+
+    private class PendingStart(val session: Session) {
+        val ready = CompletableDeferred<Boolean>()
+        val accepted = CompletableDeferred<Boolean>()
+        val finished = CompletableDeferred<Unit>()
+    }
 
     private val mutex = Mutex()
     private var session: Session? = null
+    private val pendingStart = AtomicReference<PendingStart?>(null)
     private val protector = object : ISingboxProtector.Stub() {
         override fun protect(socket: ParcelFileDescriptor): Boolean =
             socket.use { VpnSocketProtectorHolder.protect(it.fd) }
     }
 
     override suspend fun start(tunFd: Int, config: String): Boolean = mutex.withLock {
+        if (pendingStart.get() != null) return@withLock false
         stopLocked()
         val remoteResult = CompletableDeferred<ISingboxEngineProcess?>()
         val connection = object : ServiceConnection {
@@ -56,7 +73,7 @@ class OperaTunBridgeImpl(private val context: Context) : OperaTunBridge {
         }
         val owner = UUID.randomUUID().mostSignificantBits
         var bound = false
-        var remote: ISingboxEngineProcess? = null
+        var attempt: PendingStart? = null
         try {
             bound = context.bindService(
                 Intent(context, OperaTunService::class.java),
@@ -65,21 +82,51 @@ class OperaTunBridgeImpl(private val context: Context) : OperaTunBridge {
             )
             if (!bound) return@withLock false
             val connected = withTimeoutOrNull(BIND_TIMEOUT_MS) { remoteResult.await() } ?: return@withLock false
-            remote = connected
+            val current = Session(connection, connected, owner)
+            val startup = PendingStart(current)
+            val duplicate = ParcelFileDescriptor.fromFd(tunFd)
+            attempt = startup
+            pendingStart.set(startup)
+            launchNativeStart(startup, duplicate, config)
             val ready = withContext(Dispatchers.IO) {
-                ParcelFileDescriptor.fromFd(tunFd).use {
-                    connected.startWithConfig(owner, it, config, protector)
-                }
-                connected.runtimeRunning()
+                withTimeoutOrNull(startRpcTimeoutMs) { startup.ready.await() } == true
             }
             if (!ready) return@withLock false
-            session = Session(connection, connected, owner)
+            session = current
+            startup.accepted.complete(true)
+            pendingStart.compareAndSet(startup, null)
             true
         } finally {
             if (session == null && bound) {
                 withContext(NonCancellable + Dispatchers.IO) {
-                    release(connection, remote, owner)
+                    val startup = attempt
+                    if (startup == null) {
+                        unbind(connection)
+                    } else {
+                        startup.accepted.complete(false)
+                        val finished = withTimeoutOrNull(abandonedCleanupTimeoutMs) { startup.finished.await() }
+                        if (finished == null) unbindOnce(startup.session)
+                    }
                 }
+            }
+        }
+    }
+
+    private fun launchNativeStart(attempt: PendingStart, duplicate: ParcelFileDescriptor, config: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val current = attempt.session
+            try {
+                val ready = runCatching {
+                    duplicate.use { current.remote.startWithConfig(current.owner, it, config, protector) }
+                    current.remote.runtimeRunning()
+                }.onFailure {
+                    PersistentLoggers.warn("OperaTunBridge", "TUN start failed: ${it.javaClass.simpleName}")
+                }.getOrDefault(false)
+                attempt.ready.complete(ready)
+                if (!attempt.accepted.await()) release(current)
+            } finally {
+                pendingStart.compareAndSet(attempt, null)
+                attempt.finished.complete(Unit)
             }
         }
     }
@@ -96,24 +143,33 @@ class OperaTunBridgeImpl(private val context: Context) : OperaTunBridge {
     private suspend fun stopLocked() = withContext(NonCancellable + Dispatchers.IO) {
         val current = session
         session = null
-        if (current != null) release(current.connection, current.remote, current.owner)
+        if (current != null) release(current)
     }
 
-    private fun release(connection: ServiceConnection, remote: ISingboxEngineProcess?, owner: Long) {
+    private fun release(current: Session) {
         try {
-            if (remote != null && !remote.stopAndWait(owner, STOP_TIMEOUT_MS)) {
+            if (!current.remote.stopAndWait(current.owner, STOP_TIMEOUT_MS)) {
                 PersistentLoggers.warn("OperaTunBridge", "TUN stop was not acknowledged")
             }
-        } catch (e: android.os.RemoteException) {
+        } catch (e: Exception) {
             PersistentLoggers.warn("OperaTunBridge", "TUN process unavailable: ${e.javaClass.simpleName}")
         } finally {
-            runCatching { context.unbindService(connection) }
-                .onFailure { PersistentLoggers.warn("OperaTunBridge", "unbind failed: ${it.javaClass.simpleName}") }
+            unbindOnce(current)
         }
+    }
+
+    private fun unbindOnce(current: Session) {
+        if (current.unbound.compareAndSet(false, true)) unbind(current.connection)
+    }
+
+    private fun unbind(connection: ServiceConnection) {
+        runCatching { context.unbindService(connection) }
+            .onFailure { PersistentLoggers.warn("OperaTunBridge", "unbind failed: ${it.javaClass.simpleName}") }
     }
 
     private companion object {
         const val BIND_TIMEOUT_MS = 5_000L
+        const val START_RPC_TIMEOUT_MS = 18_000L
         const val STOP_TIMEOUT_MS = 3_000L
     }
 }
