@@ -1,10 +1,12 @@
 package ru.ozero.app.di
 
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.junit.jupiter.api.Test
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
+import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.security.KeyStore
@@ -14,6 +16,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertNotNull
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 import kotlin.test.assertSame
 
 class SubscriptionTrustClientFactoryTest {
@@ -84,6 +88,44 @@ class SubscriptionTrustClientFactoryTest {
         val disconnecting = connectedController(1080)
         disconnecting.onDisconnecting()
         assertNull(SubscriptionTrustClientFactory.forActiveProxy(client, disconnecting))
+    }
+
+    @Test
+    fun `stale fallback client is cancelled even when the same engine and port reconnect`() {
+        val controller = connectedController(1080)
+        val retry = assertNotNull(SubscriptionTrustClientFactory.forActiveProxy(OkHttpClient(), controller))
+        controller.onDisconnecting()
+        controller.reset()
+        controller.onProbing()
+        controller.onConnecting(EngineId.BYEDPI)
+        controller.onEngineStarted(EngineId.BYEDPI, 1080)
+
+        val call = retry.newCall(Request.Builder().url("https://example.invalid/sub").build())
+        assertFailsWith<IOException> { call.execute().close() }
+        assertTrue(call.isCanceled())
+        assertNotNull(SubscriptionTrustClientFactory.forActiveProxy(OkHttpClient(), controller))
+    }
+
+    @Test
+    fun `switching cancels registered call before connection and completed call is not cancelled`() {
+        val controller = connectedController(1080)
+        val retry = assertNotNull(SubscriptionTrustClientFactory.forActiveProxy(OkHttpClient(), controller))
+        val request = Request.Builder().url("https://example.invalid/sub").build()
+        val completed = retry.newCall(request)
+        val completedListener = retry.eventListenerFactory.create(completed)
+        completedListener.callStart(completed)
+        completedListener.callEnd(completed)
+        val active = retry.newCall(request)
+        val listener = retry.eventListenerFactory.create(active)
+        listener.callStart(active)
+        assertFalse(active.isCanceled())
+
+        controller.onSwitchingStarted(EngineId.BYEDPI, EngineId.WARP)
+
+        assertTrue(active.isCanceled())
+        assertFalse(completed.isCanceled())
+        listener.callFailed(active, IOException("fixture"))
+        assertNull(SubscriptionTrustClientFactory.forActiveProxy(OkHttpClient(), controller))
     }
 
     private fun connectedController(port: Int): TunnelController = TunnelController().apply {
