@@ -187,6 +187,46 @@ class OperaTunBridgeImplTest {
     }
 
     @Test
+    fun `stalled health checks share one query and do not prevent stop`() = runBlocking {
+        val f = Fixture()
+        val entered = CountDownLatch(1)
+        val unblock = CountDownLatch(1)
+        val returned = CountDownLatch(1)
+        val calls = AtomicInteger()
+        mockkStatic(ParcelFileDescriptor::class)
+        every { ParcelFileDescriptor.fromFd(42) } returns f.fd
+        every { f.remote.runtimeRunning() } answers {
+            if (calls.incrementAndGet() == 1) {
+                true
+            } else {
+                entered.countDown()
+                check(unblock.await(5, TimeUnit.SECONDS))
+                returned.countDown()
+                true
+            }
+        }
+        try {
+            val bridge = OperaTunBridgeImpl(f.context, readinessRpcTimeoutMs = 500)
+            assertTrue(bridge.start(42, "{}"))
+            assertFalse(bridge.isRunning())
+            assertTrue(entered.await(1, TimeUnit.SECONDS))
+            assertFalse(bridge.isRunning())
+            assertTrue(calls.get() == 2)
+
+            bridge.stop()
+            verify(exactly = 1) { f.remote.stopAndWait(any(), 3000L) }
+            verify(exactly = 1) { f.context.unbindService(any()) }
+            assertFalse(bridge.isRunning())
+            unblock.countDown()
+            assertTrue(returned.await(1, TimeUnit.SECONDS))
+            assertFalse(bridge.isRunning())
+        } finally {
+            unblock.countDown()
+            unmockkStatic(ParcelFileDescriptor::class)
+        }
+    }
+
+    @Test
     fun `failed native readiness stops owned session and unbinds`() = runTest {
         val f = Fixture()
         mockkStatic(ParcelFileDescriptor::class)
