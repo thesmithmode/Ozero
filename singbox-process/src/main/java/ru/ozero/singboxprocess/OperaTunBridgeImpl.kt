@@ -151,7 +151,7 @@ class OperaTunBridgeImpl(
             if (!current.remote.stopAndWait(current.owner, STOP_TIMEOUT_MS)) {
                 PersistentLoggers.warn("OperaTunBridge", "TUN stop was not acknowledged")
             }
-        } catch (e: android.os.RemoteException) {
+        } catch (e: Exception) {
             PersistentLoggers.warn("OperaTunBridge", "TUN process unavailable: ${e.javaClass.simpleName}")
         } finally {
             unbindOnce(current)
