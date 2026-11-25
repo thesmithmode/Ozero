@@ -89,7 +89,9 @@ class OperaEngine(
                     return@attach TunAttachResult.Failure("Opera TUN runtime failed")
                 }
                 runCatching { closeFd(tunFd) }
-                    .onFailure { PersistentLoggers.warn("OperaEngine", "TUN fd close failed: ${it.javaClass.simpleName}") }
+                    .onFailure {
+                        PersistentLoggers.warn("OperaEngine", "TUN fd close failed: ${it.javaClass.simpleName}")
+                    }
                 active = current.copy(attached = true)
                 markConnected()
                 TunAttachResult.Success
