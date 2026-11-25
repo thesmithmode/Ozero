@@ -34,8 +34,10 @@ class OperaEngineTest {
         var running = false
         var failure: Exception? = null
         var json = ""
+        var beforeStart: suspend () -> Unit = {}
 
         override suspend fun start(tunFd: Int, config: String): Boolean {
+            beforeStart()
             failure?.let { throw it }
             json = config
             running = accept
@@ -105,6 +107,35 @@ class OperaEngineTest {
 
         assertTrue(startup.isCancelled)
         assertFalse(process.alive)
+        assertTrue(plugin.exitNodeStrategy(12000) is ExitNodeStrategy.Unavailable)
+    }
+
+    @Test
+    fun `stop cancels pending TUN attachment without consuming caller fd`() = runTest {
+        val entered = CompletableDeferred<Unit>()
+        val bridge = FakeTun().apply {
+            beforeStart = {
+                entered.complete(Unit)
+                awaitCancellation()
+            }
+        }
+        val process = FakeProcess()
+        val closed = mutableListOf<Int>()
+        val plugin = engine(
+            launcher = OperaProxyLauncher { _, _ -> process },
+            tun = bridge,
+            closeFd = { closed.add(it) },
+        )
+        assertEquals(StartResult.Success(12000), plugin.start(EngineConfig.Opera(), Upstream.None))
+        val attachment = launch { plugin.attachTun(42) }
+        entered.await()
+        plugin.stop()
+        attachment.join()
+
+        assertTrue(attachment.isCancelled)
+        assertTrue(closed.isEmpty())
+        assertFalse(process.alive)
+        assertFalse(bridge.running)
         assertTrue(plugin.exitNodeStrategy(12000) is ExitNodeStrategy.Unavailable)
     }
 

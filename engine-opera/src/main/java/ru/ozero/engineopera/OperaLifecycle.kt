@@ -19,10 +19,11 @@ internal class OperaLifecycle {
     suspend fun <T> run(
         rejected: T,
         onCancelled: suspend () -> Unit = {},
+        onCompleted: (T) -> T = { it },
         block: suspend () -> T,
     ): T = lifecycle.withLock {
         var accepted = false
-        try {
+        val result = try {
             coroutineScope {
                 val job = coroutineContext.job
                 accepted = synchronized(lock) {
@@ -41,11 +42,15 @@ internal class OperaLifecycle {
         } finally {
             synchronized(lock) { operation = null }
         }
+        if (accepted) onCompleted(result) else result
     }
 
-    suspend fun <T> attach(rejected: T, block: suspend () -> T): T = lifecycle.withLock {
-        if (synchronized(lock) { stopping }) rejected else block()
-    }
+    suspend fun <T> attach(
+        rejected: T,
+        onCancelled: suspend () -> Unit = {},
+        onCompleted: (T) -> T = { it },
+        block: suspend () -> T,
+    ): T = run(rejected, onCancelled, onCompleted, block)
 
     suspend fun stop(block: suspend () -> Unit) = stopGate.withLock {
         val current = synchronized(lock) {

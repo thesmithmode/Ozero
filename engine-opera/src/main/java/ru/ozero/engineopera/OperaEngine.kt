@@ -78,7 +78,20 @@ class OperaEngine(
         }
 
     override suspend fun attachTun(tunFd: Int): TunAttachResult =
-        lifecycle.attach<TunAttachResult>(TunAttachResult.Failure("Opera is stopping")) {
+        lifecycle.attach<TunAttachResult>(
+            TunAttachResult.Failure("Opera is stopping"),
+            onCancelled = ::stopLocked,
+            onCompleted = { result ->
+                if (result == TunAttachResult.Success) {
+                    runCatching { closeFd(tunFd) }.onFailure {
+                        PersistentLoggers.warn("OperaEngine", "TUN fd close failed: ${it.javaClass.simpleName}")
+                    }
+                    active = checkNotNull(active).copy(attached = true)
+                    markConnected()
+                }
+                result
+            },
+        ) {
             val current = active ?: return@attach TunAttachResult.Failure("Opera not started")
             if (current.config.proxyMode || current.attached) {
                 return@attach TunAttachResult.Failure("Opera TUN attachment not expected")
@@ -88,15 +101,8 @@ class OperaEngine(
                     stopLocked()
                     return@attach TunAttachResult.Failure("Opera TUN runtime failed")
                 }
-                runCatching { closeFd(tunFd) }
-                    .onFailure {
-                        PersistentLoggers.warn("OperaEngine", "TUN fd close failed: ${it.javaClass.simpleName}")
-                    }
-                active = current.copy(attached = true)
-                markConnected()
                 TunAttachResult.Success
             } catch (e: CancellationException) {
-                withContext(NonCancellable) { stopLocked() }
                 throw e
             } catch (e: Exception) {
                 PersistentLoggers.warn("OperaEngine", "TUN attach failed: ${e.javaClass.simpleName}")
