@@ -614,11 +614,11 @@ class WarpAutoConfigTest {
         assertTrue(urls.isNotEmpty())
         assertEquals(urls.size, urls.distinct().size)
         val endpoints = urls.map { URI(it) }
-        assertTrue(endpoints.all { it.scheme == "https" && !it.host.isNullOrBlank() })
+        assertTrue(endpoints.all { it.scheme.equals("https", ignoreCase = true) && !it.host.isNullOrBlank() })
         assertTrue(endpoints.all { it.userInfo == null && it.fragment == null && it.query == null })
-        assertTrue(endpoints.none { it.host.equals("api.cloudflareclient.com", ignoreCase = true) })
-        assertTrue(endpoints.all { it.path == "/api/warp" || it.path == "/api/generate" })
-        assertTrue(endpoints.any { it.path == "/api/generate" })
+        assertTrue(endpoints.none { it.host?.trimEnd('.').equals("api.cloudflareclient.com", ignoreCase = true) })
+        assertTrue(endpoints.all { it.rawPath == "/api/warp" || it.rawPath == "/api/generate" })
+        assertTrue(endpoints.any { it.rawPath == "/api/generate" })
         assertTrue(endpoints.any { it.host.equals("warp.cyberportal.workers.dev", ignoreCase = true) })
         assertTrue(urls.contains("https://warp-gen.cyb-portal.org/api/warp"))
     }
