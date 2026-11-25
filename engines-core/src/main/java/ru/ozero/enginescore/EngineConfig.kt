@@ -118,6 +118,10 @@ sealed class EngineConfig {
         override val engineId = EngineId.TGWSS
     }
 
+    data object GfVpn : EngineConfig() {
+        override val engineId = EngineId.GFVPN
+    }
+
     data class Masque(
         val profileJson: String,
         val transport: String,

@@ -90,7 +90,7 @@ fun MainScreen(
     val appMode by viewModel.appMode.collectAsStateWithLifecycle()
     val manualEngine by viewModel.manualEngine.collectAsStateWithLifecycle()
     val engineAutoPriority by viewModel.engineAutoPriority.collectAsStateWithLifecycle()
-    val selectableEngines = (engineAutoPriority + EngineId.OPERA + EngineId.TGWSS).distinct()
+    val selectableEngines = (engineAutoPriority + EngineId.OPERA + EngineId.TGWSS + EngineId.GFVPN).distinct()
     val speedHistory by viewModel.speedHistory.collectAsStateWithLifecycle()
     val urnetworkPeerCount by viewModel.urnetworkPeerCount.collectAsStateWithLifecycle()
     val urnetworkPeerSearchSeconds by viewModel.urnetworkPeerSearchSeconds.collectAsStateWithLifecycle()
@@ -1205,6 +1205,7 @@ internal fun probingLabelRes(engineId: EngineId?, isReconnecting: Boolean): Int 
         EngineId.SINGBOX -> R.string.main_status_connecting
         EngineId.TGWSS -> R.string.main_status_connecting
         EngineId.OPERA -> R.string.main_status_connecting
+        EngineId.GFVPN -> R.string.main_status_connecting
     }
 }
 

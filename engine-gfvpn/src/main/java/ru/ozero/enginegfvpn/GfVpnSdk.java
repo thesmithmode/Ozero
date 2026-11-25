@@ -10,8 +10,8 @@ import java.security.MessageDigest;
 
 /** Runtime bridge for the exact locally supplied SDK. Never bundles third-party code. */
 final class GfVpnSdk {
-    private static final String DEX_SHA = "103f8155e3bd33b8f13d8ff7d1f63cb5ec1fe7acc1aa1c395eaedb83d336c829";
-    private static final String LIB_SHA = "7fdffc628230ce188c474c42bfc5fef5b802ace74bd9e9b249f0272f9090e404";
+    static final String DEX_SHA = "103f8155e3bd33b8f13d8ff7d1f63cb5ec1fe7acc1aa1c395eaedb83d336c829";
+    static final String LIB_SHA = "7fdffc628230ce188c474c42bfc5fef5b802ace74bd9e9b249f0272f9090e404";
     private final Context context;
     private Class<?> api;
     private Class<?> configType;
@@ -33,7 +33,7 @@ final class GfVpnSdk {
         this.context = context.getApplicationContext();
     }
 
-    private static void verify(File file, String expected) throws Exception {
+    static void verify(File file, String expected) throws Exception {
         if (!file.isFile() || file.canWrite()) {
             throw new IOException("SDK file missing or writable");
         }

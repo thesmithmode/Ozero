@@ -174,7 +174,7 @@ dependencies {
     implementation(project(":engine-fptn"))
     implementation(project(":engine-singbox"))
     implementation(project(":engine-tgwss"))
-    debugImplementation(project(":engine-gfvpn"))
+    implementation(project(":engine-gfvpn"))
     implementation(project(":singbox-process"))
     implementation(project(":singbox-core"))
     implementation(project(":singbox-fmt"))

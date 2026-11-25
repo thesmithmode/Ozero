@@ -1,6 +1,6 @@
 # gfVPN integration experiment
 
-The module is included in Ozero debug builds for explicit device verification, but is not connected to selectable engines or release packaging.
+The bridge is registered as a standalone selectable VPN engine. No third-party SDK is bundled; the user must explicitly import the exact authorized local APK in engine settings. Proxy-only, automatic chain selection and IPv6 are disabled.
 It contains only original bridge code, not the proprietary SDK, configurations
 or credentials. The locally supplied APK is pinned to the exact analyzed version.
 
@@ -19,7 +19,7 @@ Remaining gates before a selectable engine:
 - Test on ARM64 Android; validate JNI classloader compatibility and native
   startup/stop/restart, including bounded shutdown and process death.
 - The private IPC now passes SOCKS credentials only to the same app UID and implements a routed HTTPS probe. Validate both with the actual SDK, including native timeout recovery.
-- The isolated service now accepts a duplicated TUN descriptor and starts Ozero's existing HEV with authenticated SOCKS5 settings. Device-test UDP-over-TCP, DNS and IPv6; wire Ozero's central VPN lifecycle, split routing and engine UI only after the runtime test. No other engine may load this runtime.
+- The isolated service now accepts a duplicated TUN descriptor and starts Ozero's existing HEV with authenticated SOCKS5 settings. Device-test UDP-over-TCP, DNS and IPv6; verify the now-wired Ozero VPN lifecycle, split routing and engine UI on-device. No other engine may load this runtime.
 - Verify live configuration updates and transport behavior under real network
   conditions, and establish authorization to distribute the SDK if desired.
 
