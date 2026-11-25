@@ -28,12 +28,15 @@ class OperaTunBridgeImpl(
     private val context: Context,
     private val startRpcTimeoutMs: Long = START_RPC_TIMEOUT_MS,
     private val abandonedCleanupTimeoutMs: Long = STOP_TIMEOUT_MS,
+    private val readinessRpcTimeoutMs: Long = READINESS_RPC_TIMEOUT_MS,
+    private val stopRpcTimeoutMs: Long = STOP_TIMEOUT_MS,
 ) : OperaTunBridge {
     private data class Session(
         val connection: ServiceConnection,
         val remote: ISingboxEngineProcess,
         val owner: Long,
         val unbound: AtomicBoolean = AtomicBoolean(false),
+        val readiness: AtomicReference<CompletableDeferred<Boolean>?> = AtomicReference(null),
     )
 
     private class PendingStart(val session: Session) {
@@ -45,14 +48,16 @@ class OperaTunBridgeImpl(
     private val mutex = Mutex()
     private var session: Session? = null
     private val pendingStart = AtomicReference<PendingStart?>(null)
+    private val pendingStop = AtomicReference<CompletableDeferred<Unit>?>(null)
     private val protector = object : ISingboxProtector.Stub() {
         override fun protect(socket: ParcelFileDescriptor): Boolean =
             socket.use { VpnSocketProtectorHolder.protect(it.fd) }
     }
 
     override suspend fun start(tunFd: Int, config: String): Boolean = mutex.withLock {
-        if (pendingStart.get() != null) return@withLock false
+        if (pendingStart.get() != null || pendingStop.get() != null) return@withLock false
         stopLocked()
+        if (pendingStop.get() != null) return@withLock false
         val remoteResult = CompletableDeferred<ISingboxEngineProcess?>()
         val connection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName, service: IBinder) {
@@ -116,12 +121,12 @@ class OperaTunBridgeImpl(
         CoroutineScope(Dispatchers.IO).launch {
             val current = attempt.session
             try {
-                val ready = runCatching {
+                val started = runCatching {
                     duplicate.use { current.remote.startWithConfig(current.owner, it, config, protector) }
-                    current.remote.runtimeRunning()
                 }.onFailure {
                     PersistentLoggers.warn("OperaTunBridge", "TUN start failed: ${it.javaClass.simpleName}")
-                }.getOrDefault(false)
+                }.isSuccess
+                val ready = started && !attempt.accepted.isCompleted && queryRuntime(current)
                 attempt.ready.complete(ready)
                 if (!attempt.accepted.await()) release(current)
             } finally {
@@ -131,11 +136,23 @@ class OperaTunBridgeImpl(
         }
     }
 
-    override suspend fun isRunning(): Boolean = mutex.withLock {
-        val current = session ?: return@withLock false
-        withContext(Dispatchers.IO) {
-            runCatching { current.remote.runtimeRunning() }.getOrDefault(false)
+    override suspend fun isRunning(): Boolean {
+        val current = mutex.withLock { session } ?: return false
+        val running = withContext(Dispatchers.IO) { queryRuntime(current) }
+        return running && mutex.withLock { session === current }
+    }
+
+    private suspend fun queryRuntime(current: Session): Boolean {
+        val pending = CompletableDeferred<Boolean>()
+        val query = checkNotNull(current.readiness.updateAndGet { it ?: pending })
+        if (query === pending) {
+            CoroutineScope(Dispatchers.IO).launch {
+                val running = runCatching { current.remote.runtimeRunning() }.getOrDefault(false)
+                current.readiness.compareAndSet(pending, null)
+                pending.complete(running)
+            }
         }
+        return withTimeoutOrNull(readinessRpcTimeoutMs) { query.await() } == true
     }
 
     override suspend fun stop() = mutex.withLock { stopLocked() }
@@ -143,7 +160,21 @@ class OperaTunBridgeImpl(
     private suspend fun stopLocked() = withContext(NonCancellable + Dispatchers.IO) {
         val current = session
         session = null
-        if (current != null) release(current)
+        if (current != null) {
+            val finished = CompletableDeferred<Unit>()
+            pendingStop.set(finished)
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    release(current)
+                } finally {
+                    pendingStop.compareAndSet(finished, null)
+                    finished.complete(Unit)
+                }
+            }
+            if (withTimeoutOrNull(stopRpcTimeoutMs) { finished.await() } == null) {
+                unbindOnce(current)
+            }
+        }
     }
 
     private fun release(current: Session) {
@@ -170,6 +201,7 @@ class OperaTunBridgeImpl(
     private companion object {
         const val BIND_TIMEOUT_MS = 5_000L
         const val START_RPC_TIMEOUT_MS = 18_000L
+        const val READINESS_RPC_TIMEOUT_MS = 2_000L
         const val STOP_TIMEOUT_MS = 3_000L
     }
 }

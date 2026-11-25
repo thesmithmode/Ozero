@@ -9,9 +9,12 @@ import android.os.ParcelFileDescriptor
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.slot
 import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
@@ -19,6 +22,7 @@ import org.junit.jupiter.api.Test
 import ru.ozero.enginesingbox.ISingboxEngineProcess
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -95,9 +99,13 @@ class OperaTunBridgeImplTest {
         val entered = CountDownLatch(1)
         val unblock = CountDownLatch(1)
         val stopped = CompletableDeferred<Unit>()
+        val owner = slot<Long>()
+        val connection = slot<ServiceConnection>()
+        val nextFd = mockk<ParcelFileDescriptor>(relaxed = true)
         mockkStatic(ParcelFileDescriptor::class)
         every { ParcelFileDescriptor.fromFd(42) } returns f.fd
-        every { f.remote.startWithConfig(any(), f.fd, "{}", any()) } answers {
+        every { ParcelFileDescriptor.fromFd(43) } returns nextFd
+        every { f.remote.startWithConfig(capture(owner), f.fd, "{}", any()) } answers {
             entered.countDown()
             check(unblock.await(5, TimeUnit.SECONDS))
         }
@@ -111,13 +119,181 @@ class OperaTunBridgeImplTest {
             assertTrue(entered.await(1, TimeUnit.SECONDS))
             assertFalse(bridge.isRunning())
             assertFalse(bridge.start(42, "{}"))
-            verify(exactly = 1) { f.context.bindService(any<Intent>(), any<ServiceConnection>(), any<Int>()) }
-            verify(exactly = 1) { f.context.unbindService(any()) }
+            verify(exactly = 1) { f.context.bindService(any<Intent>(), capture(connection), any<Int>()) }
+            verify(exactly = 1) { f.context.unbindService(connection.captured) }
+            verify(exactly = 0) { f.fd.close() }
 
             unblock.countDown()
             withTimeout(5_000) { stopped.await() }
-            verify(exactly = 1) { f.remote.stopAndWait(any(), 3000L) }
+            withTimeout(5_000) {
+                while (!bridge.start(43, "{}")) delay(10)
+            }
+            verify(exactly = 1) { f.remote.stopAndWait(owner.captured, 3000L) }
+            verify(exactly = 1) { f.remote.stopAndWait(any(), any()) }
             verify(exactly = 1) { f.fd.close() }
+            verify(exactly = 1) { f.context.unbindService(connection.captured) }
+            verify(exactly = 1) { f.context.unbindService(any()) }
+            bridge.stop()
+        } finally {
+            unblock.countDown()
+            unmockkStatic(ParcelFileDescriptor::class)
+        }
+    }
+
+    @Test
+    fun `blocked readiness releases its owner and permits a new start before the old call returns`() = runBlocking {
+        val f = Fixture()
+        val entered = CountDownLatch(1)
+        val unblock = CountDownLatch(1)
+        val returned = CountDownLatch(1)
+        val calls = AtomicInteger()
+        val owner = slot<Long>()
+        val nextFd = mockk<ParcelFileDescriptor>(relaxed = true)
+        mockkStatic(ParcelFileDescriptor::class)
+        every { ParcelFileDescriptor.fromFd(42) } returns f.fd
+        every { ParcelFileDescriptor.fromFd(43) } returns nextFd
+        every { f.remote.startWithConfig(capture(owner), f.fd, "{}", any()) } returns Unit
+        every { f.remote.runtimeRunning() } answers {
+            if (calls.incrementAndGet() == 1) {
+                entered.countDown()
+                check(unblock.await(5, TimeUnit.SECONDS))
+                returned.countDown()
+            }
+            true
+        }
+        try {
+            val bridge = OperaTunBridgeImpl(
+                f.context,
+                startRpcTimeoutMs = 3_000,
+                readinessRpcTimeoutMs = 500,
+            )
+            assertFalse(bridge.start(42, "{}"))
+            assertTrue(entered.await(1, TimeUnit.SECONDS))
+            verify(exactly = 1) { f.fd.close() }
+            verify(exactly = 1) { f.remote.stopAndWait(owner.captured, 3000L) }
+            verify(exactly = 1) { f.context.unbindService(any()) }
+
+            assertTrue(bridge.start(43, "{}"))
+            assertTrue(bridge.isRunning())
+            assertTrue(returned.count == 1L)
+            unblock.countDown()
+            assertTrue(returned.await(1, TimeUnit.SECONDS))
+            verify(exactly = 1) { f.remote.stopAndWait(any(), any()) }
+            verify(exactly = 1) { f.context.unbindService(any()) }
+            bridge.stop()
+        } finally {
+            unblock.countDown()
+            unmockkStatic(ParcelFileDescriptor::class)
+        }
+    }
+
+    @Test
+    fun `stalled health checks share one query and do not prevent stop`() = runBlocking {
+        val f = Fixture()
+        val entered = CountDownLatch(1)
+        val unblock = CountDownLatch(1)
+        val returned = CountDownLatch(1)
+        val calls = AtomicInteger()
+        mockkStatic(ParcelFileDescriptor::class)
+        every { ParcelFileDescriptor.fromFd(42) } returns f.fd
+        every { f.remote.runtimeRunning() } answers {
+            if (calls.incrementAndGet() == 1) {
+                true
+            } else {
+                entered.countDown()
+                check(unblock.await(5, TimeUnit.SECONDS))
+                returned.countDown()
+                true
+            }
+        }
+        try {
+            val bridge = OperaTunBridgeImpl(f.context, readinessRpcTimeoutMs = 500)
+            assertTrue(bridge.start(42, "{}"))
+            assertFalse(bridge.isRunning())
+            assertTrue(entered.await(1, TimeUnit.SECONDS))
+            assertFalse(bridge.isRunning())
+            assertTrue(calls.get() == 2)
+
+            bridge.stop()
+            verify(exactly = 1) { f.remote.stopAndWait(any(), 3000L) }
+            verify(exactly = 1) { f.context.unbindService(any()) }
+            assertFalse(bridge.isRunning())
+            unblock.countDown()
+            assertTrue(returned.await(1, TimeUnit.SECONDS))
+            assertFalse(bridge.isRunning())
+        } finally {
+            unblock.countDown()
+            unmockkStatic(ParcelFileDescriptor::class)
+        }
+    }
+
+    @Test
+    fun `stop does not wait for an in-flight health query and ignores its late result`() = runBlocking {
+        val f = Fixture()
+        val entered = CompletableDeferred<Unit>()
+        val unblock = CountDownLatch(1)
+        val calls = AtomicInteger()
+        mockkStatic(ParcelFileDescriptor::class)
+        every { ParcelFileDescriptor.fromFd(42) } returns f.fd
+        every { f.remote.runtimeRunning() } answers {
+            if (calls.incrementAndGet() > 1) {
+                entered.complete(Unit)
+                check(unblock.await(5, TimeUnit.SECONDS))
+            }
+            true
+        }
+        try {
+            val bridge = OperaTunBridgeImpl(f.context, readinessRpcTimeoutMs = 4_000)
+            assertTrue(bridge.start(42, "{}"))
+            val health = async { bridge.isRunning() }
+            withTimeout(2_000) { entered.await() }
+
+            withTimeout(2_000) { bridge.stop() }
+            verify(exactly = 1) { f.remote.stopAndWait(any(), 3000L) }
+            verify(exactly = 1) { f.context.unbindService(any()) }
+            assertFalse(bridge.isRunning())
+            unblock.countDown()
+            assertFalse(withTimeout(2_000) { health.await() })
+        } finally {
+            unblock.countDown()
+            unmockkStatic(ParcelFileDescriptor::class)
+        }
+    }
+
+    @Test
+    fun `blocked stop returns and rejects replacement until owner cleanup finishes`() = runBlocking {
+        val f = Fixture()
+        val entered = CountDownLatch(1)
+        val unblock = CountDownLatch(1)
+        val owner = slot<Long>()
+        val connection = slot<ServiceConnection>()
+        val nextFd = mockk<ParcelFileDescriptor>(relaxed = true)
+        mockkStatic(ParcelFileDescriptor::class)
+        every { ParcelFileDescriptor.fromFd(42) } returns f.fd
+        every { ParcelFileDescriptor.fromFd(43) } returns nextFd
+        every { f.remote.startWithConfig(capture(owner), f.fd, "{}", any()) } returns Unit
+        every { f.remote.stopAndWait(any(), any()) } answers {
+            entered.countDown()
+            check(unblock.await(5, TimeUnit.SECONDS))
+            true
+        }
+        try {
+            val bridge = OperaTunBridgeImpl(f.context, stopRpcTimeoutMs = 200)
+            assertTrue(bridge.start(42, "{}"))
+            withTimeout(2_000) { bridge.stop() }
+            assertTrue(entered.await(1, TimeUnit.SECONDS))
+            assertFalse(bridge.isRunning())
+            assertFalse(bridge.start(43, "{}"))
+            verify(exactly = 1) { f.context.bindService(any<Intent>(), capture(connection), any<Int>()) }
+            verify(exactly = 1) { f.context.unbindService(connection.captured) }
+            verify(exactly = 1) { f.remote.stopAndWait(owner.captured, 3000L) }
+
+            unblock.countDown()
+            withTimeout(2_000) {
+                while (!bridge.start(43, "{}")) delay(10)
+            }
+            verify(exactly = 1) { f.context.unbindService(connection.captured) }
+            bridge.stop()
         } finally {
             unblock.countDown()
             unmockkStatic(ParcelFileDescriptor::class)
