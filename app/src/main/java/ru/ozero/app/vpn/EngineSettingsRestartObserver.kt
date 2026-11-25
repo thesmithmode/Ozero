@@ -82,8 +82,7 @@ class EngineSettingsRestartObserver(
         val snapshot = trigger.snapshot
         val state = vpnStateProvider()
         if (state is TunnelState.Connected) {
-            val unchangedOperaDns = state.engineId == EngineId.OPERA &&
-                trigger.previous.copy(customDnsServers = snapshot.customDnsServers) == snapshot
+            val unchangedOperaDns = state.engineId == EngineId.OPERA && trigger.onlyCustomDnsChanged()
             if (
                 unchangedOperaDns ||
                 (snapshot.targetEngine() == state.engineId && snapshot.sameRuntimeFor(state.engineId, trigger.previous))
@@ -113,6 +112,7 @@ class EngineSettingsRestartObserver(
                 return
             }
         }
+        if (currentEngine == EngineId.OPERA && trigger.onlyCustomDnsChanged()) return
         if (startupAcceptedSnapshot == snapshot) return
         if (canAcceptStartupSnapshot(currentEngine, trigger)) {
             startupAcceptedSnapshot = snapshot
@@ -121,6 +121,9 @@ class EngineSettingsRestartObserver(
         startupAcceptedSnapshot = null
         onRestartConnected(snapshot)
     }
+
+    private fun Trigger.onlyCustomDnsChanged(): Boolean =
+        previous.copy(customDnsServers = snapshot.customDnsServers) == snapshot
 
     private fun Snapshot.targetEngine(): EngineId? = manualEngine ?: engineAutoPriority?.firstOrNull()
 
