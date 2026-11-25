@@ -1,6 +1,9 @@
 package ru.ozero.engineopera
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -77,6 +80,32 @@ class OperaEngineTest {
         assertNull(engine(false).buildProxyConfig(null))
         assertTrue(plugin.tunSpec().routeAllV6)
         assertEquals(6_000L, plugin.stopTimeoutMs())
+    }
+
+    @Test
+    fun `stop cancels readiness and releases subprocess before another start`() = runTest {
+        val entered = CompletableDeferred<Unit>()
+        val process = FakeProcess()
+        val plugin = OperaEngine(
+            OperaProxyRuntime(
+                OperaProxyLauncher { _, _ -> process },
+                routedProbe = {
+                    entered.complete(Unit)
+                    awaitCancellation()
+                },
+                allocatePort = { 12000 },
+            ),
+            FakeTun(),
+            binaryAvailable = { true },
+        )
+        val startup = launch { plugin.start(EngineConfig.Opera(), Upstream.None) }
+        entered.await()
+        plugin.stop()
+        startup.join()
+
+        assertTrue(startup.isCancelled)
+        assertFalse(process.alive)
+        assertTrue(plugin.exitNodeStrategy(12000) is ExitNodeStrategy.Unavailable)
     }
 
     @Test

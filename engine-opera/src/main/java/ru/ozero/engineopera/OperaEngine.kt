@@ -5,8 +5,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import ru.ozero.enginescore.EngineCapabilities
 import ru.ozero.enginescore.EngineConfig
@@ -43,7 +41,7 @@ class OperaEngine(
 
     private data class Active(val port: Int, val config: EngineConfig.Opera, val attached: Boolean = false)
 
-    private val lifecycle = Mutex()
+    private val lifecycle = OperaLifecycle()
     private val currentStats = MutableStateFlow(EngineStats())
 
     @Volatile
@@ -61,47 +59,49 @@ class OperaEngine(
 
     override suspend fun tunSpec(): TunSpec = OperaTunConfig.spec()
 
-    override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult = lifecycle.withLock {
-        if (config !is EngineConfig.Opera || upstream !is Upstream.None) {
-            return@withLock StartResult.Failure("invalid Opera configuration or unsupported upstream")
-        }
-        val region = OperaRegion.entries.firstOrNull { it.name == config.region }
-            ?: return@withLock StartResult.Failure("invalid Opera region")
-        val selection = OperaServerSelection.entries.firstOrNull { it.argument == config.selection }
-            ?: return@withLock StartResult.Failure("invalid Opera server selection")
-        stopLocked()
-        val result = runtime.start(OperaProxyConfig(region, selection))
-        if (result is StartResult.Success) {
-            active = Active(result.socksPort, config)
-            if (config.proxyMode) markConnected()
-        }
-        result
-    }
-
-    override suspend fun attachTun(tunFd: Int): TunAttachResult = lifecycle.withLock {
-        val current = active ?: return@withLock TunAttachResult.Failure("Opera not started")
-        if (current.config.proxyMode || current.attached) {
-            return@withLock TunAttachResult.Failure("Opera TUN attachment not expected")
-        }
-        try {
-            if (!tun.start(tunFd, OperaTunConfig.build(current.port, current.config.ipv6Enabled))) {
-                stopLocked()
-                return@withLock TunAttachResult.Failure("Opera TUN runtime failed")
+    override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult =
+        lifecycle.run<StartResult>(StartResult.Failure("Opera is stopping")) {
+            if (config !is EngineConfig.Opera || upstream !is Upstream.None) {
+                return@run StartResult.Failure("invalid Opera configuration or unsupported upstream")
             }
-            runCatching { closeFd(tunFd) }
-                .onFailure { PersistentLoggers.warn("OperaEngine", "TUN fd close failed: ${it.javaClass.simpleName}") }
-            active = current.copy(attached = true)
-            markConnected()
-            TunAttachResult.Success
-        } catch (e: CancellationException) {
-            withContext(NonCancellable) { stopLocked() }
-            throw e
-        } catch (e: Exception) {
-            PersistentLoggers.warn("OperaEngine", "TUN attach failed: ${e.javaClass.simpleName}")
+            val region = OperaRegion.entries.firstOrNull { it.name == config.region }
+                ?: return@run StartResult.Failure("invalid Opera region")
+            val selection = OperaServerSelection.entries.firstOrNull { it.argument == config.selection }
+                ?: return@run StartResult.Failure("invalid Opera server selection")
             stopLocked()
-            TunAttachResult.Failure("Opera TUN attachment failed")
+            val result = runtime.start(OperaProxyConfig(region, selection))
+            if (result is StartResult.Success) {
+                active = Active(result.socksPort, config)
+                if (config.proxyMode) markConnected()
+            }
+            result
         }
-    }
+
+    override suspend fun attachTun(tunFd: Int): TunAttachResult =
+        lifecycle.run<TunAttachResult>(TunAttachResult.Failure("Opera is stopping")) {
+            val current = active ?: return@run TunAttachResult.Failure("Opera not started")
+            if (current.config.proxyMode || current.attached) {
+                return@run TunAttachResult.Failure("Opera TUN attachment not expected")
+            }
+            try {
+                if (!tun.start(tunFd, OperaTunConfig.build(current.port, current.config.ipv6Enabled))) {
+                    stopLocked()
+                    return@run TunAttachResult.Failure("Opera TUN runtime failed")
+                }
+                runCatching { closeFd(tunFd) }
+                    .onFailure { PersistentLoggers.warn("OperaEngine", "TUN fd close failed: ${it.javaClass.simpleName}") }
+                active = current.copy(attached = true)
+                markConnected()
+                TunAttachResult.Success
+            } catch (e: CancellationException) {
+                withContext(NonCancellable) { stopLocked() }
+                throw e
+            } catch (e: Exception) {
+                PersistentLoggers.warn("OperaEngine", "TUN attach failed: ${e.javaClass.simpleName}")
+                stopLocked()
+                TunAttachResult.Failure("Opera TUN attachment failed")
+            }
+        }
 
     override suspend fun awaitReady(): EnginePlugin.ReadyResult =
         if (probe() is ProbeResult.Success) {
@@ -110,7 +110,7 @@ class OperaEngine(
             EnginePlugin.ReadyResult.Timeout("Opera route unavailable")
         }
 
-    override suspend fun stop() = lifecycle.withLock { stopLocked() }
+    override suspend fun stop() = lifecycle.stop { stopLocked() }
 
     private suspend fun stopLocked() {
         active = null
