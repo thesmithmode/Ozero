@@ -164,8 +164,11 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
     private fun EngineSettingsRestartObserver.Snapshot.targetEngineForRestart(): EngineId? =
         manualEngine ?: engineAutoPriority?.firstOrNull()
 
-    private fun restartStartTimeoutMs(target: EngineId?): Long =
-        if (target == EngineId.FPTN) FPTN_RESTART_START_TIMEOUT_MS else RESTART_START_TIMEOUT_MS
+    private fun restartStartTimeoutMs(target: EngineId?): Long = when (target) {
+        EngineId.FPTN -> FPTN_RESTART_START_TIMEOUT_MS
+        EngineId.OPERA -> OPERA_RESTART_START_TIMEOUT_MS
+        else -> RESTART_START_TIMEOUT_MS
+    }
 
     private fun sendVpnAction(action: String) {
         context.startService(
@@ -182,6 +185,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         // Shorter than that treats a slow successful FPTN restart as a failure
         // and the next Connected restarts again, because the start is not cancelled.
         const val FPTN_RESTART_START_TIMEOUT_MS = 60_000L
+        const val OPERA_RESTART_START_TIMEOUT_MS = 60_000L
         const val RESTART_SETTLE_TIMEOUT_MS = 15_000L
     }
 }
