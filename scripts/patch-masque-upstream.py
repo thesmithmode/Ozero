@@ -74,3 +74,46 @@ replace_once(
 		log.Println("Hint: l4-socks is faster for TCP-only SOCKS use cases.")
 """,
 )
+
+# The alternate Cloudflare-owned device API is used by warpscout for the same
+# two-step v0a4471 MASQUE enrolment. Do not send account data to relay services.
+# Fall back to the legacy host only when no connection was acquired: never
+# blindly replay a registration POST after it may have reached the server.
+cloudflare = root / "api" / "cloudflare.go"
+replace_once(cloudflare, '\t"net/http"\n', '\t"net/http"\n\t"net/http/httptrace"\n\t"sync/atomic"\n')
+replace_once(cloudflare, 'OsVersion: "",', 'OsVersion: "10",')
+source = cloudflare.read_text()
+needle = "resp, err := http.DefaultClient.Do(req)"
+if source.count(needle) < 2:
+    raise RuntimeError("Unexpected upstream registration client")
+source = source.replace(needle, "resp, err := doDeviceRegistration(req)", 2)
+cloudflare.write_text(source + """
+func doDeviceRegistration(req *http.Request) (*http.Response, error) {
+    transport := http.DefaultTransport.(*http.Transport).Clone()
+    transport.Proxy = nil
+    transport.DisableKeepAlives = true
+    client := &http.Client{
+        Transport: transport,
+        Timeout: 18 * time.Second,
+        CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+            return http.ErrUseLastResponse
+        },
+    }
+    var connected atomic.Bool
+    trace := &httptrace.ClientTrace{
+        GotConn: func(_ httptrace.GotConnInfo) { connected.Store(true) },
+    }
+    preferred := req.Clone(httptrace.WithClientTrace(req.Context(), trace))
+    preferred.URL.Host = "api.devices.cloudflare.com"
+    preferred.Host = preferred.URL.Host
+    response, err := client.Do(preferred)
+    if err == nil || connected.Load() || req.GetBody == nil {
+        return response, err
+    }
+    body, bodyErr := req.GetBody()
+    if bodyErr != nil { return nil, bodyErr }
+    legacy := req.Clone(req.Context())
+    legacy.Body = body
+    return client.Do(legacy)
+}
+""")
