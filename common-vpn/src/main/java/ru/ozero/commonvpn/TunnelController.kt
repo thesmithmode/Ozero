@@ -239,6 +239,7 @@ class TunnelController(
         target == EngineId.FPTN -> FPTN_SWITCHING_TIMEOUT_MS
         target == EngineId.OPERA || target == EngineId.MASQUE -> EXTENDED_SWITCHING_TIMEOUT_MS
         target == EngineId.TGWSS -> TGWSS_SWITCHING_TIMEOUT_MS
+        target == EngineId.GFVPN -> 165_000L
         else -> switchingTimeoutMs
     }
 

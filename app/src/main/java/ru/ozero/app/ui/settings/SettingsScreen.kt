@@ -68,6 +68,7 @@ fun SettingsScreen(
     onOpenFptnSettings: () -> Unit = {},
     onOpenSingboxSettings: () -> Unit = {},
     onOpenOperaSettings: () -> Unit = {},
+    onOpenGfVpnSettings: () -> Unit = {},
     onOpenTelegramWssSettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -94,6 +95,7 @@ fun SettingsScreen(
             onOpenSingboxSettings = onOpenSingboxSettings,
             onOpenTelegramWssSettings = onOpenTelegramWssSettings,
             onOpenOperaSettings = onOpenOperaSettings,
+            onOpenGfVpnSettings = onOpenGfVpnSettings,
         ),
         onIpv6Toggle = viewModel::onIpv6Toggle,
         onAutoStartToggle = viewModel::onAutoStartToggle,
@@ -221,6 +223,7 @@ private fun ContentBody(
                 onOpenSingbox = nav.onOpenSingboxSettings,
                 onOpenTelegramWss = nav.onOpenTelegramWssSettings,
                 onOpenOpera = nav.onOpenOperaSettings,
+                onOpenGfVpn = nav.onOpenGfVpnSettings,
             )
         }
         item { SectionDivider() }
@@ -411,6 +414,7 @@ private fun EnginesSection(
     onOpenFptn: () -> Unit,
     onOpenSingbox: () -> Unit,
     onOpenOpera: () -> Unit,
+    onOpenGfVpn: () -> Unit,
     onOpenTelegramWss: () -> Unit,
 ) {
     NavRow(
@@ -474,6 +478,13 @@ private fun EnginesSection(
         summary = stringResource(R.string.settings_opera_summary),
         tag = "settings_opera_row",
         onClick = onOpenOpera,
+        enabled = true,
+    )
+    NavRow(
+        title = "gfVPN",
+        summary = stringResource(R.string.gfvpn_summary),
+        tag = "settings_gfvpn_row",
+        onClick = onOpenGfVpn,
         enabled = true,
     )
 }

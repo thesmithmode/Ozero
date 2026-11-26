@@ -533,7 +533,7 @@ class StartSequenceCoordinator(
         config: EngineConfig,
         notifyFailure: Boolean = true,
     ): ChainResult.Success? {
-        val chainResult = withTimeoutOrNull(CHAIN_START_TIMEOUT_MS) {
+        val chainResult = withTimeoutOrNull(if (engineId == EngineId.GFVPN) 130_000L else CHAIN_START_TIMEOUT_MS) {
             try {
                 deps.chainOrchestrator.start(listOf(ChainStep(engineId, config)))
             } catch (ce: CancellationException) {

@@ -2353,6 +2353,7 @@ class StartSequenceCoordinatorExtraTest {
             EngineId.TGWSS -> EngineConfig.TelegramWss(socksPort = socksPort)
             EngineId.OPERA -> EngineConfig.Opera(proxyMode = true)
             EngineId.MASQUE -> EngineConfig.Masque(profileJson = "{}", transport = "AUTO")
+            EngineId.GFVPN -> EngineConfig.GfVpn
         }
     }
 

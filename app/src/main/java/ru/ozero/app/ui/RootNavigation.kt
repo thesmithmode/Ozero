@@ -43,6 +43,7 @@ private fun engineParamsTarget(engineId: EngineId?): TopScreen = when (engineId)
     EngineId.SINGBOX -> TopScreen.SingboxSettings
     EngineId.TGWSS -> TopScreen.TelegramWssSettings
     EngineId.OPERA -> TopScreen.OperaSettings
+    EngineId.GFVPN -> TopScreen.GfVpnSettings
 }
 
 internal val screenHistorySaver = listSaver<List<TopScreen>, String>(
@@ -95,6 +96,7 @@ private fun NavigationContent(
                 onOpenSingboxSettings = { navigate(TopScreen.SingboxSettings) },
                 onOpenTelegramWssSettings = { navigate(TopScreen.TelegramWssSettings) },
                 onOpenOperaSettings = { navigate(TopScreen.OperaSettings) },
+                onOpenGfVpnSettings = { navigate(TopScreen.GfVpnSettings) },
                 onOpenStatsHistory = { navigate(TopScreen.StatsHistory) },
                 onOpenBackup = { navigate(TopScreen.Backup) },
                 onOpenAutoModeSettings = { navigate(TopScreen.AutoModeSettings) },
@@ -122,6 +124,7 @@ private fun NavigationContent(
         TopScreen.MasterDnsSettings -> MasterDnsSettingsScreen(onBack = { back() })
         TopScreen.FptnSettings -> FptnEngineSettingsScreen(onBack = { back() })
         TopScreen.OperaSettings -> OperaEngineSettingsScreen(onBack = { back() })
+        TopScreen.GfVpnSettings -> ru.ozero.app.ui.settings.engines.GfVpnSettingsScreen(onBack = back)
         TopScreen.SingboxSettings -> SingboxEngineSettingsScreen(
             onBack = { back() },
             onOpenAdvanced = { navigate(TopScreen.SingboxAdvancedSettings) },

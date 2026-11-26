@@ -17,5 +17,6 @@ data class SettingsNavActions(
     val onOpenFptnSettings: () -> Unit = {},
     val onOpenSingboxSettings: () -> Unit = {},
     val onOpenOperaSettings: () -> Unit = {},
+    val onOpenGfVpnSettings: () -> Unit = {},
     val onOpenTelegramWssSettings: () -> Unit = {},
 )
