@@ -17,6 +17,7 @@ class EngineAutoCascadeContractTest {
         EngineId.OPERA to "ru.ozero.engineopera.OperaEngine",
         EngineId.TGWSS to "ru.ozero.enginetgwss.TelegramWssEngine",
         EngineId.MASQUE to "ru.ozero.enginemasque.MasqueEngine",
+        EngineId.GFVPN to "ru.ozero.enginegfvpn.GfVpnEngine",
     )
 
     @Test

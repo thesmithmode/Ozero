@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <service android:name=".GfVpnProcessService"
+            android:exported="false" android:process=":engine_gfvpn" />
+    </application>
+</manifest>

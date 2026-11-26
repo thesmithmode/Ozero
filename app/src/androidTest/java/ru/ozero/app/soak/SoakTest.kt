@@ -224,6 +224,53 @@ class SoakTest {
     }
 
     @Test
+    fun runGfVpnTunSmoke() = runBlocking {
+        val args = InstrumentationRegistry.getArguments()
+        Assume.assumeTrue("OZERO_GFVPN_SMOKE must be 1", args.getString("OZERO_GFVPN_SMOKE") == "1")
+        val url = requireNotNull(args.getString("OZERO_GFVPN_SMOKE_URL"))
+        val marker = requireNotNull(args.getString("OZERO_GFVPN_SMOKE_MARKER"))
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        check(ru.ozero.enginegfvpn.GfVpnImport.isInstalled(context)) { "Local gfVPN SDK is absent" }
+        check(VpnService.prepare(context) == null) { "VPN consent not granted" }
+        val dependencies = EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            SoakTestEntryPoint::class.java,
+        )
+        val settings = dependencies.settingsRepository()
+        val controller = dependencies.tunnelController()
+        val original = settings.settings.first()
+        try {
+            stopVpn(context, controller)
+            settings.setTrafficMode(TrafficMode.TUN)
+            settings.setManualEngine(EngineId.GFVPN)
+            settings.setSplitMode(SplitTunnelMode.ALL)
+            settings.setIpv6Enabled(false)
+            settings.setKillswitchEnabled(true)
+            repeat(3) {
+                startVpn(context)
+                awaitConnected(controller, EngineId.GFVPN, 170_000L)
+                val probe = probeFromExternalUid(context, instrumentation.context, url, marker)
+                check(probe.vpnTransport) { "gfVPN external probe is outside VPN" }
+                check(probe.httpCode in 200..299 && probe.markerMatch) {
+                    "gfVPN routed TCP/DNS probe failed: ${probe.stage} HTTP ${probe.httpCode}"
+                }
+                stopVpn(context, controller)
+            }
+        } finally {
+            try {
+                stopVpn(context, controller)
+            } finally {
+                settings.setManualEngine(original.manualEngine)
+                settings.setTrafficMode(original.trafficMode)
+                settings.setSplitMode(original.splitMode)
+                settings.setIpv6Enabled(original.ipv6Enabled)
+                settings.setKillswitchEnabled(original.killswitchEnabled)
+            }
+        }
+    }
+
+    @Test
     fun runTelegramWssTunSmoke() = runBlocking {
         val args = InstrumentationRegistry.getArguments()
         Assume.assumeTrue("OZERO_TGWSS_SMOKE must be 1", args.getString("OZERO_TGWSS_SMOKE") == "1")
