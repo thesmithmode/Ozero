@@ -47,7 +47,7 @@ internal class GfVpnExitSocketFactory(
             val host = target.hostString
             if (target.port != 443 || host !in ALLOWED_HOSTS) throw IOException("Invalid exit lookup host")
             try {
-                super.connect(InetSocketAddress("127.0.0.1", port), timeout)
+                super.connect(InetSocketAddress("127.0.0.1", this@GfVpnExitSocketFactory.port), timeout)
                 val previous = soTimeout
                 soTimeout = 4000
                 try {
