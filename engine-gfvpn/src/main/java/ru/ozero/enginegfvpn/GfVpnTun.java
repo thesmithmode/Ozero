@@ -22,6 +22,14 @@ final class GfVpnTun {
     void start(ParcelFileDescriptor descriptor, GfVpnSdk.Session session) throws IOException {
         if (attached != null || started) throw new IOException("TUN already attached");
         if (!directory.isDirectory() && !directory.mkdirs()) throw new IOException("Cannot create TUN directory");
+        // A previous isolated process may have been killed by the watchdog.
+        // No runtime is attached in this process, so its stale configs can be removed.
+        File[] stale = directory.listFiles((dir, name) -> name.startsWith("hev-") && name.endsWith(".yaml"));
+        if (stale != null) {
+            for (File old : stale) {
+                if (!old.delete()) throw new IOException("Cannot clear stale HEV configuration");
+            }
+        }
         String yaml = yaml(session.port, session.username, session.password);
         TProxyService.loadOnce();
         if (!TProxyService.getLibraryLoaded()) throw new IOException("Ozero HEV unavailable");
@@ -38,10 +46,9 @@ final class GfVpnTun {
         } catch (Exception | LinkageError failure) {
             // JNI may have started partially. The service terminates the isolated process on failure.
             throw new IOException("HEV startup failed", failure);
-        } finally {
-            // HEV parses the configuration before the start call returns.
-            if (path.delete()) configuration = null;
         }
+        // HEV 2.7.0 native_start_service launches a pthread and returns before
+        // hev_config_init_from_file. Keep the private YAML until native stop joins.
     }
 
     boolean isAttached() { return attached != null; }
