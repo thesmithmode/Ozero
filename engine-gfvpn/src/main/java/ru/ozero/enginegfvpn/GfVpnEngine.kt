@@ -21,6 +21,7 @@ import ru.ozero.enginescore.EngineConfig
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.EnginePlugin
 import ru.ozero.enginescore.EngineStats
+import ru.ozero.enginescore.ExitNodeStrategy
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.ProbeResult
 import ru.ozero.enginescore.StartResult
@@ -47,6 +48,7 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
 
     private var callback: ConnectivityManager.NetworkCallback? = null
     private var attached = false
+    private var sdkSession: GfVpnRuntime.Session? = null
 
     override val id = EngineId.GFVPN
     override val capabilities = EngineCapabilities(
@@ -91,7 +93,7 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
             val identifier = prefs.getString("client-id", null) ?: UUID.randomUUID().toString().also {
                 prefs.edit().putString("client-id", it).apply()
             }
-            next.start("RU", identifier).awaitResult()
+            sdkSession = next.start("RU", identifier).awaitResult()
             StartResult.Success(0)
         } catch (cancelled: CancellationException) {
             reset()
@@ -142,6 +144,23 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
         } else {
             EnginePlugin.ReadyResult.Timeout("gfVPN route unavailable")
         }
+
+    override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
+        val owner = mutex.withLock {
+            if (!attached || socksPort != 0) null else sdkSession
+        } ?: return ExitNodeStrategy.Unavailable("gfVPN session unavailable")
+        val info = GfVpnExitInfo.fetch(owner).getOrElse {
+            if (it is CancellationException) throw it
+            return ExitNodeStrategy.Unavailable("gfVPN exit IP lookup failed")
+        }
+        return mutex.withLock {
+            if (!attached || sdkSession !== owner) {
+                ExitNodeStrategy.Unavailable("gfVPN session changed")
+            } else {
+                ExitNodeStrategy.ProviderLabel(info.country ?: "gfVPN", info.ip, info.countryCode)
+            }
+        }
+    }
 
     override fun stats() = state
 
@@ -199,6 +218,7 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
         callback = null
         val previous = runtime
         runtime = null
+        sdkSession = null
         attached = false
         state.value = EngineStats()
         previous?.close()
