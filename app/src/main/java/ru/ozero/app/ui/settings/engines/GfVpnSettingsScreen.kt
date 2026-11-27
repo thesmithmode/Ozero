@@ -36,6 +36,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.ozero.app.R
 import ru.ozero.enginegfvpn.GfVpnBundledSdk
+import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.GfVpnOptions
 import ru.ozero.enginescore.settings.SplitTunnelMode
 
@@ -54,7 +55,7 @@ fun GfVpnSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("gfVPN") },
+                title = { Text(EngineId.GFVPN.displayName) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.settings_back))
