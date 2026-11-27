@@ -38,7 +38,7 @@
 - Production APK: только arm64-v8a. x86_64 — отдельный soak-вариант, не обещание поддержки всех движков. Расширение ABI требует всех соответствующих native-артефактов.
 - R8 minify+shrink включены, Log.* НЕ стрипаются (proguard-rules.pro).
 ## Native libs
-- `System.loadLibrary` — **только lazy** через `loadOnce()`. Никогда в `Application.onCreate`/`attachBaseContext`/init-блоках/companion init. Исключение: `OzeroApp.onCreate` с `isEngineWarpProcess()` guard. `libam-go` только в `:engine_warp`, `libgojni` только в main process. Coexistence = SIGABRT. [sentinel: `OzeroAppProcessIsolationTest`]
+- `System.loadLibrary` — **только lazy** через `loadOnce()`. Никогда в `Application.onCreate`/`attachBaseContext`/init-блоках/companion init. Исключение: `OzeroApp.onCreate` с `isEngineWarpProcess()` guard. `libam-go` только в `:engine_warp`, Go runtime URnetwork — в main process. Adaptive VPN загружает собственный закрытый runtime через classloader в `:engine_gfvpn`; не переносить его в main process. Смешение несовместимых Go runtimes недопустимо. [sentinel: `OzeroAppProcessIsolationTest`]
 - `loadOnce()` для `libhev-socks5-tunnel` — **только из main thread**, до `serviceScope.launch`. [sentinel: `OzeroVpnServiceLifecycleTest`]
 - `libhev-socks5-tunnel.so` — собирать с `APP_CFLAGS=-DPKGNAME=hev` (release.yml + ci.yml). [sentinel: `JniContractTest`]
 - `hev.TProxyService` — объявлять **все три** `external fun`: `TProxyStartService(String, Int)`, `TProxyStopService()`, `TProxyGetStats(): LongArray`. [sentinel: `JniContractTest`]
