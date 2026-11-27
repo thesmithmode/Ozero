@@ -23,7 +23,7 @@ val unitTestsOnly = providers.gradleProperty("ozero.gfvpn.unitTestsOnly").orNull
 val prepareGfVpnSdk by tasks.registering(PrepareGfVpnSdkTask::class) {
     sourceArchive.set(
         layout.file(sdkArchivePath.map { rootProject.file(it) })
-            .orElse(layout.projectDirectory.file("vendor/gfvpn-sdk-1.0.6.zip")),
+            .orElse(layout.projectDirectory.file("vendor/runtime-bundle-1.0.6.zip")),
     )
     outputDirectory.set(layout.buildDirectory.dir("generated/gfvpn-sdk/assets"))
 }

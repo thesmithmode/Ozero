@@ -1,6 +1,6 @@
 # Pinned gfVPN runtime
 
-Required archive: `gfvpn-sdk-1.0.6.zip`
+Required archive: `runtime-bundle-1.0.6.zip`
 
 - Size: 29546886 bytes
 - SHA-256: `5ea19579e5eb0e4e0240f9977bff5e87ebf3c804c8cfc547109326cce04abd03`
@@ -9,11 +9,12 @@ Required archive: `gfvpn-sdk-1.0.6.zip`
 
 The archive is the only supported source input. It contains neither an APK file
 nor extracted account credentials. Do not fetch it from a mutable URL or accept
-an unverified replacement. Redistribution rights and device acceptance must be
-confirmed before release.
+an unverified replacement. The project maintainer has confirmed permission to redistribute this runtime.
+Preserve any applicable third-party license notices. Device acceptance must still
+be confirmed before release.
 
 An authorized build operator may supply this exact archive outside the checkout with
-`-Pozero.gfvpn.sdkArchive=/absolute/path/gfvpn-sdk-1.0.6.zip`. Its bytes undergo the same
+`-Pozero.gfvpn.sdkArchive=/absolute/path/runtime-bundle-1.0.6.zip`. Its bytes undergo the same
 mandatory hash checks and are bundled into the application APK; no end-user import exists.
 
 For JVM tests only, `-Pozero.gfvpn.unitTestsOnly=true` permits running the code and
