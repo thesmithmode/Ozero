@@ -2,6 +2,7 @@ package ru.ozero.enginegfvpn
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
@@ -72,9 +73,9 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
         sessionName = "Ozero gfVPN",
         mtu = 8500,
         blocking = false,
-        ipv4Address = "10.10.10.10",
+        ipv4Address = "198.18.0.1",
         ipv4PrefixLength = 32,
-        dnsServers = listOf("9.9.9.9"),
+        dnsServers = listOf("1.1.1.1"),
         allowFamilyV6 = false,
     )
 
@@ -186,7 +187,8 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
 
     private fun observeNetworks(owner: GfVpnRuntime) {
         val listener = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) = notifyChanged(owner)
+            override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) =
+                notifyChanged(owner)
             override fun onLost(network: Network) = notifyChanged(owner)
         }
         val request = NetworkRequest.Builder()

@@ -97,17 +97,7 @@ final class GfVpnSdk {
         File work = new File(context.getFilesDir(), "gfvpn-state");
         if (!work.isDirectory() && !work.mkdirs()) throw new IOException("Cannot create work directory");
         Object config = configType.getConstructor().newInstance();
-        set(config, "setWorkDir", work.getAbsolutePath());
-        set(config, "setLocaleCountryCode", country);
-        set(config, "setForceConfigCountry", country);
-        set(config, "setClientIdentifier", clientIdentifier);
-        set(config, "setServerSelection", "auto");
-        set(config, "setNodeRotationEnabled", "true");
-        set(config, "setUseCachedNodes", "true");
-        set(config, "setUseRemoteConfig", "true");
-        set(config, "setSplitTunnelEnabled", "false");
-        // Unauthenticated local SOCKS is not acceptable as a default.
-        set(config, "setSocksAuthEnabled", "true");
+        GfVpnClientDefaults.configure(config, work.getAbsolutePath(), country, clientIdentifier);
         try {
             active = true;
             Object result = api.getMethod("start", configType).invoke(null, config);
@@ -129,10 +119,6 @@ final class GfVpnSdk {
             }
             throw failure;
         }
-    }
-
-    private void set(Object config, String name, String value) throws Exception {
-        configType.getMethod(name, String.class).invoke(config, value);
     }
 
     synchronized void stop() throws Exception {
