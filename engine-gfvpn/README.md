@@ -23,8 +23,10 @@ state both before and after the authenticated SOCKS route probe. Idle counters
 are valid; this does not prove a third-party app can send packets. The device
 smoke script exercises the actual VPN using a separate instrumentation UID:
 `bash engine-gfvpn/device-smoke.sh` (VPN permission and any manual verification
-must be completed normally). An optional controlled HTTPS endpoint and expected
-body can be supplied through `OZERO_GFVPN_SMOKE_URL` and
+must be completed normally). The script requires a native ARM64 Android kernel,
+not an x86 emulator advertising ARM64 through ABI translation, and reports both
+SDK and external-UID test results independently. An optional controlled HTTPS
+endpoint and expected body can be supplied through `OZERO_GFVPN_SMOKE_URL` and
 `OZERO_GFVPN_SMOKE_MARKER`. Set `OZERO_GFVPN_SMOKE_NETWORK_CHANGE=1` only on a
 controlled test device with Wi-Fi to test loss and restoration of the link.
 The x86_64 soak validates live Sing-box/ByeDPI switches and Wi-Fi recovery;

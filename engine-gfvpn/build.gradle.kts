@@ -17,14 +17,13 @@ val prepareGfVpnHev by tasks.registering(ExtractGfVpnHevTask::class) {
 }
 
 // The archive is a build input, not a file selected by the installed app.
-val sdkArchivePath = providers.gradleProperty("ozero.gfvpn.sdkArchive")
+val sdkArchive = providers.gradleProperty("ozero.gfvpn.sdkArchive").orNull
+    ?.let { rootProject.file(it) }
+    ?: layout.projectDirectory.file("vendor/runtime-bundle-1.0.6.zip").asFile
 val unitTestsOnly = providers.gradleProperty("ozero.gfvpn.unitTestsOnly").orNull == "true"
 
 val prepareGfVpnSdk by tasks.registering(PrepareGfVpnSdkTask::class) {
-    sourceArchive.set(
-        layout.file(sdkArchivePath.map { rootProject.file(it) })
-            .orElse(layout.projectDirectory.file("vendor/runtime-bundle-1.0.6.zip")),
-    )
+    sourceArchive.fileValue(sdkArchive)
     outputDirectory.set(layout.buildDirectory.dir("generated/gfvpn-sdk/assets"))
 }
 

@@ -4,12 +4,14 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.net.ConnectivityManager;
+import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.Proxy;
 import java.net.URL;
 import java.net.UnknownHostException;
 import javax.net.ssl.SSLException;
@@ -34,6 +36,7 @@ public final class SoakExternalProbeReceiver extends BroadcastReceiver {
         PendingResult pendingResult = goAsync();
         new Thread(() -> {
             try {
+                Network before = activeVpnNetwork(context);
                 ProbeResponse response = request(
                     intent.getStringExtra(EXTRA_URL),
                     intent.getStringExtra(EXTRA_EXPECTED_MARKER)
@@ -43,7 +46,8 @@ public final class SoakExternalProbeReceiver extends BroadcastReceiver {
                 if (resultAction == null || resultPackage == null) return;
                 Intent result = new Intent(resultAction).setPackage(resultPackage);
                 result.putExtra(RESULT_HTTP_CODE, response.httpCode);
-                result.putExtra(RESULT_VPN_TRANSPORT, hasVpnTransport(context));
+                Network after = activeVpnNetwork(context);
+                result.putExtra(RESULT_VPN_TRANSPORT, before != null && before.equals(after));
                 result.putExtra(RESULT_MARKER_MATCH, response.markerMatch);
                 result.putExtra(RESULT_STAGE, response.stage);
                 result.putExtra(RESULT_EXCEPTION_CLASS, response.exceptionClass);
@@ -56,11 +60,14 @@ public final class SoakExternalProbeReceiver extends BroadcastReceiver {
         }, "soak-external-http").start();
     }
 
-    private static boolean hasVpnTransport(Context context) {
+    private static Network activeVpnNetwork(Context context) {
         ConnectivityManager connectivity = context.getSystemService(ConnectivityManager.class);
-        if (connectivity == null || connectivity.getActiveNetwork() == null) return false;
-        NetworkCapabilities capabilities = connectivity.getNetworkCapabilities(connectivity.getActiveNetwork());
-        return capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN);
+        if (connectivity == null) return null;
+        Network network = connectivity.getActiveNetwork();
+        if (network == null) return null;
+        NetworkCapabilities capabilities = connectivity.getNetworkCapabilities(network);
+        return capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+            ? network : null;
     }
 
     private static ProbeResponse request(String targetUrl, String expectedMarker) {
@@ -71,11 +78,13 @@ public final class SoakExternalProbeReceiver extends BroadcastReceiver {
         HttpURLConnection connection = null;
         String stage = "connect";
         try {
-            connection = (HttpURLConnection) new URL(targetUrl).openConnection();
+            connection = (HttpURLConnection) new URL(targetUrl).openConnection(Proxy.NO_PROXY);
             connection.setConnectTimeout(HTTP_TIMEOUT_MS);
             connection.setReadTimeout(HTTP_TIMEOUT_MS);
             connection.setInstanceFollowRedirects(false);
             connection.setRequestMethod("GET");
+            connection.setRequestProperty("Connection", "close");
+            connection.connect();
             stage = "response";
             int code = connection.getResponseCode();
             if (code < 200 || code >= 300) return ProbeResponse.success(code, false, startedAt);

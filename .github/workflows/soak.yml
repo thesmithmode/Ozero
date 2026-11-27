@@ -237,6 +237,7 @@ jobs:
           git -C "$SRC" checkout --detach FETCH_HEAD
           test "$(git -C "$SRC" rev-parse HEAD)" = "$HEV_COMMIT_SHA"
           git -C "$SRC" submodule update --init --recursive --depth 1
+          python3 .github/soak/instrument-hev.py "$SRC"
           cd "$SRC"
           "$NDK_PATH/ndk-build" \
             NDK_PROJECT_PATH="$SRC" \
