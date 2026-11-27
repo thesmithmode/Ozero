@@ -4,7 +4,7 @@
     <string name="gfvpn_back">Back</string>
     <string name="gfvpn_installed">Runtime included. Select gfVPN on the main screen.</string>
     <string name="gfvpn_missing">The gfVPN runtime is unavailable on this device.</string>
-    <string name="gfvpn_trust_warning">The bundled third-party runtime runs with the application's permissions.</string>
+    <string name="gfvpn_trust_warning">The bundled third-party runtime has the same permissions as the app.</string>
     <string name="gfvpn_global">Use VPN for all apps</string>
     <string name="gfvpn_update_config">Auto-update configuration</string>
     <string name="gfvpn_cached_nodes">Use cached nodes</string>

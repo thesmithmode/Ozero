@@ -29,7 +29,8 @@ abstract class ExtractGfVpnHevTask : DefaultTask() {
             ZipFile(sourceAar.get().asFile).use { archive ->
                 val entry = archive.getEntry("jni/arm64-v8a/libhev-socks5-tunnel.so")
                     ?: throw GradleException("Verified gfVPN HEV AAR has no ARM64 library")
-                if (entry.isDirectory || entry.size <= 0) {
+                // The exact filename lookup cannot match a directory entry (which ends in '/').
+                if (entry.size <= 0) {
                     throw GradleException("Verified gfVPN HEV library is empty")
                 }
                 archive.getInputStream(entry).use { input ->

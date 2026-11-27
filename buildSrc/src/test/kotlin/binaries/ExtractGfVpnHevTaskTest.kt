@@ -6,6 +6,8 @@ import org.gradle.testfixtures.ProjectBuilder
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipEntry
@@ -48,6 +50,25 @@ class ExtractGfVpnHevTaskTest {
         val output = tmp.resolve("empty")
         assertThrows<GradleException> { newTask(empty, output).extract() }
         assertThat(output.resolve("arm64-v8a/libhev-gfvpn-socks5-tunnel.so").toFile()).doesNotExist()
+    }
+
+    @Test
+    fun `inconsistent uncompressed size never replaces existing native binary`() {
+        val aar = tmp.resolve("corrupt.aar")
+        writeAar(aar, mapOf("jni/arm64-v8a/libhev-socks5-tunnel.so" to byteArrayOf(1, 2, 3)))
+        val bytes = Files.readAllBytes(aar)
+        val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+        val central = (0..bytes.size - 46).first { buffer.getInt(it) == 0x02014b50 }
+        buffer.putInt(central + 24, 4)
+        Files.write(aar, bytes)
+        val output = tmp.resolve("generated")
+        val target = output.resolve("arm64-v8a/libhev-gfvpn-socks5-tunnel.so")
+        Files.createDirectories(target.parent)
+        Files.write(target, byteArrayOf(9))
+
+        assertThrows<GradleException> { newTask(aar, output).extract() }
+        assertThat(Files.readAllBytes(target)).isEqualTo(byteArrayOf(9))
+        assertThat(target.resolveSibling(target.fileName.toString() + ".tmp").toFile()).doesNotExist()
     }
 
     private fun newTask(aar: Path, output: Path): ExtractGfVpnHevTask {

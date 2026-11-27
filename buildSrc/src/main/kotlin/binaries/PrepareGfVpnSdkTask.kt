@@ -12,6 +12,7 @@ import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import java.io.File
 import java.io.InputStream
+import java.nio.file.Files
 import java.security.MessageDigest
 import java.util.zip.ZipFile
 
@@ -35,7 +36,7 @@ abstract class PrepareGfVpnSdkTask : DefaultTask() {
         internal fun prepareArchive(source: File, root: File, stage: File, manifest: SdkManifest) {
             verify(source, manifest.archive.size, manifest.archive.hash)
             check(stage.deleteRecursively())
-            check(stage.mkdirs())
+            Files.createDirectories(stage.toPath())
             try {
                 ZipFile(source).use { zip ->
                     for (entry in manifest.entries) {
@@ -44,8 +45,10 @@ abstract class PrepareGfVpnSdkTask : DefaultTask() {
                 }
                 check(root.deleteRecursively())
                 val target = root.resolve("gfvpn-sdk")
-                check(target.mkdirs())
-                check(stage.copyRecursively(target, overwrite = true))
+                Files.createDirectories(target.toPath())
+                for (entry in manifest.entries) {
+                    Files.copy(stage.resolve(entry.name).toPath(), target.resolve(entry.name).toPath())
+                }
             } finally {
                 stage.deleteRecursively()
             }
