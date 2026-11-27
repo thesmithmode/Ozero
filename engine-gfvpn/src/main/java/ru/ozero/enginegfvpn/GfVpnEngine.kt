@@ -56,6 +56,7 @@ class GfVpnEngine(
     private var runtime: GfVpnRuntime? = null
 
     private var callback: ConnectivityManager.NetworkCallback? = null
+    private var defaultCallback: ConnectivityManager.NetworkCallback? = null
     private var networkChanges: GfVpnNetworkChanges? = null
     private var attached = false
     private var sdkSession: GfVpnRuntime.Session? = null
@@ -86,6 +87,11 @@ class GfVpnEngine(
         ipv4PrefixLength = 32,
         dnsServers = listOf(GfVpnTun.dnsAddress(Build.VERSION.SDK_INT)),
         allowFamilyV6 = false,
+        requiredRouteCidrsV4 = if (GfVpnTun.supportsMapDns(Build.VERSION.SDK_INT)) {
+            listOf(GfVpnTun.MAP_DNS_CIDR)
+        } else {
+            emptyList()
+        },
     )
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult = mutex.withLock {
@@ -238,10 +244,28 @@ class GfVpnEngine(
         try {
             manager.registerNetworkCallback(request, listener)
             callback = listener
-            networkChanges = changes
         } catch (failure: Exception) {
-            changes.close()
             PersistentLoggers.warn("GfVpnEngine", "Network observation unavailable: ${failure.javaClass.simpleName}")
+        }
+        val defaultListener = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                changes.offer()
+            }
+
+            override fun onLost(network: Network) {
+                changes.offer()
+            }
+        }
+        try {
+            manager.registerDefaultNetworkCallback(defaultListener)
+            defaultCallback = defaultListener
+        } catch (failure: Exception) {
+            PersistentLoggers.warn("GfVpnEngine", "Default network observation unavailable: ${failure.javaClass.simpleName}")
+        }
+        if (callback == null && defaultCallback == null) {
+            changes.close()
+        } else {
+            networkChanges = changes
         }
     }
 
@@ -266,6 +290,8 @@ class GfVpnEngine(
         networkChanges = null
         callback?.let { runCatching { connectivity?.unregisterNetworkCallback(it) } }
         callback = null
+        defaultCallback?.let { runCatching { connectivity?.unregisterNetworkCallback(it) } }
+        defaultCallback = null
         val previous = runtime
         runtime = null
         sdkSession = null
