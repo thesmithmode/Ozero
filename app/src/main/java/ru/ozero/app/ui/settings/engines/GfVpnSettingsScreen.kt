@@ -102,31 +102,12 @@ private fun GfVpnConnectionOptions(
 ) {
     val effective = options.effective()
     val auto = stringResource(R.string.gfvpn_auto)
-    val serverModes = listOf(
-        "auto" to auto,
-        "performance" to stringResource(R.string.gfvpn_performance),
-        "reliability" to stringResource(R.string.gfvpn_reliability),
-        "whitelist-ru" to stringResource(R.string.gfvpn_whitelist),
-    )
     val transports = listOf(
         "" to auto, "DNSTT" to "DNSTT", "H2" to "Hysteria 2", "MK" to "Meek",
         "V2H" to "V2Ray HTTP", "V2W" to "V2Ray WebSocket", "VKT" to "VK-TURN",
         "WT" to "WebTunnel", "XRXH" to "XRay XHTTP",
     )
-    Text(stringResource(R.string.gfvpn_server_selection), style = MaterialTheme.typography.titleSmall)
-    serverModes.chunked(2).forEach { row ->
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            row.forEach { (value, label) ->
-                FilterChip(
-                    selected = options.serverSelection == value,
-                    onClick = { update { it.copy(serverSelection = value) } },
-                    label = { Text(label) },
-                    enabled = enabled,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
+    GfVpnServerModes(options, enabled, update)
     GfVpnServerSelection(options, enabled, update)
     GfVpnChoice(
         stringResource(R.string.gfvpn_transport),
@@ -210,6 +191,36 @@ private fun GfVpnChoice(
 }
 
 @Composable
+private fun GfVpnServerModes(
+    options: GfVpnOptions,
+    enabled: Boolean,
+    update: ((GfVpnOptions) -> GfVpnOptions) -> Unit,
+) {
+    val serverModes = listOf(
+        "auto" to stringResource(R.string.gfvpn_auto),
+        "performance" to stringResource(R.string.gfvpn_performance),
+        "reliability" to stringResource(R.string.gfvpn_reliability),
+        "whitelist-ru" to stringResource(R.string.gfvpn_whitelist),
+    )
+    Text(stringResource(R.string.gfvpn_server_selection), style = MaterialTheme.typography.titleSmall)
+    serverModes.chunked(2).forEach { row ->
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            row.forEach { (value, label) ->
+                FilterChip(
+                    selected = options.serverSelection == value,
+                    onClick = { update { it.copy(serverSelection = value) } },
+                    label = { Text(label) },
+                    enabled = enabled,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+private const val REGIONAL_INDICATOR_A = 0x1F1E6
+
+@Composable
 private fun GfVpnServerSelection(
     options: GfVpnOptions,
     enabled: Boolean,
@@ -218,7 +229,7 @@ private fun GfVpnServerSelection(
     val country = GfVpnServerCatalog.countryFor(options.serverSelection)
     val countries = GfVpnServerCatalog.countries.map { (code, groups) ->
         val iso = code.take(2)
-        val flag = iso.map { String(Character.toChars(0x1F1E6 + it.code - 'A'.code)) }.joinToString("")
+        val flag = iso.map { String(Character.toChars(REGIONAL_INDICATOR_A + it.code - 'A'.code)) }.joinToString("")
         val name = Locale("", iso).displayCountry
         val title = if (code.endsWith("0")) stringResource(R.string.gfvpn_proxy_country, name) else name
         code to stringResource(R.string.gfvpn_country_entry, flag, title, groups.size)
