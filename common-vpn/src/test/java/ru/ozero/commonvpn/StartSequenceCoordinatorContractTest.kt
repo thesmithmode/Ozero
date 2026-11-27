@@ -47,6 +47,26 @@ class StartSequenceCoordinatorContractTest {
     }
 
     @Test
+    fun `extended startup policy keeps restart and switching deadlines above chain deadline`() {
+        val budgets = mapOf(
+            EngineId.OPERA to 100_000L,
+            EngineId.MASQUE to 90_000L,
+            EngineId.TGWSS to 210_000L,
+            EngineId.GFVPN to 540_000L,
+        )
+        for (engine in EngineId.entries) {
+            val expected = budgets[engine]
+            assertEquals(expected, EngineStartupBudget.restartTimeoutMs(engine))
+            assertEquals(expected?.plus(20_000L), EngineStartupBudget.switchingTimeoutMs(engine))
+            if (expected != null) {
+                assertTrue(expected > EngineStartupBudget.chainTimeoutMs(engine))
+            }
+        }
+        assertEquals(null, EngineStartupBudget.restartTimeoutMs(null))
+        assertEquals(null, EngineStartupBudget.switchingTimeoutMs(null))
+    }
+
+    @Test
     fun `public API — run + engineNeedsCustomTun`() {
         listOf("suspend fun run(", "suspend fun engineNeedsCustomTun(").forEach { anchor ->
             assertTrue(source.contains(anchor), "API anchor потерян: '$anchor'")
