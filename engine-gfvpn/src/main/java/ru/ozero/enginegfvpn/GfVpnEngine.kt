@@ -87,11 +87,6 @@ class GfVpnEngine(
         ipv4PrefixLength = 32,
         dnsServers = listOf(GfVpnTun.dnsAddress(Build.VERSION.SDK_INT)),
         allowFamilyV6 = false,
-        requiredRouteCidrsV4 = if (GfVpnTun.supportsMapDns(Build.VERSION.SDK_INT)) {
-            listOf(GfVpnTun.MAP_DNS_CIDR)
-        } else {
-            emptyList()
-        },
     )
 
     override suspend fun start(config: EngineConfig, upstream: Upstream): StartResult = mutex.withLock {
