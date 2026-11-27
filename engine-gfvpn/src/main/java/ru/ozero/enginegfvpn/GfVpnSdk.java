@@ -15,6 +15,7 @@ final class GfVpnSdk {
     private final Context context;
     private Class<?> api;
     private Class<?> configType;
+    private Object networkDnsCallback;
     private boolean active;
     private Session session;
 
@@ -68,6 +69,21 @@ final class GfVpnSdk {
         seq.getMethod("setContext", Context.class).invoke(null, context);
         Class<?> loadedConfig = Class.forName("gfvpnclient.ClientConfig", true, loader);
         Class<?> loadedApi = Class.forName("gfvpnclient.Gfvpnclient", true, loader);
+        Class<?> callbackType = Class.forName("gfvpnclient.NetworkDNSCallback", true, loader);
+        // The reference Android client supplies current physical-network DNS servers
+        // through this SDK callback. Resolve dynamically after Wi-Fi/mobile switches.
+        Object callback = java.lang.reflect.Proxy.newProxyInstance(loader, new Class<?>[]{callbackType},
+            (proxy, method, args) -> {
+                switch (method.getName()) {
+                    case "getNetworkDNSServers": return GfVpnNetworkDns.current(context);
+                    case "toString": return "gfVPN underlying DNS callback";
+                    case "hashCode": return System.identityHashCode(proxy);
+                    case "equals": return args != null && args.length == 1 && proxy == args[0];
+                    default: throw new UnsupportedOperationException(method.getName());
+                }
+            });
+        loadedApi.getMethod("setNetworkDNSCallback", callbackType).invoke(null, callback);
+        networkDnsCallback = callback;
         configType = loadedConfig;
         api = loadedApi;
     }
