@@ -113,8 +113,7 @@ class GfVpnEngine(
             throw cancelled
         } catch (error: Exception) {
             reset()
-            val detail = (error as? IOException)?.message?.takeIf { it.startsWith("gfVPN ") || it.startsWith("gfVPN: ") }
-                ?: error.javaClass.simpleName
+            val detail = diagnosticDetail(error)
             PersistentLoggers.warn("GfVpnEngine", "Startup failed: $detail")
             StartResult.Failure("gfVPN startup failed: $detail")
         }
@@ -137,8 +136,7 @@ class GfVpnEngine(
             throw cancelled
         } catch (error: Exception) {
             reset()
-            val detail = (error as? IOException)?.message?.takeIf { it.startsWith("gfVPN ") || it.startsWith("gfVPN: ") }
-                ?: error.javaClass.simpleName
+            val detail = diagnosticDetail(error)
             PersistentLoggers.warn("GfVpnEngine", "TUN attachment failed: $detail")
             TunAttachResult.Failure("gfVPN TUN attachment failed")
         }
@@ -234,6 +232,10 @@ class GfVpnEngine(
             }
         }
     }
+
+    private fun diagnosticDetail(error: Exception): String = (error as? IOException)?.message
+        ?.takeIf { it.startsWith("gfVPN ") || it.startsWith("gfVPN: ") }
+        ?: error.javaClass.simpleName
 
     private fun reset() {
         callback?.let { runCatching { connectivity?.unregisterNetworkCallback(it) } }
