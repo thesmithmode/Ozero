@@ -23,6 +23,10 @@ Open-source Android VPN-клиент с поддержкой нескольки�
 | URnetwork | P2P mesh | Анонимизация через peer-сеть провайдеров |
 | MasterDNS | DNS-over-UDP | Экстренный fallback, развёртывается на своём VPS в 1 клик |
 | sing-box | протоколы и транспорты libbox | Профили, подписки, автоматический выбор и цепочки |
+| Opera Proxy | TCP SOCKS5 | Выбор региона и сервера; VPN или прокси |
+| MASQUE | CONNECT-IP / HTTP/3 или HTTP/2 | Отдельный профиль WARP с автоматическим fallback |
+| Telegram WSS | TLS WebSocket + WARP | Telegram DC через WSS, остальной трафик через WARP |
+| Adaptive VPN | VPN / TCP | Ручной выбор режима, региона и транспорта |
 
 Каждый движок изолирован в отдельном Gradle-модуле и подключается через интерфейс `EnginePlugin`.
 
@@ -31,7 +35,8 @@ Open-source Android VPN-клиент с поддержкой нескольки�
 - Модульная архитектура: каждый транспорт — отдельный Gradle-модуль `engine-*`
 - Единый интерфейс `EnginePlugin` — приложение не зависит от деталей транспорта
 - Расширяемая система плагинов
-- Internal kill-switch: при отказе транспорта трафик блокируется (fail-closed)
+- Настраиваемый kill-switch в режиме VPN; при отказе движка блокирует трафик согласно политике маршрутизации.
+- URnetwork также может работать как фоновый relay при подключении через другой движок; режим и вознаграждение зависят от настроек и сервиса.
 - Релизы устанавливаются вручную. Код проверки Ed25519 пока не подключён к интерфейсу или фоновой проверке. См. [форматы подписей](docs/build.md#подписи-опубликованного-обновления).
 - Hardening сборки: R8 minify + shrink, обфускация классов
 - Per-engine UI с настройками, без общего конфигурационного экрана
@@ -49,7 +54,7 @@ cd Ozero
 
 - [Архитектура и жизненный цикл движков](docs/architecture.md)
 - [Сборка, нативные артефакты и выпуск APK](docs/build.md)
-- Движки: [WARP](engine-warp/README.md), [URnetwork](engine-urnetwork/README.md), [FPTN](engine-fptn/README.md)
+- Движки: [WARP](engine-warp/README.md), [URnetwork](engine-urnetwork/README.md), [FPTN](engine-fptn/README.md), [Opera Proxy](engine-opera/README.md), [MASQUE](engine-masque/README.md), [Telegram WSS](engine-tgwss/README.md), [Adaptive VPN](engine-gfvpn/README.md)
 - [Текущий план](PLAN.md)
 
 Разработка ведётся в `dev`. GitHub открывает `main` по умолчанию; изменения для разработки следует направлять в `dev`. Push в `main` запускает выпуск APK.
