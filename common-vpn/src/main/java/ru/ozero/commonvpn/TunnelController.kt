@@ -97,10 +97,15 @@ class TunnelController(
 
     fun onDisconnecting() = transition(TunnelState.Disconnecting)
 
-    fun onSwitchingStarted(from: EngineId?, to: EngineId?): Unit = synchronized(lock) {
+    fun onSwitchingStarted(from: EngineId?, to: EngineId?) =
+        startSwitching(from, to, switchingTimeoutFor(to))
+
+    fun onAutoSwitchingStarted(from: EngineId?, timeoutMs: Long) =
+        startSwitching(from, null, timeoutMs)
+
+    private fun startSwitching(from: EngineId?, to: EngineId?, timeoutMs: Long): Unit = synchronized(lock) {
         invalidateSocksRoute()
         val transition = SwitchingTransition(from, to)
-        val timeoutMs = switchingTimeoutFor(to)
         _switching.value = transition
         PersistentLoggers.info(TAG, "switching started: $from → $to")
         switchingWatchdogJob?.cancel()
