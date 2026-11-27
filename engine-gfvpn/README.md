@@ -18,6 +18,18 @@ release APKs. Run the existing opt-in ARM64 SDK and full TUN smoke tests from a
 fresh install, without transferring any SDK files, before production release.
 Successful CI alone does not establish backend connectivity.
 
+The runtime health check requires a live attached TUN descriptor and valid HEV
+state both before and after the authenticated SOCKS route probe. Idle counters
+are valid; this does not prove a third-party app can send packets. The device
+smoke script exercises the actual VPN using a separate instrumentation UID:
+`bash engine-gfvpn/device-smoke.sh` (VPN permission and any manual verification
+must be completed normally). An optional controlled HTTPS endpoint and expected
+body can be supplied through `OZERO_GFVPN_SMOKE_URL` and
+`OZERO_GFVPN_SMOKE_MARKER`. Set `OZERO_GFVPN_SMOKE_NETWORK_CHANGE=1` only on a
+controlled test device with Wi-Fi to test loss and restoration of the link.
+The x86_64 soak validates live Sing-box/ByeDPI switches and Wi-Fi recovery;
+the ARM64-only closed SDK still requires a supported device.
+
 Connection settings follow the reference DEX: global app routing uses Ozero's
 existing split-tunnel settings; local-service bypass, configuration updates and
 cached nodes are separate SDK switches. The server selector supports all four reference modes, 20 country/proxy groups
