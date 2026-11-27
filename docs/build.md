@@ -31,14 +31,20 @@ cd Ozero
 |-----------|-----------------------|
 | ByeDPI и MasterDNS | Gradle-задачи `:engine-byedpi:downloadBinaries` и `:engine-masterdns:downloadBinaries`, lock URL/SHA256, зависимость `preBuild` |
 | WARP | `libam.so`, `libam-go.so`, `libam-quick.so` уже отслеживаются в `engine-warp/src/main/jniLibs/arm64-v8a`; release проверяет их наличие и идентичность backend |
-| URnetwork | Workflow выбирает `urnetwork-sdk-*` release, скачивает SDK в `engine-urnetwork/libs`, удаляет дублирующие `go/*.class`; приложение дополнительно использует `StripGoClassesFromAarTask` |
+| URnetwork | Workflow скачивает `urnetwork-sdk-*` по закреплённому тегу и SHA-256 в `engine-urnetwork/libs`, удаляет дублирующие `go/*.class`; приложение дополнительно использует `StripGoClassesFromAarTask` |
 | sing-box | libbox 1.13.12: download/verify scripts, извлечение `classes.jar` и JNI, выделение и patch общих `go` stubs, удаление `go/*.class` из libbox.jar |
 | FPTN | Release собирает `.so` из закреплённых upstream-исходников через общий action `build-fptn` и проверяет совпадение библиотеки в APK с результатом сборки |
+| Opera Proxy | Gradle скачивает ARM64 `libopera_proxy.so` по lock; release сравнивает упакованный ELF с подготовленным файлом |
+| MASQUE | Общий action `build-masque` собирает закреплённый usque; APK проверяется на соответствие ELF и notice |
+| Telegram WSS | Использует существующий WARP SOCKS runtime и Kotlin-обвязку; отдельная native-библиотека для WSS не требуется |
+| Adaptive VPN | Gradle `prepareGfVpnSdk` проверяет встроенный архив и два файла, `prepareGfVpnHev` извлекает отдельный HEV из закреплённого AAR; debug/release проверяют состав APK |
 | HEV | Release собирает `libhev-ozero-socks5-tunnel.so` из закреплённого upstream commit, с `APP_CFLAGS=-DPKGNAME=hev` и 16 KB alignment |
 
 Для download scripts libbox вне GitHub Actions задайте `GITHUB_REPOSITORY=thesmithmode/Ozero`; аргумент назначения должен сохранять имя asset `libbox.aar`. Полный порядок извлечения и patch Go stubs берите из workflow. Простое добавление исходного AAR в runtime dependencies дублирует классы Go.
 
 `assembleDebug` проверяет компиляцию и упаковку, но не воспроизводит все этапы native-подготовки release и не подтверждает работу каждого транспорта на устройстве. Для installable APK со всеми движками нужны все соответствующие библиотеки из таблицы.
+
+Adaptive VPN не требует от пользователя импорта APK или SDK. Полная сборка требует точного разрешённого vendor-архива; переопределение пути не отменяет проверок. Режим `-Pozero.gfvpn.unitTestsOnly=true` предназначен исключительно для явных JVM-тестов и coverage, а не для создания APK. Подробности и происхождение — [README модуля](../engine-gfvpn/README.md) и его vendor-документация.
 
 После подготовки зависимостей debug-сборка выполняется командой:
 
@@ -82,7 +88,7 @@ Android-подпись APK, GPG-подпись файла и Ed25519-подпи�
 
 Для URnetwork CI и выпуск APK используют один [закреплённый AAR](../.github/checksums/urnetwork-sdk.lock). SHA-256 проверяется до подготовки архива, в том числе при попадании в кэш. При обновлении SDK поменяйте тег и хеш вместе.
 
-[binaries.yml](../.github/workflows/binaries.yml) собирает и публикует отдельные native-артефакты. Обновление Kotlin/C++ исходников, публикация `.so` и обновление lock — разные операции. Обычный запуск Gradle сам не пересобирает FPTN: изменение C++ в `engine-fptn/src/main/cpp` не запускает CMake. Библиотека должна быть подготовлена до упаковки APK.
+[binaries.yml](../.github/workflows/binaries.yml) собирает и публикует отдельные native-артефакты. Обновление Kotlin/C++ исходников, публикация `.so` и обновление lock — разные операции. Обычный Gradle использует готовый ByeDPI из lock. При изменении его C/CMake-обвязки соберите все ABI через `Build native binaries` (artifact `byedpi`), обновите только соответствующие URL, SHA-256 и размеры в lock по опубликованному manifest и assets; native-тест проверяет владение дескрипторами, но не заменяет Android Soak. Тег сборки учитывает JNI/CMake и скрипты. Обычный запуск Gradle сам не пересобирает FPTN: изменение C++ в `engine-fptn/src/main/cpp` не запускает CMake. Библиотека должна быть подготовлена до упаковки APK.
 
 Release и workflow `FPTN transport` собирают FPTN через общий action. Ключ native-кэша учитывает Dockerfile, build script, wrapper C++ и сам action; manifest фиксирует Android reference, protocol library и CamouflageTLS. При изменении этих исходников требуется новая сборка. Перед публикацией APK упакованная `.so` побайтно сравнивается с её результатом.
 
@@ -98,6 +104,6 @@ Release публикует APK и подписи прямо из build job, бе
 
 CI и Release показывают ELF-выравнивание библиотек внутри APK. Совместимость на Android с 16 КБ страницами нужно подтверждать запуском на таком устройстве.
 
-Для изменения транспорта к CI добавляется проверка на Android ARM64: подключение, готовность, передача трафика, reconnect, stop/start и переключение движков. Успешный sing-box soak не является проверкой native FPTN или WARP.
+Для изменения транспорта к CI добавляется проверка на Android ARM64: подключение, готовность, передача трафика, reconnect, stop/start и переключение движков. Автоматический x86_64 [Android Soak](../.github/workflows/soak.yml) проверяет маршрутизируемый трафик, переключение Sing-box/ByeDPI и восстановление Wi-Fi; он запускается для релевантных PR в dev и push в dev. Это не проверка реального ARM64-провайдера или всех режимов маршрутизации. Отдельные opt-in проверки описаны в README Opera, Telegram WSS, Adaptive VPN и MASQUE; результаты указывайте только по фактически выполненным тестам.
 
 CodeQL и MobSF сохраняют SARIF-отчёты в CI artifacts. Для приватного репозитория загрузка в GitHub Security включается переменной репозитория `CODE_SCANNING_ENABLED=true` после включения Code Scanning в настройках GitHub; сам анализ от этой переменной не зависит.
