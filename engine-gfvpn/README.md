@@ -1,6 +1,6 @@
 # gfVPN bundled runtime
 
-The exact reference APK is a verified offline build input. No external download URL is embedded. The build extracts the pinned DEX and ARM64 SDK entries into generated APK assets; a missing input fails the build rather than producing a broken release. Use `-PgfvpnSourceApk=/absolute/path/to/source.apk` for a local build.
+The two extracted and verified SDK files must be present in the checked-in `engine-gfvpn/vendor/gfvpn-sdk-1.0.6.zip` archive. Gradle verifies the complete archive and both entries, then copies the entries into APK assets. No original APK, external download URL, local override, or user import is used. Missing vendor input fails the build.
 
 On ARM64 devices the engine installs its verified read-only runtime into a
 private versioned directory automatically and starts it using a dedicated

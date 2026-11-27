@@ -17,9 +17,7 @@ val prepareGfVpnHev by tasks.registering(ExtractGfVpnHevTask::class) {
 }
 
 val prepareGfVpnSdk by tasks.registering(PrepareGfVpnSdkTask::class) {
-    localApk.set(
-        layout.file(providers.gradleProperty("gfvpnSourceApk").map { java.io.File(it) }),
-    )
+    sourceArchive.set(layout.projectDirectory.file("vendor/gfvpn-sdk-1.0.6.zip"))
     outputDirectory.set(layout.buildDirectory.dir("generated/gfvpn-sdk/assets"))
 }
 
