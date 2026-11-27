@@ -28,7 +28,12 @@ class TelegramInitTest {
     @Test
     fun `media hosts and special DC use official endpoint mapping`() {
         assertEquals(
-            listOf("kws4-1.web.telegram.org", "kws4.web.telegram.org", "vesta-1.web.telegram.org", "vesta.web.telegram.org"),
+            listOf(
+                "kws4-1.web.telegram.org",
+                "kws4.web.telegram.org",
+                "vesta-1.web.telegram.org",
+                "vesta.web.telegram.org",
+            ),
             TelegramDestination(4, true).hosts,
         )
         assertEquals(
