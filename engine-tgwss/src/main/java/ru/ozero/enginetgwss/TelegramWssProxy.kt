@@ -179,7 +179,8 @@ class TelegramWssProxy internal constructor(
     }
 
     private fun openRelay(socket: Socket, destination: TelegramDestination, init: ByteArray): WebSocket? {
-        for (factory in transports()) for (host in destination.hosts) {
+        val routes = transports().flatMap { factory -> destination.hosts.map { factory to it } }
+        for ((factory, host) in routes) {
             if (closed.get() || socket.isClosed) return null
             val attempt = RelayAttempt(socket, init)
             val ws = factory.newWebSocket(request(host), attempt)
@@ -279,21 +280,20 @@ class TelegramWssProxy internal constructor(
         val started = System.nanoTime()
         val probes = mutableListOf<WebSocket>()
         try {
-            for (dc in listOf(2, 4, 1, 3, 5)) for (factory in transports()) {
+            val factories = transports()
+            val candidates = listOf(2, 4, 1, 3, 5).flatMap { dc -> factories.map { dc to it } }
+            for ((dc, factory) in candidates) {
                 if (latency.get() >= 0 || closed.get()) break
                 val ws = factory.newWebSocket(
                     request(TelegramDestination(dc, false).host),
                     object : WebSocketListener() {
                         override fun onOpen(webSocket: WebSocket, response: Response) {
-                            if (response.header("Sec-WebSocket-Protocol") == "binary") {
-                                if (latency.compareAndSet(
-                                        -1,
-                                        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
-                                    )
-                                ) {
-                                    preferred.set(factory)
-                                    ready.countDown()
-                                }
+                            val elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+                            if (response.header("Sec-WebSocket-Protocol") == "binary" &&
+                                latency.compareAndSet(-1, elapsed)
+                            ) {
+                                preferred.set(factory)
+                                ready.countDown()
                             }
                             webSocket.cancel()
                         }

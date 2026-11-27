@@ -1,5 +1,6 @@
 package ru.ozero.enginegfvpn
 
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import ru.ozero.commonnet.IpInfo
 import ru.ozero.commonnet.OkHttpIpInfoProvider
@@ -19,7 +20,10 @@ internal object GfVpnExitInfo {
             .proxy(Proxy.NO_PROXY)
             .socketFactory(GfVpnExitSocketFactory(session.port, session.username, session.password))
             // The SOCKS server resolves the actual destination. No direct DNS lookup is necessary.
-            .dns { host -> listOf(InetAddress.getByAddress(host, byteArrayOf(127, 0, 0, 1))) }
+            .dns(object : Dns {
+                override fun lookup(hostname: String): List<InetAddress> =
+                    listOf(InetAddress.getByAddress(hostname, byteArrayOf(127, 0, 0, 1)))
+            })
             .followRedirects(false)
             .followSslRedirects(false)
             .connectTimeout(4, TimeUnit.SECONDS)

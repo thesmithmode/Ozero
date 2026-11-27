@@ -21,7 +21,8 @@ class MasqueRuntime internal constructor(
     private val launcher: MasqueProcessLauncher,
     private val readiness: MasqueReadinessProbe,
     private val startupTimeoutMs: Long = 6_000,
-    private val registrationTimeoutMs: Long = 45_000,
+    // Two enrollment stages, each with a bounded alternative-host attempt.
+    private val registrationTimeoutMs: Long = 80_000,
     private val reportFailure: (String) -> Unit = { PersistentLoggers.warn("MasqueRuntime", it) },
 ) {
     constructor(binary: File, privateDirectory: File) : this(
