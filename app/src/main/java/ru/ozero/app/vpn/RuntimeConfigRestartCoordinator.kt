@@ -13,6 +13,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.app.logging.AppLogger
+import ru.ozero.commonvpn.EngineStartupBudget
 import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
@@ -30,7 +31,9 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) {
     private val restartMutex = Mutex()
-    private val restartQueue = ArrayDeque<String>()
+    private data class RestartRequest(val reason: String, val target: EngineId?)
+
+    private val restartQueue = ArrayDeque<RestartRequest>()
     private var restartInProgress = false
     private val started = AtomicBoolean(false)
 
@@ -48,17 +51,19 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         val settingsObserver = EngineSettingsRestartObserver(
             settingsFlow = settingsRepository.settings,
             vpnStateProvider = { tunnelController.state.value },
-            onRestartConnected = { snapshot -> restartVpnIfRunning(snapshot.restartReason()) },
+            onRestartConnected = { snapshot -> restartVpnIfRunning(snapshot.restartReason(), snapshot.manualEngine) },
         )
         scope.launch(exceptionHandler) {
             settingsObserver.triggers.collect { trigger -> settingsObserver.handle(trigger) }
         }
     }
 
-    internal suspend fun restartVpnIfRunning(reason: String): Boolean {
+    internal suspend fun restartVpnIfRunning(reason: String): Boolean = restartVpnIfRunning(reason, null)
+
+    private suspend fun restartVpnIfRunning(reason: String, target: EngineId?): Boolean {
         var shouldProcess = false
         restartMutex.withLock {
-            restartQueue.addLast(reason)
+            restartQueue.addLast(RestartRequest(reason, target))
             if (!restartInProgress) {
                 restartInProgress = true
                 shouldProcess = true
@@ -100,7 +105,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         }
     }
 
-    private suspend fun performRestartIfRunning(reason: String): Boolean {
+    private suspend fun performRestartIfRunning(request: RestartRequest): Boolean {
         val current = tunnelController.state.value
         val fromEngine = when (current) {
             is TunnelState.Connected -> current.engineId
@@ -108,9 +113,9 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
             is TunnelState.Probing -> current.engineId ?: return false
             else -> return false
         }
-        AppLogger.i(TAG, "restart requested $reason")
+        AppLogger.i(TAG, "restart requested ${request.reason}")
         val pendingTarget = tunnelController.switching.value?.to
-        val targetEngine = pendingTarget ?: fromEngine
+        val targetEngine = request.target ?: pendingTarget ?: fromEngine
         tunnelController.onSwitchingStarted(from = fromEngine, to = targetEngine)
         try {
             sendVpnAction(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG)
@@ -166,10 +171,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
 
     private fun restartStartTimeoutMs(target: EngineId?): Long = when (target) {
         EngineId.FPTN -> FPTN_RESTART_START_TIMEOUT_MS
-        EngineId.OPERA -> OPERA_RESTART_START_TIMEOUT_MS
-        EngineId.MASQUE -> MASQUE_RESTART_START_TIMEOUT_MS
-        EngineId.TGWSS -> TGWSS_RESTART_START_TIMEOUT_MS
-        else -> RESTART_START_TIMEOUT_MS
+        else -> EngineStartupBudget.restartTimeoutMs(target) ?: RESTART_START_TIMEOUT_MS
     }
 
     private fun sendVpnAction(action: String) {
@@ -187,9 +189,6 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         // Shorter than that treats a slow successful FPTN restart as a failure
         // and the next Connected restarts again, because the start is not cancelled.
         const val FPTN_RESTART_START_TIMEOUT_MS = 60_000L
-        const val OPERA_RESTART_START_TIMEOUT_MS = 60_000L
-        const val MASQUE_RESTART_START_TIMEOUT_MS = 60_000L
-        const val TGWSS_RESTART_START_TIMEOUT_MS = 120_000L
         const val RESTART_SETTLE_TIMEOUT_MS = 15_000L
     }
 }

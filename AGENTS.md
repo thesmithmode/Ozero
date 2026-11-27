@@ -35,16 +35,16 @@
 ## Билд
 - Один APK (`assembleRelease`), без dynamic features.
 - Cold FPTN build: общий action освобождает место, проверяет минимум 20 GiB до Docker build и удаляет native build storage до сборки APK.
-- abiFilters: только arm64-v8a. Расширение ABI без перестройки native = рантайм-краш.
+- Production APK: только arm64-v8a. x86_64 — отдельный soak-вариант, не обещание поддержки всех движков. Расширение ABI требует всех соответствующих native-артефактов.
 - R8 minify+shrink включены, Log.* НЕ стрипаются (proguard-rules.pro).
 ## Native libs
-- `System.loadLibrary` — **только lazy** через `loadOnce()`. Никогда в `Application.onCreate`/`attachBaseContext`/init-блоках/companion init. Исключение: `OzeroApp.onCreate` с `isEngineWarpProcess()` guard. `libam-go` только в `:engine_warp`, `libgojni` только в main process. Coexistence = SIGABRT. [sentinel: `OzeroAppProcessIsolationTest`]
+- `System.loadLibrary` — **только lazy** через `loadOnce()`. Никогда в `Application.onCreate`/`attachBaseContext`/init-блоках/companion init. Исключение: `OzeroApp.onCreate` с `isEngineWarpProcess()` guard. `libam-go` только в `:engine_warp`, Go runtime URnetwork — в main process. Adaptive VPN загружает собственный закрытый runtime через classloader в `:engine_gfvpn`; не переносить его в main process. Смешение несовместимых Go runtimes недопустимо. [sentinel: `OzeroAppProcessIsolationTest`]
 - `loadOnce()` для `libhev-socks5-tunnel` — **только из main thread**, до `serviceScope.launch`. [sentinel: `OzeroVpnServiceLifecycleTest`]
 - `libhev-socks5-tunnel.so` — собирать с `APP_CFLAGS=-DPKGNAME=hev` (release.yml + ci.yml). [sentinel: `JniContractTest`]
 - `hev.TProxyService` — объявлять **все три** `external fun`: `TProxyStartService(String, Int)`, `TProxyStopService()`, `TProxyGetStats(): LongArray`. [sentinel: `JniContractTest`]
 - `loadOnce()` — `catch (e: Throwable)` после специфичных catch-блоков. [sentinel: `TProxyServiceLogTest`]
 - ByeDPI CMD mode (`byedpiUseUiMode=false`): args идут **verbatim**, только `trim()`. Никаких авто-suffix (`-Ku -a1 -An`). [sentinel: `ByeDpiBuildManualConfigTest`]
-- ByeDPI: `stop()` — `proxy.forceClose()` ДО `job.join()` (unblock READ_WAIT перед ожиданием). [sentinel: `ByeDpiEngineTest`]
+- ByeDPI: `stop()` — `proxy.forceClose()` ДО `job.join()`; native shutdown использует отдельный FD, исходный listener закрывает upstream, guard освобождает только владелец. [sentinel: `ByeDpiEngineTest`]
 ## Logging
 - `PersistentLoggers.error/warn` — только критичные события (errors, JNI checkpoints для hang-диагностики). На success — запрещено, `Log.i/d` достаточно. Дубль → шум, удалять.
 ## Коммиты — типовые ловушки
@@ -54,7 +54,7 @@
 - VM с StateFlow в `@BeforeEach`: создавать VM **внутри теста** ПОСЛЕ `store.setRaw(...)`. Иначе race.
 - Material Icons: только `material-icons-core`. `Icons.Filled.Android/Apps/PhoneAndroid` — нет в core.
 ## Per-engine UI
-- Каждый engine обязан иметь settings screen в `ui/settings/engines/`. Текущие: byedpi, fptn, urnetwork, warp, masterdns, singbox.
+- Каждый engine обязан иметь settings screen в `ui/settings/engines/`. Список движков — `EngineId`, состав модулей — `settings.gradle.kts`.
 ## Subprocess-proxy
 - `engine-masterdns` — subprocess-pattern, но полноценный `EnginePlugin` (`@IntoSet` через `MasterDnsModule`). `libmdnsvpn.so` через `ProcessBuilder`, **не** `System.loadLibrary`.
 - Routing: WARP (`socksPort==0`) → subprocess наследует UID (TUN авто). SOCKS-engine → `--socks5-proxy-url socks5://127.0.0.1:<port>`.

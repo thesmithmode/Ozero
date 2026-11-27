@@ -653,18 +653,9 @@ class StartSequenceCoordinator(
     companion object {
         private const val TAG = "StartSequenceCoordinator"
         const val SETTINGS_READ_TIMEOUT_MS = 1_500L
-        const val CHAIN_START_TIMEOUT_MS = 30_000L
+        const val CHAIN_START_TIMEOUT_MS = EngineStartupBudget.DEFAULT_CHAIN_TIMEOUT_MS
         const val PREFLIGHT_HARD_TIMEOUT_MS = 7_000L
 
-        internal fun chainStartTimeoutMs(engineId: EngineId): Long = when (engineId) {
-            // Include blocking TLS/SOCKS probe and child shutdown time after each attempt.
-            EngineId.OPERA -> 75_000L
-            // AUTO can try H3/H2 over both endpoint address families.
-            EngineId.MASQUE -> 60_000L
-            // Cold WARP registration alone has a 90-second budget; then the proxy must become ready.
-            EngineId.TGWSS -> 180_000L
-            EngineId.GFVPN -> 310_000L
-            else -> CHAIN_START_TIMEOUT_MS
-        }
+        internal fun chainStartTimeoutMs(engineId: EngineId): Long = EngineStartupBudget.chainTimeoutMs(engineId)
     }
 }

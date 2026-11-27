@@ -106,6 +106,11 @@ final class GfVpnTun {
         }
     }
 
+    // Benchmarking addresses are routed by BYPASS_LAN without intercepting real CGNAT destinations.
+    static final String MAP_DNS_NETWORK = "198.19.0.0";
+    static final int MAP_DNS_PREFIX = 16;
+    private static final String MAP_DNS_NETMASK = "255.255.0.0";
+
     static boolean supportsMapDns(int sdk) { return sdk >= 29; }
 
     static String dnsAddress(int sdk) { return supportsMapDns(sdk) ? "198.18.0.2" : "1.1.1.1"; }
@@ -122,7 +127,8 @@ final class GfVpnTun {
             "\n  password: " + quote(password) + "\n";
         // HEV resolves synthetic IPv4 destinations by domain through the authenticated SOCKS route.
         return mapDns ? base + "mapdns:\n  address: '198.18.0.2'\n  port: 53\n" +
-            "  network: '100.64.0.0'\n  netmask: '255.192.0.0'\n  cache-size: 10000\n" : base;
+            "  network: '" + MAP_DNS_NETWORK + "'\n" +
+            "  netmask: '" + MAP_DNS_NETMASK + "'\n  cache-size: 10000\n" : base;
     }
 
     private static String quote(String value) {

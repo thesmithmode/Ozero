@@ -863,6 +863,15 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
+      - name: Verify native listener ownership
+        run: |
+          cc -std=gnu11 -Wall -Wextra -Werror -pthread \
+            -Iengine-byedpi/src/main/cpp \
+            engine-byedpi/src/main/cpp/listener-control.c \
+            engine-byedpi/src/test/native/listener-control-test.c \
+            -o "$RUNNER_TEMP/byedpi-listener-test"
+          "$RUNNER_TEMP/byedpi-listener-test"
+
       - name: testDebugUnitTest + coverage
         run: ./gradlew :engine-byedpi:testDebugUnitTest :engine-byedpi:jacocoTestReport :engine-byedpi:jacocoTestCoverageVerification --stacktrace --continue
 

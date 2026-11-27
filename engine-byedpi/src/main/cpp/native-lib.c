@@ -5,7 +5,6 @@
 #include <setjmp.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <stdatomic.h>
 #include <android/log.h>
 
 #include "byedpi/error.h"
@@ -14,17 +13,7 @@
 #define BYEDPI_LOG_TAG "ByeDpiNative"
 #define BYEDPI_LOGW(...) __android_log_print(ANDROID_LOG_WARN, BYEDPI_LOG_TAG, __VA_ARGS__)
 
-/* Known limitation: server_fd объявлен в upstream byedpi как обычный int (не _Atomic).
- * Race window между jniStopProxy и jniForceClose: оба читают server_fd без синхронизации;
- * между read и close()/shutdown() kernel может переиспользовать слот fd → close/shutdown
- * чужого socket. Локальный mutex = полу-фикс (upstream main() в submodule тоже пишет fd
- * без наших локов). Полный fix требует форка byedpi submodule для смены типа на
- * _Atomic int. За прод race не воспроизведён, акцептовано как known limitation. */
-extern int server_fd;
-/* Атомарный CAS-guard от двойного запуска: раньше int-флаг читался/писался
- * без синхронизации, две параллельные jniStartProxy могли пройти guard
- * одновременно и обе вызвать main() с гонкой на server_fd. */
-static atomic_int g_proxy_running = 0;
+#include "listener-control.h"
 
 struct params default_params = {
         .await_int = 10,
@@ -58,7 +47,7 @@ static void free_argv(char **argv, int count) {
 /* Полный teardown при ошибке: освобождает argv и отпускает CAS guard. */
 static jint jni_start_fail(char **argv, int filled, jint code) {
     if (argv) free_argv(argv, filled);
-    atomic_store(&g_proxy_running, 0);
+    ozero_listener_finish();
     return code;
 }
 
@@ -66,19 +55,13 @@ static jint jni_start_fail(char **argv, int filled, jint code) {
 
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy(JNIEnv *env, __attribute__((unused)) jobject thiz, jobjectArray args) {
-    /* CAS 0→1: один caller проходит. Guard busy = JNI_GUARD_BUSY (-2), отличимо
-     * от -1 (OOM/JNI/upstream). Kotlin layer должен делать retry через cooperative
-     * delay() — НЕ блокировать здесь, иначе сериализуется single-thread dispatcher. */
-    int expected = 0;
-    if (!atomic_compare_exchange_strong(&g_proxy_running, &expected, 1)) {
-        return JNI_GUARD_BUSY;
-    }
+    if (!ozero_listener_begin()) return JNI_GUARD_BUSY;
 
     int user_argc = (*env)->GetArrayLength(env, args);
     int argc = user_argc + 1;
     char **argv = calloc((size_t)argc + 1u, sizeof(char *));
     if (!argv) {
-        atomic_store(&g_proxy_running, 0);
+        ozero_listener_finish();
         return -1;
     }
 
@@ -118,37 +101,22 @@ Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStartProxy(JNIEnv *env, __attribute__(
     reset_params();
     optind = 1;
 
-    BYEDPI_LOGW("jniStartProxy → main() entry argc=%d server_fd=%d", argc, server_fd);
+    BYEDPI_LOGW("jniStartProxy → main() entry argc=%d", argc);
     int result = main(argc, argv);
-    BYEDPI_LOGW("jniStartProxy ← main() exit code=%d server_fd=%d", result, server_fd);
+    BYEDPI_LOGW("jniStartProxy ← main() exit code=%d", result);
 
     free_argv(argv, argc);
-    atomic_store(&g_proxy_running, 0);
+    ozero_listener_finish();
 
     return result;
 }
 
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniStopProxy(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz) {
-    int running = atomic_load(&g_proxy_running);
-    int fd_snapshot = server_fd;
-    BYEDPI_LOGW("jniStopProxy entry running=%d server_fd=%d", running, fd_snapshot);
-    if (!running) return -1;
-    if (fd_snapshot < 0) return -1;
-    int rc = shutdown(fd_snapshot, SHUT_RDWR);
-    BYEDPI_LOGW("jniStopProxy exit shutdown rc=%d", rc);
-    return rc;
+    return ozero_listener_stop();
 }
 
 JNIEXPORT jint JNICALL
 Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniForceClose(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz) {
-    int fd_snapshot = server_fd;
-    BYEDPI_LOGW("jniForceClose entry server_fd=%d", fd_snapshot);
-    if (fd_snapshot < 0) {
-        return -1;
-    }
-    int rc = close(fd_snapshot);
-    server_fd = -1;
-    BYEDPI_LOGW("jniForceClose exit close rc=%d server_fd=-1", rc);
-    return rc;
+    return ozero_listener_stop();
 }
