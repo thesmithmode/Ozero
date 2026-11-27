@@ -314,7 +314,8 @@ class RuntimeConfigRestartCoordinatorTest {
             )
             val restart = launch { assertTrue(coordinator.restartVpnIfRunning("settings changed")) }
             runCurrent()
-            advanceTimeBy(if (target == EngineId.FPTN) 30_000L else requireNotNull(EngineStartupBudget.restartTimeoutMs(target)) - 1)
+            val budget = if (target == EngineId.FPTN) 30_001L else requireNotNull(EngineStartupBudget.restartTimeoutMs(target))
+            advanceTimeBy(budget - 1)
             assertTrue(restart.isActive)
             controller.setState(TunnelState.Connected(target, 0))
             restart.join()
@@ -736,10 +737,10 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun RuntimeConfigRestartCoordinator.restartQueue(): ArrayDeque<String> {
+    private fun RuntimeConfigRestartCoordinator.restartQueue(): ArrayDeque<*> {
         val field = javaClass.getDeclaredField("restartQueue")
         field.isAccessible = true
-        return field.get(this) as ArrayDeque<String>
+        return field.get(this) as ArrayDeque<*>
     }
 
     private fun RuntimeConfigRestartCoordinator.restartInProgress(): Boolean {
