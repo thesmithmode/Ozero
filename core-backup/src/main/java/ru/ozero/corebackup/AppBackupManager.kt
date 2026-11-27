@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.flow.first
 import ru.ozero.corestorage.dao.AppSplitRuleDao
 import ru.ozero.corestorage.entity.AppSplitRule
+import ru.ozero.enginescore.settings.GfVpnOptions
 import ru.ozero.enginescore.settings.SettingsKeys
 import ru.ozero.enginefptn.FptnConfigStore
 import ru.ozero.enginemasque.MasqueProfile
@@ -109,6 +110,9 @@ class AppBackupManager(
             operaSelection = fromCategory(
                 BackupCategory.GENERAL_SETTINGS in categories,
             ) { prefs[SettingsKeys.OPERA_SELECTION] },
+            gfVpnOptions = fromCategory(
+                BackupCategory.GENERAL_SETTINGS in categories,
+            ) { prefs[SettingsKeys.GFVPN_OPTIONS] },
             operaAutoEnabled = fromCategory(
                 BackupCategory.GENERAL_SETTINGS in categories,
             ) { prefs[SettingsKeys.OPERA_AUTO_ENABLED] },
@@ -198,6 +202,7 @@ class AppBackupManager(
         s.operaSelection?.takeIf { it in setOf("first", "random", "fastest") }
             ?.let { prefs[SettingsKeys.OPERA_SELECTION] = it }
         s.operaAutoEnabled?.let { prefs[SettingsKeys.OPERA_AUTO_ENABLED] = it }
+        s.gfVpnOptions?.let { prefs[SettingsKeys.GFVPN_OPTIONS] = GfVpnOptions.decode(it).encode() }
     }
 
     private suspend fun importSplitTunnel(data: AppBackupData) {

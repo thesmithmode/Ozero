@@ -15,6 +15,7 @@ import android.os.RemoteException;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
+import ru.ozero.enginescore.settings.GfVpnOptions;
 
 /** Single-session, asynchronous client. All state transitions run on the main looper. */
 public final class GfVpnRuntime implements AutoCloseable {
@@ -64,7 +65,12 @@ public final class GfVpnRuntime implements AutoCloseable {
     public GfVpnRuntime(Context context) { this.context = context.getApplicationContext(); }
 
     public CompletableFuture<Session> start(String country, String clientIdentifier) {
+        return start(country, clientIdentifier, GfVpnOptions.DEFAULT);
+    }
+
+    public CompletableFuture<Session> start(String country, String clientIdentifier, GfVpnOptions options) {
         Bundle data = new Bundle();
+        data.putString("options", options.encode());
         data.putString("country", country);
         data.putString("clientIdentifier", clientIdentifier);
         CompletableFuture<Bundle> raw = request(GfVpnProcessService.START, data, 125000);

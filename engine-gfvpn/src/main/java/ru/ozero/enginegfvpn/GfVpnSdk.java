@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
+import ru.ozero.enginescore.settings.GfVpnOptions;
 
 /** Runtime bridge for the verified SDK packaged in Ozero's own assets. */
 final class GfVpnSdk {
@@ -88,7 +89,7 @@ final class GfVpnSdk {
         api = loadedApi;
     }
 
-    synchronized Session start(String country, String clientIdentifier) throws Exception {
+    synchronized Session start(String country, String clientIdentifier, GfVpnOptions options) throws Exception {
         if (active) throw new IllegalStateException("Already started");
         load();
         if (!java.util.Arrays.asList("RU", "CN", "IR", "TM", "INT").contains(country)) {
@@ -97,7 +98,7 @@ final class GfVpnSdk {
         File work = new File(context.getFilesDir(), "gfvpn-state");
         if (!work.isDirectory() && !work.mkdirs()) throw new IOException("Cannot create work directory");
         Object config = configType.getConstructor().newInstance();
-        GfVpnClientDefaults.configure(config, work.getAbsolutePath(), country, clientIdentifier);
+        GfVpnClientDefaults.configure(config, work.getAbsolutePath(), country, clientIdentifier, options);
         try {
             active = true;
             Object result = api.getMethod("start", configType).invoke(null, config);

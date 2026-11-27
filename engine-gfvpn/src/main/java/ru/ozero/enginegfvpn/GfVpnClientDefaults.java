@@ -1,24 +1,32 @@
 package ru.ozero.enginegfvpn;
 
+import ru.ozero.enginescore.settings.GfVpnOptions;
+
 /** Explicit SDK startup defaults verified against the supplied APK's public Java binding. */
 final class GfVpnClientDefaults {
     private GfVpnClientDefaults() { }
 
     static void configure(Object config, String workDir, String country, String identifier) throws Exception {
+        configure(config, workDir, country, identifier, GfVpnOptions.DEFAULT);
+    }
+
+    static void configure(Object config, String workDir, String country, String identifier,
+                          GfVpnOptions requested) throws Exception {
+        GfVpnOptions options = requested.effective();
         set(config, "setWorkDir", workDir);
-        setLong(config, "setSimultaneousConnections", 0);
+        setLong(config, "setSimultaneousConnections", options.getSimultaneousConnections());
         set(config, "setLocaleCountryCode", country);
-        set(config, "setForceConfigCountry", country);
+        // Reference release uses SDK geolocation; forced country is a debug-only option.
+        set(config, "setForceConfigCountry", "");
         set(config, "setClientIdentifier", identifier);
-        set(config, "setServerSelection", "auto");
-        // Empty transport and zero concurrency select the SDK's own defaults.
-        set(config, "setTransport", "");
-        set(config, "setNodeRotationEnabled", "");
-        setLong(config, "setMaxConcurrentAttempts", 0);
-        set(config, "setUseRemoteConfig", "true");
-        set(config, "setUseCachedNodes", "");
-        // Ozero controls split routing; require authenticated local SOCKS.
-        set(config, "setSplitTunnelEnabled", "false");
+        set(config, "setServerSelection", options.getServerSelection());
+        set(config, "setTransport", options.getTransport());
+        set(config, "setNodeRotationEnabled", options.getRotation());
+        setLong(config, "setMaxConcurrentAttempts", options.getMaxConcurrentAttempts());
+        set(config, "setUseRemoteConfig", options.getAutoUpdate() ? "true" : "false");
+        set(config, "setUseCachedNodes", options.getCachedNodes() ? "" : "false");
+        // SDK's local-service bypass is separate from Ozero's app-based routing.
+        set(config, "setSplitTunnelEnabled", Boolean.toString(options.getBypassLocalServices()));
         set(config, "setSocksAuthEnabled", "true");
     }
 

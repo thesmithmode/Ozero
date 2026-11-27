@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -31,14 +32,20 @@ import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.settings.GfVpnOptions
 import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.SettingsRepository
+import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /** Standalone authenticated TUN engine. Never exposes credentials or a chainable proxy. */
-class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
+class GfVpnEngine(
+    context: Context,
+    private val settingsRepository: SettingsRepository? = null,
+) : EnginePlugin, TunFdAcceptor {
     private val app = context.applicationContext
     private val mutex = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -95,7 +102,11 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
             val identifier = prefs.getString("client-id", null) ?: UUID.randomUUID().toString().also {
                 prefs.edit().putString("client-id", it).apply()
             }
-            sdkSession = next.start("RU", identifier).awaitResult()
+            val options = settingsRepository?.let { repository ->
+                withTimeoutOrNull(2000L) { repository.settings.first().gfVpnOptions }
+                    ?: throw IOException("gfVPN settings unavailable")
+            } ?: GfVpnOptions.DEFAULT
+            sdkSession = next.start("RU", identifier, options).awaitResult()
             StartResult.Success(0)
         } catch (cancelled: CancellationException) {
             reset()

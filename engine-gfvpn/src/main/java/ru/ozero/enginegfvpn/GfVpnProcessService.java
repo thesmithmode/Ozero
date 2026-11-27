@@ -17,6 +17,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import ru.ozero.enginescore.settings.GfVpnOptions;
 
 /** One owner, one SDK lifetime, one isolated process. No exported endpoint. */
 public final class GfVpnProcessService extends Service {
@@ -98,7 +99,7 @@ public final class GfVpnProcessService extends Service {
             switch (operation) {
                 case START:
                     GfVpnSdk.Session session = sdk.start(input.getString("country", "RU"),
-                        input.getString("clientIdentifier", ""));
+                        input.getString("clientIdentifier", ""), GfVpnOptions.decode(input.getString("options")));
                     response.putInt("port", session.port);
                     response.putString("username", session.username);
                     response.putString("password", session.password);

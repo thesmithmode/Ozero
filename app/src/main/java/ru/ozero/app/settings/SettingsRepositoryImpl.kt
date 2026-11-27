@@ -9,6 +9,7 @@ import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.AppMode
 import ru.ozero.enginescore.settings.AutoStartGateway
 import ru.ozero.enginescore.settings.ByeDpiUiSettings
+import ru.ozero.enginescore.settings.GfVpnOptions
 import ru.ozero.enginescore.settings.HostsMode
 import ru.ozero.enginescore.settings.SettingsKeys
 import ru.ozero.enginescore.settings.SettingsModel
@@ -64,6 +65,13 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setOperaSelection(selection: String) {
         require(selection in setOf("first", "random", "fastest"))
         dataStore.edit { it[SettingsKeys.OPERA_SELECTION] = selection }
+    }
+
+    override suspend fun updateGfVpnOptions(transform: (GfVpnOptions) -> GfVpnOptions) {
+        dataStore.edit { prefs ->
+            val current = GfVpnOptions.decode(prefs[SettingsKeys.GFVPN_OPTIONS])
+            prefs[SettingsKeys.GFVPN_OPTIONS] = transform(current).encode()
+        }
     }
 
     override suspend fun setManualEngine(engine: EngineId?) {
@@ -198,6 +206,7 @@ class SettingsRepositoryImpl @Inject constructor(
         operaRegion = this[SettingsKeys.OPERA_REGION]?.takeIf { it in setOf("EU", "AS", "AM") } ?: "EU",
         operaSelection = this[SettingsKeys.OPERA_SELECTION]
             ?.takeIf { it in setOf("first", "random", "fastest") } ?: "fastest",
+        gfVpnOptions = GfVpnOptions.decode(this[SettingsKeys.GFVPN_OPTIONS]),
         engineAutoPriority = readEngineAutoPriority(),
         urnetworkEnabled = this[SettingsKeys.URNETWORK_ENABLED] ?: SettingsModel.DEFAULT_URNETWORK_ENABLED,
         urnetworkJwt = this[SettingsKeys.URNETWORK_JWT],

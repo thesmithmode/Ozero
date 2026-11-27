@@ -3,6 +3,7 @@ package ru.ozero.enginegfvpn;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import ru.ozero.enginescore.settings.GfVpnOptions;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class GfVpnClientDefaultsTest {
@@ -29,7 +30,7 @@ class GfVpnClientDefaultsTest {
         assertEquals(13, binding.values.size());
         assertEquals("/private/work", binding.values.get("work"));
         assertEquals("RU", binding.values.get("locale"));
-        assertEquals("RU", binding.values.get("country"));
+        assertEquals("", binding.values.get("country"));
         assertEquals("client-id", binding.values.get("id"));
         assertEquals(0L, binding.values.get("connections"));
         assertEquals(0L, binding.values.get("attempts"));
@@ -39,6 +40,21 @@ class GfVpnClientDefaultsTest {
         assertEquals("", binding.values.get("cached"));
         assertEquals("true", binding.values.get("remote"));
         assertEquals("false", binding.values.get("split"));
+        assertEquals("true", binding.values.get("auth"));
+    }
+
+    @Test void appliesChosenTransportAndSwitches() throws Exception {
+        FakeBinding binding = new FakeBinding();
+        GfVpnOptions options = new GfVpnOptions("performance", "H2", 3, 5, "false", false, false, true);
+        GfVpnClientDefaults.configure(binding, "/private/work", "RU", "client-id", options);
+        assertEquals("performance", binding.values.get("selection"));
+        assertEquals("H2", binding.values.get("transport"));
+        assertEquals(3L, binding.values.get("connections"));
+        assertEquals(5L, binding.values.get("attempts"));
+        assertEquals("false", binding.values.get("rotation"));
+        assertEquals("false", binding.values.get("remote"));
+        assertEquals("false", binding.values.get("cached"));
+        assertEquals("true", binding.values.get("split"));
         assertEquals("true", binding.values.get("auth"));
     }
 }

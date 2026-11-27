@@ -25,6 +25,7 @@ data class SettingsModel(
     val alwaysOnBannerDismissed: Boolean = DEFAULT_ALWAYS_ON_BANNER_DISMISSED,
     val operaRegion: String = "EU",
     val operaSelection: String = "fastest",
+    val gfVpnOptions: GfVpnOptions = GfVpnOptions.DEFAULT,
 ) {
     companion object {
         val DEFAULT_SPLIT_MODE: SplitTunnelMode = SplitTunnelMode.ALL
