@@ -79,7 +79,7 @@ class GfVpnEngine(
     override fun buildProxyConfig(settings: SettingsModel?): EngineConfig? = null
 
     override suspend fun tunSpec(): TunSpec = TunSpec(
-        sessionName = "Ozero gfVPN",
+        sessionName = "Ozero ${id.displayName}",
         mtu = 8500,
         blocking = false,
         ipv4Address = "198.18.0.1",
@@ -192,7 +192,7 @@ class GfVpnEngine(
             if (!attached || sdkSession !== owner) {
                 ExitNodeStrategy.Unavailable("gfVPN session changed")
             } else {
-                ExitNodeStrategy.ProviderLabel(info.country ?: "gfVPN", info.ip, info.countryCode)
+                ExitNodeStrategy.ProviderLabel(info.country ?: id.displayName, info.ip, info.countryCode)
             }
         }
     }
