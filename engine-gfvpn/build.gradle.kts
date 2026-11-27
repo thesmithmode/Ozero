@@ -1,3 +1,5 @@
+import binaries.ExtractGfVpnHevTask
+
 plugins {
     id("ozero.android.library")
     id("ozero.binaries")
@@ -7,28 +9,15 @@ ozeroBinaries {
     artifact("hev-gfvpn-2.20.0.aar")
 }
 
-val gfVpnHevAar = layout.projectDirectory.file("libs/hev-gfvpn-2.20.0.aar")
-val gfVpnHevJni = layout.buildDirectory.dir("generated/gfvpn-hev/jniLibs")
-val prepareGfVpnHev by tasks.registering(Sync::class) {
+val prepareGfVpnHev by tasks.registering(ExtractGfVpnHevTask::class) {
     dependsOn(tasks.named("downloadBinaries"))
-    from({ zipTree(gfVpnHevAar.asFile) }) {
-        include("jni/arm64-v8a/libhev-socks5-tunnel.so")
-        eachFile {
-            path = "arm64-v8a/libhev-gfvpn-socks5-tunnel.so"
-        }
-        includeEmptyDirs = false
-    }
-    into(gfVpnHevJni)
-    doLast {
-        check(gfVpnHevJni.get().file("arm64-v8a/libhev-gfvpn-socks5-tunnel.so").asFile.length() > 0) {
-            "Verified gfVPN HEV AAR did not contain the ARM64 native library"
-        }
-    }
+    sourceAar.set(layout.projectDirectory.file("libs/hev-gfvpn-2.20.0.aar"))
+    outputDirectory.set(layout.buildDirectory.dir("generated/gfvpn-hev/jniLibs"))
 }
 
 android {
     namespace = "ru.ozero.enginegfvpn"
-    sourceSets.getByName("main").jniLibs.srcDir(prepareGfVpnHev)
+    sourceSets.getByName("main").jniLibs.srcDir(prepareGfVpnHev.flatMap { it.outputDirectory })
 }
 
 tasks.matching { it.name == "preBuild" }.configureEach {
