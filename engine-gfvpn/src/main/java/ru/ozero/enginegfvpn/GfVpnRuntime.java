@@ -100,9 +100,26 @@ public final class GfVpnRuntime implements AutoCloseable {
         }
     }
 
+    public static final class Probe {
+        public final long latencyMs;
+        public final long bytesIn;
+        public final long bytesOut;
+        private Probe(Bundle data) {
+            latencyMs = data.getLong("latencyMs");
+            bytesIn = data.getLong("bytesIn");
+            bytesOut = data.getLong("bytesOut");
+        }
+    }
+
+    public CompletableFuture<Probe> probeWithStats() {
+        CompletableFuture<Probe> result = request(GfVpnProcessService.PROBE, new Bundle(), 15000)
+            .thenApply(Probe::new);
+        result.whenComplete((value, error) -> { if (result.isCancelled()) close(); });
+        return result;
+    }
+
     public CompletableFuture<Long> probe() {
-        CompletableFuture<Bundle> raw = request(GfVpnProcessService.PROBE, new Bundle(), 15000);
-        CompletableFuture<Long> result = raw.thenApply(data -> data.getLong("latencyMs"));
+        CompletableFuture<Long> result = probeWithStats().thenApply(data -> data.latencyMs);
         result.whenComplete((value, error) -> { if (result.isCancelled()) close(); });
         return result;
     }

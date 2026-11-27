@@ -131,7 +131,9 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
         val current = runtime
         if (current == null || !attached) return@withLock ProbeResult.Failure("gfVPN not attached")
         try {
-            ProbeResult.Success(current.probe().awaitResult())
+            val result = current.probeWithStats().awaitResult()
+            state.value = state.value.copy(bytesIn = result.bytesIn, bytesOut = result.bytesOut)
+            ProbeResult.Success(result.latencyMs)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {

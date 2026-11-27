@@ -53,13 +53,12 @@ final class GfVpnTun {
 
     boolean isAttached() { return attached != null; }
 
-    boolean isRunning() {
-        if (!started || attached == null) return false;
+    long[] counters() throws IOException {
+        if (!started || attached == null) throw new IOException("HEV not attached");
         try {
-            long[] stats = TProxyService.TProxyGetStats();
-            return stats != null && stats.length >= 4;
+            return GfVpnTunCounters.validate(TProxyService.TProxyGetStats());
         } catch (RuntimeException | LinkageError unavailable) {
-            return false;
+            throw new IOException("HEV unavailable", unavailable);
         }
     }
 
