@@ -57,4 +57,14 @@ class GfVpnClientDefaultsTest {
         assertEquals("true", binding.values.get("split"));
         assertEquals("true", binding.values.get("auth"));
     }
+    @Test void forwardsCountryAndExactServerToSdk() throws Exception {
+        for (String selection : new String[]{"GB", "HK0", "RU010", "SG03", "DE7"}) {
+            FakeBinding binding = new FakeBinding();
+            GfVpnOptions options = new GfVpnOptions(selection, "", 0, 0, "", true, true, false);
+            GfVpnClientDefaults.configure(binding, "/private/work", "RU", "client-id", options);
+            assertEquals(selection, binding.values.get("selection"));
+            assertEquals("RU", binding.values.get("locale"));
+            assertEquals("", binding.values.get("country"));
+        }
+    }
 }
