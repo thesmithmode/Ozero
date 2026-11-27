@@ -30,6 +30,7 @@ public final class GfVpnProcessService extends Service {
     public static final int ATTACH_TUN = 7;
     public static final int CAPTCHA_EVENT = 8;
     public static final int CAPTCHA_DISMISS = 9;
+    public static final int PROBE_TUN = 10;
     private final ScheduledExecutorService watchdog = Executors.newSingleThreadScheduledExecutor();
     private final AtomicBoolean closing = new AtomicBoolean();
     private HandlerThread worker;
@@ -65,6 +66,7 @@ public final class GfVpnProcessService extends Service {
             case ATTACH_TUN: return "attach-tun";
             case STOP: return "stop";
             case PROBE: return "probe";
+            case PROBE_TUN: return "probe-tun";
             case NETWORK_CHANGED: return "network-changed";
             default: return "unknown";
         }
@@ -195,11 +197,12 @@ public final class GfVpnProcessService extends Service {
                     break;
                 case PROBE:
                     response.putLong("latencyMs", sdk.probe());
-                    if (tun.isAttached()) {
-                        long[] counters = tun.counters();
-                        response.putLong("bytesOut", counters[1]);
-                        response.putLong("bytesIn", counters[3]);
-                    }
+                    break;
+                case PROBE_TUN:
+                    GfVpnTunProbe.Result evidence = GfVpnTunProbe.run(tun::counters, sdk::probe);
+                    response.putLong("latencyMs", evidence.latencyMs);
+                    response.putLong("bytesOut", evidence.bytesOut);
+                    response.putLong("bytesIn", evidence.bytesIn);
                     break;
                 case NETWORK_CHANGED:
                     sdk.networkChanged();
