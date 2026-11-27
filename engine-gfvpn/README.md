@@ -1,4 +1,4 @@
-# gfVPN bundled runtime
+# Adaptive VPN — bundled runtime
 
 The two verified SDK files must be present in the pinned `engine-gfvpn/vendor/runtime-bundle-1.0.6.zip` archive (or an authorized build operator's exact archive selected through `-Pozero.gfvpn.sdkArchive=/absolute/path/runtime-bundle-1.0.6.zip`). Gradle checks the archive and both entries before packaging the SDK in Ozero's own APK. No original APK or end-user import is required. Missing vendor input fails full APK assembly. The explicit `ozero.gfvpn.unitTestsOnly` mode permits JVM tests without proprietary assets, not APK packaging.
 
@@ -11,7 +11,7 @@ holder. Account and server access controls remain unchanged.
 
 API 29+ uses the separate pinned open-source HEV 2.20.0 with mapdns and JNI
 thread-state checks; older supported Android versions retain the existing HEV.
-Other engines are unaffected. IPv6 and proxy-only mode remain disabled.
+Mapped DNS uses `198.19.0.0/16` so LAN bypass keeps synthetic addresses in the TUN without capturing real carrier-grade NAT addresses. Physical link and default network callbacks share a bounded per-session refresh queue and are removed on teardown. Other engines retain their routing policy. IPv6 and proxy-only mode remain disabled.
 
 CI verifies the exact two bundled files and the HEV JNI package in debug and
 release APKs. Run the existing opt-in ARM64 SDK and full TUN smoke tests from a
