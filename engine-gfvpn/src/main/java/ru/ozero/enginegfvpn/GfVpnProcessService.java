@@ -54,11 +54,35 @@ public final class GfVpnProcessService extends Service {
         if (closing.compareAndSet(false, true)) Process.killProcess(Process.myPid());
     }
 
+    static String operationName(int operation) {
+        switch (operation) {
+            case START: return "start";
+            case ATTACH_TUN: return "attach-tun";
+            case STOP: return "stop";
+            case PROBE: return "probe";
+            case NETWORK_CHANGED: return "network-changed";
+            default: return "unknown";
+        }
+    }
+
+    private static void closeRejectedTun(Message request) {
+        if (request.what != ATTACH_TUN) return;
+        ParcelFileDescriptor descriptor = request.getData().getParcelable("tun");
+        if (descriptor != null) {
+            try { descriptor.close(); } catch (java.io.IOException ignored) { }
+        }
+    }
+
     private boolean dispatch(Message request) {
-        if (request.sendingUid != getApplicationInfo().uid || request.replyTo == null || closing.get()) return true;
+        if (request.sendingUid != getApplicationInfo().uid) return true;
+        if (request.replyTo == null || closing.get()) {
+            closeRejectedTun(request);
+            return true;
+        }
         IBinder caller = request.replyTo.getBinder();
         if (owner == null) {
             if (request.what != START) {
+                closeRejectedTun(request);
                 reply(request.replyTo, request.arg1, failure("No runtime owner"));
                 return true;
             }
@@ -71,6 +95,7 @@ public final class GfVpnProcessService extends Service {
             }
         }
         if (!owner.equals(caller)) {
+            closeRejectedTun(request);
             reply(request.replyTo, request.arg1, failure("Runtime already owned"));
             return true;
         }
@@ -79,6 +104,7 @@ public final class GfVpnProcessService extends Service {
             return true;
         }
         if (pending) {
+            closeRejectedTun(request);
             reply(request.replyTo, request.arg1, failure("Runtime request in progress"));
             return true;
         }
@@ -87,13 +113,20 @@ public final class GfVpnProcessService extends Service {
         int id = request.arg1;
         Bundle input = new Bundle(request.getData());
         Messenger target = request.replyTo;
-        work.post(() -> execute(operation, id, input, target));
+        if (!work.post(() -> execute(operation, id, input, target))) {
+            pending = false;
+            closeRejectedTun(request);
+            reply(target, id, failure("Runtime worker unavailable"));
+            terminate();
+        }
         return true;
     }
 
     private void execute(int operation, int id, Bundle input, Messenger target) {
-        ScheduledFuture<?> deadline = watchdog.schedule(this::terminate,
-            operation == START ? 120 : 12, TimeUnit.SECONDS);
+        ScheduledFuture<?> deadline = watchdog.schedule(() -> {
+            android.util.Log.w("GfVpnProcess", operationName(operation) + " watchdog expired");
+            terminate();
+        }, operation == START ? 120 : 12, TimeUnit.SECONDS);
         Bundle response = new Bundle();
         try {
             switch (operation) {
@@ -134,7 +167,9 @@ public final class GfVpnProcessService extends Service {
             response.putBoolean("ok", true);
         } catch (Exception | LinkageError failure) {
             response.putBoolean("ok", false);
-            response.putString("error", failure.getClass().getSimpleName());
+            String detail = failure instanceof GfVpnSdk.StartupFailure
+                ? failure.getMessage() : failure.getClass().getSimpleName();
+            response.putString("error", operationName(operation) + ": " + detail);
         } finally {
             deadline.cancel(false);
         }

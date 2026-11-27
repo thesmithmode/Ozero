@@ -158,7 +158,8 @@ public final class GfVpnRuntime implements AutoCloseable {
             pendingOperation = operation;
             pendingInput = input;
             sequence++;
-            deadline = () -> fail(new TimeoutException("gfVPN runtime timed out"));
+            deadline = () -> fail(new TimeoutException("gfVPN " +
+                GfVpnProcessService.operationName(operation) + " timed out"));
             main.postDelayed(deadline, timeoutMs);
             if (remote != null) sendPending();
             else {
@@ -211,9 +212,14 @@ public final class GfVpnRuntime implements AutoCloseable {
     }
 
     private void fail(Throwable failure) {
+        String operation = GfVpnProcessService.operationName(pendingOperation);
         CompletableFuture<Bundle> result = clearPending();
         release();
-        if (result != null) result.completeExceptionally(failure);
+        if (result != null) {
+            ru.ozero.enginescore.PersistentLoggers.INSTANCE.warn("GfVpnRuntime",
+                operation + " failed: " + failure.getClass().getSimpleName(), null);
+            result.completeExceptionally(failure);
+        }
     }
 
     private void release() {

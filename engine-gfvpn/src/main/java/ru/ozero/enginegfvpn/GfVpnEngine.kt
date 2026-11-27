@@ -113,7 +113,10 @@ class GfVpnEngine(
             throw cancelled
         } catch (error: Exception) {
             reset()
-            StartResult.Failure("gfVPN startup failed", error)
+            val detail = (error as? IOException)?.message?.takeIf { it.startsWith("gfVPN ") || it.startsWith("gfVPN: ") }
+                ?: error.javaClass.simpleName
+            PersistentLoggers.warn("GfVpnEngine", "Startup failed: $detail")
+            StartResult.Failure("gfVPN startup failed: $detail")
         }
     }
 
@@ -134,7 +137,9 @@ class GfVpnEngine(
             throw cancelled
         } catch (error: Exception) {
             reset()
-            PersistentLoggers.warn("GfVpnEngine", "TUN attachment failed: ${error.javaClass.simpleName}")
+            val detail = (error as? IOException)?.message?.takeIf { it.startsWith("gfVPN ") || it.startsWith("gfVPN: ") }
+                ?: error.javaClass.simpleName
+            PersistentLoggers.warn("GfVpnEngine", "TUN attachment failed: $detail")
             TunAttachResult.Failure("gfVPN TUN attachment failed")
         }
     }
@@ -221,7 +226,8 @@ class GfVpnEngine(
                         owner.networkChanged().awaitResult()
                     } catch (cancelled: CancellationException) {
                         throw cancelled
-                    } catch (_: Exception) {
+                    } catch (error: Exception) {
+                        PersistentLoggers.warn("GfVpnEngine", "Network change failed: ${error.javaClass.simpleName}")
                         // Routed watchdog will fail closed if the SDK cannot recover.
                     }
                 }

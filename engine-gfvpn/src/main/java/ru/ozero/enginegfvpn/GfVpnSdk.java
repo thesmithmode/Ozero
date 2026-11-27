@@ -31,6 +31,20 @@ final class GfVpnSdk {
         }
     }
 
+    enum StartupStage { LOAD_SDK, CONFIGURE, NATIVE_START, VALIDATE_SESSION }
+
+    static final class StartupFailure extends IOException {
+        StartupFailure(StartupStage stage, Throwable failure) {
+            super(stage.name() + ": " + safeType(failure));
+        }
+
+        private static String safeType(Throwable failure) {
+            Throwable reported = failure instanceof java.lang.reflect.InvocationTargetException &&
+                failure.getCause() != null ? failure.getCause() : failure;
+            return reported.getClass().getSimpleName();
+        }
+    }
+
     GfVpnSdk(Context context) {
         this.context = context.getApplicationContext();
     }
@@ -91,17 +105,21 @@ final class GfVpnSdk {
 
     synchronized Session start(String country, String clientIdentifier, GfVpnOptions options) throws Exception {
         if (active) throw new IllegalStateException("Already started");
-        load();
-        if (!java.util.Arrays.asList("RU", "CN", "IR", "TM", "INT").contains(country)) {
-            throw new IllegalArgumentException("Unsupported country");
-        }
-        File work = new File(context.getFilesDir(), "gfvpn-state");
-        if (!work.isDirectory() && !work.mkdirs()) throw new IOException("Cannot create work directory");
-        Object config = configType.getConstructor().newInstance();
-        GfVpnClientDefaults.configure(config, work.getAbsolutePath(), country, clientIdentifier, options);
+        StartupStage stage = StartupStage.LOAD_SDK;
         try {
+            load();
+            stage = StartupStage.CONFIGURE;
+            if (!java.util.Arrays.asList("RU", "CN", "IR", "TM", "INT").contains(country)) {
+                throw new IllegalArgumentException("Unsupported country");
+            }
+            File work = new File(context.getFilesDir(), "gfvpn-state");
+            if (!work.isDirectory() && !work.mkdirs()) throw new IOException("Cannot create work directory");
+            Object config = configType.getConstructor().newInstance();
+            GfVpnClientDefaults.configure(config, work.getAbsolutePath(), country, clientIdentifier, options);
+            stage = StartupStage.NATIVE_START;
             active = true;
             Object result = api.getMethod("start", configType).invoke(null, config);
+            stage = StartupStage.VALIDATE_SESSION;
             if (result == null) throw new IOException("SDK returned no result");
             Object error = result.getClass().getMethod("getError").invoke(result);
             if (error != null) throw new IOException("SDK startup failed");
@@ -115,10 +133,12 @@ final class GfVpnSdk {
             session = new Session((int) port, username, password);
             return session;
         } catch (Exception | LinkageError failure) {
+            StartupFailure diagnostic = new StartupFailure(stage, failure);
+            android.util.Log.w("GfVpnSdk", diagnostic.getMessage());
             try { stop(); } catch (Exception | LinkageError ignored) {
                 android.os.Process.killProcess(android.os.Process.myPid());
             }
-            throw failure;
+            throw diagnostic;
         }
     }
 
