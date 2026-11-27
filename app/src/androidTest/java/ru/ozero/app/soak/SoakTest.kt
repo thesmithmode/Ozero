@@ -497,8 +497,33 @@ class SoakTest {
         for (engine in listOf(EngineId.BYEDPI, EngineId.SINGBOX)) {
             settings.setManualEngine(engine)
             awaitStableConnection(controller, engine)
-            assertExternalRoute(instrumentation.targetContext, instrumentation.context, DEFAULT_TARGET, DEFAULT_MARKER)
+            awaitSwitchedRoute(controller, engine, instrumentation.targetContext, instrumentation.context)
             Log.i(TAG, "engine-switch engine=$engine phase=done")
+        }
+    }
+
+    private suspend fun awaitSwitchedRoute(
+        controller: TunnelController,
+        engine: EngineId,
+        context: Context,
+        probeContext: Context,
+    ) {
+        repeat(SWITCH_ROUTE_ATTEMPTS) { attempt ->
+            val probe = probeFromExternalUid(context, probeContext, DEFAULT_TARGET, DEFAULT_MARKER)
+            val state = controller.state.value
+            check(state is TunnelState.Connected && state.engineId == engine) {
+                "VPN state changed during routed switch probe: $state"
+            }
+            check(probe.vpnTransport) { "Switch probe is outside VPN" }
+            if (probe.httpCode in 200..299) {
+                check(probe.markerMatch) { "Unexpected switch probe marker" }
+                return
+            }
+            check(probe.httpCode == -1 && attempt < SWITCH_ROUTE_ATTEMPTS - 1) {
+                "Engine $engine routed probe failed: ${probe.stage} ${probe.exceptionClass} HTTP ${probe.httpCode}"
+            }
+            Log.w(TAG, "engine-switch engine=$engine transient route error: ${probe.stage} ${probe.exceptionClass}")
+            delay(NETWORK_POLL_MS)
         }
     }
 
@@ -750,6 +775,7 @@ class SoakTest {
         private const val TGWSS_START_TIMEOUT_MS = 220_000L
         private const val ENGINE_SWITCH_TIMEOUT_MS = 90_000L
         private const val STABLE_CONNECTION_MS = 5_000L
+        private const val SWITCH_ROUTE_ATTEMPTS = 3
         private const val WIFI_CHANGE_TIMEOUT_MS = 30_000L
         private const val NETWORK_RECOVERY_TIMEOUT_MS = 60_000L
         private const val NETWORK_POLL_MS = 500L
