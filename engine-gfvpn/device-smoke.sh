@@ -10,7 +10,7 @@ run_test() {
   local output
   output=$(adb shell "$1")
   printf '%s\n' "$output"
-  grep -Eq '^OK \(1 test\)\r?$' <<< "$output"
+  tr -d '\r' <<< "$output" | grep -Fxq 'OK (1 test)'
 }
 
 runner=ru.ozero.app.test/androidx.test.runner.AndroidJUnitRunner
