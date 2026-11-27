@@ -20,8 +20,11 @@ Successful CI alone does not establish backend connectivity.
 
 Connection settings follow the reference DEX: global app routing uses Ozero's
 existing split-tunnel settings; local-service bypass, configuration updates and
-cached nodes are separate SDK switches. The five selectors configure server
-mode, transport, simultaneous connections, concurrent attempts and rotation.
+cached nodes are separate SDK switches. The server selector supports all four reference modes, 20 country/proxy groups
+and 57 backend groups from the reference APK's bundled selection asset. The
+selection is passed unchanged to the SDK; catalog membership does not establish
+live server availability. Additional selectors configure transport, simultaneous
+connections, concurrent attempts and rotation.
 Whitelist and VK-TURN leave managed concurrency at SDK defaults. Settings are
 stored and exported through Ozero's existing settings and backup system and
 are editable only while the VPN is disconnected.
