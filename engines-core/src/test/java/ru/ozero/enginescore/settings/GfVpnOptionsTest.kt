@@ -21,4 +21,18 @@ class GfVpnOptionsTest {
             options.copy(serverSelection = "auto", transport = "VKT").effective(),
         )
     }
+    @Test
+    fun `reference country and server choices survive persistence`() {
+        assertEquals(20, GfVpnServerCatalog.countries.size)
+        assertEquals(13, GfVpnServerCatalog.countries.getValue("RU0").size)
+        GfVpnServerCatalog.countries.forEach { (country, servers) ->
+            (listOf(country) + servers).forEach { selection ->
+                assertEquals(country, GfVpnServerCatalog.countryFor(selection))
+                val options = GfVpnOptions(serverSelection = selection)
+                assertEquals(options, GfVpnOptions.decode(options.encode()))
+                assertEquals(selection, options.effective().serverSelection)
+            }
+        }
+        assertEquals(GfVpnOptions.DEFAULT, GfVpnOptions.decode("ZZ|H2|0|0||true|true|false"))
+    }
 }
