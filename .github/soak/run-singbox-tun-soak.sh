@@ -47,6 +47,7 @@ adb shell am instrument -w -e class ru.ozero.app.soak.MasqueNativeSmokeTest \
   ru.ozero.app.test/androidx.test.runner.AndroidJUnitRunner > "$RUNNER_TEMP/masque-native-smoke.txt" 2>&1
 cat "$RUNNER_TEMP/masque-native-smoke.txt"
 grep -Fq 'OK (1 test)' "$RUNNER_TEMP/masque-native-smoke.txt"
+adb shell pm clear ru.ozero.app | tr -d '\r' | grep -Fxq 'Success'
 adb shell appops set ru.ozero.app ACTIVATE_VPN allow
 boot_id_before=$(adb shell cat /proc/sys/kernel/random/boot_id | tr -d '\r')
 test -n "$boot_id_before"
@@ -96,7 +97,7 @@ if grep -E -q 'AndroidRuntime: Process: ru\.ozero\.app([,:]|\.test[, ])' "$RUNNE
   status=1
 fi
 if [[ "$OZERO_SOAK_REQUIRE_REALITY" == '0' ]]; then
-  grep -E -q 'SingboxEngine.*protocolType=-1 autoCount=([3-9]|[1-9][0-9]+) ' "$RUNNER_TEMP/soak-logcat.txt" || status=1
+  grep -E -q 'SingboxEngine.*protocolType=-1 autoCount=3 ' "$RUNNER_TEMP/soak-logcat.txt" || status=1
   grep -Fq 'auto-select phase=done' "$RUNNER_TEMP/soak-logcat.txt" || status=1
   grep -Fq 'engine-switch engine=BYEDPI phase=done' "$RUNNER_TEMP/soak-logcat.txt" || status=1
   grep -Fq 'engine-switch engine=SINGBOX phase=done' "$RUNNER_TEMP/soak-logcat.txt" || status=1
