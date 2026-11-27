@@ -107,9 +107,7 @@ jobs:
     name: Tests — Sing-box modules
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -244,9 +242,7 @@ jobs:
     name: Coverage gate
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -354,9 +350,7 @@ jobs:
     name: Tests — buildSrc (supply-chain SHA256)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -406,9 +400,7 @@ jobs:
     name: assembleDebug
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -561,9 +553,7 @@ jobs:
     name: Tests — app
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -667,9 +657,7 @@ jobs:
     name: Tests — common-vpn
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -725,9 +713,7 @@ jobs:
     name: Tests — engine-warp
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -783,9 +769,7 @@ jobs:
     name: Tests — engine-urnetwork
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -844,9 +828,7 @@ jobs:
     name: Tests — engine-byedpi
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -911,9 +893,7 @@ jobs:
     name: Tests — engine-fptn
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -994,9 +974,7 @@ jobs:
     name: Tests — core + common modules
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -1079,9 +1057,7 @@ jobs:
     name: Tests — engine-masterdns
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -1137,9 +1113,7 @@ jobs:
     name: Tests — engine-singbox
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -1230,9 +1204,7 @@ jobs:
     name: Tests — singbox-process
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -1323,9 +1295,7 @@ jobs:
     name: Tests — singbox-core
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -1416,9 +1386,7 @@ jobs:
     name: Tests — singbox-fmt
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -1509,9 +1477,7 @@ jobs:
     name: Tests — singbox-config
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -1602,9 +1568,7 @@ jobs:
     name: Tests — singbox-room
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -1695,9 +1659,7 @@ jobs:
     name: Tests — singbox-subscription
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -1788,9 +1750,7 @@ jobs:
     name: Tests — shared-warp-settings
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
@@ -1840,9 +1800,7 @@ jobs:
     name: Tests — engine-masque
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs:
-      - detect-open-pr-for-same-sha
-      - kotlin-style
+    needs: detect-open-pr-for-same-sha
     if: ${{ always() && !cancelled() && needs.detect-open-pr-for-same-sha.outputs.run_ci == 'true' }}
     permissions:
       contents: read
