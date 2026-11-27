@@ -16,8 +16,8 @@
     <string name="gfvpn_attempts">Одновременные попытки подключения</string>
     <string name="gfvpn_rotation">Ротация туннелей</string>
     <string name="gfvpn_auto">Авто</string>
-    <string name="gfvpn_performance">Производительность</string>
-    <string name="gfvpn_reliability">Надёжность</string>
+    <string name="gfvpn_performance">Быстро</string>
+    <string name="gfvpn_reliability">Надёжно</string>
     <string name="gfvpn_whitelist">Белый список (Россия)</string>
     <string name="gfvpn_enabled">Включено</string>
     <string name="gfvpn_disabled">Выключено</string>
@@ -26,4 +26,10 @@
     <string name="gfvpn_captcha_title">Проверка Adaptive VPN</string>
     <string name="gfvpn_captcha_summary">Пройдите ручную проверку, чтобы продолжить подключение.</string>
     <string name="gfvpn_captcha_cancel">Отменить проверку</string>
+    <string name="gfvpn_country">Страна или группа</string>
+    <string name="gfvpn_no_country">Без ограничения по стране</string>
+    <string name="gfvpn_server">Сервер</string>
+    <string name="gfvpn_any_server">Любой сервер группы</string>
+    <string name="gfvpn_proxy_country">%1$s (прокси)</string>
+    <string name="gfvpn_country_entry">%1$s %2$s — серверов: %3$d</string>
 </resources>
