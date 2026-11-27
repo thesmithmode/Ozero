@@ -28,6 +28,8 @@ public final class GfVpnProcessService extends Service {
     public static final int PROBE = 5;
     public static final int ABORT = 6;
     public static final int ATTACH_TUN = 7;
+    public static final int CAPTCHA_EVENT = 8;
+    public static final int CAPTCHA_DISMISS = 9;
     private final ScheduledExecutorService watchdog = Executors.newSingleThreadScheduledExecutor();
     private final AtomicBoolean closing = new AtomicBoolean();
     private HandlerThread worker;
@@ -36,12 +38,14 @@ public final class GfVpnProcessService extends Service {
     private GfVpnSdk sdk;
     private GfVpnTun tun;
     private IBinder owner;
+    private Messenger ownerTarget;
+    private final AtomicBoolean dismissingCaptcha = new AtomicBoolean();
     private boolean pending;
     private final IBinder.DeathRecipient ownerDeath = this::terminate;
 
     @Override public void onCreate() {
         super.onCreate();
-        sdk = new GfVpnSdk(this);
+        sdk = new GfVpnSdk(this, this::captchaEvent);
         tun = new GfVpnTun(this);
         worker = new HandlerThread("gfvpn-worker");
         worker.start();
@@ -89,6 +93,7 @@ public final class GfVpnProcessService extends Service {
             try {
                 caller.linkToDeath(ownerDeath, 0);
                 owner = caller;
+                ownerTarget = request.replyTo;
             } catch (RemoteException dead) {
                 terminate();
                 return true;
@@ -101,6 +106,11 @@ public final class GfVpnProcessService extends Service {
         }
         if (request.what == ABORT) {
             terminate();
+            return true;
+        }
+        // CAPTCHA dismissal is an out-of-band control operation, not a second start request.
+        if (request.what == CAPTCHA_DISMISS) {
+            dismissCaptcha();
             return true;
         }
         if (pending) {
@@ -120,6 +130,34 @@ public final class GfVpnProcessService extends Service {
             terminate();
         }
         return true;
+    }
+
+    private void captchaEvent(String url) {
+        new Handler(Looper.getMainLooper()).post(() -> {
+            if (closing.get() || ownerTarget == null) return;
+            Message event = Message.obtain(null, CAPTCHA_EVENT);
+            Bundle data = new Bundle();
+            data.putString("url", url);
+            event.setData(data);
+            try { ownerTarget.send(event); } catch (RemoteException dead) { terminate(); }
+        });
+    }
+
+    private void dismissCaptcha() {
+        if (!dismissingCaptcha.compareAndSet(false, true)) return;
+        ScheduledFuture<?> deadline = watchdog.schedule(this::terminate, 12, TimeUnit.SECONDS);
+        new Thread(() -> {
+            try {
+                sdk.dismissCaptcha();
+            } catch (Exception | LinkageError failure) {
+                android.util.Log.w("GfVpnProcess", "CAPTCHA dismissal failed: " +
+                    failure.getClass().getSimpleName());
+                terminate();
+            } finally {
+                deadline.cancel(false);
+                dismissingCaptcha.set(false);
+            }
+        }, "gfvpn-captcha-dismiss").start();
     }
 
     private void execute(int operation, int id, Bundle input, Messenger target) {

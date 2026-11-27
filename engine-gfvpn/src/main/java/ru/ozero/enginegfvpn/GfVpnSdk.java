@@ -14,9 +14,11 @@ final class GfVpnSdk {
     static final String DEX_SHA = "103f8155e3bd33b8f13d8ff7d1f63cb5ec1fe7acc1aa1c395eaedb83d336c829";
     static final String LIB_SHA = "7fdffc628230ce188c474c42bfc5fef5b802ace74bd9e9b249f0272f9090e404";
     private final Context context;
-    private Class<?> api;
+    private volatile Class<?> api;
     private Class<?> configType;
     private Object networkDnsCallback;
+    private Object captchaCallback;
+    private final java.util.function.Consumer<String> captchaEvents;
     private boolean active;
     private Session session;
 
@@ -45,8 +47,9 @@ final class GfVpnSdk {
         }
     }
 
-    GfVpnSdk(Context context) {
+    GfVpnSdk(Context context, java.util.function.Consumer<String> captchaEvents) {
         this.context = context.getApplicationContext();
+        this.captchaEvents = captchaEvents;
     }
 
     static void verify(File file, String expected) throws Exception {
@@ -99,6 +102,20 @@ final class GfVpnSdk {
             });
         loadedApi.getMethod("setNetworkDNSCallback", callbackType).invoke(null, callback);
         networkDnsCallback = callback;
+        Class<?> captchaType = Class.forName("gfvpnclient.CaptchaCallback", true, loader);
+        Object captcha = java.lang.reflect.Proxy.newProxyInstance(loader, new Class<?>[]{captchaType},
+            (proxy, method, args) -> {
+                switch (method.getName()) {
+                    case "onCaptchaRequired": captchaEvents.accept((String) args[0]); return null;
+                    case "onCaptchaResolved": captchaEvents.accept(null); return null;
+                    case "toString": return "gfVPN manual CAPTCHA callback";
+                    case "hashCode": return System.identityHashCode(proxy);
+                    case "equals": return args != null && args.length == 1 && proxy == args[0];
+                    default: throw new UnsupportedOperationException(method.getName());
+                }
+            });
+        loadedApi.getMethod("setCaptchaCallback", captchaType).invoke(null, captcha);
+        captchaCallback = captcha;
         configType = loadedConfig;
         api = loadedApi;
     }
@@ -140,6 +157,12 @@ final class GfVpnSdk {
             }
             throw diagnostic;
         }
+    }
+
+    // The reference invokes dismissal on its own thread, including during native start.
+    void dismissCaptcha() throws Exception {
+        Class<?> loaded = api;
+        if (loaded != null) loaded.getMethod("vktDismissPendingCaptcha").invoke(null);
     }
 
     synchronized void stop() throws Exception {

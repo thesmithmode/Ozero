@@ -23,4 +23,7 @@
     <string name="gfvpn_disabled">Выключено</string>
     <string name="gfvpn_managed_options">Эти настройки управляются автоматически в режиме белого списка или VK-TURN.</string>
     <string name="gfvpn_disconnect_to_edit">Отключите VPN, чтобы изменить настройки подключения.</string>
+    <string name="gfvpn_captcha_title">Проверка gfVPN</string>
+    <string name="gfvpn_captcha_summary">Пройдите ручную проверку, чтобы продолжить подключение.</string>
+    <string name="gfvpn_captcha_cancel">Отменить проверку</string>
 </resources>

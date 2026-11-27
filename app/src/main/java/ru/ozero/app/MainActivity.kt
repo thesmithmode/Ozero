@@ -9,6 +9,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import ru.ozero.app.logging.AppLogger
 import ru.ozero.app.logging.LogcatReader
 import ru.ozero.app.settings.UserFlagsRepository
+import ru.ozero.app.ui.GfVpnCaptchaDialog
 import ru.ozero.app.ui.MainViewModel
 import ru.ozero.app.ui.RootNavigation
 import ru.ozero.app.ui.launcher.BatteryGuard
@@ -57,6 +58,7 @@ class MainActivity : AppCompatActivity() {
             OzeroTheme {
                 OnboardingGate(userFlags = userFlags) {
                     RootNavigation(viewModel = viewModel, onConnectClick = vpnIntentLauncher::onConnectClick)
+                    GfVpnCaptchaDialog()
                 }
             }
         }

@@ -23,4 +23,7 @@
     <string name="gfvpn_disabled">Disabled</string>
     <string name="gfvpn_managed_options">These options are managed automatically in Whitelist mode or when VK-TURN is selected.</string>
     <string name="gfvpn_disconnect_to_edit">Disconnect the VPN to change connection settings.</string>
+    <string name="gfvpn_captcha_title">gfVPN verification</string>
+    <string name="gfvpn_captcha_summary">Complete the manual verification to continue the connection.</string>
+    <string name="gfvpn_captcha_cancel">Cancel verification</string>
 </resources>

@@ -184,8 +184,19 @@ public final class GfVpnRuntime implements AutoCloseable {
     }
 
     private boolean receive(Message message) {
-        if (message.sendingUid != context.getApplicationInfo().uid ||
-            message.what != GfVpnProcessService.RESULT || pending == null || closed) return true;
+        if (message.sendingUid != context.getApplicationInfo().uid || closed) return true;
+        if (message.what == GfVpnProcessService.CAPTCHA_EVENT) {
+            String url = message.getData().getString("url");
+            if (url == null || url.isEmpty()) {
+                GfVpnCaptchaState.clear(this);
+            } else if (!GfVpnCaptchaState.publish(this, url, this::dismissCaptcha)) {
+                ru.ozero.enginescore.PersistentLoggers.INSTANCE.warn("GfVpnRuntime",
+                    "Rejected non-local CAPTCHA URL", null);
+                dismissCaptcha();
+            }
+            return true;
+        }
+        if (message.what != GfVpnProcessService.RESULT || pending == null) return true;
         Bundle data = message.getData();
         if (data.getInt("requestId") != sequence) return true;
         int operation = pendingOperation;
@@ -199,6 +210,15 @@ public final class GfVpnRuntime implements AutoCloseable {
             if (operation == GfVpnProcessService.START || operation == GfVpnProcessService.STOP) release();
         }
         return true;
+    }
+
+    private void dismissCaptcha() {
+        main.post(() -> {
+            if (closed || remote == null) return;
+            Message message = Message.obtain(null, GfVpnProcessService.CAPTCHA_DISMISS);
+            message.replyTo = replies;
+            try { remote.send(message); } catch (RemoteException failure) { fail(failure); }
+        });
     }
 
     private CompletableFuture<Bundle> clearPending() {
@@ -225,6 +245,7 @@ public final class GfVpnRuntime implements AutoCloseable {
     private void release() {
         if (closed) return;
         closed = true;
+        GfVpnCaptchaState.clear(this);
         started = false;
         if (remote != null) {
             Message abort = Message.obtain(null, GfVpnProcessService.ABORT);
