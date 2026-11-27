@@ -83,10 +83,40 @@ class OperaProxyRuntimeTest {
     }
 
     @Test
-    fun `unreachable route times out and kills process`() = runTest {
-        val process = FakeProcess()
+    fun `stalled primary bootstrap retries and stops the first process`() = runTest {
+        val primary = FakeProcess()
+        val alternate = FakeProcess()
+        val configs = mutableListOf<Boolean>()
+        var port = 12344
         val runtime = OperaProxyRuntime(
-            launcher = OperaProxyLauncher { _, _ -> process },
+            launcher = OperaProxyLauncher { config, _ ->
+                configs.add(config.alternateBootstrap)
+                if (config.alternateBootstrap) alternate else primary
+            },
+            routedProbe = { candidate ->
+                if (candidate == 12345) throw IOException()
+                20L
+            },
+            allocatePort = { ++port },
+            timeoutMs = 100,
+            retryDelayMs = 10,
+        )
+        try {
+            assertEquals(StartResult.Success(12346), runtime.start(OperaProxyConfig()))
+            assertEquals(listOf(false, true), configs)
+            assertFalse(primary.alive)
+            assertTrue(alternate.alive)
+        } finally {
+            runtime.stop()
+        }
+        assertFalse(alternate.alive)
+    }
+
+    @Test
+    fun `unreachable route times out and kills both processes`() = runTest {
+        val processes = mutableListOf<FakeProcess>()
+        val runtime = OperaProxyRuntime(
+            launcher = OperaProxyLauncher { _, _ -> FakeProcess().also { processes.add(it) } },
             routedProbe = { throw IOException() },
             allocatePort = { 12345 },
             timeoutMs = 100,
@@ -96,7 +126,8 @@ class OperaProxyRuntimeTest {
             StartResult.Failure("opera routed readiness timed out"),
             runtime.start(OperaProxyConfig()),
         )
-        assertFalse(process.alive)
+        assertEquals(2, processes.size)
+        assertTrue(processes.none { it.alive })
     }
 
     @Test
