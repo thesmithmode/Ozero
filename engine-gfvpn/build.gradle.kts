@@ -1,4 +1,5 @@
 import binaries.ExtractGfVpnHevTask
+import binaries.PrepareGfVpnSdkTask
 
 plugins {
     id("ozero.android.library")
@@ -15,13 +16,21 @@ val prepareGfVpnHev by tasks.registering(ExtractGfVpnHevTask::class) {
     outputDirectory.set(layout.buildDirectory.dir("generated/gfvpn-hev/jniLibs"))
 }
 
+val prepareGfVpnSdk by tasks.registering(PrepareGfVpnSdkTask::class) {
+    localApk.set(
+        layout.file(providers.gradleProperty("gfvpnSourceApk").map { java.io.File(it) }),
+    )
+    outputDirectory.set(layout.buildDirectory.dir("generated/gfvpn-sdk/assets"))
+}
+
 android {
     namespace = "ru.ozero.enginegfvpn"
+    sourceSets.getByName("main").assets.srcDir(prepareGfVpnSdk.flatMap { it.outputDirectory })
     sourceSets.getByName("main").jniLibs.srcDir(prepareGfVpnHev.flatMap { it.outputDirectory })
 }
 
 tasks.matching { it.name == "preBuild" }.configureEach {
-    dependsOn(prepareGfVpnHev)
+    dependsOn(prepareGfVpnHev, prepareGfVpnSdk)
 }
 
 dependencies {

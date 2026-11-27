@@ -231,7 +231,7 @@ class SoakTest {
         val marker = requireNotNull(args.getString("OZERO_GFVPN_SMOKE_MARKER"))
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
-        check(ru.ozero.enginegfvpn.GfVpnImport.isInstalled(context)) { "Local gfVPN SDK is absent" }
+        check(ru.ozero.enginegfvpn.GfVpnBundledSdk.isAvailable(context)) { "Bundled gfVPN SDK is absent" }
         check(VpnService.prepare(context) == null) { "VPN consent not granted" }
         val dependencies = EntryPointAccessors.fromApplication(
             context.applicationContext,

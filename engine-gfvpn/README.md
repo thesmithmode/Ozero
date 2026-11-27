@@ -1,30 +1,19 @@
-# gfVPN integration experiment
+# gfVPN bundled runtime
 
-The bridge is registered as a standalone selectable VPN engine. No third-party SDK is bundled; the user must explicitly import the exact authorized local APK in engine settings. Proxy-only, automatic chain selection and IPv6 are disabled.
-It contains only original bridge code, not the proprietary SDK, configurations
-or credentials. The locally supplied APK is pinned to the exact analyzed version.
+The exact reference APK is a verified offline build input. No external download URL is embedded. The build extracts the pinned DEX and ARM64 SDK entries into generated APK assets; a missing input fails the build rather than producing a broken release. Use `-PgfvpnSourceApk=/absolute/path/to/source.apk` for a local build.
 
-`python3 engine-gfvpn/prepare-sdk.py /path/to/local.apk /tmp/gfvpn-sdk`
+On ARM64 devices the engine installs its verified read-only runtime into a
+private versioned directory automatically and starts it using a dedicated
+classloader and process. No file picker or post-install APK import is required.
+The closed runtime executes with the application's UID; process separation
+is not a security sandbox. Distribution requires permission from the rights
+holder. Account and server access controls remain unchanged.
 
-For an explicitly authorized development build, copy the two read-only files
-into the app's private files/gfvpn-sdk directory. Do not add them to Git or
-release assets. The bridge independently validates the hashes before loading.
-It loads the matching gomobile classes using a separate classloader in the
-private :engine_gfvpn process. GfVpnRuntime provides the asynchronous host-side
-session API, request deadlines, owner-death cancellation and hard process reset.
+API 29+ uses the separate pinned open-source HEV 2.20.0 with mapdns and JNI
+thread-state checks; older supported Android versions retain the existing HEV.
+Other engines are unaffected. IPv6 and proxy-only mode remain disabled.
 
-To run the real SDK smoke test on an attached ARM64 device, install the Ozero debug APK and its androidTest APK, then run `bash engine-gfvpn/device-smoke.sh /path/to/local.apk`. The test is opt-in; normal CI does not certify the closed native SDK. The script refuses to overwrite an existing SDK directory.
-
-Remaining gates before a selectable engine:
-- Test on ARM64 Android; validate JNI classloader compatibility and native
-  startup/stop/restart, including bounded shutdown and process death.
-- The private IPC now passes SOCKS credentials only to the same app UID and implements a routed HTTPS probe. Validate both with the actual SDK, including native timeout recovery.
-- The isolated service now accepts a duplicated TUN descriptor and starts a dedicated HEV 2.20.0 on API 29+ (mapdns as an alternative to the reference application's optional custom DNS forwarder, plus JNI thread-state checks), retaining Ozero's existing HEV on API 24–28, with authenticated SOCKS5 settings. Device-test UDP-over-TCP, DNS and IPv6; verify the now-wired Ozero VPN lifecycle, split routing and engine UI on-device. No other engine may load this runtime.
-- Verify live configuration updates and transport behavior under real network
-  conditions, and establish authorization to distribute the SDK if desired.
-
-No production support or runtime success is claimed.
-
-Full VPN device acceptance: run `ru.ozero.app.soak.SoakTest#runGfVpnTunSmoke` with `OZERO_GFVPN_SMOKE=1`, `OZERO_GFVPN_SMOKE_URL` and `OZERO_GFVPN_SMOKE_MARKER` (a controlled HTTPS test page and expected content). This verifies three starts/stops and external test-UID HTTPS routing, not merely SOCKS readiness. The user must grant Android VPN consent first. A separate process is not a security sandbox: the imported closed-source SDK runs with the application UID. The bridge remains experimental until ARM64 tests and provider authorization are verified.
-
-The gfVPN-specific HEV native library is obtained from the upstream 2.20.0 AAR at a locked SHA-256, with only the ARM64 JNI binary extracted. It is not the proprietary gfVPN SDK. The JNI binding uses upstream's `hev.htproxy.TProxyService` contract and a unique library filename. The other engines retain their existing HEV implementation. The upstream MIT license is bundled in assets.
+CI verifies the exact two bundled files and the HEV JNI package in debug and
+release APKs. Run the existing opt-in ARM64 SDK and full TUN smoke tests from a
+fresh install, without transferring any SDK files, before production release.
+Successful CI alone does not establish backend connectivity.

@@ -8,7 +8,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
 
-/** Runtime bridge for the exact locally supplied SDK. Never bundles third-party code. */
+/** Runtime bridge for the verified SDK packaged in Ozero's own assets. */
 final class GfVpnSdk {
     static final String DEX_SHA = "103f8155e3bd33b8f13d8ff7d1f63cb5ec1fe7acc1aa1c395eaedb83d336c829";
     static final String LIB_SHA = "7fdffc628230ce188c474c42bfc5fef5b802ace74bd9e9b249f0272f9090e404";
@@ -56,7 +56,7 @@ final class GfVpnSdk {
         if (!java.util.Arrays.asList(Build.SUPPORTED_64_BIT_ABIS).contains("arm64-v8a")) {
             throw new IOException("gfVPN SDK requires ARM64");
         }
-        File directory = new File(context.getFilesDir(), "gfvpn-sdk");
+        File directory = GfVpnBundledSdk.prepare(context);
         File dex = new File(directory, "classes.dex");
         File lib = new File(directory, "libgojni.so");
         verify(dex, DEX_SHA);

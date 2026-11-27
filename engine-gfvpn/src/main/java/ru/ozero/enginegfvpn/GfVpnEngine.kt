@@ -66,7 +66,7 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
     )
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? =
-        EngineConfig.GfVpn.takeIf { GfVpnImport.isInstalled(app) }
+        EngineConfig.GfVpn.takeIf { GfVpnBundledSdk.isAvailable(app) }
 
     override fun buildProxyConfig(settings: SettingsModel?): EngineConfig? = null
 
@@ -84,8 +84,8 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
         if (config != EngineConfig.GfVpn || upstream != Upstream.None) {
             return@withLock StartResult.Failure("gfVPN requires standalone VPN mode")
         }
-        if (!GfVpnImport.isInstalled(app)) {
-            return@withLock StartResult.Failure("Import the local gfVPN APK in engine settings")
+        if (!GfVpnBundledSdk.isAvailable(app)) {
+            return@withLock StartResult.Failure("Bundled gfVPN runtime unavailable on this build or device")
         }
         reset()
         val next = GfVpnRuntime(app)

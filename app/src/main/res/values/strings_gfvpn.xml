@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="gfvpn_summary">Experimental standalone VPN; automatic server selection (Russia). Local SDK import required. IPv6 and proxy-only mode are unavailable.</string>
+    <string name="gfvpn_summary">VPN with automatic server selection (Russia). IPv6 and proxy-only mode are unavailable.</string>
     <string name="gfvpn_back">Back</string>
-    <string name="gfvpn_installed">Local SDK installed. Select gfVPN on the main screen.</string>
-    <string name="gfvpn_missing">Import the authorized Cyberportal BS 1.0.6 APK to enable this engine. The third-party SDK is not included.</string>
-    <string name="gfvpn_import">Import APK</string>
-    <string name="gfvpn_importing">Importing…</string>
-    <string name="gfvpn_import_failed">Import failed. Check APK version, device architecture and available storage.</string>
-    <string name="gfvpn_trust_warning">Import only if you trust this closed-source APK. Process separation contains crashes, not access to app data.</string>
+    <string name="gfvpn_installed">Runtime included. Select gfVPN on the main screen.</string>
+    <string name="gfvpn_missing">The gfVPN runtime is unavailable on this device.</string>
+    <string name="gfvpn_trust_warning">The bundled third-party runtime runs with the application's permissions.</string>
 </resources>

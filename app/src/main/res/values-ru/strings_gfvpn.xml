@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="gfvpn_summary">Экспериментальный VPN с автоматическим выбором серверов (Россия). Требуется локальный SDK. IPv6 и режим прокси недоступны.</string>
+    <string name="gfvpn_summary">VPN с автоматическим выбором серверов (Россия). IPv6 и режим прокси недоступны.</string>
     <string name="gfvpn_back">Назад</string>
-    <string name="gfvpn_installed">SDK установлен. Выберите gfVPN на главном экране.</string>
-    <string name="gfvpn_missing">Импортируйте разрешённый к использованию APK КИБЕРПОРТАЛ БС 1.0.6. Стороннее ядро не входит в приложение.</string>
-    <string name="gfvpn_import">Импортировать APK</string>
-    <string name="gfvpn_importing">Импорт…</string>
-    <string name="gfvpn_import_failed">Ошибка импорта. Проверьте версию APK, архитектуру и свободное место.</string>
-    <string name="gfvpn_trust_warning">Импортируйте только доверенный APK. Отдельный процесс изолирует сбои, но не доступ стороннего ядра к данным приложения.</string>
+    <string name="gfvpn_installed">Ядро встроено. Выберите gfVPN на главном экране.</string>
+    <string name="gfvpn_missing">На этом устройстве ядро gfVPN недоступно.</string>
+    <string name="gfvpn_trust_warning">Встроенное стороннее ядро работает с правами приложения.</string>
 </resources>
