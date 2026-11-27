@@ -2,8 +2,8 @@
 <resources>
     <string name="gfvpn_summary">VPN with automatic or manual connection selection. IPv6 and proxy-only mode are unavailable.</string>
     <string name="gfvpn_back">Back</string>
-    <string name="gfvpn_installed">Runtime included. Select gfVPN on the main screen.</string>
-    <string name="gfvpn_missing">The gfVPN runtime is unavailable on this device.</string>
+    <string name="gfvpn_installed">Runtime included. Select Adaptive VPN on the main screen.</string>
+    <string name="gfvpn_missing">The Adaptive VPN runtime is unavailable on this device.</string>
     <string name="gfvpn_trust_warning">The bundled third-party runtime has the same permissions as the app.</string>
     <string name="gfvpn_global">Use VPN for all apps</string>
     <string name="gfvpn_update_config">Auto-update configuration</string>
@@ -23,7 +23,7 @@
     <string name="gfvpn_disabled">Disabled</string>
     <string name="gfvpn_managed_options">These options are managed automatically in Whitelist mode or when VK-TURN is selected.</string>
     <string name="gfvpn_disconnect_to_edit">Disconnect the VPN to change connection settings.</string>
-    <string name="gfvpn_captcha_title">gfVPN verification</string>
+    <string name="gfvpn_captcha_title">Adaptive VPN verification</string>
     <string name="gfvpn_captcha_summary">Complete the manual verification to continue the connection.</string>
     <string name="gfvpn_captcha_cancel">Cancel verification</string>
 </resources>
