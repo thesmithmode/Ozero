@@ -15,7 +15,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -57,6 +56,7 @@ class GfVpnEngine(
     private var runtime: GfVpnRuntime? = null
 
     private var callback: ConnectivityManager.NetworkCallback? = null
+    private var networkChanges: GfVpnNetworkChanges? = null
     private var attached = false
     private var sdkSession: GfVpnRuntime.Session? = null
 
@@ -220,32 +220,39 @@ class GfVpnEngine(
     }
 
     private fun observeNetworks(owner: GfVpnRuntime) {
+        val manager = connectivity ?: return
+        val changes = GfVpnNetworkChanges(scope) { notifyChanged(owner) }
         val listener = object : ConnectivityManager.NetworkCallback() {
-            override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) =
-                notifyChanged(owner)
-            override fun onLost(network: Network) = notifyChanged(owner)
+            override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
+                changes.offer()
+            }
+
+            override fun onLost(network: Network) {
+                changes.offer()
+            }
         }
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
             .build()
-        connectivity?.registerNetworkCallback(request, listener)
-        callback = listener
+        try {
+            manager.registerNetworkCallback(request, listener)
+            callback = listener
+            networkChanges = changes
+        } catch (failure: Exception) {
+            changes.close()
+            PersistentLoggers.warn("GfVpnEngine", "Network observation unavailable: ${failure.javaClass.simpleName}")
+        }
     }
 
-    private fun notifyChanged(owner: GfVpnRuntime) {
-        scope.launch {
-            mutex.withLock {
-                if (runtime === owner && attached) {
-                    try {
-                        owner.networkChanged().awaitResult()
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        PersistentLoggers.warn("GfVpnEngine", "Network change failed: ${error.javaClass.simpleName}")
-                        // Routed watchdog will fail closed if the SDK cannot recover.
-                    }
-                }
+    private suspend fun notifyChanged(owner: GfVpnRuntime) = mutex.withLock {
+        if (runtime === owner && attached) {
+            try {
+                owner.networkChanged().awaitResult()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                PersistentLoggers.warn("GfVpnEngine", "Network change failed: ${error.javaClass.simpleName}")
             }
         }
     }
@@ -255,6 +262,8 @@ class GfVpnEngine(
         ?: error.javaClass.simpleName
 
     private fun reset() {
+        networkChanges?.close()
+        networkChanges = null
         callback?.let { runCatching { connectivity?.unregisterNetworkCallback(it) } }
         callback = null
         val previous = runtime

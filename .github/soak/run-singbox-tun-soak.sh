@@ -98,6 +98,9 @@ fi
 if [[ "$OZERO_SOAK_REQUIRE_REALITY" == '0' ]]; then
   grep -E -q 'SingboxEngine.*protocolType=-1 autoCount=([3-9]|[1-9][0-9]+) ' "$RUNNER_TEMP/soak-logcat.txt" || status=1
   grep -Fq 'auto-select phase=done' "$RUNNER_TEMP/soak-logcat.txt" || status=1
+  grep -Fq 'engine-switch engine=BYEDPI phase=done' "$RUNNER_TEMP/soak-logcat.txt" || status=1
+  grep -Fq 'engine-switch engine=SINGBOX phase=done' "$RUNNER_TEMP/soak-logcat.txt" || status=1
+  grep -Fq 'network-recovery engine=SINGBOX phase=done' "$RUNNER_TEMP/soak-logcat.txt" || status=1
 fi
 if ! pull_metrics; then
   echo 'Failed to pull soak metrics after ADB recovery attempts.' >&2

@@ -3,6 +3,10 @@ package ru.ozero.enginegfvpn;
 import android.content.Context;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
+import android.system.ErrnoException;
+import android.system.Os;
+import android.system.OsConstants;
+import android.system.StructPollfd;
 import hev.TProxyService;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -60,17 +64,21 @@ final class GfVpnTun {
         // Both HEV versions start asynchronously. Keep the private YAML until native stop joins.
     }
 
-    boolean isAttached() { return attached != null; }
-
     long[] counters() throws IOException {
         if (!started || attached == null) throw new IOException("HEV not attached");
         try {
+            StructPollfd descriptor = new StructPollfd();
+            descriptor.fd = attached.getFileDescriptor();
+            if (!descriptor.fd.valid()) throw new IOException("TUN descriptor closed");
+            Os.poll(new StructPollfd[]{descriptor}, 0);
+            if ((descriptor.revents & (OsConstants.POLLERR | OsConstants.POLLHUP | OsConstants.POLLNVAL)) != 0) {
+                throw new IOException("TUN descriptor unavailable");
+            }
             if (mapDns && !hev.htproxy.TProxyService.TProxyIsRunning()) {
                 throw new IOException("gfVPN HEV stopped");
             }
-            return GfVpnTunCounters.validate(mapDns
-                ? hev.htproxy.TProxyService.TProxyGetStats() : TProxyService.TProxyGetStats());
-        } catch (RuntimeException | LinkageError unavailable) {
+            return mapDns ? hev.htproxy.TProxyService.TProxyGetStats() : TProxyService.TProxyGetStats();
+        } catch (ErrnoException | RuntimeException | LinkageError unavailable) {
             throw new IOException("HEV unavailable", unavailable);
         }
     }

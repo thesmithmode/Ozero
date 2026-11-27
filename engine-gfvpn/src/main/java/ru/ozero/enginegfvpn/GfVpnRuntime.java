@@ -116,21 +116,29 @@ public final class GfVpnRuntime implements AutoCloseable {
         public final long bytesIn;
         public final long bytesOut;
         private Probe(Bundle data) {
-            latencyMs = data.getLong("latencyMs");
-            bytesIn = data.getLong("bytesIn");
-            bytesOut = data.getLong("bytesOut");
+            latencyMs = data.getLong("latencyMs", -1);
+            bytesIn = data.getLong("bytesIn", -1);
+            bytesOut = data.getLong("bytesOut", -1);
+            if (latencyMs < 0 || bytesIn < 0 || bytesOut < 0) {
+                throw new IllegalStateException("Missing or invalid TUN probe evidence");
+            }
         }
     }
 
     public CompletableFuture<Probe> probeWithStats() {
-        CompletableFuture<Probe> result = request(GfVpnProcessService.PROBE, new Bundle(), 15000)
+        CompletableFuture<Probe> result = request(GfVpnProcessService.PROBE_TUN, new Bundle(), 15000)
             .thenApply(Probe::new);
         result.whenComplete((value, error) -> { if (result.isCancelled()) close(); });
         return result;
     }
 
     public CompletableFuture<Long> probe() {
-        CompletableFuture<Long> result = probeWithStats().thenApply(data -> data.latencyMs);
+        CompletableFuture<Long> result = request(GfVpnProcessService.PROBE, new Bundle(), 15000)
+            .thenApply(data -> {
+                long latency = data.getLong("latencyMs", -1);
+                if (latency < 0) throw new IllegalStateException("Invalid SDK probe evidence");
+                return latency;
+            });
         result.whenComplete((value, error) -> { if (result.isCancelled()) close(); });
         return result;
     }

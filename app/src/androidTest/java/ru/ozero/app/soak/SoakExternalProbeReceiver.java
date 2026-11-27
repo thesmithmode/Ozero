@@ -14,8 +14,6 @@ import java.net.URL;
 import java.net.UnknownHostException;
 import javax.net.ssl.SSLException;
 
-import ru.ozero.enginescore.LogSanitizer;
-
 public final class SoakExternalProbeReceiver extends BroadcastReceiver {
     public static final String EXTRA_URL = "url";
     public static final String EXTRA_EXPECTED_MARKER = "expected_marker";
@@ -93,7 +91,7 @@ public final class SoakExternalProbeReceiver extends BroadcastReceiver {
             ProbeResponse failure = ProbeResponse.failure(
                 resolvedStage,
                 error.getClass().getSimpleName(),
-                LogSanitizer.INSTANCE.sanitize(error.getMessage() == null ? "" : error.getMessage()),
+                "redacted",
                 startedAt
             );
             Log.w("SoakExternalProbe", "stage=" + failure.stage + " exceptionClass=" + failure.exceptionClass
