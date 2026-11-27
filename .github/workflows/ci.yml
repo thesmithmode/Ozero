@@ -478,6 +478,15 @@ jobs:
       - name: Build MASQUE native transport
         uses: ./.github/actions/build-masque
 
+      - name: Verify Adaptive VPN SDK configuration cache
+        run: |
+          set -euo pipefail
+          args=(:engine-gfvpn:prepareGfVpnSdk --configuration-cache --configuration-cache-problems=fail --console=plain --stacktrace)
+          ./gradlew "${args[@]}"
+          ./gradlew "${args[@]}" | tee "$RUNNER_TEMP/adaptive-sdk-cache.log"
+          grep -F "Reusing configuration cache." "$RUNNER_TEMP/adaptive-sdk-cache.log"
+          ./gradlew "${args[@]}" -Pozero.gfvpn.sdkArchive="$GITHUB_WORKSPACE/engine-gfvpn/vendor/runtime-bundle-1.0.6.zip"
+
       - name: assembleDebug
         run: ./gradlew assembleDebug :app:assembleDebugAndroidTest --stacktrace
 
