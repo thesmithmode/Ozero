@@ -89,6 +89,111 @@ class RuntimeManualEngineSwitchTest {
         assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), actions)
     }
 
+    @Test
+    fun `automatic switch waits for fallback and accepts any connected candidate`() = runTest {
+        val actions = mutableListOf<String?>()
+        val settings = MutableStateFlow(SettingsModel(manualEngine = EngineId.WARP))
+        val controller = TunnelController(watchdogScope = backgroundScope)
+        controller.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val coordinator = RuntimeConfigRestartCoordinator(
+            context = recordingContext(actions) { controller.onDisconnecting() },
+            observer = EngineRuntimeConfigRestartObserver(emptySet()),
+            tunnelController = controller,
+            settingsRepository = fakeSettingsRepository(settings),
+        )
+
+        coordinator.start(backgroundScope)
+        runCurrent()
+        settings.value = SettingsModel(
+            manualEngine = null,
+            engineAutoPriority = listOf(EngineId.BYEDPI, EngineId.MASQUE),
+        )
+        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        runCurrent()
+        controller.reset()
+        controller.onProbing(EngineId.BYEDPI)
+        advanceTimeBy(30_000L)
+        controller.onDisconnecting()
+        controller.reset()
+        controller.onProbing(EngineId.MASQUE)
+        advanceTimeBy(70_000L)
+        assertTrue(coordinator.restartInProgress())
+        assertEquals(EngineId.WARP, controller.switching.value?.from)
+        assertEquals(null, controller.switching.value?.to)
+        controller.onConnecting(EngineId.MASQUE)
+        controller.onEngineStarted(EngineId.MASQUE, 12345)
+        runCurrent()
+
+        assertFalse(coordinator.restartInProgress())
+        assertEquals(null, controller.switching.value)
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), actions)
+    }
+
+    @Test
+    fun `automatic switch remains bounded and excludes standalone candidates`() = runTest {
+        val actions = mutableListOf<String?>()
+        val settings = MutableStateFlow(SettingsModel(manualEngine = EngineId.WARP))
+        val controller = TunnelController(watchdogScope = backgroundScope)
+        controller.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val coordinator = RuntimeConfigRestartCoordinator(
+            context = recordingContext(actions) { controller.onDisconnecting() },
+            observer = EngineRuntimeConfigRestartObserver(emptySet()),
+            tunnelController = controller,
+            settingsRepository = fakeSettingsRepository(settings),
+        )
+
+        coordinator.start(backgroundScope)
+        runCurrent()
+        settings.value = SettingsModel(
+            manualEngine = null,
+            engineAutoPriority = listOf(EngineId.BYEDPI, EngineId.BYEDPI, EngineId.GFVPN, EngineId.TGWSS),
+        )
+        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        runCurrent()
+        controller.reset()
+        controller.onProbing(EngineId.BYEDPI)
+        runCurrent()
+        advanceTimeBy(59_999L)
+        assertTrue(coordinator.restartInProgress())
+        advanceTimeBy(2L)
+        runCurrent()
+
+        assertFalse(coordinator.restartInProgress())
+        assertEquals(null, controller.switching.value)
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), actions)
+    }
+
+    @Test
+    fun `automatic switch without startup progress retains the original short timeout`() = runTest {
+        val actions = mutableListOf<String?>()
+        val settings = MutableStateFlow(SettingsModel(manualEngine = EngineId.WARP))
+        val controller = TunnelController(watchdogScope = backgroundScope)
+        controller.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val coordinator = RuntimeConfigRestartCoordinator(
+            context = recordingContext(actions) { controller.onDisconnecting() },
+            observer = EngineRuntimeConfigRestartObserver(emptySet()),
+            tunnelController = controller,
+            settingsRepository = fakeSettingsRepository(settings),
+        )
+
+        coordinator.start(backgroundScope)
+        runCurrent()
+        settings.value = SettingsModel(
+            manualEngine = null,
+            engineAutoPriority = listOf(EngineId.BYEDPI),
+        )
+        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        runCurrent()
+        advanceTimeBy(14_999L)
+        assertTrue(coordinator.restartInProgress())
+        advanceTimeBy(2L)
+        runCurrent()
+
+        assertFalse(coordinator.restartInProgress())
+        assertEquals(null, controller.switching.value)
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), actions)
+    }
+
     private fun recordingContext(
         startServiceActions: MutableList<String?>,
         onStartService: () -> Unit = {},
