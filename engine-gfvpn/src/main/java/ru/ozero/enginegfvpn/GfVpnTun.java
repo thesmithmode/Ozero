@@ -106,6 +106,8 @@ final class GfVpnTun {
         }
     }
 
+    static final String MAP_DNS_CIDR = "100.64.0.0/10";
+
     static boolean supportsMapDns(int sdk) { return sdk >= 29; }
 
     static String dnsAddress(int sdk) { return supportsMapDns(sdk) ? "198.18.0.2" : "1.1.1.1"; }
@@ -122,7 +124,8 @@ final class GfVpnTun {
             "\n  password: " + quote(password) + "\n";
         // HEV resolves synthetic IPv4 destinations by domain through the authenticated SOCKS route.
         return mapDns ? base + "mapdns:\n  address: '198.18.0.2'\n  port: 53\n" +
-            "  network: '100.64.0.0'\n  netmask: '255.192.0.0'\n  cache-size: 10000\n" : base;
+            "  network: '" + MAP_DNS_CIDR.substring(0, MAP_DNS_CIDR.indexOf('/')) + "'\n" +
+            "  netmask: '255.192.0.0'\n  cache-size: 10000\n" : base;
     }
 
     private static String quote(String value) {
