@@ -255,7 +255,10 @@ class GfVpnEngine(
             manager.registerDefaultNetworkCallback(defaultListener)
             defaultCallback = defaultListener
         } catch (failure: Exception) {
-            PersistentLoggers.warn("GfVpnEngine", "Default network observation unavailable: ${failure.javaClass.simpleName}")
+            PersistentLoggers.warn(
+                "GfVpnEngine",
+                "Default network observation unavailable: ${failure.javaClass.simpleName}",
+            )
         }
         if (callback == null && defaultCallback == null) {
             changes.close()
