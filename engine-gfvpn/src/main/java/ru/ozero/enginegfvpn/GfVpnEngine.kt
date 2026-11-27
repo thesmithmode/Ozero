@@ -173,8 +173,11 @@ class GfVpnEngine(
             }
             false
         } == true
-        return if (ready) EnginePlugin.ReadyResult.Ready
-        else EnginePlugin.ReadyResult.Timeout("gfVPN route unavailable")
+        return if (ready) {
+            EnginePlugin.ReadyResult.Ready
+        } else {
+            EnginePlugin.ReadyResult.Timeout("gfVPN route unavailable")
+        }
     }
 
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
