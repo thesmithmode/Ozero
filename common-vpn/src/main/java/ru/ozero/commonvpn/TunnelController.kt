@@ -237,8 +237,7 @@ class TunnelController(
     private fun switchingTimeoutFor(target: EngineId?): Long = when {
         switchingTimeoutMs != SWITCHING_TIMEOUT_MS -> switchingTimeoutMs
         target == EngineId.FPTN -> FPTN_SWITCHING_TIMEOUT_MS
-        EngineStartupBudget.switchingTimeoutMs(target) > 0L -> EngineStartupBudget.switchingTimeoutMs(target)
-        else -> switchingTimeoutMs
+        else -> EngineStartupBudget.switchingTimeoutMs(target) ?: switchingTimeoutMs
     }
 
     private fun isAllowed(from: TunnelState, to: TunnelState): Boolean = when (from) {
