@@ -10,7 +10,9 @@ the existing WARP SOCKS runtime, not directly to the destination. Fallback
 from WSS is allowed only before the encrypted MTProto header is queued.
 The WARP configuration is the currently selected WARP slot. A failed WARP
 startup or routed TCP/UDP probe prevents a connected state. WSS upgrade is
-also required at initial readiness. Standalone manual selection avoids
+also required at initial readiness. Once connected, a WSS outage does not report
+engine failure while the WARP fallback remains healthy. Endpoint candidates
+are raced across the available WebSocket transports; losing sockets are closed. Standalone manual selection avoids
 concurrent use of the shared WARP runtime in chains and redundant auto picks.
 
 ## Release acceptance
