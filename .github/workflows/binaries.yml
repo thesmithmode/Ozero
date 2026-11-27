@@ -21,7 +21,6 @@ on:
   push:
     branches:
       - 'feat/**'
-      - 'fix/tun-routing-network-switch-budgets'
     paths:
       - '.github/workflows/binaries.yml'
       - 'build-tools/Dockerfile'
@@ -262,7 +261,7 @@ jobs:
       # Upload — engine-specific glob
       # ---------------------------------------------------------------------
       - name: Upload byedpi assets
-        if: env.ARTIFACT == 'byedpi' && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/fix/tun-routing-network-switch-budgets')
+        if: env.ARTIFACT == 'byedpi' && github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v3
         env:
           GH_TAG: ${{ steps.tag.outputs.tag }}
@@ -427,7 +426,6 @@ jobs:
       # удаляем (вместе с git tag). Защита от захламления Releases UI.
       # ---------------------------------------------------------------------
       - name: Cleanup old prereleases for this engine
-        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ENGINE_NAME: ${{ env.ARTIFACT }}
