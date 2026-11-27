@@ -11,7 +11,7 @@ internal class GfVpnNetworkChanges(
 ) : AutoCloseable {
     private val pending = Channel<Unit>(Channel.CONFLATED)
     private val worker = scope.launch {
-        for (event in pending) {
+        while (pending.receiveCatching().isSuccess) {
             refresh()
         }
     }
