@@ -117,3 +117,57 @@ func doDeviceRegistration(req *http.Request) (*http.Response, error) {
     return client.Do(legacy)
 }
 """)
+
+# Enrolment responses are not guaranteed to include endpoint fields. Preserve
+# the account's assigned addresses and key; use known MASQUE endpoints only
+# when the API omits a usable endpoint. The peer key remains pinned.
+replace_once(register, '\t"log"\n', '\t"log"\n\t"net"\n')
+replace_once(
+    register,
+    "\n\t\tprivKey, pubKey, err := internal.GenerateEcKeyPair()",
+    "\n\t\tif accountData == nil || accountData.ID == \"\" || accountData.Token == \"\" { os.Exit(24) }\n\t\tprivKey, pubKey, err := internal.GenerateEcKeyPair()",
+)
+replace_once(
+    register,
+    '\t\tlog.Printf("Successful registration. Saving config...")',
+    """\t\tif updatedAccountData == nil || len(updatedAccountData.Config.Peers) == 0 ||
+            updatedAccountData.Config.Peers[0].PublicKey == "" ||
+            net.ParseIP(updatedAccountData.Config.Interface.Addresses.V4).To4() == nil ||
+            net.ParseIP(updatedAccountData.Config.Interface.Addresses.V6) == nil ||
+            net.ParseIP(updatedAccountData.Config.Interface.Addresses.V6).To4() != nil {
+            os.Exit(24)
+        }
+        peer := updatedAccountData.Config.Peers[0]
+        v4 := managedEndpointIP(peer.Endpoint.V4, false)
+        v6 := managedEndpointIP(peer.Endpoint.V6, true)
+        if v4 == "" { v4 = "162.159.198.1" }
+        if updatedAccountData.ID == "" { updatedAccountData.ID = accountData.ID }
+        log.Printf("Successful registration. Saving config...")""",
+)
+replace_once(
+    register,
+    "\t\t\t// TODO: proper endpoint parsing in utils\n"
+    "\t\t\t// strip :0\n"
+    "\t\t\tEndpointV4: updatedAccountData.Config.Peers[0].Endpoint.V4[:len(updatedAccountData.Config.Peers[0].Endpoint.V4)-2],\n"
+    "\t\t\t// strip [ from beginning and ]:0 from end\n"
+    "\t\t\tEndpointV6:     updatedAccountData.Config.Peers[0].Endpoint.V6[1 : len(updatedAccountData.Config.Peers[0].Endpoint.V6)-3],",
+    "\t\t\tEndpointV4: v4,\n\t\t\tEndpointV6: v6,",
+)
+replace_once(
+    register,
+    "\n\t\tif err := config.AppConfig.SaveConfig(configPath); err != nil {",
+    "\n\t\tif _, err := config.AppConfig.GetEcEndpointPublicKey(); err != nil { os.Exit(24) }\n"
+    "\t\tif err := config.AppConfig.SaveConfig(configPath); err != nil {",
+)
+register.write_text(register.read_text() + """
+func managedEndpointIP(raw string, ipv6 bool) string {
+    if host, _, err := net.SplitHostPort(raw); err == nil {
+        raw = host
+    }
+    ip := net.ParseIP(raw)
+    if ip == nil || (ip.To4() == nil) != ipv6 || ip.IsUnspecified() || ip.IsLoopback() {
+        return ""
+    }
+    return ip.String()
+}
+""")

@@ -59,6 +59,7 @@ class MasqueRuntime internal constructor(
         21 -> "MASQUE key generation failed"
         22 -> "Cloudflare key enrollment failed"
         23 -> "MASQUE could not save the registered profile"
+        24 -> "Cloudflare returned incomplete registration data"
         else -> "registration process exited with code $code"
     }
 
