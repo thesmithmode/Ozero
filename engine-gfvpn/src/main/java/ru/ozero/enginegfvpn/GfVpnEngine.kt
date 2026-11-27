@@ -11,6 +11,7 @@ import android.os.ParcelFileDescriptor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -142,26 +143,39 @@ class GfVpnEngine(
         }
     }
 
-    override suspend fun probe(): ProbeResult = mutex.withLock {
-        val current = runtime
-        if (current == null || !attached) return@withLock ProbeResult.Failure("gfVPN not attached")
-        try {
-            val result = current.probeWithStats().awaitResult()
-            state.value = state.value.copy(bytesIn = result.bytesIn, bytesOut = result.bytesOut)
-            ProbeResult.Success(result.latencyMs)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            ProbeResult.Failure("gfVPN authenticated route unavailable", error)
+    override suspend fun probe(): ProbeResult {
+        val owner = runtime ?: return ProbeResult.Failure("gfVPN not started")
+        // Do not hold the lifecycle lock while a manual challenge is displayed.
+        if (!GfVpnCaptchaState.awaitResolution(owner)) {
+            return ProbeResult.Failure("gfVPN manual verification timed out")
+        }
+        return mutex.withLock {
+            if (runtime !== owner || !attached) return@withLock ProbeResult.Failure("gfVPN session changed")
+            try {
+                val result = owner.probeWithStats().awaitResult()
+                state.value = state.value.copy(bytesIn = result.bytesIn, bytesOut = result.bytesOut)
+                ProbeResult.Success(result.latencyMs)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                ProbeResult.Failure("gfVPN authenticated route unavailable", error)
+            }
         }
     }
 
-    override suspend fun awaitReady(): EnginePlugin.ReadyResult =
-        if (probe() is ProbeResult.Success) {
-            EnginePlugin.ReadyResult.Ready
-        } else {
-            EnginePlugin.ReadyResult.Timeout("gfVPN route unavailable")
-        }
+    override suspend fun awaitReady(): EnginePlugin.ReadyResult {
+        val owner = runtime ?: return EnginePlugin.ReadyResult.Timeout("gfVPN not started")
+        val ready = withTimeoutOrNull(200_000L) {
+            repeat(4) { attempt ->
+                if (runtime !== owner) return@withTimeoutOrNull false
+                if (probe() is ProbeResult.Success) return@withTimeoutOrNull true
+                if (attempt < 3) delay(500L)
+            }
+            false
+        } == true
+        return if (ready) EnginePlugin.ReadyResult.Ready
+        else EnginePlugin.ReadyResult.Timeout("gfVPN route unavailable")
+    }
 
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
         val owner = mutex.withLock {

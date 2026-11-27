@@ -35,7 +35,7 @@ class StartSequenceCoordinatorContractTest {
             EngineId.OPERA to 75_000L,
             EngineId.MASQUE to 60_000L,
             EngineId.TGWSS to 180_000L,
-            EngineId.GFVPN to 130_000L,
+            EngineId.GFVPN to 310_000L,
         )
         budgets.forEach { (engine, timeout) ->
             assertEquals(timeout, StartSequenceCoordinator.chainStartTimeoutMs(engine))

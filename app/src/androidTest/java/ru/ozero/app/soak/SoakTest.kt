@@ -311,7 +311,7 @@ class SoakTest {
             settings.setKillswitchEnabled(true)
             repeat(3) {
                 startVpn(context)
-                awaitConnected(controller, EngineId.GFVPN, 170_000L)
+                awaitConnected(controller, EngineId.GFVPN, 540_000L)
                 val probe = probeFromExternalUid(context, instrumentation.context, url, marker)
                 check(probe.vpnTransport) { "gfVPN external probe is outside VPN" }
                 check(probe.httpCode in 200..299 && probe.markerMatch) {

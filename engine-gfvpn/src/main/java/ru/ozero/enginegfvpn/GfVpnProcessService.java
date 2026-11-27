@@ -40,6 +40,7 @@ public final class GfVpnProcessService extends Service {
     private IBinder owner;
     private Messenger ownerTarget;
     private final AtomicBoolean dismissingCaptcha = new AtomicBoolean();
+    private final AtomicBoolean manualVerificationSeen = new AtomicBoolean();
     private boolean pending;
     private final IBinder.DeathRecipient ownerDeath = this::terminate;
 
@@ -133,6 +134,7 @@ public final class GfVpnProcessService extends Service {
     }
 
     private void captchaEvent(String url) {
+        if (url != null && !url.isEmpty()) manualVerificationSeen.set(true);
         new Handler(Looper.getMainLooper()).post(() -> {
             if (closing.get() || ownerTarget == null) return;
             Message event = Message.obtain(null, CAPTCHA_EVENT);
@@ -161,7 +163,10 @@ public final class GfVpnProcessService extends Service {
     }
 
     private void execute(int operation, int id, Bundle input, Messenger target) {
+        ScheduledFuture<?> hardDeadline = operation == START
+            ? watchdog.schedule(this::terminate, 300, TimeUnit.SECONDS) : null;
         ScheduledFuture<?> deadline = watchdog.schedule(() -> {
+            if (operation == START && manualVerificationSeen.get()) return;
             android.util.Log.w("GfVpnProcess", operationName(operation) + " watchdog expired");
             terminate();
         }, operation == START ? 120 : 12, TimeUnit.SECONDS);
@@ -210,6 +215,7 @@ public final class GfVpnProcessService extends Service {
             response.putString("error", operationName(operation) + ": " + detail);
         } finally {
             deadline.cancel(false);
+            if (hardDeadline != null) hardDeadline.cancel(false);
         }
         new Handler(Looper.getMainLooper()).post(() -> {
             pending = false;

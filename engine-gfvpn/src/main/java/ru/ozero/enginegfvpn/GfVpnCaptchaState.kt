@@ -2,6 +2,8 @@ package ru.ozero.enginegfvpn
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.URI
 
 /** In-memory manual challenge. Never persist or log the capability URL. */
@@ -42,6 +44,12 @@ object GfVpnCaptchaState {
         current.value = null
         return true
     }
+
+    internal suspend fun awaitResolution(owner: Any, timeoutMs: Long = 180_000L): Boolean =
+        withTimeoutOrNull(timeoutMs) {
+            challenge.first { it?.owner !== owner }
+            true
+        } == true
 
     fun cancel(challenge: Challenge) {
         val dismiss = synchronized(this) {

@@ -663,7 +663,7 @@ class StartSequenceCoordinator(
             EngineId.MASQUE -> 60_000L
             // Cold WARP registration alone has a 90-second budget; then the proxy must become ready.
             EngineId.TGWSS -> 180_000L
-            EngineId.GFVPN -> 130_000L
+            EngineId.GFVPN -> 310_000L
             else -> CHAIN_START_TIMEOUT_MS
         }
     }

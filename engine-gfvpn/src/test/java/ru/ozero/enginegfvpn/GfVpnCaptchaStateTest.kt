@@ -1,5 +1,8 @@
 package ru.ozero.enginegfvpn
 
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -70,6 +73,19 @@ class GfVpnCaptchaStateTest {
         assertFalse(GfVpnCaptchaState.clear(replacement))
         assertTrue(GfVpnCaptchaState.clear(owner))
         assertFalse(GfVpnCaptchaState.clear(owner))
+    }
+
+    @Test
+    fun `verification wait is bounded and scoped to the current owner`() = runBlocking {
+        assertTrue(GfVpnCaptchaState.publish(owner, "http://localhost:1234/", Runnable {}))
+        assertTrue(GfVpnCaptchaState.awaitResolution(replacement, 100L))
+        assertFalse(GfVpnCaptchaState.awaitResolution(owner, 10L))
+        val waiting = async(start = CoroutineStart.UNDISPATCHED) {
+            GfVpnCaptchaState.awaitResolution(owner, 1000L)
+        }
+        assertFalse(waiting.isCompleted)
+        GfVpnCaptchaState.clear(owner)
+        assertTrue(waiting.await())
     }
 
     @Test

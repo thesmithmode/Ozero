@@ -41,6 +41,7 @@ public final class GfVpnRuntime implements AutoCloseable {
     private boolean bound;
     private boolean closed;
     private boolean started;
+    private boolean manualVerificationSeen;
     private int sequence;
     private int pendingOperation;
     private CompletableFuture<Bundle> pending;
@@ -162,8 +163,15 @@ public final class GfVpnRuntime implements AutoCloseable {
             pendingOperation = operation;
             pendingInput = input;
             sequence++;
-            deadline = () -> fail(new TimeoutException("gfVPN " +
-                GfVpnProcessService.operationName(operation) + " timed out"));
+            deadline = () -> {
+                if (operation == GfVpnProcessService.START && manualVerificationSeen) {
+                    deadline = () -> fail(new TimeoutException("gfVPN verification startup timed out"));
+                    main.postDelayed(deadline, 180000);
+                } else {
+                    fail(new TimeoutException("gfVPN " +
+                        GfVpnProcessService.operationName(operation) + " timed out"));
+                }
+            };
             main.postDelayed(deadline, timeoutMs);
             if (remote != null) sendPending();
             else {
@@ -197,6 +205,9 @@ public final class GfVpnRuntime implements AutoCloseable {
                 captchaNotifier.cancel();
                 dismissCaptcha();
             })) {
+                if (pending != null && pendingOperation == GfVpnProcessService.START) {
+                    manualVerificationSeen = true;
+                }
                 captchaNotifier.show();
             } else {
                 clearCaptcha();

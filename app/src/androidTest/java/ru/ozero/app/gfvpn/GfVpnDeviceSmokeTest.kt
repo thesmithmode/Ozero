@@ -23,7 +23,7 @@ class GfVpnDeviceSmokeTest {
         assertTrue("Build must include the verified SDK", GfVpnBundledSdk.isAvailable(context))
         val runtime = GfVpnRuntime(context)
         try {
-            val session = runtime.start("RU", UUID.randomUUID().toString()).get(130, TimeUnit.SECONDS)
+            val session = runtime.start("RU", UUID.randomUUID().toString()).get(310, TimeUnit.SECONDS)
             assertTrue(session.port in 1..65535)
             assertTrue(runtime.probe().get(20, TimeUnit.SECONDS) >= 0)
             runtime.stop().get(20, TimeUnit.SECONDS)
