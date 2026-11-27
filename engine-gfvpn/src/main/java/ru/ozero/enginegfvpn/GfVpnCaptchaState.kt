@@ -29,14 +29,18 @@ object GfVpnCaptchaState {
     @Synchronized
     fun publish(owner: Any, url: String, dismiss: Runnable): Boolean {
         val origin = localUri(url) ?: return false
+        val previous = current.value
+        if (previous?.owner === owner && previous.url == url) return true
         current.value = Challenge(owner, url, origin, dismiss)
         return true
     }
 
     @JvmStatic
     @Synchronized
-    fun clear(owner: Any) {
-        if (current.value?.owner === owner) current.value = null
+    fun clear(owner: Any): Boolean {
+        if (current.value?.owner !== owner) return false
+        current.value = null
+        return true
     }
 
     fun cancel(challenge: Challenge) {

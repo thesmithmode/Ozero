@@ -34,6 +34,7 @@ public final class GfVpnRuntime implements AutoCloseable {
         @Override public String toString() { return "gfVPN session (credentials redacted)"; }
     }
     private final Context context;
+    private final GfVpnCaptchaNotifier captchaNotifier;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Messenger replies = new Messenger(new Handler(Looper.getMainLooper(), this::receive));
     private Messenger remote;
@@ -62,7 +63,10 @@ public final class GfVpnRuntime implements AutoCloseable {
         }
     };
 
-    public GfVpnRuntime(Context context) { this.context = context.getApplicationContext(); }
+    public GfVpnRuntime(Context context) {
+        this.context = context.getApplicationContext();
+        captchaNotifier = new GfVpnCaptchaNotifier(this.context);
+    }
 
     public CompletableFuture<Session> start(String country, String clientIdentifier) {
         return start(country, clientIdentifier, GfVpnOptions.DEFAULT);
@@ -188,8 +192,14 @@ public final class GfVpnRuntime implements AutoCloseable {
         if (message.what == GfVpnProcessService.CAPTCHA_EVENT) {
             String url = message.getData().getString("url");
             if (url == null || url.isEmpty()) {
-                GfVpnCaptchaState.clear(this);
-            } else if (!GfVpnCaptchaState.publish(this, url, this::dismissCaptcha)) {
+                clearCaptcha();
+            } else if (GfVpnCaptchaState.publish(this, url, () -> {
+                captchaNotifier.cancel();
+                dismissCaptcha();
+            })) {
+                captchaNotifier.show();
+            } else {
+                clearCaptcha();
                 ru.ozero.enginescore.PersistentLoggers.INSTANCE.warn("GfVpnRuntime",
                     "Rejected non-local CAPTCHA URL", null);
                 dismissCaptcha();
@@ -210,6 +220,10 @@ public final class GfVpnRuntime implements AutoCloseable {
             if (operation == GfVpnProcessService.START || operation == GfVpnProcessService.STOP) release();
         }
         return true;
+    }
+
+    private void clearCaptcha() {
+        if (GfVpnCaptchaState.clear(this)) captchaNotifier.cancel();
     }
 
     private void dismissCaptcha() {
@@ -245,7 +259,7 @@ public final class GfVpnRuntime implements AutoCloseable {
     private void release() {
         if (closed) return;
         closed = true;
-        GfVpnCaptchaState.clear(this);
+        clearCaptcha();
         started = false;
         if (remote != null) {
             Message abort = Message.obtain(null, GfVpnProcessService.ABORT);

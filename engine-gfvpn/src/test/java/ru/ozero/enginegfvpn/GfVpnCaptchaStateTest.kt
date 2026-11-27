@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -57,6 +58,18 @@ class GfVpnCaptchaStateTest {
         GfVpnCaptchaState.cancel(current)
         assertEquals(1, cancellations)
         assertNull(GfVpnCaptchaState.challenge.value)
+    }
+
+    @Test
+    fun `duplicate callbacks do not reset the in-progress challenge`() {
+        val url = "http://localhost:1234/"
+        assertTrue(GfVpnCaptchaState.publish(owner, url, Runnable {}))
+        val current = GfVpnCaptchaState.challenge.value
+        assertTrue(GfVpnCaptchaState.publish(owner, url, Runnable {}))
+        assertSame(current, GfVpnCaptchaState.challenge.value)
+        assertFalse(GfVpnCaptchaState.clear(replacement))
+        assertTrue(GfVpnCaptchaState.clear(owner))
+        assertFalse(GfVpnCaptchaState.clear(owner))
     }
 
     @Test

@@ -1,6 +1,8 @@
 package ru.ozero.app.ui
 
 import android.annotation.SuppressLint
+import android.webkit.ConsoleMessage
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -44,7 +46,11 @@ fun GfVpnCaptchaDialog() {
                     AndroidView(
                         factory = { context -> WebView(context).apply { configureChallenge(challenge) } },
                         modifier = Modifier.fillMaxWidth().height(400.dp),
-                        onRelease = { web -> web.stopLoading(); web.destroy() },
+                        onReset = null,
+                        onRelease = { web ->
+                            web.stopLoading()
+                            web.destroy()
+                        },
                     )
                     TextButton(onClick = { GfVpnCaptchaState.cancel(challenge) }) {
                         Text(stringResource(R.string.gfvpn_captcha_cancel))
@@ -68,6 +74,9 @@ private fun WebView.configureChallenge(challenge: GfVpnCaptchaState.Challenge) {
         setSupportMultipleWindows(false)
         mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
         cacheMode = WebSettings.LOAD_NO_CACHE
+    }
+    webChromeClient = object : WebChromeClient() {
+        override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean = true
     }
     webViewClient = object : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =

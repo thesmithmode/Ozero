@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gfvpn_verification_channel">gfVPN verification</string>
+    <string name="gfvpn_verification_notification_title">gfVPN needs verification</string>
+    <string name="gfvpn_verification_notification_body">Open Ozero to complete the manual verification.</string>
+</resources>
