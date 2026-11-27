@@ -533,7 +533,7 @@ class StartSequenceCoordinator(
         config: EngineConfig,
         notifyFailure: Boolean = true,
     ): ChainResult.Success? {
-        val chainResult = withTimeoutOrNull(if (engineId == EngineId.GFVPN) 130_000L else CHAIN_START_TIMEOUT_MS) {
+        val chainResult = withTimeoutOrNull(chainStartTimeoutMs(engineId)) {
             try {
                 deps.chainOrchestrator.start(listOf(ChainStep(engineId, config)))
             } catch (ce: CancellationException) {
@@ -655,5 +655,12 @@ class StartSequenceCoordinator(
         const val SETTINGS_READ_TIMEOUT_MS = 1_500L
         const val CHAIN_START_TIMEOUT_MS = 30_000L
         const val PREFLIGHT_HARD_TIMEOUT_MS = 7_000L
+
+        internal fun chainStartTimeoutMs(engineId: EngineId): Long = when (engineId) {
+            // Opera may exhaust its first 25-second attempt before alternate bootstrap.
+            EngineId.OPERA -> 60_000L
+            EngineId.GFVPN -> 130_000L
+            else -> CHAIN_START_TIMEOUT_MS
+        }
     }
 }
