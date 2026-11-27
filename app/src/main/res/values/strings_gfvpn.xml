@@ -16,8 +16,8 @@
     <string name="gfvpn_attempts">Concurrent connection attempts</string>
     <string name="gfvpn_rotation">Tunnel rotation</string>
     <string name="gfvpn_auto">Auto</string>
-    <string name="gfvpn_performance">Performance</string>
-    <string name="gfvpn_reliability">Reliability</string>
+    <string name="gfvpn_performance">Fast</string>
+    <string name="gfvpn_reliability">Reliable</string>
     <string name="gfvpn_whitelist">Whitelist (Russia)</string>
     <string name="gfvpn_enabled">Enabled</string>
     <string name="gfvpn_disabled">Disabled</string>
@@ -26,4 +26,10 @@
     <string name="gfvpn_captcha_title">Adaptive VPN verification</string>
     <string name="gfvpn_captcha_summary">Complete the manual verification to continue the connection.</string>
     <string name="gfvpn_captcha_cancel">Cancel verification</string>
+    <string name="gfvpn_country">Country or group</string>
+    <string name="gfvpn_no_country">No country filter</string>
+    <string name="gfvpn_server">Server</string>
+    <string name="gfvpn_any_server">Any server in this group</string>
+    <string name="gfvpn_proxy_country">%1$s (proxy)</string>
+    <string name="gfvpn_country_entry">%1$s %2$s — servers: %3$d</string>
 </resources>
