@@ -22,6 +22,7 @@ on:
       - 'app/**'
       - 'common-vpn/**'
       - 'engine-singbox/**'
+      - 'engine-urnetwork/**'
       - 'singbox-*/**'
 
 concurrency:
