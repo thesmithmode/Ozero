@@ -19,6 +19,7 @@ class GfVpnTunTest {
         assertFalse(GfVpnTun.yaml(1080, "alice", "secret", false).contains("mapdns:"));
         String mapped = GfVpnTun.yaml(1080, "alice", "secret", true);
         assertTrue(mapped.contains("mapdns:\n  address: '198.18.0.2'\n  port: 53\n"));
+        assertEquals("100.64.0.0/10", GfVpnTun.MAP_DNS_CIDR);
         assertTrue(mapped.contains("network: '100.64.0.0'\n  netmask: '255.192.0.0'\n"));
         assertTrue(mapped.contains("cache-size: 10000\n"));
         assertTrue(mapped.contains("username: 'alice'\n"));
