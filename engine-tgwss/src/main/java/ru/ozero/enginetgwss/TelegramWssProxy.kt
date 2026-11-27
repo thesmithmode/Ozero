@@ -24,17 +24,23 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 class TelegramWssProxy internal constructor(
     private val webSockets: WebSocket.Factory,
     private val warpRelay: WarpSocksRelay? = null,
+    private val fallbackWebSockets: WebSocket.Factory? = null,
     private val closeTransport: () -> Unit,
 ) : Closeable {
-    private constructor(client: OkHttpClient, warpPort: Int?) : this(client, warpPort?.let(::WarpSocksRelay), {
-        client.dispatcher.cancelAll()
-        client.connectionPool.evictAll()
-        client.dispatcher.executorService.shutdownNow()
-    })
+    private constructor(client: OkHttpClient, warpPort: Int?, fallback: OkHttpClient?) : this(
+        client, warpPort?.let(::WarpSocksRelay), fallback, {
+            listOfNotNull(client, fallback).forEach {
+                it.dispatcher.cancelAll()
+                it.connectionPool.evictAll()
+                it.dispatcher.executorService.shutdownNow()
+            }
+        },
+    )
 
     constructor(
         warpPort: Int? = null,
@@ -50,7 +56,20 @@ class TelegramWssProxy internal constructor(
             .connectTimeout(5, TimeUnit.SECONDS)
             .build(),
         warpPort,
+        warpPort?.let { port ->
+            OkHttpClient.Builder()
+                .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", port)))
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .connectTimeout(5, TimeUnit.SECONDS)
+                .build()
+        },
     )
+    private val preferred = AtomicReference(webSockets)
+
+    private fun transports(): List<WebSocket.Factory> =
+        listOfNotNull(preferred.get(), webSockets, fallbackWebSockets).distinct()
+
     private val closed = AtomicBoolean(false)
     private val sockets = ConcurrentHashMap.newKeySet<Socket>()
     private val workers = ThreadPoolExecutor(0, 128, 30, TimeUnit.SECONDS, SynchronousQueue())
@@ -160,12 +179,16 @@ class TelegramWssProxy internal constructor(
     }
 
     private fun openRelay(socket: Socket, destination: TelegramDestination, init: ByteArray): WebSocket? {
-        for (host in destination.hosts) {
+        val routes = transports().flatMap { factory -> destination.hosts.map { factory to it } }
+        for ((factory, host) in routes) {
             if (closed.get() || socket.isClosed) return null
             val attempt = RelayAttempt(socket, init)
-            val ws = webSockets.newWebSocket(request(host), attempt)
+            val ws = factory.newWebSocket(request(host), attempt)
             try {
-                if (attempt.awaitCommitted()) return ws
+                if (attempt.awaitCommitted()) {
+                    preferred.set(factory)
+                    return ws
+                }
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
                 attempt.expire()
@@ -257,17 +280,19 @@ class TelegramWssProxy internal constructor(
         val started = System.nanoTime()
         val probes = mutableListOf<WebSocket>()
         try {
-            for (dc in listOf(2, 4, 1)) {
+            val factories = transports()
+            val candidates = listOf(2, 4, 1, 3, 5).flatMap { dc -> factories.map { dc to it } }
+            for ((dc, factory) in candidates) {
                 if (latency.get() >= 0 || closed.get()) break
-                val ws = webSockets.newWebSocket(
+                val ws = factory.newWebSocket(
                     request(TelegramDestination(dc, false).host),
                     object : WebSocketListener() {
                         override fun onOpen(webSocket: WebSocket, response: Response) {
-                            if (response.header("Sec-WebSocket-Protocol") == "binary") {
-                                latency.compareAndSet(
-                                    -1,
-                                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
-                                )
+                            val elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+                            if (response.header("Sec-WebSocket-Protocol") == "binary" &&
+                                latency.compareAndSet(-1, elapsed)
+                            ) {
+                                preferred.set(factory)
                                 ready.countDown()
                             }
                             webSocket.cancel()

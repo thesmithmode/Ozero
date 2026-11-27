@@ -7,6 +7,8 @@ android {
 
 dependencies {
     implementation(project(":common-vpn"))
+    implementation(project(":common-net"))
+    implementation(libs.okhttp.core)
     implementation(project(":engines-core"))
     implementation(libs.bundles.coroutines)
     testImplementation(libs.bundles.junit5)

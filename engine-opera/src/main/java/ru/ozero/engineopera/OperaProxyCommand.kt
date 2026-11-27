@@ -19,6 +19,15 @@ object OperaProxyCommand {
             "-timeout", "10s",
             "-init-retries", "1",
             "-verbosity", "60",
-        )
+        ) + if (config.alternateBootstrap) {
+            // The upstream Android wrapper uses encrypted DNS for API discovery.
+            // Retain a separate probe target when the default benchmark fails.
+            listOf(
+                "-bootstrap-dns", "https://1.1.1.1/dns-query,https://8.8.8.8/dns-query,https://dns.quad9.net/dns-query",
+                "-server-selection-test-url", "https://example.com/",
+            )
+        } else {
+            emptyList()
+        }
     }
 }

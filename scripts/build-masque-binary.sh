@@ -30,7 +30,7 @@ mkdir -p "$out"
     grep -Eq '^Pkg.Revision[[:space:]]*=[[:space:]]*27\.2\.12479018[[:space:]]*$' "$ndk/source.properties"
     export CC="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/${triple}24-clang"
     test -x "$CC"
-    gofmt -w main.go internal/socks5.go cmd/socks.go config/config.go api/masque.go
+    gofmt -w main.go internal/socks5.go cmd/socks.go config/config.go api/masque.go api/cloudflare.go cmd/register.go
     go mod download
     go mod verify
     go build -mod=readonly -trimpath -buildmode=pie -tags netcgo \

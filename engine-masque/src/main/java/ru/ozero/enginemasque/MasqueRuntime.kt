@@ -21,7 +21,8 @@ class MasqueRuntime internal constructor(
     private val launcher: MasqueProcessLauncher,
     private val readiness: MasqueReadinessProbe,
     private val startupTimeoutMs: Long = 6_000,
-    private val registrationTimeoutMs: Long = 45_000,
+    // Two enrollment stages, each with a bounded alternative-host attempt.
+    private val registrationTimeoutMs: Long = 80_000,
     private val reportFailure: (String) -> Unit = { PersistentLoggers.warn("MasqueRuntime", it) },
 ) {
     constructor(binary: File, privateDirectory: File) : this(
@@ -58,6 +59,7 @@ class MasqueRuntime internal constructor(
         21 -> "MASQUE key generation failed"
         22 -> "Cloudflare key enrollment failed"
         23 -> "MASQUE could not save the registered profile"
+        24 -> "Cloudflare returned incomplete registration data"
         else -> "registration process exited with code $code"
     }
 

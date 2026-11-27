@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 
 interface OperaProxyProcess {
     val alive: Boolean
+    val exitCode: Int? get() = null
     fun stop()
 }
 
@@ -40,6 +41,8 @@ class SubprocessOperaProxyLauncher(
             }
             object : OperaProxyProcess {
                 override val alive: Boolean get() = process.isAlive
+                override val exitCode: Int?
+                    get() = if (process.isAlive) null else runCatching { process.exitValue() }.getOrNull()
 
                 override fun stop() {
                     process.destroy()

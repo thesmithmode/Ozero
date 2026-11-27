@@ -56,6 +56,33 @@ class OperaProxyRuntimeTest {
     }
 
     @Test
+    fun `native registration or selection failure retries with alternate bootstrap`() = runTest {
+        val failed = object : OperaProxyProcess {
+            override val alive = false
+            override val exitCode = 12
+            override fun stop() = Unit
+        }
+        val replacement = FakeProcess()
+        val configs = mutableListOf<OperaProxyConfig>()
+        val runtime = OperaProxyRuntime(
+            launcher = OperaProxyLauncher { config, _ ->
+                configs.add(config)
+                if (configs.size == 1) failed else replacement
+            },
+            routedProbe = { 10L },
+            allocatePort = { 12345 },
+        )
+        try {
+            assertEquals(StartResult.Success(12345), runtime.start(OperaProxyConfig()))
+            assertEquals(listOf(false, true), configs.map { it.alternateBootstrap })
+            assertTrue(replacement.alive)
+        } finally {
+            runtime.stop()
+        }
+        assertFalse(replacement.alive)
+    }
+
+    @Test
     fun `unreachable route times out and kills process`() = runTest {
         val process = FakeProcess()
         val runtime = OperaProxyRuntime(
