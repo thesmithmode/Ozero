@@ -157,7 +157,7 @@ class SoakTest {
                 Log.i(TAG, "auto-select phase=start")
                 selectAutoProfile(dependencies.singboxDataStore())
                 startVpn(targetContext)
-                awaitConnected(dependencies.tunnelController())
+                awaitStableConnection(dependencies.tunnelController(), EngineId.SINGBOX)
                 val probe = probeFromExternalUid(
                     targetContext,
                     testContext,
@@ -496,15 +496,30 @@ class SoakTest {
         val settings = dependencies.settingsRepository()
         for (engine in listOf(EngineId.BYEDPI, EngineId.SINGBOX)) {
             settings.setManualEngine(engine)
-            val state = withTimeout(ENGINE_SWITCH_TIMEOUT_MS) {
-                controller.state.first {
-                    (it is TunnelState.Connected && it.engineId == engine) ||
-                        (it is TunnelState.Failed && it.engineId == engine)
-                }
-            }
-            check(state is TunnelState.Connected) { "Engine switch to $engine failed: $state" }
+            awaitStableConnection(controller, engine)
             assertExternalRoute(instrumentation.targetContext, instrumentation.context, DEFAULT_TARGET, DEFAULT_MARKER)
             Log.i(TAG, "engine-switch engine=$engine phase=done")
+        }
+    }
+
+    private suspend fun awaitStableConnection(controller: TunnelController, engine: EngineId) {
+        withTimeout(ENGINE_SWITCH_TIMEOUT_MS) {
+            var stableSince: Long? = null
+            while (true) {
+                val state = controller.state.value
+                check(state !is TunnelState.Failed) { "Connection failed during switch to $engine: $state" }
+                val ready = state is TunnelState.Connected &&
+                    state.engineId == engine &&
+                    controller.switching.value == null
+                if (ready) {
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    val since = stableSince ?: now.also { stableSince = it }
+                    if (now - since >= STABLE_CONNECTION_MS) break
+                } else {
+                    stableSince = null
+                }
+                delay(NETWORK_POLL_MS)
+            }
         }
     }
 
@@ -734,6 +749,7 @@ class SoakTest {
         private const val START_TIMEOUT_MS = 30_000L
         private const val TGWSS_START_TIMEOUT_MS = 220_000L
         private const val ENGINE_SWITCH_TIMEOUT_MS = 90_000L
+        private const val STABLE_CONNECTION_MS = 5_000L
         private const val WIFI_CHANGE_TIMEOUT_MS = 30_000L
         private const val NETWORK_RECOVERY_TIMEOUT_MS = 60_000L
         private const val NETWORK_POLL_MS = 500L
