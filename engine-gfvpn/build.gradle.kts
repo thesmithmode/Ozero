@@ -16,19 +16,53 @@ val prepareGfVpnHev by tasks.registering(ExtractGfVpnHevTask::class) {
     outputDirectory.set(layout.buildDirectory.dir("generated/gfvpn-hev/jniLibs"))
 }
 
+// The archive is a build input, not a file selected by the installed app.
+val sdkArchivePath = providers.gradleProperty("ozero.gfvpn.sdkArchive")
+val unitTestsOnly = providers.gradleProperty("ozero.gfvpn.unitTestsOnly").orNull == "true"
+
 val prepareGfVpnSdk by tasks.registering(PrepareGfVpnSdkTask::class) {
-    sourceArchive.set(layout.projectDirectory.file("vendor/gfvpn-sdk-1.0.6.zip"))
+    sourceArchive.set(
+        layout.file(sdkArchivePath.map { rootProject.file(it) })
+            .orElse(layout.projectDirectory.file("vendor/gfvpn-sdk-1.0.6.zip")),
+    )
     outputDirectory.set(layout.buildDirectory.dir("generated/gfvpn-sdk/assets"))
 }
 
 android {
     namespace = "ru.ozero.enginegfvpn"
-    sourceSets.getByName("main").assets.srcDir(prepareGfVpnSdk.flatMap { it.outputDirectory })
+    if (!unitTestsOnly) {
+        sourceSets.getByName("main").assets.srcDir(prepareGfVpnSdk.flatMap { it.outputDirectory })
+    }
     sourceSets.getByName("main").jniLibs.srcDir(prepareGfVpnHev.flatMap { it.outputDirectory })
 }
 
 tasks.matching { it.name == "preBuild" }.configureEach {
-    dependsOn(prepareGfVpnHev, prepareGfVpnSdk)
+    dependsOn(prepareGfVpnHev)
+    if (!unitTestsOnly) dependsOn(prepareGfVpnSdk)
+}
+
+// SDK-free mode may run JVM tests but must not produce installable APKs or AARs.
+if (unitTestsOnly) {
+    gradle.taskGraph.whenReady {
+        check(allTasks.any { it.name.endsWith("UnitTest") }) {
+            "ozero.gfvpn.unitTestsOnly requires a unit-test task"
+        }
+        val appPackaging = setOf(
+            "assemble", "assembleDebug", "assembleRelease", "assembleDebugAndroidTest",
+            "bundle", "bundleDebug", "bundleRelease", "packageDebug", "packageRelease", "packageDebugAndroidTest",
+        )
+        val sdkPackaging = setOf("assemble", "assembleDebug", "assembleRelease", "bundleDebugAar", "bundleReleaseAar")
+        check(allTasks.none { task ->
+            val name = task.name
+            val publishesApp = task.project.path == ":app" &&
+                (name in appPackaging || name.startsWith("install") || name.startsWith("publish"))
+            val publishesSdk = task.project.path == ":engine-gfvpn" &&
+                (name in sdkPackaging || name.startsWith("publish"))
+            publishesApp || publishesSdk
+        }) {
+            "SDK-free unit-test mode must not produce installable or distributable artifacts"
+        }
+    }
 }
 
 dependencies {

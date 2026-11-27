@@ -314,7 +314,7 @@ jobs:
       - name: coverage verification first
         run: >
           ./gradlew
-          :app:assembleDebugAndroidTest
+          -Pozero.gfvpn.unitTestsOnly=true
           :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification
           :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport :common-vpn:jacocoTestCoverageVerification
           :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport :engine-urnetwork:jacocoTestCoverageVerification
@@ -478,7 +478,7 @@ jobs:
         uses: ./.github/actions/build-masque
 
       - name: assembleDebug
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug :app:assembleDebugAndroidTest --stacktrace
 
       - name: Verify packaged MASQUE transport
         run: |
@@ -618,7 +618,7 @@ jobs:
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
+        run: ./gradlew -Pozero.gfvpn.unitTestsOnly=true :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -911,12 +911,12 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification :engine-opera:testDebugUnitTest :engine-opera:jacocoTestReport :engine-opera:jacocoTestCoverageVerification :engine-gfvpn:testDebugUnitTest --stacktrace --continue
+        run: ./gradlew -Pozero.gfvpn.unitTestsOnly=true :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification :engine-opera:testDebugUnitTest :engine-opera:jacocoTestReport :engine-opera:jacocoTestCoverageVerification :engine-gfvpn:testDebugUnitTest --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
           python3 -m pip install --quiet defusedxml
-          python3 scripts/verify-junit-nonzero.py engine-fptn engine-opera
+          python3 scripts/verify-junit-nonzero.py engine-fptn engine-opera engine-gfvpn
 
       - name: Upload coverage report
         if: always()

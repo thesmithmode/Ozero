@@ -11,3 +11,12 @@ The archive is the only supported source input. It contains neither an APK file
 nor extracted account credentials. Do not fetch it from a mutable URL or accept
 an unverified replacement. Redistribution rights and device acceptance must be
 confirmed before release.
+
+An authorized build operator may supply this exact archive outside the checkout with
+`-Pozero.gfvpn.sdkArchive=/absolute/path/gfvpn-sdk-1.0.6.zip`. Its bytes undergo the same
+mandatory hash checks and are bundled into the application APK; no end-user import exists.
+
+For JVM tests only, `-Pozero.gfvpn.unitTestsOnly=true` permits running the code and
+integrity tests without the proprietary binary. It does not create placeholder assets.
+Installable or distributable artifacts are prohibited in that mode. The full APK assembly
+and integrity checks remain required and will fail until the authorized SDK is available.
