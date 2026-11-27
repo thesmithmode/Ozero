@@ -104,7 +104,10 @@ class RuntimeManualEngineSwitchTest {
 
         coordinator.start(backgroundScope)
         runCurrent()
-        settings.value = SettingsModel(manualEngine = null, engineAutoPriority = listOf(EngineId.BYEDPI, EngineId.MASQUE))
+        settings.value = SettingsModel(
+            manualEngine = null,
+            engineAutoPriority = listOf(EngineId.BYEDPI, EngineId.MASQUE),
+        )
         advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
         runCurrent()
         controller.reset()
@@ -175,7 +178,10 @@ class RuntimeManualEngineSwitchTest {
 
         coordinator.start(backgroundScope)
         runCurrent()
-        settings.value = SettingsModel(manualEngine = null)
+        settings.value = SettingsModel(
+            manualEngine = null,
+            engineAutoPriority = listOf(EngineId.BYEDPI),
+        )
         advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
         runCurrent()
         advanceTimeBy(14_999L)

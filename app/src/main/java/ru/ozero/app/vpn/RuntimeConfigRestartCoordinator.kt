@@ -55,7 +55,9 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
             settingsFlow = settingsRepository.settings,
             vpnStateProvider = { tunnelController.state.value },
             onRestartConnected = { snapshot ->
-                val auto = snapshot.engineAutoPriority?.let { AutoRestart(it, snapshot.trafficMode == TrafficMode.PROXY) }
+                val auto = snapshot.engineAutoPriority?.let {
+                    AutoRestart(it, snapshot.trafficMode == TrafficMode.PROXY)
+                }
                 restartVpnIfRunning(RestartRequest(snapshot.restartReason(), snapshot.manualEngine, auto))
             },
         )
@@ -64,7 +66,8 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         }
     }
 
-    internal suspend fun restartVpnIfRunning(reason: String): Boolean = restartVpnIfRunning(RestartRequest(reason, null))
+    internal suspend fun restartVpnIfRunning(reason: String): Boolean =
+        restartVpnIfRunning(RestartRequest(reason, null))
 
     private suspend fun restartVpnIfRunning(request: RestartRequest): Boolean {
         var shouldProcess = false
@@ -127,9 +130,10 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         if (auto == null) {
             tunnelController.onSwitchingStarted(from = fromEngine, to = targetEngine)
         } else {
-            tunnelController.onAutoSwitchingStarted(
+            tunnelController.onSwitchingStarted(
                 from = fromEngine,
-                timeoutMs = startupTimeoutMs + RESTART_STOP_TIMEOUT_MS + RESTART_SETTLE_TIMEOUT_MS,
+                to = null,
+                autoTimeoutMs = startupTimeoutMs + RESTART_STOP_TIMEOUT_MS + RESTART_SETTLE_TIMEOUT_MS,
             )
         }
         try {
@@ -189,8 +193,10 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         var current = awaitAutoProgress() ?: return@withTimeoutOrNull null
         while (current !is TunnelState.Connected && current !is TunnelState.Failed) {
             current = tunnelController.state.first {
-                it is TunnelState.Connected || it is TunnelState.Failed ||
-                    it is TunnelState.Idle || it is TunnelState.Disconnecting
+                it is TunnelState.Connected ||
+                    it is TunnelState.Failed ||
+                    it is TunnelState.Idle ||
+                    it is TunnelState.Disconnecting
             }
             if (current is TunnelState.Idle || current is TunnelState.Disconnecting) {
                 current = awaitAutoProgress() ?: return@withTimeoutOrNull null
