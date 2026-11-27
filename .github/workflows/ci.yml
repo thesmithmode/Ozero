@@ -617,6 +617,16 @@ jobs:
           ls -la singbox-core/libs/
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
+      - name: Assert SDK-free mode rejects APK assembly
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/gfvpn-test-mode-guard.log"
+          if ./gradlew -Pozero.gfvpn.unitTestsOnly=true :app:assembleDebug :app:testDebugUnitTest --dry-run >"$log" 2>&1; then
+            echo "::error::SDK-free mode unexpectedly allowed APK assembly"
+            exit 1
+          fi
+          grep -F 'SDK-free unit-test mode requires explicit JVM test and coverage tasks only' "$log"
+
       - name: testDebugUnitTest + coverage
         run: ./gradlew -Pozero.gfvpn.unitTestsOnly=true :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
 

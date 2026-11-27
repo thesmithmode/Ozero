@@ -41,27 +41,14 @@ tasks.matching { it.name == "preBuild" }.configureEach {
     if (!unitTestsOnly) dependsOn(prepareGfVpnSdk)
 }
 
-// SDK-free mode may run JVM tests but must not produce installable APKs or AARs.
+// Validate requested tasks at configuration time, including configuration-cache builds.
 if (unitTestsOnly) {
-    gradle.taskGraph.whenReady {
-        check(allTasks.any { it.name.endsWith("UnitTest") }) {
-            "ozero.gfvpn.unitTestsOnly requires a unit-test task"
-        }
-        val appPackaging = setOf(
-            "assemble", "assembleDebug", "assembleRelease", "assembleDebugAndroidTest",
-            "bundle", "bundleDebug", "bundleRelease", "packageDebug", "packageRelease", "packageDebugAndroidTest",
-        )
-        val sdkPackaging = setOf("assemble", "assembleDebug", "assembleRelease", "bundleDebugAar", "bundleReleaseAar")
-        check(allTasks.none { task ->
-            val name = task.name
-            val publishesApp = task.project.path == ":app" &&
-                (name in appPackaging || name.startsWith("install") || name.startsWith("publish"))
-            val publishesSdk = task.project.path == ":engine-gfvpn" &&
-                (name in sdkPackaging || name.startsWith("publish"))
-            publishesApp || publishesSdk
-        }) {
-            "SDK-free unit-test mode must not produce installable or distributable artifacts"
-        }
+    val allowed = setOf("testDebugUnitTest", "jacocoTestReport", "jacocoTestCoverageVerification")
+    val requested = gradle.startParameter.taskNames
+    val includesTests = requested.any { it.substringAfterLast(':') == "testDebugUnitTest" }
+    val testsOnly = requested.all { it.startsWith(":") && it.substringAfterLast(':') in allowed }
+    check(includesTests && testsOnly) {
+        "SDK-free unit-test mode requires explicit JVM test and coverage tasks only"
     }
 }
 

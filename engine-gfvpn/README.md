@@ -1,6 +1,6 @@
 # gfVPN bundled runtime
 
-The two extracted and verified SDK files must be present in the checked-in `engine-gfvpn/vendor/gfvpn-sdk-1.0.6.zip` archive. Gradle verifies the complete archive and both entries, then copies the entries into APK assets. No original APK, external download URL, local override, or user import is used. Missing vendor input fails the build.
+The two verified SDK files must be present in the pinned `engine-gfvpn/vendor/gfvpn-sdk-1.0.6.zip` archive (or an authorized build operator's exact archive selected through `-Pozero.gfvpn.sdkArchive=/absolute/path/gfvpn-sdk-1.0.6.zip`). Gradle checks the archive and both entries before packaging the SDK in Ozero's own APK. No original APK or end-user import is required. Missing vendor input fails full APK assembly. The explicit `ozero.gfvpn.unitTestsOnly` mode permits JVM tests without proprietary assets, not APK packaging.
 
 On ARM64 devices the engine installs its verified read-only runtime into a
 private versioned directory automatically and starts it using a dedicated
