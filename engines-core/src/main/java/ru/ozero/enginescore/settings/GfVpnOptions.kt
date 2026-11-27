@@ -12,7 +12,7 @@ data class GfVpnOptions(
     val bypassLocalServices: Boolean = false,
 ) {
     init {
-        require(serverSelection in SERVER_MODES)
+        require(serverSelection in SERVER_MODES || GfVpnServerCatalog.countryFor(serverSelection) != null)
         require(transport in TRANSPORTS)
         require(simultaneousConnections in 0..4)
         require(maxConcurrentAttempts in 0..10)
