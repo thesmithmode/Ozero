@@ -1,8 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="gfvpn_summary">VPN with automatic server selection (Russia). IPv6 and proxy-only mode are unavailable.</string>
+    <string name="gfvpn_summary">VPN with automatic or manual connection selection. IPv6 and proxy-only mode are unavailable.</string>
     <string name="gfvpn_back">Back</string>
     <string name="gfvpn_installed">Runtime included. Select gfVPN on the main screen.</string>
     <string name="gfvpn_missing">The gfVPN runtime is unavailable on this device.</string>
     <string name="gfvpn_trust_warning">The bundled third-party runtime runs with the application's permissions.</string>
+    <string name="gfvpn_global">Use VPN for all apps</string>
+    <string name="gfvpn_update_config">Auto-update configuration</string>
+    <string name="gfvpn_cached_nodes">Use cached nodes</string>
+    <string name="gfvpn_bypass_local">Disable VPN for local services</string>
+    <string name="gfvpn_bypass_local_summary">Government sites, banks and other local services can connect directly when supported by the runtime for your country.</string>
+    <string name="gfvpn_server_selection">Server selection mode</string>
+    <string name="gfvpn_transport">Tunnel protocol</string>
+    <string name="gfvpn_connections">Simultaneous connections</string>
+    <string name="gfvpn_attempts">Concurrent connection attempts</string>
+    <string name="gfvpn_rotation">Tunnel rotation</string>
+    <string name="gfvpn_auto">Auto</string>
+    <string name="gfvpn_performance">Performance</string>
+    <string name="gfvpn_reliability">Reliability</string>
+    <string name="gfvpn_whitelist">Whitelist (Russia)</string>
+    <string name="gfvpn_enabled">Enabled</string>
+    <string name="gfvpn_disabled">Disabled</string>
+    <string name="gfvpn_managed_options">These options are managed automatically in Whitelist mode or when VK-TURN is selected.</string>
+    <string name="gfvpn_disconnect_to_edit">Disconnect the VPN to change connection settings.</string>
 </resources>

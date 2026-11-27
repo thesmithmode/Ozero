@@ -1,8 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="gfvpn_summary">VPN с автоматическим выбором серверов (Россия). IPv6 и режим прокси недоступны.</string>
+    <string name="gfvpn_summary">VPN с автоматическим или ручным выбором режима подключения. IPv6 и режим прокси недоступны.</string>
     <string name="gfvpn_back">Назад</string>
     <string name="gfvpn_installed">Ядро встроено. Выберите gfVPN на главном экране.</string>
     <string name="gfvpn_missing">На этом устройстве ядро gfVPN недоступно.</string>
     <string name="gfvpn_trust_warning">Встроенное стороннее ядро работает с правами приложения.</string>
+    <string name="gfvpn_global">Использовать VPN для всех приложений</string>
+    <string name="gfvpn_update_config">Автоматически обновлять конфигурацию</string>
+    <string name="gfvpn_cached_nodes">Использовать кэшированные узлы</string>
+    <string name="gfvpn_bypass_local">Отключить VPN для локальных сервисов</string>
+    <string name="gfvpn_bypass_local_summary">Государственные сайты, банки и другие локальные сервисы будут доступны напрямую, если ядро поддерживает это для вашей страны.</string>
+    <string name="gfvpn_server_selection">Режим выбора сервера</string>
+    <string name="gfvpn_transport">Протокол туннелирования</string>
+    <string name="gfvpn_connections">Количество одновременных подключений</string>
+    <string name="gfvpn_attempts">Одновременные попытки подключения</string>
+    <string name="gfvpn_rotation">Ротация туннелей</string>
+    <string name="gfvpn_auto">Авто</string>
+    <string name="gfvpn_performance">Производительность</string>
+    <string name="gfvpn_reliability">Надёжность</string>
+    <string name="gfvpn_whitelist">Белый список (Россия)</string>
+    <string name="gfvpn_enabled">Включено</string>
+    <string name="gfvpn_disabled">Выключено</string>
+    <string name="gfvpn_managed_options">Эти настройки управляются автоматически в режиме белого списка или VK-TURN.</string>
+    <string name="gfvpn_disconnect_to_edit">Отключите VPN, чтобы изменить настройки подключения.</string>
 </resources>

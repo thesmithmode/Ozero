@@ -17,3 +17,11 @@ CI verifies the exact two bundled files and the HEV JNI package in debug and
 release APKs. Run the existing opt-in ARM64 SDK and full TUN smoke tests from a
 fresh install, without transferring any SDK files, before production release.
 Successful CI alone does not establish backend connectivity.
+
+Connection settings follow the reference DEX: global app routing uses Ozero's
+existing split-tunnel settings; local-service bypass, configuration updates and
+cached nodes are separate SDK switches. The five selectors configure server
+mode, transport, simultaneous connections, concurrent attempts and rotation.
+Whitelist and VK-TURN leave managed concurrency at SDK defaults. Settings are
+stored and exported through Ozero's existing settings and backup system and
+are editable only while the VPN is disconnected.
