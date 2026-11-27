@@ -40,6 +40,7 @@ jobs:
             if [ -z "$LAST" ]; then LAST="v0.0.0"; fi
             IFS='.' read -r ma mi pa <<< "${LAST#v}"
             TAG="v${ma}.${mi}.$((pa + 1))"
+            TAG=$(printf '%s\n' v1.1.0 "$TAG" | sort -V | tail -1)
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
