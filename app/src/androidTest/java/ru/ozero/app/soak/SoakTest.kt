@@ -16,6 +16,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.work.WorkManager
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -34,6 +35,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import ru.ozero.app.di.SingboxSubscriptionEntryPoint
 import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
+import ru.ozero.app.workers.SubscriptionUpdateWorker
 import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
@@ -57,6 +59,7 @@ import ru.ozero.singboxroom.dao.SubscriptionGroupDao
 import ru.ozero.singboxroom.entity.ProxyProfile
 import ru.ozero.singboxroom.entity.SubscriptionGroup
 import ru.ozero.singboxsubscription.RawUpdater
+import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class SoakTest {
@@ -92,6 +95,7 @@ class SoakTest {
             targetContext.applicationContext,
             SoakTestEntryPoint::class.java,
         )
+        isolateSubscriptionFixtures(targetContext, dependencies)
         val profiles = if (realityOnly) {
             listOf(seedProfile(dependencies, requireNotNull(realityInput)))
         } else {
@@ -155,6 +159,11 @@ class SoakTest {
             }
             if (!realityOnly) {
                 Log.i(TAG, "auto-select phase=start")
+                val expectedProfileIds = profiles.map { it.profile.id }.toSet()
+                val candidateIds = dependencies.proxyProfileDao().getAllFlow().first().map { it.id }.toSet()
+                check(candidateIds == expectedProfileIds && candidateIds.size >= 3) {
+                    "Auto-select fixture contamination: expected ${expectedProfileIds.size}, got ${candidateIds.size}"
+                }
                 selectAutoProfile(dependencies.singboxDataStore())
                 startVpn(targetContext)
                 awaitStableConnection(dependencies.tunnelController(), EngineId.SINGBOX)
@@ -168,7 +177,8 @@ class SoakTest {
                     "auto-select external probe did not use Android VPN transport"
                 }
                 check(probe.httpCode in 200..299) {
-                    "auto-select routed HTTP failed code=${probe.httpCode}"
+                    "auto-select routed HTTP failed code=${probe.httpCode} stage=${probe.stage} " +
+                        "exceptionClass=${probe.exceptionClass} elapsedMs=${probe.elapsedMs}"
                 }
                 check(probe.markerMatch) { "auto-select routed HTTP returned an unexpected marker" }
                 Log.i(TAG, "auto-select phase=done")
@@ -470,6 +480,23 @@ class SoakTest {
         is VMessBean -> 1
         is TrojanBean -> 2
         else -> error("unsupported soak protocol")
+    }
+
+    private suspend fun isolateSubscriptionFixtures(context: Context, dependencies: SoakTestEntryPoint) {
+        val manager = WorkManager.getInstance(context)
+        val tag = SubscriptionUpdateWorker::class.java.name
+        // Startup seeds built-ins before enqueuing the two subscription jobs.
+        withTimeout(30_000L) {
+            manager.getWorkInfosByTagFlow(tag).first { it.size >= 2 }
+        }
+        manager.cancelAllWorkByTag(tag).result.get(10, TimeUnit.SECONDS)
+        val groupDao = dependencies.subscriptionGroupDao()
+        val groups = groupDao.getAll()
+        check(groups.all { it.isBuiltin }) { "Soak requires a clean test installation" }
+        groups.forEach { groupDao.deleteBuiltinGroupWithProfiles(it) }
+        check(dependencies.proxyProfileDao().getAllFlow().first().isEmpty()) {
+            "Unexpected profiles before controlled subscription import"
+        }
     }
 
     private suspend fun selectProfile(dataStore: DataStore<Preferences>, profile: ProxyProfile) {
