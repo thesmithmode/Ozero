@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,7 +39,9 @@ import ru.ozero.app.R
 import ru.ozero.enginegfvpn.GfVpnBundledSdk
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.GfVpnOptions
+import ru.ozero.enginescore.settings.GfVpnServerCatalog
 import ru.ozero.enginescore.settings.SplitTunnelMode
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,14 +113,21 @@ private fun GfVpnConnectionOptions(
         "V2H" to "V2Ray HTTP", "V2W" to "V2Ray WebSocket", "VKT" to "VK-TURN",
         "WT" to "WebTunnel", "XRXH" to "XRay XHTTP",
     )
-    GfVpnChoice(
-        stringResource(R.string.gfvpn_server_selection),
-        options.serverSelection,
-        serverModes,
-        enabled,
-    ) { value ->
-        update { it.copy(serverSelection = value) }
+    Text(stringResource(R.string.gfvpn_server_selection), style = MaterialTheme.typography.titleSmall)
+    serverModes.chunked(2).forEach { row ->
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            row.forEach { (value, label) ->
+                FilterChip(
+                    selected = options.serverSelection == value,
+                    onClick = { update { it.copy(serverSelection = value) } },
+                    label = { Text(label) },
+                    enabled = enabled,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
     }
+    GfVpnServerSelection(options, enabled, update)
     GfVpnChoice(
         stringResource(R.string.gfvpn_transport),
         effective.transport,
@@ -196,5 +206,37 @@ private fun GfVpnChoice(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun GfVpnServerSelection(
+    options: GfVpnOptions,
+    enabled: Boolean,
+    update: ((GfVpnOptions) -> GfVpnOptions) -> Unit,
+) {
+    val country = GfVpnServerCatalog.countryFor(options.serverSelection)
+    val countries = GfVpnServerCatalog.countries.map { (code, groups) ->
+        val iso = code.take(2)
+        val flag = iso.map { String(Character.toChars(0x1F1E6 + it.code - 'A'.code)) }.joinToString("")
+        val name = Locale("", iso).displayCountry
+        val title = if (code.endsWith("0")) stringResource(R.string.gfvpn_proxy_country, name) else name
+        code to stringResource(R.string.gfvpn_country_entry, flag, title, groups.size)
+    }.sortedBy { it.second.substringAfter(' ') }
+    val automatic = stringResource(R.string.gfvpn_no_country)
+    GfVpnChoice(
+        stringResource(R.string.gfvpn_country),
+        country.orEmpty(),
+        listOf("" to automatic) + countries,
+        enabled,
+    ) { value -> update { it.copy(serverSelection = value.ifEmpty { "auto" }) } }
+    if (country != null) {
+        val servers = GfVpnServerCatalog.countries.getValue(country)
+        GfVpnChoice(
+            stringResource(R.string.gfvpn_server),
+            options.serverSelection,
+            listOf(country to stringResource(R.string.gfvpn_any_server)) + servers.map { it to it },
+            enabled,
+        ) { value -> update { it.copy(serverSelection = value) } }
     }
 }
