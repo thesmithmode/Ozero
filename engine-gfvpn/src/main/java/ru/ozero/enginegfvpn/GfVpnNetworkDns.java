@@ -19,7 +19,8 @@ final class GfVpnNetworkDns {
             if (manager == null) return "";
             Network active = manager.getActiveNetwork();
             if (isPhysical(manager, active)) {
-                return addresses(manager, active);
+                String dns = addresses(manager, active);
+                if (!dns.isEmpty()) return dns;
             }
             Network fallback = null;
             for (Network network : manager.getAllNetworks()) {
@@ -59,6 +60,11 @@ final class GfVpnNetworkDns {
             if (scope >= 0) value = value.substring(0, scope);
             if (!value.isEmpty()) unique.add(value);
         }
-        return String.join(",", unique);
+        StringBuilder joined = new StringBuilder();
+        for (String value : unique) {
+            if (joined.length() > 0) joined.append(',');
+            joined.append(value);
+        }
+        return joined.toString();
     }
 }
