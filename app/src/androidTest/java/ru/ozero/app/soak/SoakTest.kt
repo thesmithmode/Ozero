@@ -268,7 +268,7 @@ class SoakTest {
             settings.setKillswitchEnabled(true)
             repeat(3) {
                 startVpn(context)
-                awaitConnected(controller, EngineId.OPERA, 90_000L)
+                awaitConnected(controller, EngineId.OPERA, 105_000L)
                 val probe = probeFromExternalUid(context, instrumentation.context, url, marker)
                 check(probe.vpnTransport) { "Opera probe is outside the VPN" }
                 check(probe.httpCode in 200..299 && probe.markerMatch) {
@@ -640,7 +640,7 @@ class SoakTest {
         private const val LOCAL_SUBSCRIPTION_URL = "http://10.0.2.2:18080/subscription.txt"
         private const val DEFAULT_MARKER = "ozero-singbox-routed"
         private const val START_TIMEOUT_MS = 30_000L
-        private const val TGWSS_START_TIMEOUT_MS = 120_000L
+        private const val TGWSS_START_TIMEOUT_MS = 220_000L
         private const val STOP_TIMEOUT_MS = 10_000L
         private const val PROBE_TIMEOUT_MS = 15_000L
         private const val RUNTIME_REFRESH_OBSERVATION_MS = 2_000L

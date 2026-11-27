@@ -44,9 +44,12 @@ tasks.matching { it.name == "preBuild" }.configureEach {
 // Validate requested tasks at configuration time, including configuration-cache builds.
 if (unitTestsOnly) {
     val allowed = setOf("testDebugUnitTest", "jacocoTestReport", "jacocoTestCoverageVerification")
+    val testCompilation = setOf(":app:compileDebugAndroidTestKotlin", ":app:compileDebugAndroidTestJavaWithJavac")
     val requested = gradle.startParameter.taskNames
     val includesTests = requested.any { it.substringAfterLast(':') == "testDebugUnitTest" }
-    val testsOnly = requested.all { it.startsWith(":") && it.substringAfterLast(':') in allowed }
+    val testsOnly = requested.all {
+        it in testCompilation || (it.startsWith(":") && it.substringAfterLast(':') in allowed)
+    }
     check(includesTests && testsOnly) {
         "SDK-free unit-test mode requires explicit JVM test and coverage tasks only"
     }

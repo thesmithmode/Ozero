@@ -315,6 +315,7 @@ jobs:
         run: >
           ./gradlew
           -Pozero.gfvpn.unitTestsOnly=true
+          :app:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestJavaWithJavac
           :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification
           :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport :common-vpn:jacocoTestCoverageVerification
           :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport :engine-urnetwork:jacocoTestCoverageVerification

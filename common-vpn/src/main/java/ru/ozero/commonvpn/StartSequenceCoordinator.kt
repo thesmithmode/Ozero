@@ -657,8 +657,12 @@ class StartSequenceCoordinator(
         const val PREFLIGHT_HARD_TIMEOUT_MS = 7_000L
 
         internal fun chainStartTimeoutMs(engineId: EngineId): Long = when (engineId) {
-            // Opera may exhaust its first 25-second attempt before alternate bootstrap.
-            EngineId.OPERA -> 60_000L
+            // Include blocking TLS/SOCKS probe and child shutdown time after each attempt.
+            EngineId.OPERA -> 75_000L
+            // AUTO can try H3/H2 over both endpoint address families.
+            EngineId.MASQUE -> 60_000L
+            // Cold WARP registration alone has a 90-second budget; then the proxy must become ready.
+            EngineId.TGWSS -> 180_000L
             EngineId.GFVPN -> 130_000L
             else -> CHAIN_START_TIMEOUT_MS
         }

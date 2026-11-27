@@ -30,10 +30,17 @@ class StartSequenceCoordinatorContractTest {
     }
 
     @Test
-    fun `Opera fallback receives a full second attempt without extending other engine budgets`() {
-        assertEquals(60_000L, StartSequenceCoordinator.chainStartTimeoutMs(EngineId.OPERA))
-        assertEquals(130_000L, StartSequenceCoordinator.chainStartTimeoutMs(EngineId.GFVPN))
-        EngineId.entries.filterNot { it == EngineId.OPERA || it == EngineId.GFVPN }.forEach {
+    fun `multi-attempt engines have enough time without extending unrelated engine budgets`() {
+        val budgets = mapOf(
+            EngineId.OPERA to 75_000L,
+            EngineId.MASQUE to 60_000L,
+            EngineId.TGWSS to 180_000L,
+            EngineId.GFVPN to 130_000L,
+        )
+        budgets.forEach { (engine, timeout) ->
+            assertEquals(timeout, StartSequenceCoordinator.chainStartTimeoutMs(engine))
+        }
+        EngineId.entries.filterNot { it in budgets }.forEach {
             assertEquals(30_000L, StartSequenceCoordinator.chainStartTimeoutMs(it))
         }
         assertTrue(source.contains("withTimeoutOrNull(chainStartTimeoutMs(engineId))"))
