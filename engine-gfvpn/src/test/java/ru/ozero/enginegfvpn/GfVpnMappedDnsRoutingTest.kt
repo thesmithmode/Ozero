@@ -11,16 +11,22 @@ class GfVpnMappedDnsRoutingTest {
         val mappedNetwork = ipv4(GfVpnTun.MAP_DNS_NETWORK)
         val mappedPrefix = GfVpnTun.MAP_DNS_PREFIX
         val routes = LanRoutes.BYPASS_LAN_IPV4
-        assertTrue(routes.any { route ->
-            route.prefix <= mappedPrefix &&
-                mappedNetwork and mask(route.prefix) == ipv4(route.address) and mask(route.prefix)
-        })
-        assertFalse(routes.any { route ->
-            ipv4("100.64.0.1") and mask(route.prefix) == ipv4(route.address) and mask(route.prefix)
-        })
-        assertFalse(routes.any { route ->
-            ipv4("192.168.1.1") and mask(route.prefix) == ipv4(route.address) and mask(route.prefix)
-        })
+        assertTrue(
+            routes.any { route ->
+                route.prefix <= mappedPrefix &&
+                    mappedNetwork and mask(route.prefix) == ipv4(route.address) and mask(route.prefix)
+            },
+        )
+        assertFalse(
+            routes.any { route ->
+                ipv4("100.64.0.1") and mask(route.prefix) == ipv4(route.address) and mask(route.prefix)
+            },
+        )
+        assertFalse(
+            routes.any { route ->
+                ipv4("192.168.1.1") and mask(route.prefix) == ipv4(route.address) and mask(route.prefix)
+            },
+        )
     }
 
     private fun ipv4(address: String): Long =
