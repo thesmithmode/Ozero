@@ -126,6 +126,29 @@ jobs:
           bash scripts/verify-gfvpn-hev-apk.sh "$APK"
           unzip -Z1 "$APK" | awk '/^lib\// && $0 !~ /^lib\/arm64-v8a\// { invalid=1 } END { exit invalid }'
 
+      - name: Prepare strict diagnostic script
+        run: |
+          cat > "$RUNNER_TEMP/adaptive-diagnostic.sh" <<'BASH'
+          set -euo pipefail
+          adb shell getprop ro.product.cpu.abilist64 | tr -d '\r' | grep -E '(^|,)arm64-v8a(,|$)'
+          adb install -r app/build/outputs/apk/debug/app-debug.apk
+          adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          adb shell dumpsys package ru.ozero.app | grep -E 'primaryCpuAbi=arm64-v8a'
+          adb shell appops set ru.ozero.app ACTIVATE_VPN allow
+          adb logcat -c
+          status=0
+          timeout 2200s bash engine-gfvpn/device-smoke.sh > "$RUNNER_TEMP/adaptive-diagnostic.txt" 2>&1 || status=$?
+          count=$(tr -d '\r' < "$RUNNER_TEMP/adaptive-diagnostic.txt" | grep -Fxc 'OK (1 test)' || true)
+          echo "Successful test suites: $count of 2; exit status: $status"
+          if [ "$status" -ne 0 ] || [ "$count" -ne 2 ]; then
+            echo 'ARM64 translated SDK/TUN check failed; reporting only fixed diagnostic categories.'
+            grep -Eo 'java\.(lang|io|util\.concurrent)\.[A-Za-z]+(Exception|Error)|LOAD_SDK|CONFIGURE|NATIVE_START|VALIDATE_SESSION|ARM64 device required|Bundled gfVPN SDK is absent|VPN consent not granted|gfVPN process disconnected|gfVPN verification startup timed out|SDK startup failed|TUN health probe succeeded without an attached descriptor|external routed HTTP failed|external probe is outside the VPN' "$RUNNER_TEMP/adaptive-diagnostic.txt" | sort -u || true
+            adb logcat -d -s GfVpnSdk:W GfVpnProcess:W GfVpnRuntime:W | grep -Eo '(LOAD_SDK|CONFIGURE|NATIVE_START|VALIDATE_SESSION): [A-Za-z]+(Exception|Error)|[a-z-]+ watchdog expired|[a-z-]+ failed: [A-Za-z]+(Exception|Error)' | sort -u || true
+            exit 1
+          fi
+          echo 'Real SDK and three routed external UID TUN cycles passed on ARM64 translation.'
+          BASH
+
       - name: Run real SDK and external UID VPN probes (translated ARM64)
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -134,22 +157,4 @@ jobs:
           arch: x86_64
           profile: pixel_5
           emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
-          script: |
-            set -eu
-            adb shell getprop ro.product.cpu.abilist64 | tr -d '\r' | grep -E '(^|,)arm64-v8a(,|$)'
-            adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            adb shell dumpsys package ru.ozero.app | grep -E 'primaryCpuAbi=arm64-v8a'
-            adb shell appops set ru.ozero.app ACTIVATE_VPN allow
-            adb logcat -c
-            status=0
-            timeout 2200s bash engine-gfvpn/device-smoke.sh > "$RUNNER_TEMP/adaptive-diagnostic.txt" 2>&1 || status=$?
-            count=$(tr -d '\r' < "$RUNNER_TEMP/adaptive-diagnostic.txt" | grep -Fxc 'OK (1 test)' || true)
-            echo "Successful test suites: $count of 2; exit status: $status"
-            if [ "$status" -ne 0 ] || [ "$count" -ne 2 ]; then
-              echo 'ARM64 translated SDK/TUN check failed; reporting only fixed diagnostic categories.'
-              grep -Eo 'java\.(lang|io|util\.concurrent)\.[A-Za-z]+(Exception|Error)|LOAD_SDK|CONFIGURE|NATIVE_START|VALIDATE_SESSION|ARM64 device required|Bundled gfVPN SDK is absent|VPN consent not granted|gfVPN process disconnected|gfVPN verification startup timed out|SDK startup failed|TUN health probe succeeded without an attached descriptor|external routed HTTP failed|external probe is outside the VPN' "$RUNNER_TEMP/adaptive-diagnostic.txt" | sort -u || true
-              adb logcat -d -s GfVpnSdk:W GfVpnProcess:W GfVpnRuntime:W | grep -Eo '(LOAD_SDK|CONFIGURE|NATIVE_START|VALIDATE_SESSION): [A-Za-z]+(Exception|Error)|[a-z-]+ watchdog expired|[a-z-]+ failed: [A-Za-z]+(Exception|Error)' | sort -u || true
-              exit 1
-            fi
-            echo 'Real SDK and three routed external UID TUN cycles passed on ARM64 translation.'
+          script: bash "$RUNNER_TEMP/adaptive-diagnostic.sh"
