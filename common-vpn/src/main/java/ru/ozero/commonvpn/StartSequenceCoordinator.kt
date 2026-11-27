@@ -42,7 +42,7 @@ internal fun TunSpec.forSplitMode(mode: SplitTunnelMode): TunSpec =
     } else {
         copy(
             routeAllV4 = false,
-            routeCidrsV4 = emptyList(),
+            routeCidrsV4 = requiredRouteCidrsV4,
             routeAllV6 = false,
             routeCidrsV6 = if (routeAllV6) {
                 LanRoutes.BYPASS_LAN_IPV6.map { "${it.address}/${it.prefix}" }
