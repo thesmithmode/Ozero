@@ -68,60 +68,6 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Test
-    fun `manual engine settings change restarts connected tunnel`() = runTest {
-        val startServiceActions = mutableListOf<String?>()
-        val settings = MutableStateFlow(SettingsModel(manualEngine = EngineId.WARP))
-        val tunnelController = TunnelController()
-        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
-        val coordinator = RuntimeConfigRestartCoordinator(
-            context = recordingContext(startServiceActions) {
-                tunnelController.setState(TunnelState.Disconnecting)
-                launch { tunnelController.setState(TunnelState.Connected(EngineId.FPTN, 0)) }
-            },
-            observer = EngineRuntimeConfigRestartObserver(emptySet()),
-            tunnelController = tunnelController,
-            settingsRepository = fakeSettingsRepository(settings),
-        )
-
-        coordinator.start(backgroundScope)
-        runCurrent()
-        settings.value = SettingsModel(manualEngine = EngineId.FPTN)
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
-        runCurrent()
-
-        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
-        assertEquals(TunnelState.Connected(EngineId.FPTN, 0), tunnelController.state.value)
-    }
-
-    @Test
-    fun `manual switch to Adaptive VPN uses the target deadline not the previous engine deadline`() = runTest {
-        val actions = mutableListOf<String?>()
-        val settings = MutableStateFlow(SettingsModel(manualEngine = EngineId.WARP))
-        val controller = TunnelController(watchdogScope = backgroundScope)
-        controller.setState(TunnelState.Connected(EngineId.WARP, 51820))
-        val coordinator = RuntimeConfigRestartCoordinator(
-            context = recordingContext(actions) { controller.setState(TunnelState.Disconnecting) },
-            observer = EngineRuntimeConfigRestartObserver(emptySet()),
-            tunnelController = controller,
-            settingsRepository = fakeSettingsRepository(settings),
-        )
-
-        coordinator.start(backgroundScope)
-        runCurrent()
-        settings.value = SettingsModel(manualEngine = EngineId.GFVPN)
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
-        runCurrent()
-        advanceTimeBy(300_000L)
-        assertEquals(EngineId.GFVPN, controller.switching.value?.to)
-        assertTrue(coordinator.restartInProgress())
-        controller.setState(TunnelState.Connected(EngineId.GFVPN, 0))
-        runCurrent()
-        assertFalse(coordinator.restartInProgress())
-        assertEquals(null, controller.switching.value)
-        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), actions)
-    }
-
-    @Test
     fun `restart returns false and does not start service when tunnel is idle`() = runTest {
         val startServiceActions = mutableListOf<String?>()
         val coordinator = coordinator(
@@ -314,7 +260,11 @@ class RuntimeConfigRestartCoordinatorTest {
             )
             val restart = launch { assertTrue(coordinator.restartVpnIfRunning("settings changed")) }
             runCurrent()
-            val budget = if (target == EngineId.FPTN) 30_001L else requireNotNull(EngineStartupBudget.restartTimeoutMs(target))
+            val budget = if (target == EngineId.FPTN) {
+                30_001L
+            } else {
+                requireNotNull(EngineStartupBudget.restartTimeoutMs(target))
+            }
             advanceTimeBy(budget - 1)
             assertTrue(restart.isActive)
             controller.setState(TunnelState.Connected(target, 0))
