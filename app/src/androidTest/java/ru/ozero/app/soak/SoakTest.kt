@@ -4,8 +4,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.VpnService
 import android.os.Debug
+import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.datastore.core.DataStore
@@ -21,6 +24,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -167,8 +171,10 @@ class SoakTest {
                     "auto-select routed HTTP failed code=${probe.httpCode}"
                 }
                 check(probe.markerMatch) { "auto-select routed HTTP returned an unexpected marker" }
-                stopVpn(targetContext, dependencies.tunnelController())
                 Log.i(TAG, "auto-select phase=done")
+                exerciseEngineSwitching(dependencies)
+                exerciseWifiRecovery(dependencies.tunnelController(), EngineId.SINGBOX, DEFAULT_TARGET, DEFAULT_MARKER)
+                stopVpn(targetContext, dependencies.tunnelController())
             }
         } finally {
             runCatching { stopVpn(targetContext, dependencies.tunnelController()) }
@@ -309,13 +315,12 @@ class SoakTest {
             settings.setSplitMode(SplitTunnelMode.ALL)
             settings.setIpv6Enabled(false)
             settings.setKillswitchEnabled(true)
-            repeat(3) {
+            repeat(3) { cycle ->
                 startVpn(context)
                 awaitConnected(controller, EngineId.GFVPN, 540_000L)
-                val probe = probeFromExternalUid(context, instrumentation.context, url, marker)
-                check(probe.vpnTransport) { "gfVPN external probe is outside VPN" }
-                check(probe.httpCode in 200..299 && probe.markerMatch) {
-                    "gfVPN routed TCP/DNS probe failed: ${probe.stage} HTTP ${probe.httpCode}"
+                assertExternalRoute(context, instrumentation.context, url, marker)
+                if (cycle == 0 && args.getString("OZERO_GFVPN_SMOKE_NETWORK_CHANGE") == "1") {
+                    exerciseWifiRecovery(controller, EngineId.GFVPN, url, marker)
                 }
                 stopVpn(context, controller)
             }
@@ -485,6 +490,89 @@ class SoakTest {
         }
     }
 
+    private suspend fun exerciseEngineSwitching(dependencies: SoakTestEntryPoint) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val controller = dependencies.tunnelController()
+        val settings = dependencies.settingsRepository()
+        for (engine in listOf(EngineId.BYEDPI, EngineId.SINGBOX)) {
+            settings.setManualEngine(engine)
+            val state = withTimeout(ENGINE_SWITCH_TIMEOUT_MS) {
+                controller.state.first {
+                    (it is TunnelState.Connected && it.engineId == engine) ||
+                        (it is TunnelState.Failed && it.engineId == engine)
+                }
+            }
+            check(state is TunnelState.Connected) { "Engine switch to $engine failed: $state" }
+            assertExternalRoute(instrumentation.targetContext, instrumentation.context, DEFAULT_TARGET, DEFAULT_MARKER)
+            Log.i(TAG, "engine-switch engine=$engine phase=done")
+        }
+    }
+
+    private suspend fun assertExternalRoute(
+        context: Context,
+        probeContext: Context,
+        url: String,
+        marker: String,
+    ) {
+        val probe = probeFromExternalUid(context, probeContext, url, marker)
+        check(probe.vpnTransport) { "External probe is outside VPN" }
+        check(probe.httpCode in 200..299 && probe.markerMatch) {
+            "External route failed: ${probe.stage} HTTP ${probe.httpCode}"
+        }
+    }
+
+    private suspend fun exerciseWifiRecovery(
+        controller: TunnelController,
+        engine: EngineId,
+        url: String,
+        marker: String,
+    ) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val connectivity = requireNotNull(context.getSystemService(ConnectivityManager::class.java))
+        withTimeout(WIFI_CHANGE_TIMEOUT_MS) {
+            while (!hasPhysicalWifi(connectivity)) delay(NETWORK_POLL_MS)
+        }
+        try {
+            setWifi(false)
+            withTimeout(WIFI_CHANGE_TIMEOUT_MS) {
+                while (hasPhysicalWifi(connectivity)) delay(NETWORK_POLL_MS)
+            }
+        } finally {
+            setWifi(true)
+        }
+        withTimeout(WIFI_CHANGE_TIMEOUT_MS) {
+            while (!hasPhysicalWifi(connectivity)) delay(NETWORK_POLL_MS)
+        }
+        withTimeout(NETWORK_RECOVERY_TIMEOUT_MS) {
+            while (true) {
+                val probe = probeFromExternalUid(context, instrumentation.context, url, marker)
+                val state = controller.state.value
+                check(state !is TunnelState.Failed) { "VPN failed after physical network change: $state" }
+                if (state is TunnelState.Connected && state.engineId == engine &&
+                    probe.vpnTransport && probe.httpCode in 200..299 && probe.markerMatch
+                ) {
+                    break
+                }
+                delay(NETWORK_POLL_MS)
+            }
+        }
+        Log.i(TAG, "network-recovery engine=$engine phase=done")
+    }
+
+    private fun hasPhysicalWifi(connectivity: ConnectivityManager): Boolean =
+        connectivity.allNetworks.any { network ->
+            val capabilities = connectivity.getNetworkCapabilities(network)
+            capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+        }
+
+    private fun setWifi(enabled: Boolean) {
+        val command = if (enabled) "svc wifi enable" else "svc wifi disable"
+        val output = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+        ParcelFileDescriptor.AutoCloseInputStream(output).use { it.readBytes() }
+    }
+
     private fun startVpn(context: Context) {
         ContextCompat.startForegroundService(
             context,
@@ -641,6 +729,10 @@ class SoakTest {
         private const val DEFAULT_MARKER = "ozero-singbox-routed"
         private const val START_TIMEOUT_MS = 30_000L
         private const val TGWSS_START_TIMEOUT_MS = 220_000L
+        private const val ENGINE_SWITCH_TIMEOUT_MS = 90_000L
+        private const val WIFI_CHANGE_TIMEOUT_MS = 30_000L
+        private const val NETWORK_RECOVERY_TIMEOUT_MS = 60_000L
+        private const val NETWORK_POLL_MS = 500L
         private const val STOP_TIMEOUT_MS = 10_000L
         private const val PROBE_TIMEOUT_MS = 15_000L
         private const val RUNTIME_REFRESH_OBSERVATION_MS = 2_000L
