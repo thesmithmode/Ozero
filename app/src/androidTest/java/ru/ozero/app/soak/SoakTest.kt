@@ -549,8 +549,11 @@ class SoakTest {
                 val probe = probeFromExternalUid(context, instrumentation.context, url, marker)
                 val state = controller.state.value
                 check(state !is TunnelState.Failed) { "VPN failed after physical network change: $state" }
-                if (state is TunnelState.Connected && state.engineId == engine &&
-                    probe.vpnTransport && probe.httpCode in 200..299 && probe.markerMatch
+                if (state is TunnelState.Connected &&
+                    state.engineId == engine &&
+                    probe.vpnTransport &&
+                    probe.httpCode in 200..299 &&
+                    probe.markerMatch
                 ) {
                     break
                 }
@@ -563,7 +566,8 @@ class SoakTest {
     private fun hasPhysicalWifi(connectivity: ConnectivityManager): Boolean =
         connectivity.allNetworks.any { network ->
             val capabilities = connectivity.getNetworkCapabilities(network)
-            capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
+            capabilities != null &&
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
                 capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
         }
 
