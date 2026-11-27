@@ -19,7 +19,7 @@ Remaining gates before a selectable engine:
 - Test on ARM64 Android; validate JNI classloader compatibility and native
   startup/stop/restart, including bounded shutdown and process death.
 - The private IPC now passes SOCKS credentials only to the same app UID and implements a routed HTTPS probe. Validate both with the actual SDK, including native timeout recovery.
-- The isolated service now accepts a duplicated TUN descriptor and starts a dedicated HEV 2.20.0 on API 29+ (mapdns and JNI thread-state checks), retaining Ozero's existing HEV on API 24–28, with authenticated SOCKS5 settings. Device-test UDP-over-TCP, DNS and IPv6; verify the now-wired Ozero VPN lifecycle, split routing and engine UI on-device. No other engine may load this runtime.
+- The isolated service now accepts a duplicated TUN descriptor and starts a dedicated HEV 2.20.0 on API 29+ (mapdns as an alternative to the reference application's optional custom DNS forwarder, plus JNI thread-state checks), retaining Ozero's existing HEV on API 24–28, with authenticated SOCKS5 settings. Device-test UDP-over-TCP, DNS and IPv6; verify the now-wired Ozero VPN lifecycle, split routing and engine UI on-device. No other engine may load this runtime.
 - Verify live configuration updates and transport behavior under real network
   conditions, and establish authorization to distribute the SDK if desired.
 

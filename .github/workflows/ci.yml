@@ -486,6 +486,12 @@ jobs:
           APK=$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)
           bash scripts/verify-masque-apk.sh "$APK" arm64-v8a
 
+      - name: Verify gfVPN-specific HEV JNI package
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)
+          bash scripts/verify-gfvpn-hev-apk.sh "$APK"
+
       - name: Assert APK contains MasterDNS subprocess binary
         run: |
           set -euo pipefail
