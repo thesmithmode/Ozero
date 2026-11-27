@@ -171,7 +171,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
 
     private fun restartStartTimeoutMs(target: EngineId?): Long = when (target) {
         EngineId.FPTN -> FPTN_RESTART_START_TIMEOUT_MS
-        else -> EngineStartupBudget.restartTimeoutMs(target).takeIf { it > 0L } ?: RESTART_START_TIMEOUT_MS
+        else -> EngineStartupBudget.restartTimeoutMs(target) ?: RESTART_START_TIMEOUT_MS
     }
 
     private fun sendVpnAction(action: String) {
