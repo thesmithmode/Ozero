@@ -94,6 +94,34 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Test
+    fun `manual switch to Adaptive VPN uses the target deadline not the previous engine deadline`() = runTest {
+        val actions = mutableListOf<String?>()
+        val settings = MutableStateFlow(SettingsModel(manualEngine = EngineId.WARP))
+        val controller = TunnelController(watchdogScope = backgroundScope)
+        controller.setState(TunnelState.Connected(EngineId.WARP, 51820))
+        val coordinator = RuntimeConfigRestartCoordinator(
+            context = recordingContext(actions) { controller.setState(TunnelState.Disconnecting) },
+            observer = EngineRuntimeConfigRestartObserver(emptySet()),
+            tunnelController = controller,
+            settingsRepository = fakeSettingsRepository(settings),
+        )
+
+        coordinator.start(backgroundScope)
+        runCurrent()
+        settings.value = SettingsModel(manualEngine = EngineId.GFVPN)
+        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
+        runCurrent()
+        advanceTimeBy(300_000L)
+        assertEquals(EngineId.GFVPN, controller.switching.value?.to)
+        assertTrue(coordinator.restartInProgress())
+        controller.setState(TunnelState.Connected(EngineId.GFVPN, 0))
+        runCurrent()
+        assertFalse(coordinator.restartInProgress())
+        assertEquals(null, controller.switching.value)
+        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), actions)
+    }
+
+    @Test
     fun `restart returns false and does not start service when tunnel is idle`() = runTest {
         val startServiceActions = mutableListOf<String?>()
         val coordinator = coordinator(
@@ -286,7 +314,7 @@ class RuntimeConfigRestartCoordinatorTest {
             )
             val restart = launch { assertTrue(coordinator.restartVpnIfRunning("settings changed")) }
             runCurrent()
-            advanceTimeBy(if (target == EngineId.FPTN) 30_000 else EngineStartupBudget.restartTimeoutMs(target) - 1)
+            advanceTimeBy(if (target == EngineId.FPTN) 30_000L else requireNotNull(EngineStartupBudget.restartTimeoutMs(target)) - 1)
             assertTrue(restart.isActive)
             controller.setState(TunnelState.Connected(target, 0))
             restart.join()
