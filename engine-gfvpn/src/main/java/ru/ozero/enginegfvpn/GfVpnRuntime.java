@@ -15,6 +15,7 @@ import android.os.RemoteException;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
+import ru.ozero.enginescore.settings.GfVpnOptions;
 
 /** Single-session, asynchronous client. All state transitions run on the main looper. */
 public final class GfVpnRuntime implements AutoCloseable {
@@ -33,12 +34,14 @@ public final class GfVpnRuntime implements AutoCloseable {
         @Override public String toString() { return "gfVPN session (credentials redacted)"; }
     }
     private final Context context;
+    private final GfVpnCaptchaNotifier captchaNotifier;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Messenger replies = new Messenger(new Handler(Looper.getMainLooper(), this::receive));
     private Messenger remote;
     private boolean bound;
     private boolean closed;
     private boolean started;
+    private boolean manualVerificationSeen;
     private int sequence;
     private int pendingOperation;
     private CompletableFuture<Bundle> pending;
@@ -61,10 +64,18 @@ public final class GfVpnRuntime implements AutoCloseable {
         }
     };
 
-    public GfVpnRuntime(Context context) { this.context = context.getApplicationContext(); }
+    public GfVpnRuntime(Context context) {
+        this.context = context.getApplicationContext();
+        captchaNotifier = new GfVpnCaptchaNotifier(this.context);
+    }
 
     public CompletableFuture<Session> start(String country, String clientIdentifier) {
+        return start(country, clientIdentifier, GfVpnOptions.DEFAULT);
+    }
+
+    public CompletableFuture<Session> start(String country, String clientIdentifier, GfVpnOptions options) {
         Bundle data = new Bundle();
+        data.putString("options", options.encode());
         data.putString("country", country);
         data.putString("clientIdentifier", clientIdentifier);
         CompletableFuture<Bundle> raw = request(GfVpnProcessService.START, data, 125000);
@@ -100,9 +111,26 @@ public final class GfVpnRuntime implements AutoCloseable {
         }
     }
 
+    public static final class Probe {
+        public final long latencyMs;
+        public final long bytesIn;
+        public final long bytesOut;
+        private Probe(Bundle data) {
+            latencyMs = data.getLong("latencyMs");
+            bytesIn = data.getLong("bytesIn");
+            bytesOut = data.getLong("bytesOut");
+        }
+    }
+
+    public CompletableFuture<Probe> probeWithStats() {
+        CompletableFuture<Probe> result = request(GfVpnProcessService.PROBE, new Bundle(), 15000)
+            .thenApply(Probe::new);
+        result.whenComplete((value, error) -> { if (result.isCancelled()) close(); });
+        return result;
+    }
+
     public CompletableFuture<Long> probe() {
-        CompletableFuture<Bundle> raw = request(GfVpnProcessService.PROBE, new Bundle(), 15000);
-        CompletableFuture<Long> result = raw.thenApply(data -> data.getLong("latencyMs"));
+        CompletableFuture<Long> result = probeWithStats().thenApply(data -> data.latencyMs);
         result.whenComplete((value, error) -> { if (result.isCancelled()) close(); });
         return result;
     }
@@ -135,7 +163,15 @@ public final class GfVpnRuntime implements AutoCloseable {
             pendingOperation = operation;
             pendingInput = input;
             sequence++;
-            deadline = () -> fail(new TimeoutException("gfVPN runtime timed out"));
+            deadline = () -> {
+                if (operation == GfVpnProcessService.START && manualVerificationSeen) {
+                    deadline = () -> fail(new TimeoutException("gfVPN verification startup timed out"));
+                    main.postDelayed(deadline, 180000);
+                } else {
+                    fail(new TimeoutException("gfVPN " +
+                        GfVpnProcessService.operationName(operation) + " timed out"));
+                }
+            };
             main.postDelayed(deadline, timeoutMs);
             if (remote != null) sendPending();
             else {
@@ -160,8 +196,28 @@ public final class GfVpnRuntime implements AutoCloseable {
     }
 
     private boolean receive(Message message) {
-        if (message.sendingUid != context.getApplicationInfo().uid ||
-            message.what != GfVpnProcessService.RESULT || pending == null || closed) return true;
+        if (message.sendingUid != context.getApplicationInfo().uid || closed) return true;
+        if (message.what == GfVpnProcessService.CAPTCHA_EVENT) {
+            String url = message.getData().getString("url");
+            if (url == null || url.isEmpty()) {
+                clearCaptcha();
+            } else if (GfVpnCaptchaState.publish(this, url, () -> {
+                captchaNotifier.cancel();
+                dismissCaptcha();
+            })) {
+                if (pending != null && pendingOperation == GfVpnProcessService.START) {
+                    manualVerificationSeen = true;
+                }
+                captchaNotifier.show();
+            } else {
+                clearCaptcha();
+                ru.ozero.enginescore.PersistentLoggers.INSTANCE.warn("GfVpnRuntime",
+                    "Rejected non-local CAPTCHA URL", null);
+                dismissCaptcha();
+            }
+            return true;
+        }
+        if (message.what != GfVpnProcessService.RESULT || pending == null) return true;
         Bundle data = message.getData();
         if (data.getInt("requestId") != sequence) return true;
         int operation = pendingOperation;
@@ -177,6 +233,19 @@ public final class GfVpnRuntime implements AutoCloseable {
         return true;
     }
 
+    private void clearCaptcha() {
+        if (GfVpnCaptchaState.clear(this)) captchaNotifier.cancel();
+    }
+
+    private void dismissCaptcha() {
+        main.post(() -> {
+            if (closed || remote == null) return;
+            Message message = Message.obtain(null, GfVpnProcessService.CAPTCHA_DISMISS);
+            message.replyTo = replies;
+            try { remote.send(message); } catch (RemoteException failure) { fail(failure); }
+        });
+    }
+
     private CompletableFuture<Bundle> clearPending() {
         CompletableFuture<Bundle> result = pending;
         pending = null;
@@ -188,14 +257,20 @@ public final class GfVpnRuntime implements AutoCloseable {
     }
 
     private void fail(Throwable failure) {
+        String operation = GfVpnProcessService.operationName(pendingOperation);
         CompletableFuture<Bundle> result = clearPending();
         release();
-        if (result != null) result.completeExceptionally(failure);
+        if (result != null) {
+            ru.ozero.enginescore.PersistentLoggers.INSTANCE.warn("GfVpnRuntime",
+                operation + " failed: " + failure.getClass().getSimpleName(), null);
+            result.completeExceptionally(failure);
+        }
     }
 
     private void release() {
         if (closed) return;
         closed = true;
+        clearCaptcha();
         started = false;
         if (remote != null) {
             Message abort = Message.obtain(null, GfVpnProcessService.ABORT);

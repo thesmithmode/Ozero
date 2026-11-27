@@ -62,7 +62,9 @@ class OperaProxyRuntime(
                         }
                         // Only the owner of the failed session may replace it.
                         // 9/10/12 are upstream registration/discovery/selection failures.
-                        if (session === current && !alternate && code in RETRYABLE_EXIT_CODES) {
+                        val retryable = current.process.alive || code in RETRYABLE_EXIT_CODES
+                        if (session === current && !alternate && retryable) {
+                            PersistentLoggers.info("OperaRuntime", "retry with alternate bootstrap: $reason")
                             stopIfCurrent(current)
                             alternate = true
                             withContext(Dispatchers.IO) {

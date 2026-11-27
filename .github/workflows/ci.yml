@@ -314,7 +314,8 @@ jobs:
       - name: coverage verification first
         run: >
           ./gradlew
-          :app:assembleDebugAndroidTest
+          -Pozero.gfvpn.unitTestsOnly=true
+          :app:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestJavaWithJavac
           :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification
           :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport :common-vpn:jacocoTestCoverageVerification
           :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport :engine-urnetwork:jacocoTestCoverageVerification
@@ -478,13 +479,25 @@ jobs:
         uses: ./.github/actions/build-masque
 
       - name: assembleDebug
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug :app:assembleDebugAndroidTest --stacktrace
 
       - name: Verify packaged MASQUE transport
         run: |
           set -euo pipefail
           APK=$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)
           bash scripts/verify-masque-apk.sh "$APK" arm64-v8a
+
+      - name: Verify bundled gfVPN SDK
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)
+          python3 engine-gfvpn/verify-bundled-sdk.py "$APK"
+
+      - name: Verify gfVPN-specific HEV JNI package
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)
+          bash scripts/verify-gfvpn-hev-apk.sh "$APK"
 
       - name: Assert APK contains MasterDNS subprocess binary
         run: |
@@ -605,8 +618,18 @@ jobs:
           ls -la singbox-core/libs/
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
+      - name: Assert SDK-free mode rejects APK assembly
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/gfvpn-test-mode-guard.log"
+          if ./gradlew -Pozero.gfvpn.unitTestsOnly=true :app:assembleDebug :app:testDebugUnitTest --dry-run >"$log" 2>&1; then
+            echo "::error::SDK-free mode unexpectedly allowed APK assembly"
+            exit 1
+          fi
+          grep -F 'SDK-free unit-test mode requires explicit JVM test and coverage tasks only' "$log"
+
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
+        run: ./gradlew -Pozero.gfvpn.unitTestsOnly=true :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -899,12 +922,12 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification :engine-opera:testDebugUnitTest :engine-opera:jacocoTestReport :engine-opera:jacocoTestCoverageVerification :engine-gfvpn:testDebugUnitTest --stacktrace --continue
+        run: ./gradlew -Pozero.gfvpn.unitTestsOnly=true :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification :engine-opera:testDebugUnitTest :engine-opera:jacocoTestReport :engine-opera:jacocoTestCoverageVerification :engine-gfvpn:testDebugUnitTest --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
           python3 -m pip install --quiet defusedxml
-          python3 scripts/verify-junit-nonzero.py engine-fptn engine-opera
+          python3 scripts/verify-junit-nonzero.py engine-fptn engine-opera engine-gfvpn
 
       - name: Upload coverage report
         if: always()

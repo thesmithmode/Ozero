@@ -25,6 +25,8 @@ interface SettingsRepository {
 
     suspend fun setOperaSelection(selection: String) = Unit
 
+    suspend fun updateGfVpnOptions(transform: (GfVpnOptions) -> GfVpnOptions) = Unit
+
     suspend fun setUrnetworkEnabled(enabled: Boolean)
 
     suspend fun setUrnetworkJwt(jwt: String?)

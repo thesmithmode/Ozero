@@ -4,6 +4,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import javax.net.ssl.SSLSocket;
@@ -16,7 +17,7 @@ final class GfVpnSocksProbe {
 
     static long probe(int port, String username, String password) throws IOException {
         long start = System.nanoTime();
-        try (Socket socket = new Socket()) {
+        try (Socket socket = new Socket(Proxy.NO_PROXY)) {
             socket.connect(new InetSocketAddress("127.0.0.1", port), TIMEOUT_MS);
             socket.setSoTimeout(TIMEOUT_MS);
             connect(socket, username, password, HOST, 443);

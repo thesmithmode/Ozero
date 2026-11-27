@@ -102,6 +102,72 @@ class TelegramWssRelayTest {
         }
     }
 
+    @Test
+    fun `blocked direct handshake cannot delay WARP or duplicate MTProto init`() {
+        val direct = FakeTelegramWebSockets(deferOpen = true)
+        val fallback = FakeTelegramWebSockets()
+        TelegramWssProxy(direct, fallbackWebSockets = fallback) {}.use { proxy ->
+            Socket("127.0.0.1", proxy.start()).use { socket ->
+                socket.soTimeout = 2000
+                val input = DataInputStream(socket.getInputStream())
+                socket.getOutputStream().apply {
+                    write(socksRequest(41))
+                    flush()
+                }
+                input.readFully(ByteArray(12))
+                val (header, packet) = initAndPacket()
+                socket.getOutputStream().apply {
+                    write(header)
+                    write(packet)
+                    flush()
+                }
+
+                val slow = assertNotNull(direct.sessions.poll(2, TimeUnit.SECONDS))
+                val winner = assertNotNull(fallback.sessions.poll(2, TimeUnit.SECONDS))
+                assertContentEquals(header, assertNotNull(winner.sent.poll(2, TimeUnit.SECONDS)).toByteArray())
+                assertContentEquals(packet, assertNotNull(winner.sent.poll(2, TimeUnit.SECONDS)).toByteArray())
+                slow.open()
+                assertTrue(slow.cancelled.get())
+                assertTrue(slow.sent.isEmpty())
+                slow.listener.onFailure(slow, java.io.IOException("late failure"), null)
+                winner.listener.onMessage(winner, byteArrayOf(42).toByteString())
+                assertEquals(42, input.read())
+            }
+        }
+    }
+
+    @Test
+    fun `documented TLS endpoint works when Web K host is unavailable`() {
+        val webSockets = FakeTelegramWebSockets(rejectedHosts = setOf("kws2.web.telegram.org"))
+        TelegramWssProxy(webSockets) {}.use { proxy ->
+            assertNotNull(proxy.probeRemote(100))
+            assertEquals("kws2.web.telegram.org", assertNotNull(webSockets.sessions.poll()).request().url.host)
+            assertEquals("venus.web.telegram.org", assertNotNull(webSockets.sessions.poll()).request().url.host)
+            Socket("127.0.0.1", proxy.start()).use { socket ->
+                socket.soTimeout = 2000
+                val input = DataInputStream(socket.getInputStream())
+                socket.getOutputStream().apply {
+                    write(socksRequest(41))
+                    flush()
+                }
+                input.readFully(ByteArray(12))
+                val (header, packet) = initAndPacket()
+                socket.getOutputStream().apply {
+                    write(header)
+                    write(packet)
+                    flush()
+                }
+                val rejected = assertNotNull(webSockets.sessions.poll(2, TimeUnit.SECONDS))
+                val accepted = assertNotNull(webSockets.sessions.poll(2, TimeUnit.SECONDS))
+                assertEquals("kws2.web.telegram.org", rejected.request().url.host)
+                assertEquals("venus.web.telegram.org", accepted.request().url.host)
+                assertTrue(rejected.sent.isEmpty())
+                assertContentEquals(header, assertNotNull(accepted.sent.poll(2, TimeUnit.SECONDS)).toByteArray())
+                assertContentEquals(packet, assertNotNull(accepted.sent.poll(2, TimeUnit.SECONDS)).toByteArray())
+            }
+        }
+    }
+
     private fun socksRequest(lastOctet: Int): ByteArray =
         byteArrayOf(
             5, 1, 0, 5, 1, 0, 1, 149.toByte(), 154.toByte(), 167.toByte(), lastOctet.toByte(), 1, 187.toByte(),

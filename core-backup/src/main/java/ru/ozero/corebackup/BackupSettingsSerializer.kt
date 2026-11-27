@@ -28,6 +28,7 @@ internal object BackupSettingsSerializer {
         s.operaRegion?.let { obj.put("operaRegion", it) }
         s.operaSelection?.let { obj.put("operaSelection", it) }
         s.operaAutoEnabled?.let { obj.put("operaAutoEnabled", it) }
+        s.gfVpnOptions?.let { obj.put("gfVpnOptions", it) }
         return obj
     }
 
@@ -55,5 +56,6 @@ internal object BackupSettingsSerializer {
             operaRegion = s.optString("operaRegion").takeIf { it in setOf("EU", "AS", "AM") },
             operaSelection = s.optString("operaSelection").takeIf { it in setOf("first", "random", "fastest") },
             operaAutoEnabled = s.booleanOrNull("operaAutoEnabled"),
+            gfVpnOptions = s.optString("gfVpnOptions").takeIf { it.isNotEmpty() },
         )
 }

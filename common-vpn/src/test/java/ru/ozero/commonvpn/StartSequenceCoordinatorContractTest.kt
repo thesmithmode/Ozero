@@ -1,6 +1,7 @@
 package ru.ozero.commonvpn
 
 import org.junit.jupiter.api.Test
+import ru.ozero.enginescore.EngineId
 import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -26,6 +27,23 @@ class StartSequenceCoordinatorContractTest {
         assertEquals(1_500L, StartSequenceCoordinator.SETTINGS_READ_TIMEOUT_MS)
         assertEquals(30_000L, StartSequenceCoordinator.CHAIN_START_TIMEOUT_MS)
         assertEquals(7_000L, StartSequenceCoordinator.PREFLIGHT_HARD_TIMEOUT_MS)
+    }
+
+    @Test
+    fun `multi-attempt engines have enough time without extending unrelated engine budgets`() {
+        val budgets = mapOf(
+            EngineId.OPERA to 75_000L,
+            EngineId.MASQUE to 60_000L,
+            EngineId.TGWSS to 180_000L,
+            EngineId.GFVPN to 310_000L,
+        )
+        budgets.forEach { (engine, timeout) ->
+            assertEquals(timeout, StartSequenceCoordinator.chainStartTimeoutMs(engine))
+        }
+        EngineId.entries.filterNot { it in budgets }.forEach {
+            assertEquals(30_000L, StartSequenceCoordinator.chainStartTimeoutMs(it))
+        }
+        assertTrue(source.contains("withTimeoutOrNull(chainStartTimeoutMs(engineId))"))
     }
 
     @Test

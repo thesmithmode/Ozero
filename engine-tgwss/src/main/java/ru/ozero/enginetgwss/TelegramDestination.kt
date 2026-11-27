@@ -7,9 +7,19 @@ internal data class TelegramDestination(val dc: Int, val media: Boolean) {
         get() = if (media) "kws$webDc-1.web.telegram.org" else "kws$webDc.web.telegram.org"
 
     val hosts: List<String>
-        get() = if (media) listOf(host, "kws$webDc.web.telegram.org") else listOf(host)
+        get() {
+            // Telegram's documented TLS URI names, in addition to the Web K endpoints.
+            val name = DC_NAMES.getValue(webDc)
+            return if (media) {
+                listOf(host, "kws$webDc.web.telegram.org", "$name-1.web.telegram.org", "$name.web.telegram.org")
+            } else {
+                listOf(host, "$name.web.telegram.org", "$name-1.web.telegram.org")
+            }
+        }
 
     companion object {
+        private val DC_NAMES = mapOf(1 to "pluto", 2 to "venus", 3 to "aurora", 4 to "vesta", 5 to "flora")
+
         private val destinations = mapOf(
             "149.154.175.50" to TelegramDestination(1, false),
             "149.154.175.51" to TelegramDestination(1, false),

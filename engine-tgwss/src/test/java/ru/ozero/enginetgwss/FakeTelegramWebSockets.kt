@@ -13,6 +13,7 @@ internal class FakeTelegramWebSockets(
     @Volatile var protocol: String? = "binary",
     private val connectFails: Boolean = false,
     private val rejectedHosts: Set<String> = emptySet(),
+    private val deferOpen: Boolean = false,
 ) : WebSocket.Factory {
     val sessions = LinkedBlockingQueue<Session>()
 
@@ -21,15 +22,8 @@ internal class FakeTelegramWebSockets(
         sessions.add(session)
         if (connectFails || request.url.host in rejectedHosts) {
             listener.onFailure(session, java.io.IOException("test connection failure"), null)
-        } else {
-            val response = Response.Builder()
-                .request(request)
-                .protocol(Protocol.HTTP_1_1)
-                .code(101)
-                .message("Switching Protocols")
-                .apply { protocol?.let { header("Sec-WebSocket-Protocol", it) } }
-                .build()
-            listener.onOpen(session, response)
+        } else if (!deferOpen) {
+            session.open(protocol)
         }
         return session
     }
@@ -40,6 +34,17 @@ internal class FakeTelegramWebSockets(
     ) : WebSocket {
         val sent = LinkedBlockingQueue<ByteString>()
         val cancelled = AtomicBoolean(false)
+
+        fun open(protocol: String? = "binary") {
+            val response = Response.Builder()
+                .request(originalRequest)
+                .protocol(Protocol.HTTP_1_1)
+                .code(101)
+                .message("Switching Protocols")
+                .apply { protocol?.let { header("Sec-WebSocket-Protocol", it) } }
+                .build()
+            listener.onOpen(this, response)
+        }
 
         override fun request(): Request = originalRequest
         override fun queueSize(): Long = 0

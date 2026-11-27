@@ -124,7 +124,10 @@ private fun NavigationContent(
         TopScreen.MasterDnsSettings -> MasterDnsSettingsScreen(onBack = { back() })
         TopScreen.FptnSettings -> FptnEngineSettingsScreen(onBack = { back() })
         TopScreen.OperaSettings -> OperaEngineSettingsScreen(onBack = { back() })
-        TopScreen.GfVpnSettings -> ru.ozero.app.ui.settings.engines.GfVpnSettingsScreen(onBack = back)
+        TopScreen.GfVpnSettings -> ru.ozero.app.ui.settings.engines.GfVpnSettingsScreen(
+            onBack = back,
+            onOpenSplitTunnel = { navigate(TopScreen.SplitTunnel) },
+        )
         TopScreen.SingboxSettings -> SingboxEngineSettingsScreen(
             onBack = { back() },
             onOpenAdvanced = { navigate(TopScreen.SingboxAdvancedSettings) },

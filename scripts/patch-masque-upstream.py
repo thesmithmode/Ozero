@@ -80,18 +80,28 @@ replace_once(
 # Fall back to the legacy host only when no connection was acquired: never
 # blindly replay a registration POST after it may have reached the server.
 cloudflare = root / "api" / "cloudflare.go"
-replace_once(cloudflare, '\t"net/http"\n', '\t"net/http"\n\t"net/http/httptrace"\n\t"sync/atomic"\n')
 replace_once(cloudflare, 'OsVersion: "",', 'OsVersion: "10",')
 source = cloudflare.read_text()
 needle = "resp, err := http.DefaultClient.Do(req)"
 if source.count(needle) < 2:
     raise RuntimeError("Unexpected upstream registration client")
 source = source.replace(needle, "resp, err := doDeviceRegistration(req)", 2)
-cloudflare.write_text(source + """
+cloudflare.write_text(source)
+cloudflare.with_name("ozero_registration.go").write_text("""
+package api
+
+import (
+    "net/http"
+    "net/http/httptrace"
+    "sync/atomic"
+    "time"
+)
+
 func doDeviceRegistration(req *http.Request) (*http.Response, error) {
     transport := http.DefaultTransport.(*http.Transport).Clone()
     transport.Proxy = nil
     transport.DisableKeepAlives = true
+    defer transport.CloseIdleConnections()
     client := &http.Client{
         Transport: transport,
         Timeout: 18 * time.Second,
@@ -99,6 +109,10 @@ func doDeviceRegistration(req *http.Request) (*http.Response, error) {
             return http.ErrUseLastResponse
         },
     }
+    return doDeviceRegistrationWithClient(req, client)
+}
+
+func doDeviceRegistrationWithClient(req *http.Request, client *http.Client) (*http.Response, error) {
     var connected atomic.Bool
     trace := &httptrace.ClientTrace{
         GotConn: func(_ httptrace.GotConnInfo) { connected.Store(true) },
@@ -107,14 +121,93 @@ func doDeviceRegistration(req *http.Request) (*http.Response, error) {
     preferred.URL.Host = "api.devices.cloudflare.com"
     preferred.Host = preferred.URL.Host
     response, err := client.Do(preferred)
-    if err == nil || connected.Load() || req.GetBody == nil {
+    // RFC 9110 section 15.5.20 permits retrying a misdirected request,
+    // even a non-idempotent one, on a different connection.
+    misdirected := err == nil && response.StatusCode == http.StatusMisdirectedRequest
+    if (!misdirected && (err == nil || connected.Load())) ||
+        req.GetBody == nil || req.Context().Err() != nil {
         return response, err
     }
     body, bodyErr := req.GetBody()
-    if bodyErr != nil { return nil, bodyErr }
+    if bodyErr != nil {
+        if response != nil { response.Body.Close() }
+        return nil, bodyErr
+    }
+    if response != nil { response.Body.Close() }
     legacy := req.Clone(req.Context())
     legacy.Body = body
     return client.Do(legacy)
+}
+""")
+cloudflare.with_name("ozero_registration_test.go").write_text("""
+package api
+
+import (
+    "errors"
+    "io"
+    "net/http"
+    "net/http/httptrace"
+    "strings"
+    "testing"
+)
+
+type ozeroRegistrationTransport func(*http.Request) (*http.Response, error)
+
+func (f ozeroRegistrationTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+    return f(req)
+}
+
+func TestOzeroDeviceRegistrationFallback(t *testing.T) {
+    for _, tc := range []struct {
+        name string
+        connected bool
+        status int
+        fallback bool
+    }{
+        {"dns failure", false, 0, true},
+        {"ambiguous failure after connect", true, 0, false},
+        {"misdirected request", true, 421, true},
+        {"authorization denied", true, 403, false},
+        {"rate limited", true, 429, false},
+        {"server error", true, 500, false},
+        {"success", true, 200, false},
+    } {
+        t.Run(tc.name, func(t *testing.T) {
+            req, err := http.NewRequest("POST", "https://api.cloudflareclient.com/v0a4471/reg", strings.NewReader("test-body"))
+            if err != nil { t.Fatal(err) }
+            calls := 0
+            client := &http.Client{Transport: ozeroRegistrationTransport(func(r *http.Request) (*http.Response, error) {
+                calls++
+                payload, readErr := io.ReadAll(r.Body)
+                r.Body.Close()
+                if readErr != nil || string(payload) != "test-body" {
+                    t.Fatalf("request body changed: %q, %v", payload, readErr)
+                }
+                if r.Method != "POST" || r.URL.Path != "/v0a4471/reg" {
+                    t.Fatal("registration method or path changed")
+                }
+                if calls == 1 {
+                    if r.URL.Host != "api.devices.cloudflare.com" { t.Fatal(r.URL.Host) }
+                    if tc.connected {
+                        httptrace.ContextClientTrace(r.Context()).GotConn(httptrace.GotConnInfo{})
+                    }
+                    if tc.status == 0 { return nil, errors.New("network error") }
+                    return &http.Response{StatusCode: tc.status, Body: io.NopCloser(strings.NewReader(""))}, nil
+                }
+                if r.URL.Host != "api.cloudflareclient.com" { t.Fatal(r.URL.Host) }
+                return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(""))}, nil
+            })}
+            response, err := doDeviceRegistrationWithClient(req, client)
+            if response != nil { defer response.Body.Close() }
+            expectedCalls := 1
+            if tc.fallback { expectedCalls = 2 }
+            if calls != expectedCalls { t.Fatalf("calls=%d, want %d", calls, expectedCalls) }
+            if tc.fallback && (err != nil || response == nil || response.StatusCode != 200) {
+                t.Fatalf("fallback failed: %v", err)
+            }
+            if req.URL.Host != "api.cloudflareclient.com" { t.Fatal("original request mutated") }
+        })
+    }
 }
 """)
 

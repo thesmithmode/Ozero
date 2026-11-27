@@ -21,6 +21,12 @@ test "$(git -C "$work/usque" rev-parse HEAD)" = "$revision"
 
 python3 "$root/scripts/patch-masque-upstream.py" "$work/usque"
 
+# Test the registration transport on the build host without Android or live credentials.
+(
+    cd "$work/usque"
+    GOTOOLCHAIN=local go test -count=1 api/ozero_registration.go api/ozero_registration_test.go
+)
+
 out="$root/engine-masque/build/native/$abi"
 mkdir -p "$out"
 (

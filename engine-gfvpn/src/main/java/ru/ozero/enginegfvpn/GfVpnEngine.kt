@@ -2,15 +2,19 @@ package ru.ozero.enginegfvpn
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -29,14 +33,20 @@ import ru.ozero.enginescore.TunAttachResult
 import ru.ozero.enginescore.TunFdAcceptor
 import ru.ozero.enginescore.TunSpec
 import ru.ozero.enginescore.Upstream
+import ru.ozero.enginescore.settings.GfVpnOptions
 import ru.ozero.enginescore.settings.SettingsModel
+import ru.ozero.enginescore.settings.SettingsRepository
+import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /** Standalone authenticated TUN engine. Never exposes credentials or a chainable proxy. */
-class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
+class GfVpnEngine(
+    context: Context,
+    private val settingsRepository: SettingsRepository? = null,
+) : EnginePlugin, TunFdAcceptor {
     private val app = context.applicationContext
     private val mutex = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -64,17 +74,17 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
     )
 
     override fun buildManualConfig(settings: SettingsModel?): EngineConfig? =
-        EngineConfig.GfVpn.takeIf { GfVpnImport.isInstalled(app) }
+        EngineConfig.GfVpn.takeIf { GfVpnBundledSdk.isAvailable(app) }
 
     override fun buildProxyConfig(settings: SettingsModel?): EngineConfig? = null
 
     override suspend fun tunSpec(): TunSpec = TunSpec(
-        sessionName = "Ozero gfVPN",
+        sessionName = "Ozero ${id.displayName}",
         mtu = 8500,
         blocking = false,
-        ipv4Address = "10.10.10.10",
+        ipv4Address = "198.18.0.1",
         ipv4PrefixLength = 32,
-        dnsServers = listOf("9.9.9.9"),
+        dnsServers = listOf(GfVpnTun.dnsAddress(Build.VERSION.SDK_INT)),
         allowFamilyV6 = false,
     )
 
@@ -82,8 +92,8 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
         if (config != EngineConfig.GfVpn || upstream != Upstream.None) {
             return@withLock StartResult.Failure("gfVPN requires standalone VPN mode")
         }
-        if (!GfVpnImport.isInstalled(app)) {
-            return@withLock StartResult.Failure("Import the local gfVPN APK in engine settings")
+        if (!GfVpnBundledSdk.isAvailable(app)) {
+            return@withLock StartResult.Failure("Bundled gfVPN runtime unavailable on this build or device")
         }
         reset()
         val next = GfVpnRuntime(app)
@@ -93,14 +103,20 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
             val identifier = prefs.getString("client-id", null) ?: UUID.randomUUID().toString().also {
                 prefs.edit().putString("client-id", it).apply()
             }
-            sdkSession = next.start("RU", identifier).awaitResult()
+            val options = settingsRepository?.let { repository ->
+                withTimeoutOrNull(2000L) { repository.settings.first().gfVpnOptions }
+                    ?: throw IOException("gfVPN settings unavailable")
+            } ?: GfVpnOptions.DEFAULT
+            sdkSession = next.start("RU", identifier, options).awaitResult()
             StartResult.Success(0)
         } catch (cancelled: CancellationException) {
             reset()
             throw cancelled
         } catch (error: Exception) {
             reset()
-            StartResult.Failure("gfVPN startup failed", error)
+            val detail = diagnosticDetail(error)
+            PersistentLoggers.warn("GfVpnEngine", "Startup failed: $detail")
+            StartResult.Failure("gfVPN startup failed: $detail")
         }
     }
 
@@ -121,29 +137,48 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
             throw cancelled
         } catch (error: Exception) {
             reset()
-            PersistentLoggers.warn("GfVpnEngine", "TUN attachment failed: ${error.javaClass.simpleName}")
+            val detail = diagnosticDetail(error)
+            PersistentLoggers.warn("GfVpnEngine", "TUN attachment failed: $detail")
             TunAttachResult.Failure("gfVPN TUN attachment failed")
         }
     }
 
-    override suspend fun probe(): ProbeResult = mutex.withLock {
-        val current = runtime
-        if (current == null || !attached) return@withLock ProbeResult.Failure("gfVPN not attached")
-        try {
-            ProbeResult.Success(current.probe().awaitResult())
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            ProbeResult.Failure("gfVPN authenticated route unavailable", error)
+    override suspend fun probe(): ProbeResult {
+        val owner = runtime ?: return ProbeResult.Failure("gfVPN not started")
+        // Do not hold the lifecycle lock while a manual challenge is displayed.
+        if (!GfVpnCaptchaState.awaitResolution(owner)) {
+            return ProbeResult.Failure("gfVPN manual verification timed out")
+        }
+        return mutex.withLock {
+            if (runtime !== owner || !attached) return@withLock ProbeResult.Failure("gfVPN session changed")
+            try {
+                val result = owner.probeWithStats().awaitResult()
+                state.value = state.value.copy(bytesIn = result.bytesIn, bytesOut = result.bytesOut)
+                ProbeResult.Success(result.latencyMs)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                ProbeResult.Failure("gfVPN authenticated route unavailable", error)
+            }
         }
     }
 
-    override suspend fun awaitReady(): EnginePlugin.ReadyResult =
-        if (probe() is ProbeResult.Success) {
+    override suspend fun awaitReady(): EnginePlugin.ReadyResult {
+        val owner = runtime ?: return EnginePlugin.ReadyResult.Timeout("gfVPN not started")
+        val ready = withTimeoutOrNull(200_000L) {
+            repeat(4) { attempt ->
+                if (runtime !== owner) return@withTimeoutOrNull false
+                if (probe() is ProbeResult.Success) return@withTimeoutOrNull true
+                if (attempt < 3) delay(500L)
+            }
+            false
+        } == true
+        return if (ready) {
             EnginePlugin.ReadyResult.Ready
         } else {
             EnginePlugin.ReadyResult.Timeout("gfVPN route unavailable")
         }
+    }
 
     override suspend fun exitNodeStrategy(socksPort: Int): ExitNodeStrategy {
         val owner = mutex.withLock {
@@ -157,7 +192,7 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
             if (!attached || sdkSession !== owner) {
                 ExitNodeStrategy.Unavailable("gfVPN session changed")
             } else {
-                ExitNodeStrategy.ProviderLabel(info.country ?: "gfVPN", info.ip, info.countryCode)
+                ExitNodeStrategy.ProviderLabel(info.country ?: id.displayName, info.ip, info.countryCode)
             }
         }
     }
@@ -186,7 +221,8 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
 
     private fun observeNetworks(owner: GfVpnRuntime) {
         val listener = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) = notifyChanged(owner)
+            override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) =
+                notifyChanged(owner)
             override fun onLost(network: Network) = notifyChanged(owner)
         }
         val request = NetworkRequest.Builder()
@@ -205,13 +241,18 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
                         owner.networkChanged().awaitResult()
                     } catch (cancelled: CancellationException) {
                         throw cancelled
-                    } catch (_: Exception) {
+                    } catch (error: Exception) {
+                        PersistentLoggers.warn("GfVpnEngine", "Network change failed: ${error.javaClass.simpleName}")
                         // Routed watchdog will fail closed if the SDK cannot recover.
                     }
                 }
             }
         }
     }
+
+    private fun diagnosticDetail(error: Exception): String = (error as? IOException)?.message
+        ?.takeIf { it.startsWith("gfVPN ") || it.startsWith("gfVPN: ") }
+        ?: error.javaClass.simpleName
 
     private fun reset() {
         callback?.let { runCatching { connectivity?.unregisterNetworkCallback(it) } }

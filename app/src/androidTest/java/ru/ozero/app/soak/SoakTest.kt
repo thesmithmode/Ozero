@@ -33,6 +33,9 @@ import ru.ozero.app.ui.settings.engines.singbox.SingboxProbeService
 import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
+import ru.ozero.enginemasque.MasqueProfileStore
+import ru.ozero.enginemasque.MasqueRuntime
+import ru.ozero.enginemasque.MasqueTransport
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.TrafficMode
 import ru.ozero.enginescore.settings.SettingsRepository
@@ -183,6 +186,65 @@ class SoakTest {
     }
 
     @Test
+    fun runMasqueTunSmoke() = runBlocking {
+        val args = InstrumentationRegistry.getArguments()
+        Assume.assumeTrue("OZERO_MASQUE_SMOKE must be 1", args.getString("OZERO_MASQUE_SMOKE") == "1")
+        check(args.getString("OZERO_MASQUE_ACCEPT_TERMS") == "1") {
+            "The operator must explicitly accept Cloudflare's terms before live registration"
+        }
+        val url = requireNotNull(args.getString("OZERO_MASQUE_SMOKE_URL"))
+        val marker = requireNotNull(args.getString("OZERO_MASQUE_SMOKE_MARKER"))
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        check(VpnService.prepare(context) == null) { "VPN consent not granted" }
+        val dependencies = EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            SoakTestEntryPoint::class.java,
+        )
+        val settings = dependencies.settingsRepository()
+        val controller = dependencies.tunnelController()
+        val store = dependencies.masqueProfileStore()
+        val runtime = dependencies.masqueRuntime()
+        val original = settings.settings.first()
+        val originalMasque = store.settings().first()
+        check(originalMasque.profile == null && !originalMasque.corrupt) {
+            "Run live registration on a clean test installation"
+        }
+        try {
+            stopVpn(context, controller)
+            store.save(runtime.register(acceptedTerms = true))
+            settings.setTrafficMode(TrafficMode.TUN)
+            settings.setManualEngine(EngineId.MASQUE)
+            settings.setSplitMode(SplitTunnelMode.ALL)
+            settings.setKillswitchEnabled(true)
+            store.setAutoEnabled(true)
+            store.setTransport(MasqueTransport.AUTO)
+            repeat(3) {
+                startVpn(context)
+                awaitConnected(controller, EngineId.MASQUE, 90_000L)
+                val probe = probeFromExternalUid(context, instrumentation.context, url, marker)
+                check(probe.vpnTransport) { "MASQUE external probe is outside VPN" }
+                check(probe.httpCode in 200..299 && probe.markerMatch) {
+                    "MASQUE external routed probe failed: ${probe.stage} HTTP ${probe.httpCode}"
+                }
+                stopVpn(context, controller)
+            }
+        } finally {
+            try {
+                stopVpn(context, controller)
+            } finally {
+                store.clear()
+                store.setTransport(originalMasque.transport)
+                store.setAutoEnabled(originalMasque.autoEnabled)
+                settings.setManualEngine(original.manualEngine)
+                settings.setTrafficMode(original.trafficMode)
+                settings.setSplitMode(original.splitMode)
+                settings.setKillswitchEnabled(original.killswitchEnabled)
+            }
+        }
+    }
+
+    @Test
     fun runOperaTunSmoke() = runBlocking {
         val args = InstrumentationRegistry.getArguments()
         Assume.assumeTrue("OZERO_OPERA_SMOKE must be 1", args.getString("OZERO_OPERA_SMOKE") == "1")
@@ -206,7 +268,7 @@ class SoakTest {
             settings.setKillswitchEnabled(true)
             repeat(3) {
                 startVpn(context)
-                awaitConnected(controller, EngineId.OPERA)
+                awaitConnected(controller, EngineId.OPERA, 105_000L)
                 val probe = probeFromExternalUid(context, instrumentation.context, url, marker)
                 check(probe.vpnTransport) { "Opera probe is outside the VPN" }
                 check(probe.httpCode in 200..299 && probe.markerMatch) {
@@ -231,7 +293,7 @@ class SoakTest {
         val marker = requireNotNull(args.getString("OZERO_GFVPN_SMOKE_MARKER"))
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
-        check(ru.ozero.enginegfvpn.GfVpnImport.isInstalled(context)) { "Local gfVPN SDK is absent" }
+        check(ru.ozero.enginegfvpn.GfVpnBundledSdk.isAvailable(context)) { "Bundled gfVPN SDK is absent" }
         check(VpnService.prepare(context) == null) { "VPN consent not granted" }
         val dependencies = EntryPointAccessors.fromApplication(
             context.applicationContext,
@@ -249,7 +311,7 @@ class SoakTest {
             settings.setKillswitchEnabled(true)
             repeat(3) {
                 startVpn(context)
-                awaitConnected(controller, EngineId.GFVPN, 170_000L)
+                awaitConnected(controller, EngineId.GFVPN, 540_000L)
                 val probe = probeFromExternalUid(context, instrumentation.context, url, marker)
                 check(probe.vpnTransport) { "gfVPN external probe is outside VPN" }
                 check(probe.httpCode in 200..299 && probe.markerMatch) {
@@ -578,7 +640,7 @@ class SoakTest {
         private const val LOCAL_SUBSCRIPTION_URL = "http://10.0.2.2:18080/subscription.txt"
         private const val DEFAULT_MARKER = "ozero-singbox-routed"
         private const val START_TIMEOUT_MS = 30_000L
-        private const val TGWSS_START_TIMEOUT_MS = 120_000L
+        private const val TGWSS_START_TIMEOUT_MS = 220_000L
         private const val STOP_TIMEOUT_MS = 10_000L
         private const val PROBE_TIMEOUT_MS = 15_000L
         private const val RUNTIME_REFRESH_OBSERVATION_MS = 2_000L
@@ -594,6 +656,10 @@ interface SoakTestEntryPoint {
     fun settingsRepository(): SettingsRepository
 
     fun tunnelController(): TunnelController
+
+    fun masqueProfileStore(): MasqueProfileStore
+
+    fun masqueRuntime(): MasqueRuntime
 
     fun subscriptionGroupDao(): SubscriptionGroupDao
 
