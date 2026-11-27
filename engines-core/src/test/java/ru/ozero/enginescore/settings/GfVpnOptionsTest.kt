@@ -21,9 +21,11 @@ class GfVpnOptionsTest {
             options.copy(serverSelection = "auto", transport = "VKT").effective(),
         )
     }
+
     @Test
     fun `reference country and server choices survive persistence`() {
         assertEquals(20, GfVpnServerCatalog.countries.size)
+        assertEquals(57, GfVpnServerCatalog.countries.values.sumOf { it.size })
         assertEquals(13, GfVpnServerCatalog.countries.getValue("RU0").size)
         GfVpnServerCatalog.countries.forEach { (country, servers) ->
             (listOf(country) + servers).forEach { selection ->
