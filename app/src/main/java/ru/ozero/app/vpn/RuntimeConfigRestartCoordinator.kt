@@ -146,11 +146,12 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
                 tunnelController.onSwitchingFinished("runtime config restart stop timeout")
                 return false
             }
-            val restarted = withTimeoutOrNull(startupTimeoutMs) {
-                tunnelController.state.first {
-                    it is TunnelState.Connected ||
-                        it is TunnelState.Failed
+            val restarted = if (auto == null) {
+                withTimeoutOrNull(startupTimeoutMs) {
+                    tunnelController.state.first { it is TunnelState.Connected || it is TunnelState.Failed }
                 }
+            } else {
+                awaitAutoRestarted(startupTimeoutMs)
             }
             return when (restarted) {
                 is TunnelState.Connected -> {
@@ -183,6 +184,24 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
 
     private fun EngineSettingsRestartObserver.Snapshot.targetEngineForRestart(): EngineId? =
         manualEngine ?: engineAutoPriority?.firstOrNull()
+
+    private suspend fun awaitAutoRestarted(timeoutMs: Long): TunnelState? = withTimeoutOrNull(timeoutMs) {
+        var current = awaitAutoProgress() ?: return@withTimeoutOrNull null
+        while (current !is TunnelState.Connected && current !is TunnelState.Failed) {
+            current = tunnelController.state.first {
+                it is TunnelState.Connected || it is TunnelState.Failed ||
+                    it is TunnelState.Idle || it is TunnelState.Disconnecting
+            }
+            if (current is TunnelState.Idle || current is TunnelState.Disconnecting) {
+                current = awaitAutoProgress() ?: return@withTimeoutOrNull null
+            }
+        }
+        current
+    }
+
+    private suspend fun awaitAutoProgress(): TunnelState? = withTimeoutOrNull(RESTART_START_TIMEOUT_MS) {
+        tunnelController.state.first { it !is TunnelState.Idle && it !is TunnelState.Disconnecting }
+    }
 
     private fun autoRestartTimeoutMs(auto: AutoRestart): Long =
         auto.candidates.distinct().filterNot { it.manualStandaloneOnly }.sumOf { engine ->
