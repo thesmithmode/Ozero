@@ -237,7 +237,8 @@ class TelegramWssProxy internal constructor(
                     val eligible = !finished && !expired && winner == null
                     val connected = !closed.get() && !socket.isClosed
                     val protocol = response.header("Sec-WebSocket-Protocol") == "binary"
-                    if (!eligible || !connected || !protocol || !webSocket.send(init.toByteString())) {
+                    val canSend = eligible && connected && protocol
+                    if (!canSend || !webSocket.send(init.toByteString())) {
                         finishAttempt()
                         false
                     } else {
@@ -378,7 +379,8 @@ class TelegramWssProxy internal constructor(
             fun complete(success: Boolean) {
                 if (!done.compareAndSet(false, true)) return
                 synchronized(lock) {
-                    if (success && !expired && !closed.get() && latency == null) {
+                    val accepting = !expired && !closed.get() && latency == null
+                    if (success && accepting) {
                         latency = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
                         preferred.set(factory)
                         ready.countDown()
