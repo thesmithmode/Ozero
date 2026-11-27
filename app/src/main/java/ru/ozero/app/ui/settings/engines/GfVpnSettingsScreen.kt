@@ -109,7 +109,12 @@ private fun GfVpnConnectionOptions(
         "V2H" to "V2Ray HTTP", "V2W" to "V2Ray WebSocket", "VKT" to "VK-TURN",
         "WT" to "WebTunnel", "XRXH" to "XRay XHTTP",
     )
-    GfVpnChoice(stringResource(R.string.gfvpn_server_selection), options.serverSelection, serverModes, enabled) { value ->
+    GfVpnChoice(
+        stringResource(R.string.gfvpn_server_selection),
+        options.serverSelection,
+        serverModes,
+        enabled,
+    ) { value ->
         update { it.copy(serverSelection = value) }
     }
     GfVpnChoice(
