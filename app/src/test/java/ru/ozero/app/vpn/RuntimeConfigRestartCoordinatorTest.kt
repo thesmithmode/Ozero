@@ -18,6 +18,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import ru.ozero.commonvpn.EngineStartupBudget
 import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
@@ -274,7 +275,7 @@ class RuntimeConfigRestartCoordinatorTest {
 
     @Test
     fun `slow engine restart succeeds inside its startup budget`() = runTest {
-        for (target in listOf(EngineId.FPTN, EngineId.OPERA, EngineId.MASQUE, EngineId.TGWSS)) {
+        for (target in listOf(EngineId.FPTN, EngineId.OPERA, EngineId.MASQUE, EngineId.TGWSS, EngineId.GFVPN)) {
             val actions = mutableListOf<String?>()
             val controller = TunnelController()
             controller.setState(TunnelState.Connected(EngineId.WARP, 51820))
@@ -285,7 +286,7 @@ class RuntimeConfigRestartCoordinatorTest {
             )
             val restart = launch { assertTrue(coordinator.restartVpnIfRunning("settings changed")) }
             runCurrent()
-            advanceTimeBy(30_000)
+            advanceTimeBy(if (target == EngineId.FPTN) 30_000 else EngineStartupBudget.restartTimeoutMs(target) - 1)
             assertTrue(restart.isActive)
             controller.setState(TunnelState.Connected(target, 0))
             restart.join()
