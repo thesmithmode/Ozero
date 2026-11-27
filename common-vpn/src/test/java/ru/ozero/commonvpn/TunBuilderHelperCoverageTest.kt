@@ -33,6 +33,18 @@ class TunBuilderHelperCoverageTest {
     }
 
     @Test
+    fun `BYPASS_LAN retains only engine-required synthetic DNS routes`() {
+        val spec = baseSpec(routeCidrsV4 = listOf("0.0.0.0/0", "192.168.0.0/16"))
+            .copy(requiredRouteCidrsV4 = listOf("100.64.0.0/10"))
+        val routed = spec.forSplitMode(SplitTunnelMode.BYPASS_LAN)
+        assertFalse(routed.routeAllV4)
+        assertEquals(listOf("100.64.0.0/10"), routed.routeCidrsV4)
+        assertEquals(spec, spec.forSplitMode(SplitTunnelMode.ALL))
+        assertEquals(spec, spec.forSplitMode(SplitTunnelMode.ALLOWLIST))
+        assertEquals(spec, spec.forSplitMode(SplitTunnelMode.BLOCKLIST))
+    }
+
+    @Test
     fun `non BYPASS_LAN mode preserves engine routing spec`() {
         val spec = baseSpec(routeAllV4 = true)
 
