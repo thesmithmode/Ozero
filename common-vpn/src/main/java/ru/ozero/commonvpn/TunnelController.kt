@@ -237,9 +237,7 @@ class TunnelController(
     private fun switchingTimeoutFor(target: EngineId?): Long = when {
         switchingTimeoutMs != SWITCHING_TIMEOUT_MS -> switchingTimeoutMs
         target == EngineId.FPTN -> FPTN_SWITCHING_TIMEOUT_MS
-        target == EngineId.OPERA || target == EngineId.MASQUE -> EXTENDED_SWITCHING_TIMEOUT_MS
-        target == EngineId.TGWSS -> TGWSS_SWITCHING_TIMEOUT_MS
-        target == EngineId.GFVPN -> 165_000L
+        EngineStartupBudget.switchingTimeoutMs(target) > 0L -> EngineStartupBudget.switchingTimeoutMs(target)
         else -> switchingTimeoutMs
     }
 
@@ -279,7 +277,5 @@ class TunnelController(
         const val EWMA_ALPHA = 0.4
         const val SWITCHING_TIMEOUT_MS = 12_000L
         const val FPTN_SWITCHING_TIMEOUT_MS = 25_000L
-        const val EXTENDED_SWITCHING_TIMEOUT_MS = 75_000L
-        const val TGWSS_SWITCHING_TIMEOUT_MS = 135_000L
     }
 }
