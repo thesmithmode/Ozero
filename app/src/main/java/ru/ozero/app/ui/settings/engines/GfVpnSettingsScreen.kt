@@ -109,8 +109,8 @@ private fun GfVpnConnectionOptions(
         "V2H" to "V2Ray HTTP", "V2W" to "V2Ray WebSocket", "VKT" to "VK-TURN",
         "WT" to "WebTunnel", "XRXH" to "XRay XHTTP",
     )
-    GfVpnChoice(stringResource(R.string.gfvpn_server_selection), options.serverSelection, serverModes, enabled) {
-        value -> update { it.copy(serverSelection = value) }
+    GfVpnChoice(stringResource(R.string.gfvpn_server_selection), options.serverSelection, serverModes, enabled) { value ->
+        update { it.copy(serverSelection = value) }
     }
     GfVpnChoice(
         stringResource(R.string.gfvpn_transport),
@@ -143,14 +143,14 @@ private fun GfVpnConnectionOptions(
     ) { value -> update { it.copy(rotation = value) } }
     if (options.managedConcurrency) Text(stringResource(R.string.gfvpn_managed_options))
     HorizontalDivider()
-    GfVpnToggle(stringResource(R.string.gfvpn_update_config), options.autoUpdate, enabled) {
-        value -> update { it.copy(autoUpdate = value) }
+    GfVpnToggle(stringResource(R.string.gfvpn_update_config), options.autoUpdate, enabled) { value ->
+        update { it.copy(autoUpdate = value) }
     }
-    GfVpnToggle(stringResource(R.string.gfvpn_cached_nodes), options.cachedNodes, enabled) {
-        value -> update { it.copy(cachedNodes = value) }
+    GfVpnToggle(stringResource(R.string.gfvpn_cached_nodes), options.cachedNodes, enabled) { value ->
+        update { it.copy(cachedNodes = value) }
     }
-    GfVpnToggle(stringResource(R.string.gfvpn_bypass_local), options.bypassLocalServices, enabled) {
-        value -> update { it.copy(bypassLocalServices = value) }
+    GfVpnToggle(stringResource(R.string.gfvpn_bypass_local), options.bypassLocalServices, enabled) { value ->
+        update { it.copy(bypassLocalServices = value) }
     }
     Text(stringResource(R.string.gfvpn_bypass_local_summary), style = MaterialTheme.typography.bodySmall)
 }

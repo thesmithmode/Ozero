@@ -16,6 +16,9 @@ class GfVpnOptionsTest {
     fun `whitelist and VK TURN own concurrency settings`() {
         val options = GfVpnOptions("whitelist-ru", "H2", 3, 7, "true")
         assertEquals(GfVpnOptions("whitelist-ru"), options.effective())
-        assertEquals(GfVpnOptions(transport = "VKT"), options.copy(serverSelection = "auto", transport = "VKT").effective())
+        assertEquals(
+            GfVpnOptions(transport = "VKT"),
+            options.copy(serverSelection = "auto", transport = "VKT").effective(),
+        )
     }
 }

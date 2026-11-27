@@ -38,6 +38,13 @@ public final class GfVpnBundledSdk {
                 deleteKnownDirectory(target);
             }
         }
+        // Only the private gfVPN worker calls prepare(). Reap staging directories
+        // left by a process killed during extraction, before making a fresh one.
+        File[] stale = context.getFilesDir().listFiles((dir, name) ->
+            name.startsWith(DIRECTORY + "-stage-"));
+        if (stale != null) {
+            for (File old : stale) deleteKnownDirectory(old);
+        }
         File stage = new File(context.getFilesDir(), DIRECTORY + "-stage-" + UUID.randomUUID());
         if (!stage.mkdir()) throw new IOException("Cannot create gfVPN SDK staging directory");
         try {
