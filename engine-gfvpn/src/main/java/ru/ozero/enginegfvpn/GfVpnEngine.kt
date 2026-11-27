@@ -6,6 +6,7 @@ import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -75,7 +76,7 @@ class GfVpnEngine(context: Context) : EnginePlugin, TunFdAcceptor {
         blocking = false,
         ipv4Address = "198.18.0.1",
         ipv4PrefixLength = 32,
-        dnsServers = listOf("1.1.1.1"),
+        dnsServers = listOf(GfVpnTun.dnsAddress(Build.VERSION.SDK_INT)),
         allowFamilyV6 = false,
     )
 
