@@ -11,4 +11,5 @@ enum class OperaServerSelection(val argument: String) {
 data class OperaProxyConfig(
     val region: OperaRegion = OperaRegion.EU,
     val selection: OperaServerSelection = OperaServerSelection.FASTEST,
+    internal val alternateBootstrap: Boolean = false,
 )

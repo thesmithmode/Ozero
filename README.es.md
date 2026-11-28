@@ -23,6 +23,10 @@ Cliente VPN open-source para Android con soporte para múltiples motores de tran
 | URnetwork | mesh P2P | Anonimización mediante una red peer de proveedores |
 | MasterDNS | DNS sobre UDP | Fallback de emergencia, desplegado en tu propio VPS en un clic |
 | sing-box | protocolos y transportes de libbox | Perfiles, suscripciones, selección automática y cadenas |
+| Opera Proxy | SOCKS5 TCP | Selección de región y servidor; VPN o proxy |
+| MASQUE | CONNECT-IP / HTTP/3 o HTTP/2 | Perfil WARP independiente con fallback automático |
+| Telegram WSS | TLS WebSocket + WARP | Tráfico de los DC de Telegram por WSS y el resto por WARP |
+| Adaptive VPN | VPN / TCP | Selección manual del modo, región y transporte |
 
 Cada motor está aislado en un módulo Gradle dedicado y se conecta mediante la interfaz `EnginePlugin`.
 
@@ -31,7 +35,8 @@ Cada motor está aislado en un módulo Gradle dedicado y se conecta mediante la 
 - Arquitectura modular: cada transporte es un módulo Gradle dedicado `engine-*`
 - Interfaz `EnginePlugin` unificada — la aplicación no depende de los detalles del transporte
 - Sistema de plugins extensible
-- Kill-switch interno: el tráfico se bloquea ante un fallo del motor (fail-closed)
+- Kill-switch configurable en modo VPN: bloquea el tráfico ante un fallo según la política de enrutamiento.
+- URnetwork también puede actuar como relay en segundo plano junto a otro motor conectado; el funcionamiento y las recompensas dependen de la configuración y del servicio.
 - Los lanzamientos se instalan manualmente. La verificación Ed25519 no está conectada a la interfaz ni a comprobaciones en segundo plano. Consulta los [formatos de firma](docs/build.md#подписи-опубликованного-обновления) (en ruso).
 - Compilación reforzada: R8 minify + shrink, ofuscación de clases
 - UI por motor con sus propios ajustes
@@ -49,7 +54,7 @@ Antes de compilar, prepara las bibliotecas nativas y los artefactos de los SDK. 
 
 - [Arquitectura y ciclo de vida](docs/architecture.md) (en ruso)
 - [Compilación y publicación de APK](docs/build.md) (en ruso)
-- Motores: [WARP](engine-warp/README.md), [URnetwork](engine-urnetwork/README.md), [FPTN](engine-fptn/README.md)
+- Motores: [WARP](engine-warp/README.md), [URnetwork](engine-urnetwork/README.md), [FPTN](engine-fptn/README.md), [Opera Proxy](engine-opera/README.md), [MASQUE](engine-masque/README.md), [Telegram WSS](engine-tgwss/README.md), [Adaptive VPN](engine-gfvpn/README.md)
 - [Plan actual](PLAN.md) (en ruso)
 
 El desarrollo se integra en `dev`, aunque la rama predeterminada de GitHub es `main`. Un push a `main` inicia la publicación de un APK.

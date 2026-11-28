@@ -40,6 +40,7 @@ jobs:
             if [ -z "$LAST" ]; then LAST="v0.0.0"; fi
             IFS='.' read -r ma mi pa <<< "${LAST#v}"
             TAG="v${ma}.${mi}.$((pa + 1))"
+            TAG=$(printf '%s\n' v1.1.0 "$TAG" | sort -V | tail -1)
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
@@ -244,6 +245,18 @@ jobs:
           APK=$(find app/build/outputs/apk/release -name '*.apk' -print -quit)
           bash scripts/verify-masque-apk.sh "$APK" arm64-v8a
           unzip -Z1 "$APK" | awk '/^lib\// && $0 !~ /^lib\/arm64-v8a\// { invalid=1 } END { exit invalid }'
+
+      - name: Verify bundled gfVPN SDK
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/release -name '*.apk' -print -quit)
+          python3 engine-gfvpn/verify-bundled-sdk.py "$APK"
+
+      - name: Verify gfVPN-specific HEV JNI package
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/release -name '*.apk' -print -quit)
+          bash scripts/verify-gfvpn-hev-apk.sh "$APK"
 
       - name: Assert APK versionCode matches gradle.properties
         run: |

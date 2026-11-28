@@ -24,17 +24,23 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 class TelegramWssProxy internal constructor(
     private val webSockets: WebSocket.Factory,
     private val warpRelay: WarpSocksRelay? = null,
+    private val fallbackWebSockets: WebSocket.Factory? = null,
     private val closeTransport: () -> Unit,
 ) : Closeable {
-    private constructor(client: OkHttpClient, warpPort: Int?) : this(client, warpPort?.let(::WarpSocksRelay), {
-        client.dispatcher.cancelAll()
-        client.connectionPool.evictAll()
-        client.dispatcher.executorService.shutdownNow()
-    })
+    private constructor(client: OkHttpClient, warpPort: Int?, fallback: OkHttpClient?) : this(
+        client, warpPort?.let(::WarpSocksRelay), fallback, {
+            listOfNotNull(client, fallback).forEach {
+                it.dispatcher.cancelAll()
+                it.connectionPool.evictAll()
+                it.dispatcher.executorService.shutdownNow()
+            }
+        },
+    )
 
     constructor(
         warpPort: Int? = null,
@@ -50,7 +56,20 @@ class TelegramWssProxy internal constructor(
             .connectTimeout(5, TimeUnit.SECONDS)
             .build(),
         warpPort,
+        warpPort?.let { port ->
+            OkHttpClient.Builder()
+                .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", port)))
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .connectTimeout(5, TimeUnit.SECONDS)
+                .build()
+        },
     )
+    private val preferred = AtomicReference(webSockets)
+
+    private fun transports(): List<WebSocket.Factory> =
+        listOfNotNull(preferred.get(), webSockets, fallbackWebSockets).distinct()
+
     private val closed = AtomicBoolean(false)
     private val sockets = ConcurrentHashMap.newKeySet<Socket>()
     private val workers = ThreadPoolExecutor(0, 128, 30, TimeUnit.SECONDS, SynchronousQueue())
@@ -128,7 +147,7 @@ class TelegramWssProxy internal constructor(
         val init = TelegramInit.prepare(header, destination)
         val ws = init?.let { openRelay(socket, destination, it) }
         if (ws == null) {
-            warpRelay?.relay(socket, input, request, header)
+            if (!Thread.currentThread().isInterrupted) warpRelay?.relay(socket, input, request, header)
             return
         }
         try {
@@ -160,126 +179,216 @@ class TelegramWssProxy internal constructor(
     }
 
     private fun openRelay(socket: Socket, destination: TelegramDestination, init: ByteArray): WebSocket? {
-        for (host in destination.hosts) {
-            if (closed.get() || socket.isClosed) return null
-            val attempt = RelayAttempt(socket, init)
-            val ws = webSockets.newWebSocket(request(host), attempt)
-            try {
-                if (attempt.awaitCommitted()) return ws
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                attempt.expire()
-                ws.cancel()
-                return null
+        // Race hosts and routes under one deadline, committing the MTProto init exactly once.
+        if (closed.get() || socket.isClosed) return null
+        val routes = destination.hosts.flatMap { host -> transports().map { host to it } }
+        val race = RelayRace(socket, init, routes.size)
+        val attempts = mutableListOf<WebSocket>()
+        var winner: WebSocket? = null
+        try {
+            for ((host, factory) in routes) {
+                if (race.hasWinner() || closed.get() || socket.isClosed) break
+                launchRelayAttempt(host, factory, race, attempts)
             }
-            ws.cancel()
+            winner = race.awaitWinner()
+            return winner
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            return null
+        } finally {
+            race.expire()
+            attempts.filter { it !== winner }.forEach { it.cancel() }
         }
-        return null
     }
 
-    private inner class RelayAttempt(
+    private fun launchRelayAttempt(
+        host: String,
+        factory: WebSocket.Factory,
+        race: RelayRace,
+        attempts: MutableList<WebSocket>,
+    ) {
+        val listener = race.listener(factory)
+        try {
+            attempts.add(factory.newWebSocket(request(host), listener))
+        } catch (_: RuntimeException) {
+            listener.failedBeforeOpen()
+        }
+    }
+
+    private inner class RelayRace(
         private val socket: Socket,
         private val init: ByteArray,
-    ) : WebSocketListener() {
+        private var remaining: Int,
+    ) {
         private val ready = CountDownLatch(1)
         private val lock = Any()
-        private var committed = false
+        private var winner: WebSocket? = null
         private var expired = false
 
-        override fun onOpen(webSocket: WebSocket, response: Response) {
-            synchronized(lock) {
-                val accepted = !expired && !closed.get() && response.header("Sec-WebSocket-Protocol") == "binary"
-                if (accepted && webSocket.send(init.toByteString())) {
-                    committed = true
-                    sent.addAndGet(init.size.toLong())
-                } else {
-                    expired = true
-                    webSocket.cancel()
+        fun hasWinner(): Boolean = synchronized(lock) { winner != null }
+
+        fun listener(factory: WebSocket.Factory) = Attempt(factory)
+
+        inner class Attempt(private val factory: WebSocket.Factory) : WebSocketListener() {
+            private var finished = false
+
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                val accepted = synchronized(lock) {
+                    val eligible = !finished && !expired && winner == null
+                    val connected = !closed.get() && !socket.isClosed
+                    val protocol = response.header("Sec-WebSocket-Protocol") == "binary"
+                    val canSend = eligible && connected && protocol
+                    if (!canSend || !webSocket.send(init.toByteString())) {
+                        finishAttempt()
+                        false
+                    } else {
+                        winner = webSocket
+                        preferred.set(factory)
+                        sent.addAndGet(init.size.toLong())
+                        ready.countDown()
+                        true
+                    }
                 }
-                ready.countDown()
+                if (!accepted) webSocket.cancel()
             }
-        }
 
-        override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-            if (!synchronized(lock) { committed }) {
-                terminate(webSocket)
-                return
-            }
-            try {
-                socket.getOutputStream().apply {
-                    write(bytes.toByteArray())
-                    flush()
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                if (!synchronized(lock) { winner === webSocket }) {
+                    terminate(webSocket)
+                    return
                 }
-                received.addAndGet(bytes.size.toLong())
-            } catch (_: IOException) {
-                terminate(webSocket)
+                try {
+                    socket.getOutputStream().apply {
+                        write(bytes.toByteArray())
+                        flush()
+                    }
+                    received.addAndGet(bytes.size.toLong())
+                } catch (_: IOException) {
+                    terminate(webSocket)
+                }
             }
-        }
 
-        override fun onMessage(webSocket: WebSocket, text: String) = terminate(webSocket)
+            override fun onMessage(webSocket: WebSocket, text: String) = terminate(webSocket)
 
-        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) = terminate(webSocket)
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) = terminate(webSocket)
 
-        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = finish()
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = finish(webSocket)
 
-        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = finish()
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = finish(webSocket)
 
-        private fun terminate(webSocket: WebSocket) {
-            finish()
-            webSocket.cancel()
-        }
+            fun failedBeforeOpen() = synchronized(lock) { finishAttempt() }
 
-        private fun finish() {
-            synchronized(lock) {
-                expired = true
+            private fun terminate(webSocket: WebSocket) {
+                finish(webSocket)
+                webSocket.cancel()
+            }
+
+            private fun finish(webSocket: WebSocket) {
+                val committed = synchronized(lock) {
+                    finishAttempt()
+                    winner === webSocket
+                }
                 if (committed) release(socket)
-                ready.countDown()
+            }
+
+            // Must be called under the race lock: callbacks may be synchronous or repeated.
+            private fun finishAttempt() {
+                if (finished) return
+                finished = true
+                remaining--
+                if (remaining == 0) ready.countDown()
             }
         }
 
-        fun awaitCommitted(): Boolean {
+        fun awaitWinner(): WebSocket? {
             ready.await(10, TimeUnit.SECONDS)
             return synchronized(lock) {
                 expired = true
-                committed
+                winner
             }
         }
 
-        fun expire() {
-            synchronized(lock) { expired = true }
-        }
+        fun expire() = synchronized(lock) { expired = true }
     }
 
     internal fun probeRemote(timeoutMs: Long = 5_000): Long? {
         if (closed.get()) return null
-        val ready = CountDownLatch(1)
-        val latency = AtomicLong(-1)
-        val started = System.nanoTime()
         val probes = mutableListOf<WebSocket>()
+        val factories = transports()
+        val candidates = listOf(2, 4, 1, 3, 5).flatMap { dc ->
+            TelegramDestination(dc, false).hosts.flatMap { host -> factories.map { host to it } }
+        }
+        val race = ProbeRace(candidates.size)
         try {
-            for (dc in listOf(2, 4, 1)) {
-                if (latency.get() >= 0 || closed.get()) break
-                val ws = webSockets.newWebSocket(
-                    request(TelegramDestination(dc, false).host),
-                    object : WebSocketListener() {
-                        override fun onOpen(webSocket: WebSocket, response: Response) {
-                            if (response.header("Sec-WebSocket-Protocol") == "binary") {
-                                latency.compareAndSet(
-                                    -1,
-                                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
-                                )
-                                ready.countDown()
-                            }
-                            webSocket.cancel()
-                        }
-                    },
-                )
-                probes.add(ws)
+            for ((host, factory) in candidates) {
+                if (race.hasWinner() || closed.get()) break
+                launchProbeAttempt(host, factory, race, probes)
             }
-            ready.await(timeoutMs, TimeUnit.MILLISECONDS)
-            return latency.get().takeIf { it >= 0 && !closed.get() }
+            return race.awaitWinner(timeoutMs)
         } finally {
+            race.expire()
             probes.forEach { it.cancel() }
+        }
+    }
+
+    private fun launchProbeAttempt(
+        host: String,
+        factory: WebSocket.Factory,
+        race: ProbeRace,
+        probes: MutableList<WebSocket>,
+    ) {
+        val listener = race.Attempt(factory)
+        try {
+            probes.add(factory.newWebSocket(request(host), listener))
+        } catch (_: RuntimeException) {
+            listener.complete(false)
+        }
+    }
+
+    private inner class ProbeRace(private var remaining: Int) {
+        private val lock = Any()
+        private val ready = CountDownLatch(1)
+        private val started = System.nanoTime()
+        private var latency: Long? = null
+        private var expired = false
+
+        fun hasWinner(): Boolean = synchronized(lock) { latency != null }
+
+        fun awaitWinner(timeoutMs: Long): Long? {
+            ready.await(timeoutMs, TimeUnit.MILLISECONDS)
+            return synchronized(lock) {
+                expired = true
+                latency.takeUnless { closed.get() }
+            }
+        }
+
+        fun expire() = synchronized(lock) { expired = true }
+
+        inner class Attempt(private val factory: WebSocket.Factory) : WebSocketListener() {
+            private val done = AtomicBoolean(false)
+
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                complete(response.header("Sec-WebSocket-Protocol") == "binary")
+                webSocket.cancel()
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = complete(false)
+
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = complete(false)
+
+            fun complete(success: Boolean) {
+                if (!done.compareAndSet(false, true)) return
+                synchronized(lock) {
+                    val accepting = !expired && !closed.get() && latency == null
+                    if (success && accepting) {
+                        latency = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+                        preferred.set(factory)
+                        ready.countDown()
+                    }
+                    remaining--
+                    if (remaining == 0) ready.countDown()
+                }
+            }
         }
     }
 

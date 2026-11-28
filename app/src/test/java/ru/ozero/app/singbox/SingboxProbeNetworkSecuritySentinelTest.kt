@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 class SingboxProbeNetworkSecuritySentinelTest {
 
     @Test
-    fun `network security rejects cleartext for every host`() {
+    fun `network security rejects external cleartext and limits manual verification to exact loopback hosts`() {
         val root = locateRepoRoot()
         val config = File(root, "app/src/main/res/xml/network_security_config.xml")
         assertTrue(config.isFile, "network_security_config.xml must exist")
@@ -31,7 +31,7 @@ class SingboxProbeNetworkSecuritySentinelTest {
 
         assertEquals("false", baseConfig.getAttribute("cleartextTrafficPermitted"))
         assertEquals(setOf("system"), baseAnchors)
-        assertEquals(emptySet(), cleartextDomains)
+        assertEquals(setOf("127.0.0.1" to "false", "localhost" to "false"), cleartextDomains)
     }
 
     private fun Element.elements(name: String): List<Element> = (0 until childNodes.length)

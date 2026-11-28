@@ -7,14 +7,18 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
+import ru.ozero.enginescore.settings.GfVpnOptions;
 
-/** Runtime bridge for the exact locally supplied SDK. Never bundles third-party code. */
+/** Runtime bridge for the verified SDK packaged in Ozero's own assets. */
 final class GfVpnSdk {
     static final String DEX_SHA = "103f8155e3bd33b8f13d8ff7d1f63cb5ec1fe7acc1aa1c395eaedb83d336c829";
     static final String LIB_SHA = "7fdffc628230ce188c474c42bfc5fef5b802ace74bd9e9b249f0272f9090e404";
     private final Context context;
-    private Class<?> api;
+    private volatile Class<?> api;
     private Class<?> configType;
+    private Object networkDnsCallback;
+    private Object captchaCallback;
+    private final java.util.function.Consumer<String> captchaEvents;
     private boolean active;
     private Session session;
 
@@ -29,8 +33,23 @@ final class GfVpnSdk {
         }
     }
 
-    GfVpnSdk(Context context) {
+    enum StartupStage { LOAD_SDK, CONFIGURE, NATIVE_START, VALIDATE_SESSION }
+
+    static final class StartupFailure extends IOException {
+        StartupFailure(StartupStage stage, Throwable failure) {
+            super(stage.name() + ": " + safeType(failure));
+        }
+
+        private static String safeType(Throwable failure) {
+            Throwable reported = failure instanceof java.lang.reflect.InvocationTargetException &&
+                failure.getCause() != null ? failure.getCause() : failure;
+            return reported.getClass().getSimpleName();
+        }
+    }
+
+    GfVpnSdk(Context context, java.util.function.Consumer<String> captchaEvents) {
         this.context = context.getApplicationContext();
+        this.captchaEvents = captchaEvents;
     }
 
     static void verify(File file, String expected) throws Exception {
@@ -55,7 +74,7 @@ final class GfVpnSdk {
         if (!java.util.Arrays.asList(Build.SUPPORTED_64_BIT_ABIS).contains("arm64-v8a")) {
             throw new IOException("gfVPN SDK requires ARM64");
         }
-        File directory = new File(context.getFilesDir(), "gfvpn-sdk");
+        File directory = GfVpnBundledSdk.prepare(context);
         File dex = new File(directory, "classes.dex");
         File lib = new File(directory, "libgojni.so");
         verify(dex, DEX_SHA);
@@ -68,33 +87,56 @@ final class GfVpnSdk {
         seq.getMethod("setContext", Context.class).invoke(null, context);
         Class<?> loadedConfig = Class.forName("gfvpnclient.ClientConfig", true, loader);
         Class<?> loadedApi = Class.forName("gfvpnclient.Gfvpnclient", true, loader);
+        Class<?> callbackType = Class.forName("gfvpnclient.NetworkDNSCallback", true, loader);
+        // The reference Android client supplies current physical-network DNS servers
+        // through this SDK callback. Resolve dynamically after Wi-Fi/mobile switches.
+        Object callback = java.lang.reflect.Proxy.newProxyInstance(loader, new Class<?>[]{callbackType},
+            (proxy, method, args) -> {
+                switch (method.getName()) {
+                    case "getNetworkDNSServers": return GfVpnNetworkDns.current(context);
+                    case "toString": return "gfVPN underlying DNS callback";
+                    case "hashCode": return System.identityHashCode(proxy);
+                    case "equals": return args != null && args.length == 1 && proxy == args[0];
+                    default: throw new UnsupportedOperationException(method.getName());
+                }
+            });
+        loadedApi.getMethod("setNetworkDNSCallback", callbackType).invoke(null, callback);
+        networkDnsCallback = callback;
+        Class<?> captchaType = Class.forName("gfvpnclient.CaptchaCallback", true, loader);
+        Object captcha = java.lang.reflect.Proxy.newProxyInstance(loader, new Class<?>[]{captchaType},
+            (proxy, method, args) -> {
+                switch (method.getName()) {
+                    case "onCaptchaRequired": captchaEvents.accept((String) args[0]); return null;
+                    case "onCaptchaResolved": captchaEvents.accept(null); return null;
+                    case "toString": return "gfVPN manual CAPTCHA callback";
+                    case "hashCode": return System.identityHashCode(proxy);
+                    case "equals": return args != null && args.length == 1 && proxy == args[0];
+                    default: throw new UnsupportedOperationException(method.getName());
+                }
+            });
+        loadedApi.getMethod("setCaptchaCallback", captchaType).invoke(null, captcha);
+        captchaCallback = captcha;
         configType = loadedConfig;
         api = loadedApi;
     }
 
-    synchronized Session start(String country, String clientIdentifier) throws Exception {
+    synchronized Session start(String country, String clientIdentifier, GfVpnOptions options) throws Exception {
         if (active) throw new IllegalStateException("Already started");
-        load();
-        if (!java.util.Arrays.asList("RU", "CN", "IR", "TM", "INT").contains(country)) {
-            throw new IllegalArgumentException("Unsupported country");
-        }
-        File work = new File(context.getFilesDir(), "gfvpn-state");
-        if (!work.isDirectory() && !work.mkdirs()) throw new IOException("Cannot create work directory");
-        Object config = configType.getConstructor().newInstance();
-        set(config, "setWorkDir", work.getAbsolutePath());
-        set(config, "setLocaleCountryCode", country);
-        set(config, "setForceConfigCountry", country);
-        set(config, "setClientIdentifier", clientIdentifier);
-        set(config, "setServerSelection", "auto");
-        set(config, "setNodeRotationEnabled", "true");
-        set(config, "setUseCachedNodes", "true");
-        set(config, "setUseRemoteConfig", "true");
-        set(config, "setSplitTunnelEnabled", "false");
-        // Unauthenticated local SOCKS is not acceptable as a default.
-        set(config, "setSocksAuthEnabled", "true");
+        StartupStage stage = StartupStage.LOAD_SDK;
         try {
+            load();
+            stage = StartupStage.CONFIGURE;
+            if (!java.util.Arrays.asList("RU", "CN", "IR", "TM", "INT").contains(country)) {
+                throw new IllegalArgumentException("Unsupported country");
+            }
+            File work = new File(context.getFilesDir(), "gfvpn-state");
+            if (!work.isDirectory() && !work.mkdirs()) throw new IOException("Cannot create work directory");
+            Object config = configType.getConstructor().newInstance();
+            GfVpnClientDefaults.configure(config, work.getAbsolutePath(), country, clientIdentifier, options);
+            stage = StartupStage.NATIVE_START;
             active = true;
             Object result = api.getMethod("start", configType).invoke(null, config);
+            stage = StartupStage.VALIDATE_SESSION;
             if (result == null) throw new IOException("SDK returned no result");
             Object error = result.getClass().getMethod("getError").invoke(result);
             if (error != null) throw new IOException("SDK startup failed");
@@ -108,15 +150,19 @@ final class GfVpnSdk {
             session = new Session((int) port, username, password);
             return session;
         } catch (Exception | LinkageError failure) {
+            StartupFailure diagnostic = new StartupFailure(stage, failure);
+            android.util.Log.w("GfVpnSdk", diagnostic.getMessage());
             try { stop(); } catch (Exception | LinkageError ignored) {
                 android.os.Process.killProcess(android.os.Process.myPid());
             }
-            throw failure;
+            throw diagnostic;
         }
     }
 
-    private void set(Object config, String name, String value) throws Exception {
-        configType.getMethod(name, String.class).invoke(config, value);
+    // The reference invokes dismissal on its own thread, including during native start.
+    void dismissCaptcha() throws Exception {
+        Class<?> loaded = api;
+        if (loaded != null) loaded.getMethod("vktDismissPendingCaptcha").invoke(null);
     }
 
     synchronized void stop() throws Exception {

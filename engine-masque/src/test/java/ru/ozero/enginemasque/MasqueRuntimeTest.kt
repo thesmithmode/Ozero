@@ -180,6 +180,7 @@ class MasqueRuntimeTest {
             21 to "MASQUE key generation failed",
             22 to "Cloudflare key enrollment failed",
             23 to "MASQUE could not save the registered profile",
+            24 to "Cloudflare returned incomplete registration data",
         )
         val executable = binary()
         for ((code, stage) in stages) {

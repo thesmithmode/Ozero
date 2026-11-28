@@ -13,11 +13,14 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.ozero.app.logging.AppLogger
+import ru.ozero.commonvpn.EngineStartupBudget
 import ru.ozero.commonvpn.OzeroVpnService
+import ru.ozero.commonvpn.StartSequenceCoordinator
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.SettingsRepository
+import ru.ozero.enginescore.settings.TrafficMode
 import javax.inject.Inject
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Singleton
@@ -30,7 +33,10 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) {
     private val restartMutex = Mutex()
-    private val restartQueue = ArrayDeque<String>()
+    private data class AutoRestart(val candidates: List<EngineId>, val proxyMode: Boolean)
+    private data class RestartRequest(val reason: String, val target: EngineId?, val auto: AutoRestart? = null)
+
+    private val restartQueue = ArrayDeque<RestartRequest>()
     private var restartInProgress = false
     private val started = AtomicBoolean(false)
 
@@ -48,17 +54,25 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         val settingsObserver = EngineSettingsRestartObserver(
             settingsFlow = settingsRepository.settings,
             vpnStateProvider = { tunnelController.state.value },
-            onRestartConnected = { snapshot -> restartVpnIfRunning(snapshot.restartReason()) },
+            onRestartConnected = { snapshot ->
+                val auto = snapshot.engineAutoPriority?.let {
+                    AutoRestart(it, snapshot.trafficMode == TrafficMode.PROXY)
+                }
+                restartVpnIfRunning(RestartRequest(snapshot.restartReason(), snapshot.manualEngine, auto))
+            },
         )
         scope.launch(exceptionHandler) {
             settingsObserver.triggers.collect { trigger -> settingsObserver.handle(trigger) }
         }
     }
 
-    internal suspend fun restartVpnIfRunning(reason: String): Boolean {
+    internal suspend fun restartVpnIfRunning(reason: String): Boolean =
+        restartVpnIfRunning(RestartRequest(reason, null))
+
+    private suspend fun restartVpnIfRunning(request: RestartRequest): Boolean {
         var shouldProcess = false
         restartMutex.withLock {
-            restartQueue.addLast(reason)
+            restartQueue.addLast(request)
             if (!restartInProgress) {
                 restartInProgress = true
                 shouldProcess = true
@@ -100,7 +114,7 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         }
     }
 
-    private suspend fun performRestartIfRunning(reason: String): Boolean {
+    private suspend fun performRestartIfRunning(request: RestartRequest): Boolean {
         val current = tunnelController.state.value
         val fromEngine = when (current) {
             is TunnelState.Connected -> current.engineId
@@ -108,10 +122,20 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
             is TunnelState.Probing -> current.engineId ?: return false
             else -> return false
         }
-        AppLogger.i(TAG, "restart requested $reason")
+        AppLogger.i(TAG, "restart requested ${request.reason}")
         val pendingTarget = tunnelController.switching.value?.to
-        val targetEngine = pendingTarget ?: fromEngine
-        tunnelController.onSwitchingStarted(from = fromEngine, to = targetEngine)
+        val auto = request.auto
+        val targetEngine = if (auto == null) request.target ?: pendingTarget ?: fromEngine else null
+        val startupTimeoutMs = auto?.let(::autoRestartTimeoutMs) ?: restartStartTimeoutMs(targetEngine)
+        if (auto == null) {
+            tunnelController.onSwitchingStarted(from = fromEngine, to = targetEngine)
+        } else {
+            tunnelController.onSwitchingStarted(
+                from = fromEngine,
+                to = null,
+                autoTimeoutMs = startupTimeoutMs + RESTART_STOP_TIMEOUT_MS + RESTART_SETTLE_TIMEOUT_MS,
+            )
+        }
         try {
             sendVpnAction(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG)
             val stopped = withTimeoutOrNull(RESTART_STOP_TIMEOUT_MS) {
@@ -126,11 +150,12 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
                 tunnelController.onSwitchingFinished("runtime config restart stop timeout")
                 return false
             }
-            val restarted = withTimeoutOrNull(restartStartTimeoutMs(targetEngine)) {
-                tunnelController.state.first {
-                    it is TunnelState.Connected ||
-                        it is TunnelState.Failed
+            val restarted = if (auto == null) {
+                withTimeoutOrNull(startupTimeoutMs) {
+                    tunnelController.state.first { it is TunnelState.Connected || it is TunnelState.Failed }
                 }
+            } else {
+                awaitAutoRestarted(startupTimeoutMs)
             }
             return when (restarted) {
                 is TunnelState.Connected -> {
@@ -164,12 +189,39 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
     private fun EngineSettingsRestartObserver.Snapshot.targetEngineForRestart(): EngineId? =
         manualEngine ?: engineAutoPriority?.firstOrNull()
 
+    private suspend fun awaitAutoRestarted(timeoutMs: Long): TunnelState? = withTimeoutOrNull(timeoutMs) {
+        var current = awaitAutoProgress() ?: return@withTimeoutOrNull null
+        while (current !is TunnelState.Connected && current !is TunnelState.Failed) {
+            current = tunnelController.state.first {
+                it is TunnelState.Connected ||
+                    it is TunnelState.Failed ||
+                    it is TunnelState.Idle ||
+                    it is TunnelState.Disconnecting
+            }
+            if (current is TunnelState.Idle || current is TunnelState.Disconnecting) {
+                current = awaitAutoProgress() ?: return@withTimeoutOrNull null
+            }
+        }
+        current
+    }
+
+    private suspend fun awaitAutoProgress(): TunnelState? = withTimeoutOrNull(RESTART_START_TIMEOUT_MS) {
+        tunnelController.state.first { it !is TunnelState.Idle && it !is TunnelState.Disconnecting }
+    }
+
+    private fun autoRestartTimeoutMs(auto: AutoRestart): Long =
+        auto.candidates.distinct().filterNot { it.manualStandaloneOnly }.sumOf { engine ->
+            val start = maxOf(
+                restartStartTimeoutMs(engine),
+                EngineStartupBudget.chainTimeoutMs(engine) + RESTART_START_TIMEOUT_MS,
+            )
+            val preflight = if (auto.proxyMode) StartSequenceCoordinator.PREFLIGHT_HARD_TIMEOUT_MS else 0L
+            start + preflight + RESTART_SETTLE_TIMEOUT_MS
+        }.coerceAtLeast(RESTART_START_TIMEOUT_MS)
+
     private fun restartStartTimeoutMs(target: EngineId?): Long = when (target) {
         EngineId.FPTN -> FPTN_RESTART_START_TIMEOUT_MS
-        EngineId.OPERA -> OPERA_RESTART_START_TIMEOUT_MS
-        EngineId.MASQUE -> MASQUE_RESTART_START_TIMEOUT_MS
-        EngineId.TGWSS -> TGWSS_RESTART_START_TIMEOUT_MS
-        else -> RESTART_START_TIMEOUT_MS
+        else -> EngineStartupBudget.restartTimeoutMs(target) ?: RESTART_START_TIMEOUT_MS
     }
 
     private fun sendVpnAction(action: String) {
@@ -187,9 +239,6 @@ class RuntimeConfigRestartCoordinator @Inject constructor(
         // Shorter than that treats a slow successful FPTN restart as a failure
         // and the next Connected restarts again, because the start is not cancelled.
         const val FPTN_RESTART_START_TIMEOUT_MS = 60_000L
-        const val OPERA_RESTART_START_TIMEOUT_MS = 60_000L
-        const val MASQUE_RESTART_START_TIMEOUT_MS = 60_000L
-        const val TGWSS_RESTART_START_TIMEOUT_MS = 120_000L
         const val RESTART_SETTLE_TIMEOUT_MS = 15_000L
     }
 }

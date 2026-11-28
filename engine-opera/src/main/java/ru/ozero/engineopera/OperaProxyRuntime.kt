@@ -31,7 +31,7 @@ class OperaProxyRuntime(
 
     suspend fun start(config: OperaProxyConfig): StartResult {
         var launched: Session? = null
-        return try {
+        try {
             mutex.withLock {
                 stopCurrent()
                 withContext(Dispatchers.IO) {
@@ -42,21 +42,46 @@ class OperaProxyRuntime(
                     }
                 }
             }
-            val current = checkNotNull(launched)
-            val ready = withTimeoutOrNull(timeoutMs) { awaitRoute(current) } == true
-            mutex.withLock {
-                if (ready && session === current && current.process.alive) {
-                    current.ready = true
-                    StartResult.Success(current.port)
-                } else {
-                    val reason = when {
-                        session !== current -> "opera startup interrupted"
-                        !current.process.alive -> "opera process exited before readiness"
-                        else -> "opera routed readiness timed out"
+            var alternate = config.alternateBootstrap
+            while (true) {
+                val current = checkNotNull(launched)
+                val ready = withTimeoutOrNull(timeoutMs) { awaitRoute(current) } == true
+                val result: StartResult? = mutex.withLock {
+                    if (ready && session === current && current.process.alive) {
+                        current.ready = true
+                        StartResult.Success(current.port)
+                    } else {
+                        val code = current.process.exitCode
+                        val reason = when {
+                            session !== current -> "opera startup interrupted"
+                            !current.process.alive -> "opera process exited before readiness"
+                            else -> "opera routed readiness timed out"
+                        }
+                        if (session === current && code != null) {
+                            PersistentLoggers.warn("OperaRuntime", "native startup exit code=$code")
+                        }
+                        // Only the owner of the failed session may replace it.
+                        // 9/10/12 are upstream registration/discovery/selection failures.
+                        val retryable = current.process.alive || code in RETRYABLE_EXIT_CODES
+                        if (session === current && !alternate && retryable) {
+                            PersistentLoggers.info("OperaRuntime", "retry with alternate bootstrap: $reason")
+                            stopIfCurrent(current)
+                            alternate = true
+                            withContext(Dispatchers.IO) {
+                                val port = allocatePort()
+                                Session(launcher.launch(config.copy(alternateBootstrap = true), port), port).also {
+                                    launched = it
+                                    session = it
+                                }
+                            }
+                            null
+                        } else {
+                            stopIfCurrent(current)
+                            StartResult.Failure(reason)
+                        }
                     }
-                    stopIfCurrent(current)
-                    StartResult.Failure(reason)
                 }
+                if (result != null) return result
             }
         } catch (e: CancellationException) {
             cleanup(launched)
@@ -64,7 +89,7 @@ class OperaProxyRuntime(
         } catch (e: Exception) {
             cleanup(launched)
             PersistentLoggers.warn("OperaRuntime", "startup failed: ${e.javaClass.simpleName}")
-            StartResult.Failure("opera startup failed")
+            return StartResult.Failure("opera startup failed")
         }
     }
 
@@ -121,6 +146,8 @@ class OperaProxyRuntime(
     }
 
     private companion object {
+        val RETRYABLE_EXIT_CODES = setOf(9, 10, 12)
+
         fun freePort(): Int = ServerSocket(0, 1, InetAddress.getByName(OperaProxyCommand.LOOPBACK)).use {
             it.localPort
         }

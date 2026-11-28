@@ -20,8 +20,7 @@ class ByeDpiProxy : ByeDpiProxyContract {
 
     override fun stopProxy(): Int = jniStopProxy()
 
-    // SENTINEL [project_byedpi_native_guard_ownership]: forceClose() НЕ должен релизить g_proxy_running.
-    // Native: только jniStartProxy владеет guard, jniForceClose триггерит graceful shutdown цикла main().
+    // Only the native start owner releases the guard; forceClose requests shutdown of its own listener.
     override fun forceClose(): Int = jniForceClose()
 
     companion object {

@@ -31,14 +31,16 @@ object UrnetworkRuntime {
     private var space: NetworkSpace? = null
 
     private val mutex = Mutex()
+    private val logInitialization = UrnetworkLogInitialization()
 
     suspend fun ensure(app: Application): NetworkSpace = withContext(Dispatchers.Main.immediate) {
         space?.let { return@withContext it }
         mutex.withLock {
             space?.let { return@withLock it }
             val filesPath = app.filesDir.absolutePath
-            runCatching { Sdk.setLogDir(filesPath) }
-                .onFailure { PersistentLoggers.warn(TAG, "Sdk.setLogDir threw: ${it.message}") }
+            // Go glog is process-global. Reinitializing it in the same second can abort the process.
+            runCatching { logInitialization.runOnce { Sdk.setLogDir(filesPath) } }
+                .onFailure { PersistentLoggers.warn(TAG, "Sdk.setLogDir threw: ${it.javaClass.simpleName}") }
             runCatching {
                 val am = app.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
                 val maxMib = am?.memoryClass?.toLong() ?: DEFAULT_MEM_MIB

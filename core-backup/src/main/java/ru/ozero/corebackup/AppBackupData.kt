@@ -82,6 +82,7 @@ data class BackupSettings(
     val operaRegion: String? = null,
     val operaSelection: String? = null,
     val operaAutoEnabled: Boolean? = null,
+    val gfVpnOptions: String? = null,
 )
 
 data class BackupUrnetwork(

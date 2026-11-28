@@ -26,6 +26,8 @@ on:
       - 'build-tools/Dockerfile'
       - 'build-tools/Dockerfile.byedpi'
       - 'build-tools/build_byedpi.sh'
+      - 'engine-byedpi/src/main/cpp/**'
+      - 'engine-byedpi/src/test/native/**'
       - 'build-tools/build_naive.sh'
       - 'build-tools/build_amneziawg.sh'
       - 'build-tools/build_hysteria2.sh'
@@ -60,7 +62,7 @@ jobs:
           # bumping xray never invalidates the byedpi tag.
           case "$ARTIFACT" in
             byedpi)
-              FILES="build-tools/Dockerfile.byedpi build-tools/build_byedpi.sh build-tools/regen_lock.py"
+              FILES="build-tools/Dockerfile.byedpi build-tools/build_byedpi.sh build-tools/regen_lock.py engine-byedpi/src/main/cpp/CMakeLists.txt engine-byedpi/src/main/cpp/native-lib.c engine-byedpi/src/main/cpp/listener-control.c engine-byedpi/src/main/cpp/listener-control.h"
               ;;
             naive)
               FILES="build-tools/build_naive.sh build-tools/regen_lock.py"
@@ -109,6 +111,16 @@ jobs:
           cd engine-byedpi/src/main/cpp/byedpi
           git checkout "$BYEDPI_COMMIT"
           cd -
+
+      - name: Verify native listener ownership
+        if: env.ARTIFACT == 'byedpi'
+        run: |
+          cc -std=gnu11 -Wall -Wextra -Werror -pthread \
+            -Iengine-byedpi/src/main/cpp \
+            engine-byedpi/src/main/cpp/listener-control.c \
+            engine-byedpi/src/test/native/listener-control-test.c \
+            -o "$RUNNER_TEMP/byedpi-listener-test"
+          "$RUNNER_TEMP/byedpi-listener-test"
 
       - name: Build byedpi Docker image
         if: env.ARTIFACT == 'byedpi'
@@ -255,6 +267,7 @@ jobs:
           GH_TAG: ${{ steps.tag.outputs.tag }}
         with:
           tag_name: ${{ env.GH_TAG }}
+          target_commitish: ${{ github.sha }}
           name: Native binaries ${{ env.GH_TAG }}
           body: |
             Auto-built native binaries.

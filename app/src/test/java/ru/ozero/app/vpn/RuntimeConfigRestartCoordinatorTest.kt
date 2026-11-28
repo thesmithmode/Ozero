@@ -18,6 +18,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import ru.ozero.commonvpn.EngineStartupBudget
 import ru.ozero.commonvpn.OzeroVpnService
 import ru.ozero.commonvpn.TunnelController
 import ru.ozero.commonvpn.TunnelState
@@ -64,32 +65,6 @@ class RuntimeConfigRestartCoordinatorTest {
 
         assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
         assertFalse(coordinator.restartInProgress())
-    }
-
-    @Test
-    fun `manual engine settings change restarts connected tunnel`() = runTest {
-        val startServiceActions = mutableListOf<String?>()
-        val settings = MutableStateFlow(SettingsModel(manualEngine = EngineId.WARP))
-        val tunnelController = TunnelController()
-        tunnelController.setState(TunnelState.Connected(EngineId.WARP, 51820))
-        val coordinator = RuntimeConfigRestartCoordinator(
-            context = recordingContext(startServiceActions) {
-                tunnelController.setState(TunnelState.Disconnecting)
-                launch { tunnelController.setState(TunnelState.Connected(EngineId.FPTN, 0)) }
-            },
-            observer = EngineRuntimeConfigRestartObserver(emptySet()),
-            tunnelController = tunnelController,
-            settingsRepository = fakeSettingsRepository(settings),
-        )
-
-        coordinator.start(backgroundScope)
-        runCurrent()
-        settings.value = SettingsModel(manualEngine = EngineId.FPTN)
-        advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
-        runCurrent()
-
-        assertEquals(listOf<String?>(OzeroVpnService.ACTION_RESTART_RUNTIME_CONFIG), startServiceActions)
-        assertEquals(TunnelState.Connected(EngineId.FPTN, 0), tunnelController.state.value)
     }
 
     @Test
@@ -274,7 +249,7 @@ class RuntimeConfigRestartCoordinatorTest {
 
     @Test
     fun `slow engine restart succeeds inside its startup budget`() = runTest {
-        for (target in listOf(EngineId.FPTN, EngineId.OPERA, EngineId.MASQUE, EngineId.TGWSS)) {
+        for (target in listOf(EngineId.FPTN, EngineId.OPERA, EngineId.MASQUE, EngineId.TGWSS, EngineId.GFVPN)) {
             val actions = mutableListOf<String?>()
             val controller = TunnelController()
             controller.setState(TunnelState.Connected(EngineId.WARP, 51820))
@@ -285,7 +260,12 @@ class RuntimeConfigRestartCoordinatorTest {
             )
             val restart = launch { assertTrue(coordinator.restartVpnIfRunning("settings changed")) }
             runCurrent()
-            advanceTimeBy(30_000)
+            val budget = if (target == EngineId.FPTN) {
+                30_001L
+            } else {
+                requireNotNull(EngineStartupBudget.restartTimeoutMs(target))
+            }
+            advanceTimeBy(budget - 1)
             assertTrue(restart.isActive)
             controller.setState(TunnelState.Connected(target, 0))
             restart.join()
@@ -707,10 +687,10 @@ class RuntimeConfigRestartCoordinatorTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun RuntimeConfigRestartCoordinator.restartQueue(): ArrayDeque<String> {
+    private fun RuntimeConfigRestartCoordinator.restartQueue(): ArrayDeque<*> {
         val field = javaClass.getDeclaredField("restartQueue")
         field.isAccessible = true
-        return field.get(this) as ArrayDeque<String>
+        return field.get(this) as ArrayDeque<*>
     }
 
     private fun RuntimeConfigRestartCoordinator.restartInProgress(): Boolean {

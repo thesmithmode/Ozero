@@ -22,6 +22,26 @@ on:
       - 'app/**'
       - 'common-vpn/**'
       - 'engine-singbox/**'
+      - 'engine-byedpi/**'
+      - 'build-tools/binaries.lock.yaml'
+      - 'engine-gfvpn/**'
+      - 'engine-urnetwork/**'
+      - 'singbox-*/**'
+  pull_request:
+    branches: [dev]
+    paths:
+      - '.github/soak/**'
+      - '.github/scripts/**'
+      - '.github/actions/prepare-urnetwork/**'
+      - '.github/checksums/urnetwork-sdk.lock'
+      - '.github/workflows/soak.yml'
+      - 'app/**'
+      - 'common-vpn/**'
+      - 'engine-singbox/**'
+      - 'engine-byedpi/**'
+      - 'build-tools/binaries.lock.yaml'
+      - 'engine-gfvpn/**'
+      - 'engine-urnetwork/**'
       - 'singbox-*/**'
 
 concurrency:
@@ -217,6 +237,7 @@ jobs:
           git -C "$SRC" checkout --detach FETCH_HEAD
           test "$(git -C "$SRC" rev-parse HEAD)" = "$HEV_COMMIT_SHA"
           git -C "$SRC" submodule update --init --recursive --depth 1
+          python3 .github/soak/instrument-hev.py "$SRC"
           cd "$SRC"
           "$NDK_PATH/ndk-build" \
             NDK_PROJECT_PATH="$SRC" \
@@ -254,6 +275,7 @@ jobs:
           APK="app/build/outputs/apk/debug/app-debug.apk"
           unzip -l "$APK" | grep -q 'lib/x86_64/libbox.so'
           unzip -l "$APK" | grep -q 'lib/x86_64/libhev-ozero-socks5-tunnel.so'
+          unzip -l "$APK" | grep -q 'lib/x86_64/libbyedpi.so'
           bash scripts/verify-masque-apk.sh "$APK" x86_64
           bash scripts/verify-masque-apk.sh "$APK" arm64-v8a
 

@@ -16,6 +16,7 @@ object SettingsKeys {
     val OPERA_AUTO_ENABLED = booleanPreferencesKey("opera_auto_enabled")
     val OPERA_REGION = stringPreferencesKey("opera_region")
     val OPERA_SELECTION = stringPreferencesKey("opera_selection")
+    val GFVPN_OPTIONS = stringPreferencesKey("gfvpn_options")
 
     val BATTERY_PROMPT_SHOWN = booleanPreferencesKey("battery_prompt_shown")
 

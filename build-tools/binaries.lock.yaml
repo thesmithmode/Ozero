@@ -188,9 +188,9 @@ artifacts:
     abi: arm64-v8a
     destination: jniLibs
     target_filename: libbyedpi.so
-    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-e4e9f53e/libbyedpi-arm64-v8a.so
-    sha256: 7f1ffc173684de76e2814f93b1bf9f2769520b4127b6b2ebddf5c9008a9750db
-    size_bytes: 357384
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-e74ca6a8/libbyedpi-arm64-v8a.so
+    sha256: 22219e9c61abe55d83aa059478e555e41c03d0aa22514bae8797e1e1cef6a427
+    size_bytes: 355584
     source_repo: https://github.com/hufrea/byedpi
     source_commit: ba532298de7b28cfe854aea83d061369d13ca290
   - name: libbyedpi-armeabi-v7a.so
@@ -198,9 +198,9 @@ artifacts:
     abi: armeabi-v7a
     destination: jniLibs
     target_filename: libbyedpi.so
-    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-e4e9f53e/libbyedpi-armeabi-v7a.so
-    sha256: cb62f961fc191f046c8ed1cd33067b815cbc18685987b7fdb564f4ff7c82ca2a
-    size_bytes: 262064
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-e74ca6a8/libbyedpi-armeabi-v7a.so
+    sha256: 7f9c8e6f6e8ee55ac1c4abcbb9e97cc780ff074a392d44f39468cca5cf25ae0e
+    size_bytes: 263620
     source_repo: https://github.com/hufrea/byedpi
     source_commit: ba532298de7b28cfe854aea83d061369d13ca290
   - name: libbyedpi-x86.so
@@ -208,9 +208,9 @@ artifacts:
     abi: x86
     destination: jniLibs
     target_filename: libbyedpi.so
-    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-e4e9f53e/libbyedpi-x86.so
-    sha256: 6dc531bcd94d381b569d69eddb95b406dc2a084bf8bf7416aee2cf093971ec3a
-    size_bytes: 281840
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-e74ca6a8/libbyedpi-x86.so
+    sha256: a4500e829f9298134dbe12026564773c8d0329aac9ab5d4f57571a74956cfddb
+    size_bytes: 283576
     source_repo: https://github.com/hufrea/byedpi
     source_commit: ba532298de7b28cfe854aea83d061369d13ca290
   - name: libbyedpi-x86_64.so
@@ -218,9 +218,9 @@ artifacts:
     abi: x86_64
     destination: jniLibs
     target_filename: libbyedpi.so
-    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-e4e9f53e/libbyedpi-x86_64.so
-    sha256: 2f071e9312ec593a4cdc1d668f906f808f4864208b3e1e82aceacad3ea77dc01
-    size_bytes: 340928
+    download_url: https://github.com/thesmithmode/Ozero/releases/download/byedpi-e74ca6a8/libbyedpi-x86_64.so
+    sha256: 3781cafd5dfd8983cd98e16f4e98fbaf44fff369fe31aba8cc38955fa7c7a1c7
+    size_bytes: 342880
     source_repo: https://github.com/hufrea/byedpi
     source_commit: ba532298de7b28cfe854aea83d061369d13ca290
   - name: libfptn_native_lib-arm64-v8a.so
@@ -233,3 +233,11 @@ artifacts:
     size_bytes: 28228368
     source_repo: https://github.com/fptn-project/FptnClient-Android.git
     source_commit: 2a38c7e4fc9268ae7d30f8ec0390a97e02e41980
+  - name: hev-gfvpn-2.20.0.aar
+    engine: gfvpn
+    destination: libs
+    download_url: https://github.com/heiher/hev-socks5-tunnel/releases/download/2.20.0/hev-socks5-tunnel.aar
+    sha256: ae8a2e96b80b4eccccd037805a4bb4a278090c89dbcae8bc6fcb7634e9a255b9
+    size_bytes: 617551
+    source_repo: https://github.com/heiher/hev-socks5-tunnel
+    source_commit: 75dbc1e9ace6c70d3d1b94df7c283efe1de7effc

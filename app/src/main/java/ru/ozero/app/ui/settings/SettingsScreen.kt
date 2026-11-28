@@ -481,7 +481,7 @@ private fun EnginesSection(
         enabled = true,
     )
     NavRow(
-        title = "gfVPN",
+        title = EngineId.GFVPN.displayName,
         summary = stringResource(R.string.gfvpn_summary),
         tag = "settings_gfvpn_row",
         onClick = onOpenGfVpn,

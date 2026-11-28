@@ -118,6 +118,22 @@ class TelegramWssEngineTest {
     }
 
     @Test
+    fun `WSS readiness tries the WARP transport when direct upgrade fails`() = runTest {
+        val direct = FakeTelegramWebSockets(protocol = null)
+        val fallback = FakeTelegramWebSockets()
+        val engine = TelegramWssEngine(
+            warp, { port, _ -> TelegramWssProxy(direct, WarpSocksRelay(port), fallback) {} },
+            { true },
+        )
+        try {
+            assertIs<StartResult.Success>(engine.start(EngineConfig.TelegramWss(0), Upstream.None))
+            assertIs<EnginePlugin.ReadyResult.Ready>(engine.awaitReady())
+        } finally {
+            engine.stop()
+        }
+    }
+
+    @Test
     fun `readiness requires routed traffic and a Telegram WSS upgrade`() = runTest {
         val badRoute = engine(routeReady = false)
         try {

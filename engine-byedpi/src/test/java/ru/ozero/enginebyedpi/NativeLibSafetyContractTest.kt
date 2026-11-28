@@ -21,14 +21,14 @@ class NativeLibSafetyContractTest {
     }
 
     @Test
-    fun `jniStartProxy возвращает JNI_GUARD_BUSY при CAS fail`() {
+    fun `jniStartProxy returns JNI_GUARD_BUSY when listener ownership is unavailable`() {
         val pattern = Regex(
-            """atomic_compare_exchange_strong\(\&g_proxy_running[^)]+\)\s*\)\s*\{\s*return\s+JNI_GUARD_BUSY""",
+            """if\s*\(\s*!ozero_listener_begin\(\)\s*\)\s*return\s+JNI_GUARD_BUSY""",
             RegexOption.DOT_MATCHES_ALL,
         )
         assertTrue(
             pattern.containsMatchIn(nativeLib),
-            "jniStartProxy на CAS fail обязан возвращать JNI_GUARD_BUSY (не -1). " +
+            "jniStartProxy must return JNI_GUARD_BUSY when the previous owner has not finished. " +
                 "Иначе Kotlin не различит guard busy от real failure.",
         )
     }
@@ -89,33 +89,12 @@ class NativeLibSafetyContractTest {
     }
 
     @Test
-    fun `jniForceClose не сбрасывает g_proxy_running — guard owned by jniStartProxy`() {
-        val forceCloseBody = Regex(
-            """Java_ru_ozero_enginebyedpi_ByeDpiProxy_jniForceClose[^{]*\{(.*?)^\}""",
-            setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.MULTILINE),
-        ).find(nativeLib)?.groupValues?.get(1)
-            ?: error("jniForceClose не найден в native-lib.c")
-
-        val guardMutators = listOf(
-            "atomic_store(&g_proxy_running",
-            "atomic_exchange(&g_proxy_running",
-            "atomic_fetch_and(&g_proxy_running",
-            "atomic_fetch_or(&g_proxy_running",
-            "atomic_fetch_xor(&g_proxy_running",
-            "atomic_fetch_sub(&g_proxy_running",
-            "atomic_fetch_add(&g_proxy_running",
-            "atomic_compare_exchange_strong(&g_proxy_running",
-            "atomic_compare_exchange_weak(&g_proxy_running",
-        )
-        val violations = guardMutators.filter { forceCloseBody.contains(it) }
-        assertTrue(
-            violations.isEmpty(),
-            "jniForceClose НЕ должен мутировать g_proxy_running ЛЮБЫМИ atomic_*. " +
-                "Найдены нарушители: $violations. Guard owned by jniStartProxy — " +
-                "premature release → вторая CAS пройдёт пока старая main() в cleanup → " +
-                "concurrent main() с shared upstream globals → memory corruption. " +
-                "См. feedback_byedpi_native_guard_ownership.",
-        )
+    fun `jniForceClose requests shutdown without releasing native owner`() {
+        val forceCloseBody = nativeLib.substringAfter("ByeDpiProxy_jniForceClose")
+            .substringAfter("{")
+            .substringBefore("}")
+            .trim()
+        assertTrue(forceCloseBody == "return ozero_listener_stop();")
     }
 
     @Test

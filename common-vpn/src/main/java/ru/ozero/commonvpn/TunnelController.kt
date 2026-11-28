@@ -97,10 +97,14 @@ class TunnelController(
 
     fun onDisconnecting() = transition(TunnelState.Disconnecting)
 
-    fun onSwitchingStarted(from: EngineId?, to: EngineId?): Unit = synchronized(lock) {
+    fun onSwitchingStarted(
+        from: EngineId?,
+        to: EngineId?,
+        autoTimeoutMs: Long? = null,
+    ): Unit = synchronized(lock) {
         invalidateSocksRoute()
         val transition = SwitchingTransition(from, to)
-        val timeoutMs = switchingTimeoutFor(to)
+        val timeoutMs = if (to == null && autoTimeoutMs != null) autoTimeoutMs else switchingTimeoutFor(to)
         _switching.value = transition
         PersistentLoggers.info(TAG, "switching started: $from → $to")
         switchingWatchdogJob?.cancel()
@@ -237,10 +241,7 @@ class TunnelController(
     private fun switchingTimeoutFor(target: EngineId?): Long = when {
         switchingTimeoutMs != SWITCHING_TIMEOUT_MS -> switchingTimeoutMs
         target == EngineId.FPTN -> FPTN_SWITCHING_TIMEOUT_MS
-        target == EngineId.OPERA || target == EngineId.MASQUE -> EXTENDED_SWITCHING_TIMEOUT_MS
-        target == EngineId.TGWSS -> TGWSS_SWITCHING_TIMEOUT_MS
-        target == EngineId.GFVPN -> 165_000L
-        else -> switchingTimeoutMs
+        else -> EngineStartupBudget.switchingTimeoutMs(target) ?: switchingTimeoutMs
     }
 
     private fun isAllowed(from: TunnelState, to: TunnelState): Boolean = when (from) {
@@ -279,7 +280,5 @@ class TunnelController(
         const val EWMA_ALPHA = 0.4
         const val SWITCHING_TIMEOUT_MS = 12_000L
         const val FPTN_SWITCHING_TIMEOUT_MS = 25_000L
-        const val EXTENDED_SWITCHING_TIMEOUT_MS = 75_000L
-        const val TGWSS_SWITCHING_TIMEOUT_MS = 135_000L
     }
 }

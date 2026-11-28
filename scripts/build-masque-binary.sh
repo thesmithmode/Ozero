@@ -21,6 +21,12 @@ test "$(git -C "$work/usque" rev-parse HEAD)" = "$revision"
 
 python3 "$root/scripts/patch-masque-upstream.py" "$work/usque"
 
+# Test the registration transport on the build host without Android or live credentials.
+(
+    cd "$work/usque"
+    GOTOOLCHAIN=local go test -count=1 api/ozero_registration.go api/ozero_registration_test.go
+)
+
 out="$root/engine-masque/build/native/$abi"
 mkdir -p "$out"
 (
@@ -30,7 +36,7 @@ mkdir -p "$out"
     grep -Eq '^Pkg.Revision[[:space:]]*=[[:space:]]*27\.2\.12479018[[:space:]]*$' "$ndk/source.properties"
     export CC="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/${triple}24-clang"
     test -x "$CC"
-    gofmt -w main.go internal/socks5.go cmd/socks.go config/config.go api/masque.go
+    gofmt -w main.go internal/socks5.go cmd/socks.go config/config.go api/masque.go api/cloudflare.go cmd/register.go
     go mod download
     go mod verify
     go build -mod=readonly -trimpath -buildmode=pie -tags netcgo \

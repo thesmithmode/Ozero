@@ -17,6 +17,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import ru.ozero.enginescore.settings.GfVpnOptions;
 
 /** One owner, one SDK lifetime, one isolated process. No exported endpoint. */
 public final class GfVpnProcessService extends Service {
@@ -27,6 +28,9 @@ public final class GfVpnProcessService extends Service {
     public static final int PROBE = 5;
     public static final int ABORT = 6;
     public static final int ATTACH_TUN = 7;
+    public static final int CAPTCHA_EVENT = 8;
+    public static final int CAPTCHA_DISMISS = 9;
+    public static final int PROBE_TUN = 10;
     private final ScheduledExecutorService watchdog = Executors.newSingleThreadScheduledExecutor();
     private final AtomicBoolean closing = new AtomicBoolean();
     private HandlerThread worker;
@@ -35,12 +39,15 @@ public final class GfVpnProcessService extends Service {
     private GfVpnSdk sdk;
     private GfVpnTun tun;
     private IBinder owner;
+    private Messenger ownerTarget;
+    private final AtomicBoolean dismissingCaptcha = new AtomicBoolean();
+    private final AtomicBoolean manualVerificationSeen = new AtomicBoolean();
     private boolean pending;
     private final IBinder.DeathRecipient ownerDeath = this::terminate;
 
     @Override public void onCreate() {
         super.onCreate();
-        sdk = new GfVpnSdk(this);
+        sdk = new GfVpnSdk(this, this::captchaEvent);
         tun = new GfVpnTun(this);
         worker = new HandlerThread("gfvpn-worker");
         worker.start();
@@ -53,23 +60,50 @@ public final class GfVpnProcessService extends Service {
         if (closing.compareAndSet(false, true)) Process.killProcess(Process.myPid());
     }
 
+    static String operationName(int operation) {
+        switch (operation) {
+            case START: return "start";
+            case ATTACH_TUN: return "attach-tun";
+            case STOP: return "stop";
+            case PROBE: return "probe";
+            case PROBE_TUN: return "probe-tun";
+            case NETWORK_CHANGED: return "network-changed";
+            default: return "unknown";
+        }
+    }
+
+    private static void closeRejectedTun(Message request) {
+        if (request.what != ATTACH_TUN) return;
+        ParcelFileDescriptor descriptor = request.getData().getParcelable("tun");
+        if (descriptor != null) {
+            try { descriptor.close(); } catch (java.io.IOException ignored) { }
+        }
+    }
+
     private boolean dispatch(Message request) {
-        if (request.sendingUid != getApplicationInfo().uid || request.replyTo == null || closing.get()) return true;
+        if (request.sendingUid != getApplicationInfo().uid) return true;
+        if (request.replyTo == null || closing.get()) {
+            closeRejectedTun(request);
+            return true;
+        }
         IBinder caller = request.replyTo.getBinder();
         if (owner == null) {
             if (request.what != START) {
+                closeRejectedTun(request);
                 reply(request.replyTo, request.arg1, failure("No runtime owner"));
                 return true;
             }
             try {
                 caller.linkToDeath(ownerDeath, 0);
                 owner = caller;
+                ownerTarget = request.replyTo;
             } catch (RemoteException dead) {
                 terminate();
                 return true;
             }
         }
         if (!owner.equals(caller)) {
+            closeRejectedTun(request);
             reply(request.replyTo, request.arg1, failure("Runtime already owned"));
             return true;
         }
@@ -77,7 +111,13 @@ public final class GfVpnProcessService extends Service {
             terminate();
             return true;
         }
+        // CAPTCHA dismissal is an out-of-band control operation, not a second start request.
+        if (request.what == CAPTCHA_DISMISS) {
+            dismissCaptcha();
+            return true;
+        }
         if (pending) {
+            closeRejectedTun(request);
             reply(request.replyTo, request.arg1, failure("Runtime request in progress"));
             return true;
         }
@@ -86,19 +126,58 @@ public final class GfVpnProcessService extends Service {
         int id = request.arg1;
         Bundle input = new Bundle(request.getData());
         Messenger target = request.replyTo;
-        work.post(() -> execute(operation, id, input, target));
+        if (!work.post(() -> execute(operation, id, input, target))) {
+            pending = false;
+            closeRejectedTun(request);
+            reply(target, id, failure("Runtime worker unavailable"));
+            terminate();
+        }
         return true;
     }
 
+    private void captchaEvent(String url) {
+        if (url != null && !url.isEmpty()) manualVerificationSeen.set(true);
+        new Handler(Looper.getMainLooper()).post(() -> {
+            if (closing.get() || ownerTarget == null) return;
+            Message event = Message.obtain(null, CAPTCHA_EVENT);
+            Bundle data = new Bundle();
+            data.putString("url", url);
+            event.setData(data);
+            try { ownerTarget.send(event); } catch (RemoteException dead) { terminate(); }
+        });
+    }
+
+    private void dismissCaptcha() {
+        if (!dismissingCaptcha.compareAndSet(false, true)) return;
+        ScheduledFuture<?> deadline = watchdog.schedule(this::terminate, 12, TimeUnit.SECONDS);
+        new Thread(() -> {
+            try {
+                sdk.dismissCaptcha();
+            } catch (Exception | LinkageError failure) {
+                android.util.Log.w("GfVpnProcess", "CAPTCHA dismissal failed: " +
+                    failure.getClass().getSimpleName());
+                terminate();
+            } finally {
+                deadline.cancel(false);
+                dismissingCaptcha.set(false);
+            }
+        }, "gfvpn-captcha-dismiss").start();
+    }
+
     private void execute(int operation, int id, Bundle input, Messenger target) {
-        ScheduledFuture<?> deadline = watchdog.schedule(this::terminate,
-            operation == START ? 120 : 12, TimeUnit.SECONDS);
+        ScheduledFuture<?> hardDeadline = operation == START
+            ? watchdog.schedule(this::terminate, 300, TimeUnit.SECONDS) : null;
+        ScheduledFuture<?> deadline = watchdog.schedule(() -> {
+            if (operation == START && manualVerificationSeen.get()) return;
+            android.util.Log.w("GfVpnProcess", operationName(operation) + " watchdog expired");
+            terminate();
+        }, operation == START ? 120 : 12, TimeUnit.SECONDS);
         Bundle response = new Bundle();
         try {
             switch (operation) {
                 case START:
                     GfVpnSdk.Session session = sdk.start(input.getString("country", "RU"),
-                        input.getString("clientIdentifier", ""));
+                        input.getString("clientIdentifier", ""), GfVpnOptions.decode(input.getString("options")));
                     response.putInt("port", session.port);
                     response.putString("username", session.username);
                     response.putString("password", session.password);
@@ -117,8 +196,13 @@ public final class GfVpnProcessService extends Service {
                     try { tun.stop(); } finally { sdk.stop(); }
                     break;
                 case PROBE:
-                    if (tun.isAttached() && !tun.isRunning()) throw new java.io.IOException("HEV unavailable");
                     response.putLong("latencyMs", sdk.probe());
+                    break;
+                case PROBE_TUN:
+                    GfVpnTunProbe.Result evidence = GfVpnTunProbe.run(tun::counters, sdk::probe);
+                    response.putLong("latencyMs", evidence.latencyMs);
+                    response.putLong("bytesOut", evidence.bytesOut);
+                    response.putLong("bytesIn", evidence.bytesIn);
                     break;
                 case NETWORK_CHANGED:
                     sdk.networkChanged();
@@ -129,9 +213,12 @@ public final class GfVpnProcessService extends Service {
             response.putBoolean("ok", true);
         } catch (Exception | LinkageError failure) {
             response.putBoolean("ok", false);
-            response.putString("error", failure.getClass().getSimpleName());
+            String detail = failure instanceof GfVpnSdk.StartupFailure
+                ? failure.getMessage() : failure.getClass().getSimpleName();
+            response.putString("error", operationName(operation) + ": " + detail);
         } finally {
             deadline.cancel(false);
+            if (hardDeadline != null) hardDeadline.cancel(false);
         }
         new Handler(Looper.getMainLooper()).post(() -> {
             pending = false;

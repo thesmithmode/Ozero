@@ -13,6 +13,7 @@ import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.PersistentLoggers
 import ru.ozero.enginescore.settings.ByeDpiUiSettings
+import ru.ozero.enginescore.settings.GfVpnOptions
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.TrafficMode
 
@@ -34,6 +35,7 @@ class EngineSettingsRestartObserver(
         val byedpiUiSettings: ByeDpiUiSettings = ByeDpiUiSettings.DEFAULT,
         val operaRegion: String = "EU",
         val operaSelection: String = "fastest",
+        val gfVpnOptions: GfVpnOptions = GfVpnOptions(),
     )
 
     data class Trigger(val previous: Snapshot, val snapshot: Snapshot)
@@ -58,6 +60,7 @@ class EngineSettingsRestartObserver(
                     engineAutoPriority = if (it.manualEngine == null) it.engineAutoPriority else null,
                     operaRegion = it.operaRegion,
                     operaSelection = it.operaSelection,
+                    gfVpnOptions = it.gfVpnOptions,
                 )
             }
             .distinctUntilChanged()
@@ -148,6 +151,7 @@ class EngineSettingsRestartObserver(
                     commonRuntimeMatches
             EngineId.OPERA ->
                 operaRegion == other.operaRegion && operaSelection == other.operaSelection && transportMatches
+            EngineId.GFVPN -> gfVpnOptions == other.gfVpnOptions && commonRuntimeMatches
             else -> commonRuntimeMatches
         }
     }
