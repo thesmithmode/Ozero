@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +21,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import ru.ozero.commonnet.IpInfo
 import ru.ozero.commonnet.IpInfoProvider
 import ru.ozero.commonvpn.HealthMonitor
@@ -389,7 +387,7 @@ class MainViewModel @Inject constructor(
         return IpInfoState.Error(lastError ?: "unknown")
     }
 
-    private suspend fun resolveOnce(engineId: EngineId?, socksPort: Int): IpInfoState = withContext(Dispatchers.IO) {
+    private suspend fun resolveOnce(engineId: EngineId?, socksPort: Int): IpInfoState {
         val plugin = engineId?.let { id -> enginePlugins.firstOrNull { it.id == id } }
         val strategy = when {
             engineId == null -> ExitNodeStrategy.DirectHttp
@@ -411,7 +409,7 @@ class MainViewModel @Inject constructor(
             IP_TAG,
             "resolve route engine=${engineId ?: "DIRECT"} strategy=${strategy.javaClass.simpleName} port=$socksPort",
         )
-        exitNodeResolver.resolve(strategy)
+        return exitNodeResolver.resolve(strategy)
     }
     fun onConnectClick() = Unit
 
