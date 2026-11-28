@@ -5,7 +5,6 @@
     <string name="gfvpn_installed">Ядро встроено. Выберите Adaptive VPN на главном экране.</string>
     <string name="gfvpn_missing">На этом устройстве ядро Adaptive VPN недоступно.</string>
     <string name="gfvpn_trust_warning">Встроенное стороннее ядро работает с правами приложения.</string>
-    <string name="gfvpn_global">Использовать VPN для всех приложений</string>
     <string name="gfvpn_update_config">Автоматически обновлять конфигурацию</string>
     <string name="gfvpn_cached_nodes">Использовать кэшированные узлы</string>
     <string name="gfvpn_bypass_local">Отключить VPN для локальных сервисов</string>

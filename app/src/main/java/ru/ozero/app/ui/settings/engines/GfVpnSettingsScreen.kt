@@ -40,7 +40,6 @@ import ru.ozero.enginegfvpn.GfVpnBundledSdk
 import ru.ozero.enginescore.EngineId
 import ru.ozero.enginescore.settings.GfVpnOptions
 import ru.ozero.enginescore.settings.GfVpnServerCatalog
-import ru.ozero.enginescore.settings.SplitTunnelMode
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,7 +53,6 @@ fun GfVpnSettingsScreen(
     val available = remember(context) { GfVpnBundledSdk.isAvailable(context) }
     val model by viewModel.settings.collectAsStateWithLifecycle()
     val editable by viewModel.editable.collectAsStateWithLifecycle()
-    val global = model.splitMode in setOf(SplitTunnelMode.ALL, SplitTunnelMode.BYPASS_LAN)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -74,12 +72,6 @@ fun GfVpnSettingsScreen(
             Text(stringResource(R.string.gfvpn_summary), style = MaterialTheme.typography.bodyMedium)
             Text(stringResource(if (available) R.string.gfvpn_installed else R.string.gfvpn_missing))
             if (!editable) Text(stringResource(R.string.gfvpn_disconnect_to_edit))
-            GfVpnToggle(
-                label = stringResource(R.string.gfvpn_global),
-                checked = global,
-                enabled = editable,
-                onChange = { viewModel.setGlobal(it, onOpenSplitTunnel) },
-            )
             OutlinedButton(onClick = onOpenSplitTunnel, enabled = editable) {
                 Text(stringResource(R.string.settings_split_tunnel_title))
             }
