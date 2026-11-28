@@ -11,6 +11,8 @@
     <string name="gfvpn_bypass_local">Отключить VPN для локальных сервисов</string>
     <string name="gfvpn_bypass_local_summary">Государственные сайты, банки и другие локальные сервисы будут доступны напрямую, если ядро поддерживает это для вашей страны.</string>
     <string name="gfvpn_server_selection">Режим выбора сервера</string>
+    <string name="gfvpn_advanced_title">Дополнительные настройки gfVPN</string>
+    <string name="gfvpn_mode_country_hint">Выберите режим подбора или конкретную страну. Выбор страны включает её группу серверов.</string>
     <string name="gfvpn_transport">Протокол туннелирования</string>
     <string name="gfvpn_connections">Количество одновременных подключений</string>
     <string name="gfvpn_attempts">Одновременные попытки подключения</string>
