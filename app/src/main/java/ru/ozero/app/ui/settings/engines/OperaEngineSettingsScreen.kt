@@ -70,10 +70,17 @@ fun OperaEngineSettingsScreen(
             Text(stringResource(R.string.opera_region), style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OperaRegion.entries.forEach { region ->
+                    val label = stringResource(
+                        when (region) {
+                            OperaRegion.EU -> R.string.opera_region_europe
+                            OperaRegion.AS -> R.string.opera_region_asia
+                            OperaRegion.AM -> R.string.opera_region_americas
+                        },
+                    )
                     FilterChip(
                         selected = model.operaRegion == region.name,
                         onClick = { viewModel.selectRegion(region.name) },
-                        label = { Text(region.name) },
+                        label = { Text(label) },
                     )
                 }
             }
