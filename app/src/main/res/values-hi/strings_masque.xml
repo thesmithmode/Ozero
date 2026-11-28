@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="masque_title">MASQUE</string>
+    <string name="masque_title">WARP 2 (MASQUE)</string>
     <string name="masque_summary">HTTP/2 या HTTP/3 के माध्यम से Cloudflare WARP</string>
     <string name="masque_registered">प्रोफ़ाइल पंजीकृत है</string>
     <string name="masque_not_registered">कोई पंजीकृत प्रोफ़ाइल नहीं</string>

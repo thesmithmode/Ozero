@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -370,7 +371,13 @@ class MainViewModel @Inject constructor(
             when (val s = resolveOnce(engineId, socksPort)) {
                 is IpInfoState.Loaded -> return s
                 is IpInfoState.AutoSelected -> return s
-                is IpInfoState.Error -> lastError = s.message
+                is IpInfoState.Error -> {
+                    lastError = s.message
+                    PersistentLoggers.warn(
+                        IP_TAG,
+                        "resolve attempt=${attempt + 1}/$IP_INFO_RETRY_ATTEMPTS engine=$engineId port=$socksPort failed: ${s.message}",
+                    )
+                }
                 else -> Unit
             }
             if (attempt < IP_INFO_RETRY_ATTEMPTS - 1) {
@@ -385,9 +392,23 @@ class MainViewModel @Inject constructor(
         val strategy = when {
             engineId == null -> ExitNodeStrategy.DirectHttp
             plugin == null -> ExitNodeStrategy.Unavailable("engine plugin unavailable")
-            else -> runCatching { plugin.exitNodeStrategy(socksPort) }
-                .getOrElse { ExitNodeStrategy.Unavailable(it.message ?: it.javaClass.simpleName) }
+            else -> try {
+                plugin.exitNodeStrategy(socksPort)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                PersistentLoggers.warn(
+                    IP_TAG,
+                    "exit route discovery failed engine=$engineId port=$socksPort",
+                    failure,
+                )
+                ExitNodeStrategy.Unavailable("exit route discovery failed (${failure.javaClass.simpleName})")
+            }
         }
+        PersistentLoggers.debug(
+            IP_TAG,
+            "resolve route engine=${engineId ?: "DIRECT"} strategy=${strategy.javaClass.simpleName} port=$socksPort",
+        )
         return exitNodeResolver.resolve(strategy)
     }
     fun onConnectClick() = Unit

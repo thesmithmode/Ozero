@@ -1,4 +1,4 @@
-# Adaptive VPN — bundled runtime
+# gfVPN — bundled runtime
 
 The two verified SDK files must be present in the pinned `engine-gfvpn/vendor/runtime-bundle-1.0.6.zip` archive (or an authorized build operator's exact archive selected through `-Pozero.gfvpn.sdkArchive=/absolute/path/runtime-bundle-1.0.6.zip`). Gradle checks the archive and both entries before packaging the SDK in Ozero's own APK. No original APK or end-user import is required. Missing vendor input fails full APK assembly. The explicit `ozero.gfvpn.unitTestsOnly` mode permits JVM tests without proprietary assets, not APK packaging.
 
@@ -17,6 +17,8 @@ CI verifies the exact two bundled files and the HEV JNI package in debug and
 release APKs. Run the existing opt-in ARM64 SDK and full TUN smoke tests from a
 fresh install, without transferring any SDK files, before production release.
 Successful CI alone does not establish backend connectivity.
+
+In automatic mode, the engine is tried after the standard candidates in TUN mode. It cannot run in proxy mode or as part of a multi-engine chain.
 
 The runtime health check requires a live attached TUN descriptor and valid HEV
 state both before and after the authenticated SOCKS route probe. Idle counters

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="masque_title">MASQUE</string>
+    <string name="masque_title">WARP 2 (MASQUE)</string>
     <string name="masque_summary">HTTP/2 または HTTP/3 経由の Cloudflare WARP</string>
     <string name="masque_registered">プロファイル登録済み</string>
     <string name="masque_not_registered">未登録</string>

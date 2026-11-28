@@ -24,9 +24,9 @@ Open-source Android VPN-клиент с поддержкой нескольки�
 | MasterDNS | DNS-over-UDP | Экстренный fallback, развёртывается на своём VPS в 1 клик |
 | sing-box | протоколы и транспорты libbox | Профили, подписки, автоматический выбор и цепочки |
 | Opera Proxy | TCP SOCKS5 | Выбор региона и сервера; VPN или прокси |
-| MASQUE | CONNECT-IP / HTTP/3 или HTTP/2 | Отдельный профиль WARP с автоматическим fallback |
+| WARP 2 (MASQUE) | CONNECT-IP / HTTP/3 или HTTP/2 | Отдельный профиль WARP с автоматическим fallback |
 | Telegram WSS | TLS WebSocket + WARP | Telegram DC через WSS, остальной трафик через WARP |
-| Adaptive VPN | VPN / TCP | Ручной выбор режима, региона и транспорта |
+| gfVPN | VPN / TCP | Ручной выбор режима, региона и транспорта |
 
 Каждый движок изолирован в отдельном Gradle-модуле и подключается через интерфейс `EnginePlugin`.
 
@@ -54,7 +54,7 @@ cd Ozero
 
 - [Архитектура и жизненный цикл движков](docs/architecture.md)
 - [Сборка, нативные артефакты и выпуск APK](docs/build.md)
-- Движки: [WARP](engine-warp/README.md), [URnetwork](engine-urnetwork/README.md), [FPTN](engine-fptn/README.md), [Opera Proxy](engine-opera/README.md), [MASQUE](engine-masque/README.md), [Telegram WSS](engine-tgwss/README.md), [Adaptive VPN](engine-gfvpn/README.md)
+- Движки: [WARP](engine-warp/README.md), [URnetwork](engine-urnetwork/README.md), [FPTN](engine-fptn/README.md), [Opera Proxy](engine-opera/README.md), [WARP 2 (MASQUE)](engine-masque/README.md), [Telegram WSS](engine-tgwss/README.md), [gfVPN](engine-gfvpn/README.md)
 - [Текущий план](PLAN.md)
 
 Разработка ведётся в `dev`. GitHub открывает `main` по умолчанию; изменения для разработки следует направлять в `dev`. Push в `main` запускает выпуск APK.

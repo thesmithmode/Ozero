@@ -2,6 +2,9 @@
 <resources>
     <string name="settings_opera_summary">VPN et SOCKS5 via Opera. TCP et DNS via Cloudflare DoH ; les autres flux UDP ne sont pas pris en charge.</string>
     <string name="opera_region">Région</string>
+    <string name="opera_region_europe">Europe</string>
+    <string name="opera_region_asia">Asie</string>
+    <string name="opera_region_americas">Amérique</string>
     <string name="opera_selection">Sélection du serveur</string>
     <string name="opera_first">Premier disponible</string>
     <string name="opera_random">Aléatoire</string>

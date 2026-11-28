@@ -1,5 +1,7 @@
 package ru.ozero.enginegfvpn
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import ru.ozero.commonnet.IpInfo
@@ -15,7 +17,7 @@ import javax.net.SocketFactory
 
 /** Resolve the exit using the SDK's authenticated SOCKS route, never the excluded app's network. */
 internal object GfVpnExitInfo {
-    suspend fun fetch(session: GfVpnRuntime.Session): Result<IpInfo> {
+    suspend fun fetch(session: GfVpnRuntime.Session): Result<IpInfo> = withContext(Dispatchers.IO) {
         val client = OkHttpClient.Builder()
             .proxy(Proxy.NO_PROXY)
             .socketFactory(GfVpnExitSocketFactory(session.port, session.username, session.password))
@@ -30,7 +32,7 @@ internal object GfVpnExitInfo {
             .readTimeout(4, TimeUnit.SECONDS)
             .callTimeout(10, TimeUnit.SECONDS)
             .build()
-        return try {
+        try {
             OkHttpIpInfoProvider(client = client).fetch()
         } finally {
             client.connectionPool.evictAll()

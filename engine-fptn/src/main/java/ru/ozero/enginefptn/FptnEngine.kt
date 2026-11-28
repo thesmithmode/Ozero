@@ -62,7 +62,10 @@ class FptnEngine(
     private val authRequestSequence = AtomicLong()
     private val _stats = MutableStateFlow(EngineStats())
     private var tunScope: CoroutineScope? = null
+
+    @Volatile
     private var _nativeHandle: Long = 0L
+
     private var _currentServer: FptnServer? = null
     private var _currentServerIp: String? = null
     private var _accessToken: String? = null
@@ -301,7 +304,7 @@ class FptnEngine(
                         }
                     }
                 } catch (e: Exception) {
-                    if (isActive) {
+                    if (isActive && _nativeHandle == handle) {
                         PersistentLoggers.error(TAG, "TUN read loop terminated: ${e.javaClass.simpleName}")
                     } else {
                         Log.d(TAG, "TUN read loop stopped: ${e.javaClass.simpleName}")
