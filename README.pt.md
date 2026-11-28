@@ -26,7 +26,7 @@ Cliente VPN open-source para Android com suporte a múltiplos motores de transpo
 | Opera Proxy | SOCKS5 TCP | Seleção de região e servidor; VPN ou proxy |
 | MASQUE | CONNECT-IP / HTTP/3 ou HTTP/2 | Perfil WARP separado com fallback automático |
 | Telegram WSS | TLS WebSocket + WARP | Tráfego dos DCs do Telegram por WSS e demais tráfegos por WARP |
-| Adaptive VPN | VPN / TCP | Seleção manual de modo, região e transporte |
+| gfVPN | VPN / TCP | Seleção manual de modo, região e transporte |
 
 Cada motor é isolado em um módulo Gradle dedicado e conectado através da interface `EnginePlugin`.
 
@@ -54,7 +54,7 @@ Antes de compilar, prepare as bibliotecas nativas e os artefatos dos SDKs. A com
 
 - [Arquitetura e ciclo de vida](docs/architecture.md) (em russo)
 - [Compilação e publicação de APK](docs/build.md) (em russo)
-- Motores: [WARP](engine-warp/README.md), [URnetwork](engine-urnetwork/README.md), [FPTN](engine-fptn/README.md), [Opera Proxy](engine-opera/README.md), [MASQUE](engine-masque/README.md), [Telegram WSS](engine-tgwss/README.md), [Adaptive VPN](engine-gfvpn/README.md)
+- Motores: [WARP](engine-warp/README.md), [URnetwork](engine-urnetwork/README.md), [FPTN](engine-fptn/README.md), [Opera Proxy](engine-opera/README.md), [MASQUE](engine-masque/README.md), [Telegram WSS](engine-tgwss/README.md), [gfVPN](engine-gfvpn/README.md)
 - [Plano atual](PLAN.md) (em russo)
 
 O desenvolvimento é integrado em `dev`, embora a branch padrão do GitHub seja `main`. Um push para `main` inicia a publicação de um APK.

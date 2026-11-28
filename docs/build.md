@@ -37,14 +37,14 @@ cd Ozero
 | Opera Proxy | Gradle скачивает ARM64 `libopera_proxy.so` по lock; release сравнивает упакованный ELF с подготовленным файлом |
 | MASQUE | Общий action `build-masque` собирает закреплённый usque; APK проверяется на соответствие ELF и notice |
 | Telegram WSS | Использует существующий WARP SOCKS runtime и Kotlin-обвязку; отдельная native-библиотека для WSS не требуется |
-| Adaptive VPN | Gradle `prepareGfVpnSdk` проверяет встроенный архив и два файла, `prepareGfVpnHev` извлекает отдельный HEV из закреплённого AAR; debug/release проверяют состав APK |
+| gfVPN | Gradle `prepareGfVpnSdk` проверяет встроенный архив и два файла, `prepareGfVpnHev` извлекает отдельный HEV из закреплённого AAR; debug/release проверяют состав APK |
 | HEV | Release собирает `libhev-ozero-socks5-tunnel.so` из закреплённого upstream commit, с `APP_CFLAGS=-DPKGNAME=hev` и 16 KB alignment |
 
 Для download scripts libbox вне GitHub Actions задайте `GITHUB_REPOSITORY=thesmithmode/Ozero`; аргумент назначения должен сохранять имя asset `libbox.aar`. Полный порядок извлечения и patch Go stubs берите из workflow. Простое добавление исходного AAR в runtime dependencies дублирует классы Go.
 
 `assembleDebug` проверяет компиляцию и упаковку, но не воспроизводит все этапы native-подготовки release и не подтверждает работу каждого транспорта на устройстве. Для installable APK со всеми движками нужны все соответствующие библиотеки из таблицы.
 
-Adaptive VPN не требует от пользователя импорта APK или SDK. Полная сборка требует точного разрешённого vendor-архива; переопределение пути не отменяет проверок. Режим `-Pozero.gfvpn.unitTestsOnly=true` предназначен исключительно для явных JVM-тестов и coverage, а не для создания APK. Подробности и происхождение — [README модуля](../engine-gfvpn/README.md) и его vendor-документация.
+gfVPN не требует от пользователя импорта APK или SDK. Полная сборка требует точного разрешённого vendor-архива; переопределение пути не отменяет проверок. Режим `-Pozero.gfvpn.unitTestsOnly=true` предназначен исключительно для явных JVM-тестов и coverage, а не для создания APK. Подробности и происхождение — [README модуля](../engine-gfvpn/README.md) и его vendor-документация.
 
 После подготовки зависимостей debug-сборка выполняется командой:
 
@@ -104,6 +104,6 @@ Release публикует APK и подписи прямо из build job, бе
 
 CI и Release показывают ELF-выравнивание библиотек внутри APK. Совместимость на Android с 16 КБ страницами нужно подтверждать запуском на таком устройстве.
 
-Для изменения транспорта к CI добавляется проверка на Android ARM64: подключение, готовность, передача трафика, reconnect, stop/start и переключение движков. Автоматический x86_64 [Android Soak](../.github/workflows/soak.yml) проверяет маршрутизируемый трафик, переключение Sing-box/ByeDPI и восстановление Wi-Fi; он запускается для релевантных PR в dev и push в dev. Это не проверка реального ARM64-провайдера или всех режимов маршрутизации. Отдельные opt-in проверки описаны в README Opera, Telegram WSS, Adaptive VPN и MASQUE; результаты указывайте только по фактически выполненным тестам.
+Для изменения транспорта к CI добавляется проверка на Android ARM64: подключение, готовность, передача трафика, reconnect, stop/start и переключение движков. Автоматический x86_64 [Android Soak](../.github/workflows/soak.yml) проверяет маршрутизируемый трафик, переключение Sing-box/ByeDPI и восстановление Wi-Fi; он запускается для релевантных PR в dev и push в dev. Это не проверка реального ARM64-провайдера или всех режимов маршрутизации. Отдельные opt-in проверки описаны в README Opera, Telegram WSS, gfVPN и MASQUE; результаты указывайте только по фактически выполненным тестам.
 
 CodeQL и MobSF сохраняют SARIF-отчёты в CI artifacts. Для приватного репозитория загрузка в GitHub Security включается переменной репозитория `CODE_SCANNING_ENABLED=true` после включения Code Scanning в настройках GitHub; сам анализ от этой переменной не зависит.
