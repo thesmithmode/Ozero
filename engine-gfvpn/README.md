@@ -18,6 +18,8 @@ release APKs. Run the existing opt-in ARM64 SDK and full TUN smoke tests from a
 fresh install, without transferring any SDK files, before production release.
 Successful CI alone does not establish backend connectivity.
 
+In automatic mode, the engine is tried after the standard candidates in TUN mode. It cannot run in proxy mode or as part of a multi-engine chain.
+
 The runtime health check requires a live attached TUN descriptor and valid HEV
 state both before and after the authenticated SOCKS route probe. Idle counters
 are valid; this does not prove a third-party app can send packets. The device

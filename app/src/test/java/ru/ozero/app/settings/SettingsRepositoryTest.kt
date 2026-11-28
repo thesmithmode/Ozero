@@ -222,13 +222,13 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `engineAutoPriority defaults exclude opt in and standalone engines`() = runTest {
+    fun `engineAutoPriority defaults include gfVPN and exclude opt in and Telegram engines`() = runTest {
         val current = repository.settings.first()
         assertEquals(
             listOf(
                 EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
                 EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
-                EngineId.MASQUE,
+                EngineId.MASQUE, EngineId.GFVPN,
             ),
             current.engineAutoPriority,
         )
@@ -241,7 +241,7 @@ class SettingsRepositoryTest {
             listOf(
                 EngineId.WARP, EngineId.URNETWORK, EngineId.BYEDPI,
                 EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
-                EngineId.MASQUE,
+                EngineId.MASQUE, EngineId.GFVPN,
             ),
             repository.settings.first().engineAutoPriority,
         )
@@ -258,7 +258,7 @@ class SettingsRepositoryTest {
             listOf(
                 EngineId.BYEDPI, EngineId.FPTN, EngineId.WARP,
                 EngineId.URNETWORK, EngineId.MASTERDNS, EngineId.SINGBOX,
-                EngineId.MASQUE,
+                EngineId.MASQUE, EngineId.GFVPN,
             ),
             repository.settings.first().engineAutoPriority,
         )
@@ -293,7 +293,7 @@ class SettingsRepositoryTest {
             listOf(
                 EngineId.WARP, EngineId.BYEDPI, EngineId.URNETWORK,
                 EngineId.MASTERDNS, EngineId.SINGBOX, EngineId.FPTN,
-                EngineId.MASQUE,
+                EngineId.MASQUE, EngineId.GFVPN,
             ),
             repository.settings.first().engineAutoPriority,
         )
