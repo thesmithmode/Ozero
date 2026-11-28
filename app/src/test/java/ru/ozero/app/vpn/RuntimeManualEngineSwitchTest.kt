@@ -130,7 +130,7 @@ class RuntimeManualEngineSwitchTest {
     }
 
     @Test
-    fun `automatic switch remains bounded and excludes standalone candidates`() = runTest {
+    fun `automatic switch remains bounded and excludes Telegram standalone candidate`() = runTest {
         val actions = mutableListOf<String?>()
         val settings = MutableStateFlow(SettingsModel(manualEngine = EngineId.WARP))
         val controller = TunnelController(watchdogScope = backgroundScope)
@@ -146,7 +146,7 @@ class RuntimeManualEngineSwitchTest {
         runCurrent()
         settings.value = SettingsModel(
             manualEngine = null,
-            engineAutoPriority = listOf(EngineId.BYEDPI, EngineId.BYEDPI, EngineId.GFVPN, EngineId.TGWSS),
+            engineAutoPriority = listOf(EngineId.BYEDPI, EngineId.BYEDPI, EngineId.TGWSS),
         )
         advanceTimeBy(EngineSettingsRestartObserver.RESTART_DEBOUNCE_MS_FOR_TESTS)
         runCurrent()
