@@ -187,6 +187,11 @@ class GfVpnEngine(
         } ?: return ExitNodeStrategy.Unavailable("gfVPN session unavailable")
         val info = GfVpnExitInfo.fetch(owner).getOrElse {
             if (it is CancellationException) throw it
+            PersistentLoggers.warn(
+                "GfVpnEngine",
+                "exit IP lookup failed through authenticated SOCKS",
+                it,
+            )
             return ExitNodeStrategy.Unavailable("gfVPN exit IP lookup failed")
         }
         return mutex.withLock {
