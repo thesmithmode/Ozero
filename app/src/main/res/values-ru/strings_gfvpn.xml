@@ -2,8 +2,8 @@
 <resources>
     <string name="gfvpn_summary">VPN с автоматическим или ручным выбором режима подключения. IPv6 и режим прокси недоступны.</string>
     <string name="gfvpn_back">Назад</string>
-    <string name="gfvpn_installed">Ядро встроено. Выберите Adaptive VPN на главном экране.</string>
-    <string name="gfvpn_missing">На этом устройстве ядро Adaptive VPN недоступно.</string>
+    <string name="gfvpn_installed">Ядро встроено. Выберите gfVPN на главном экране.</string>
+    <string name="gfvpn_missing">На этом устройстве ядро gfVPN недоступно.</string>
     <string name="gfvpn_trust_warning">Встроенное стороннее ядро работает с правами приложения.</string>
     <string name="gfvpn_global">Использовать VPN для всех приложений</string>
     <string name="gfvpn_update_config">Автоматически обновлять конфигурацию</string>
@@ -23,7 +23,7 @@
     <string name="gfvpn_disabled">Выключено</string>
     <string name="gfvpn_managed_options">Эти настройки управляются автоматически в режиме белого списка или VK-TURN.</string>
     <string name="gfvpn_disconnect_to_edit">Отключите VPN, чтобы изменить настройки подключения.</string>
-    <string name="gfvpn_captcha_title">Проверка Adaptive VPN</string>
+    <string name="gfvpn_captcha_title">Проверка gfVPN</string>
     <string name="gfvpn_captcha_summary">Пройдите ручную проверку, чтобы продолжить подключение.</string>
     <string name="gfvpn_captcha_cancel">Отменить проверку</string>
     <string name="gfvpn_country">Страна или группа</string>

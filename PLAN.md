@@ -4,7 +4,7 @@
 
 ## Состояние
 
-В Gradle и production DI подключены 10 движков: ByeDPI, WARP/AmneziaWG, FPTN, URnetwork, MasterDNS, sing-box, Opera Proxy, MASQUE, Telegram WSS и Adaptive VPN. Наличие реализации не означает, что все режимы уже прошли проверку на физическом устройстве. Разработка ведётся в `dev`; `main` используется для выпуска APK. Исторические статусы веток и blocked-задачи из мая не определяют текущее состояние модулей.
+В Gradle и production DI подключены 10 движков: ByeDPI, WARP/AmneziaWG, FPTN, URnetwork, MasterDNS, sing-box, Opera Proxy, MASQUE, Telegram WSS и gfVPN. Наличие реализации не означает, что все режимы уже прошли проверку на физическом устройстве. Разработка ведётся в `dev`; `main` используется для выпуска APK. Исторические статусы веток и blocked-задачи из мая не определяют текущее состояние модулей.
 
 ## Следующие небольшие изменения
 
