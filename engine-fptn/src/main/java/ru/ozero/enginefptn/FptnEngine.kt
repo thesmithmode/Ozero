@@ -62,6 +62,7 @@ class FptnEngine(
     private val authRequestSequence = AtomicLong()
     private val _stats = MutableStateFlow(EngineStats())
     private var tunScope: CoroutineScope? = null
+
     @Volatile
     private var _nativeHandle: Long = 0L
     private var _currentServer: FptnServer? = null
