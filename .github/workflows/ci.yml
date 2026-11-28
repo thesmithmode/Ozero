@@ -96,7 +96,7 @@ jobs:
 
       - name: Prime native cache + ktlint + detekt
         run: |
-          ./gradlew \
+          bash .github/scripts/gradle-retry.sh ./gradlew \
             :engine-byedpi:downloadBinaries \
             :engine-masterdns:downloadBinaries \
             ktlintCheck detekt \
@@ -168,7 +168,7 @@ jobs:
 
       - name: Sing-box module unit tests
         run: >
-          ./gradlew
+          bash .github/scripts/gradle-retry.sh ./gradlew
           :engine-singbox:testDebugUnitTest
           :singbox-config:testDebugUnitTest
           :singbox-process:testDebugUnitTest
@@ -309,7 +309,7 @@ jobs:
 
       - name: coverage verification first
         run: >
-          ./gradlew
+          bash .github/scripts/gradle-retry.sh ./gradlew
           -Pozero.gfvpn.unitTestsOnly=true
           :app:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestJavaWithJavac
           :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification
@@ -371,7 +371,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: buildSrc unit tests + coverage
-        run: ./gradlew :buildSrc:test :buildSrc:jacocoTestReport :buildSrc:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :buildSrc:test :buildSrc:jacocoTestReport :buildSrc:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -427,7 +427,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: Download native binaries
-        run: ./gradlew :engine-byedpi:downloadBinaries --stacktrace
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :engine-byedpi:downloadBinaries --stacktrace
 
       - name: Prepare URnetwork AAR
         uses: ./.github/actions/prepare-urnetwork
@@ -474,13 +474,13 @@ jobs:
         run: |
           set -euo pipefail
           args=(:engine-gfvpn:prepareGfVpnSdk --configuration-cache --configuration-cache-problems=fail --console=plain --stacktrace)
-          ./gradlew "${args[@]}"
-          ./gradlew "${args[@]}" | tee "$RUNNER_TEMP/adaptive-sdk-cache.log"
+          bash .github/scripts/gradle-retry.sh ./gradlew "${args[@]}"
+          bash .github/scripts/gradle-retry.sh ./gradlew "${args[@]}" | tee "$RUNNER_TEMP/adaptive-sdk-cache.log"
           grep -F "Reusing configuration cache." "$RUNNER_TEMP/adaptive-sdk-cache.log"
-          ./gradlew "${args[@]}" -Pozero.gfvpn.sdkArchive="$GITHUB_WORKSPACE/engine-gfvpn/vendor/runtime-bundle-1.0.6.zip"
+          bash .github/scripts/gradle-retry.sh ./gradlew "${args[@]}" -Pozero.gfvpn.sdkArchive="$GITHUB_WORKSPACE/engine-gfvpn/vendor/runtime-bundle-1.0.6.zip"
 
       - name: assembleDebug
-        run: ./gradlew assembleDebug :app:assembleDebugAndroidTest --stacktrace
+        run: bash .github/scripts/gradle-retry.sh ./gradlew assembleDebug :app:assembleDebugAndroidTest --stacktrace
 
       - name: Verify packaged MASQUE transport
         run: |
@@ -533,7 +533,7 @@ jobs:
           readelf -h "$TEMP" | grep -E 'Type:.*DYN'
 
       - name: lintVitalAnalyzeRelease (smoke — release-path lint without keystore)
-        run: ./gradlew :app:lintVitalAnalyzeRelease --stacktrace
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :app:lintVitalAnalyzeRelease --stacktrace
 
       - name: Report 16 KB alignment in the ARM64 debug APK
         run: |
@@ -621,14 +621,14 @@ jobs:
         run: |
           set -euo pipefail
           log="$RUNNER_TEMP/gfvpn-test-mode-guard.log"
-          if ./gradlew -Pozero.gfvpn.unitTestsOnly=true :app:assembleDebug :app:testDebugUnitTest --dry-run >"$log" 2>&1; then
+          if bash .github/scripts/gradle-retry.sh ./gradlew -Pozero.gfvpn.unitTestsOnly=true :app:assembleDebug :app:testDebugUnitTest --dry-run >"$log" 2>&1; then
             echo "::error::SDK-free mode unexpectedly allowed APK assembly"
             exit 1
           fi
           grep -F 'SDK-free unit-test mode requires explicit JVM test and coverage tasks only' "$log"
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew -Pozero.gfvpn.unitTestsOnly=true :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew -Pozero.gfvpn.unitTestsOnly=true :app:testDebugUnitTest :app:jacocoTestReport :app:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -684,7 +684,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport :common-vpn:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :common-vpn:testDebugUnitTest :common-vpn:jacocoTestReport :common-vpn:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -740,7 +740,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :engine-warp:testDebugUnitTest :engine-warp:jacocoTestReport :engine-warp:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :engine-warp:testDebugUnitTest :engine-warp:jacocoTestReport :engine-warp:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -799,7 +799,7 @@ jobs:
         uses: ./.github/actions/prepare-urnetwork
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport :engine-urnetwork:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :engine-urnetwork:testDebugUnitTest :engine-urnetwork:jacocoTestReport :engine-urnetwork:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -864,7 +864,7 @@ jobs:
           "$RUNNER_TEMP/byedpi-listener-test"
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :engine-byedpi:testDebugUnitTest :engine-byedpi:jacocoTestReport :engine-byedpi:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :engine-byedpi:testDebugUnitTest :engine-byedpi:jacocoTestReport :engine-byedpi:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -920,7 +920,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew -Pozero.gfvpn.unitTestsOnly=true :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification :engine-opera:testDebugUnitTest :engine-opera:jacocoTestReport :engine-opera:jacocoTestCoverageVerification :engine-gfvpn:testDebugUnitTest --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew -Pozero.gfvpn.unitTestsOnly=true :engine-fptn:testDebugUnitTest :engine-fptn:jacocoTestReport :engine-fptn:jacocoTestCoverageVerification :engine-opera:testDebugUnitTest :engine-opera:jacocoTestReport :engine-opera:jacocoTestCoverageVerification :engine-gfvpn:testDebugUnitTest --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -1005,7 +1005,7 @@ jobs:
 
       - name: testDebugUnitTest + coverage
         run: >
-          ./gradlew
+          bash .github/scripts/gradle-retry.sh ./gradlew
           :core-storage:testDebugUnitTest :core-storage:jacocoTestReport :core-storage:jacocoTestCoverageVerification
           :core-backup:testDebugUnitTest :core-backup:jacocoTestReport :core-backup:jacocoTestCoverageVerification
           :engines-core:testDebugUnitTest :engines-core:jacocoTestReport :engines-core:jacocoTestCoverageVerification
@@ -1084,7 +1084,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :engine-masterdns:testDebugUnitTest :engine-masterdns:jacocoTestReport :engine-masterdns:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :engine-masterdns:testDebugUnitTest :engine-masterdns:jacocoTestReport :engine-masterdns:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -1175,7 +1175,7 @@ jobs:
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :engine-singbox:testDebugUnitTest :engine-singbox:jacocoTestReport :engine-singbox:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :engine-singbox:testDebugUnitTest :engine-singbox:jacocoTestReport :engine-singbox:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -1266,7 +1266,7 @@ jobs:
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :singbox-process:testDebugUnitTest :singbox-process:jacocoTestReport :singbox-process:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :singbox-process:testDebugUnitTest :singbox-process:jacocoTestReport :singbox-process:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -1357,7 +1357,7 @@ jobs:
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :singbox-core:testDebugUnitTest :singbox-core:jacocoTestReport :singbox-core:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :singbox-core:testDebugUnitTest :singbox-core:jacocoTestReport :singbox-core:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -1448,7 +1448,7 @@ jobs:
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :singbox-fmt:testDebugUnitTest :singbox-fmt:jacocoTestReport :singbox-fmt:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :singbox-fmt:testDebugUnitTest :singbox-fmt:jacocoTestReport :singbox-fmt:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -1539,7 +1539,7 @@ jobs:
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :singbox-config:testDebugUnitTest :singbox-config:jacocoTestReport :singbox-config:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :singbox-config:testDebugUnitTest :singbox-config:jacocoTestReport :singbox-config:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -1630,7 +1630,7 @@ jobs:
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :singbox-room:testDebugUnitTest :singbox-room:jacocoTestReport :singbox-room:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :singbox-room:testDebugUnitTest :singbox-room:jacocoTestReport :singbox-room:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -1721,7 +1721,7 @@ jobs:
           find singbox-core/src/main/jniLibs -type f 2>/dev/null || echo "no jniLibs"
 
       - name: testDebugUnitTest + coverage
-        run: ./gradlew :singbox-subscription:testDebugUnitTest :singbox-subscription:jacocoTestReport :singbox-subscription:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :singbox-subscription:testDebugUnitTest :singbox-subscription:jacocoTestReport :singbox-subscription:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -1771,7 +1771,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/feature' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/fix/') }}
 
       - name: test + coverage
-        run: ./gradlew :shared-warp-settings:test :shared-warp-settings:jacocoTestReport :shared-warp-settings:jacocoTestCoverageVerification --stacktrace --continue
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :shared-warp-settings:test :shared-warp-settings:jacocoTestReport :shared-warp-settings:jacocoTestCoverageVerification --stacktrace --continue
 
       - name: Verify tests were discovered
         run: |
@@ -1816,14 +1816,14 @@ jobs:
           packages: 'platform-tools'
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit tests and coverage report
-        run: ./gradlew :engine-masque:testDebugUnitTest :engine-masque:jacocoTestReport --stacktrace
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :engine-masque:testDebugUnitTest :engine-masque:jacocoTestReport --stacktrace
       - name: Verify tests and production class coverage were discovered
         run: |
           python3 -m pip install --quiet defusedxml
           python3 scripts/verify-junit-nonzero.py engine-masque
           python3 scripts/verify-masque-coverage.py
       - name: Enforce module coverage gate
-        run: ./gradlew :engine-masque:jacocoTestCoverageVerification --stacktrace
+        run: bash .github/scripts/gradle-retry.sh ./gradlew :engine-masque:jacocoTestCoverageVerification --stacktrace
       - name: Build MASQUE native transport
         if: ${{ always() && !cancelled() }}
         uses: ./.github/actions/build-masque
