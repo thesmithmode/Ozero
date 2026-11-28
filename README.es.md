@@ -24,7 +24,7 @@ Cliente VPN open-source para Android con soporte para múltiples motores de tran
 | MasterDNS | DNS sobre UDP | Fallback de emergencia, desplegado en tu propio VPS en un clic |
 | sing-box | protocolos y transportes de libbox | Perfiles, suscripciones, selección automática y cadenas |
 | Opera Proxy | SOCKS5 TCP | Selección de región y servidor; VPN o proxy |
-| MASQUE | CONNECT-IP / HTTP/3 o HTTP/2 | Perfil WARP independiente con fallback automático |
+| WARP 2 (MASQUE) | CONNECT-IP / HTTP/3 o HTTP/2 | Perfil WARP independiente con fallback automático |
 | Telegram WSS | TLS WebSocket + WARP | Tráfico de los DC de Telegram por WSS y el resto por WARP |
 | gfVPN | VPN / TCP | Selección manual del modo, región y transporte |
 
@@ -54,7 +54,7 @@ Antes de compilar, prepara las bibliotecas nativas y los artefactos de los SDK. 
 
 - [Arquitectura y ciclo de vida](docs/architecture.md) (en ruso)
 - [Compilación y publicación de APK](docs/build.md) (en ruso)
-- Motores: [WARP](engine-warp/README.md), [URnetwork](engine-urnetwork/README.md), [FPTN](engine-fptn/README.md), [Opera Proxy](engine-opera/README.md), [MASQUE](engine-masque/README.md), [Telegram WSS](engine-tgwss/README.md), [gfVPN](engine-gfvpn/README.md)
+- Motores: [WARP](engine-warp/README.md), [URnetwork](engine-urnetwork/README.md), [FPTN](engine-fptn/README.md), [Opera Proxy](engine-opera/README.md), [WARP 2 (MASQUE)](engine-masque/README.md), [Telegram WSS](engine-tgwss/README.md), [gfVPN](engine-gfvpn/README.md)
 - [Plan actual](PLAN.md) (en ruso)
 
 El desarrollo se integra en `dev`, aunque la rama predeterminada de GitHub es `main`. Un push a `main` inicia la publicación de un APK.

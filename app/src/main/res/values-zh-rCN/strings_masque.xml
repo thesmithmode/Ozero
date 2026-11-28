@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="masque_title">MASQUE</string>
+    <string name="masque_title">WARP 2 (MASQUE)</string>
     <string name="masque_summary">通过 HTTP/2 或 HTTP/3 使用 Cloudflare WARP</string>
     <string name="masque_registered">已注册配置</string>
     <string name="masque_not_registered">未注册配置</string>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="masque_title">MASQUE</string>
+    <string name="masque_title">WARP 2 (MASQUE)</string>
     <string name="masque_summary">Cloudflare WARP über HTTP/2 oder HTTP/3</string>
     <string name="masque_registered">Profil registriert</string>
     <string name="masque_not_registered">Kein registriertes Profil</string>

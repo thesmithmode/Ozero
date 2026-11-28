@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="masque_title">MASQUE</string>
+    <string name="masque_title">WARP 2 (MASQUE)</string>
     <string name="masque_summary">Cloudflare WARP عبر HTTP/2 أو HTTP/3</string>
     <string name="masque_registered">تم تسجيل الملف</string>
     <string name="masque_not_registered">لا يوجد ملف مسجل</string>

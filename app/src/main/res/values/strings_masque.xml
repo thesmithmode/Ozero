@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="masque_title">MASQUE</string>
+    <string name="masque_title">WARP 2 (MASQUE)</string>
     <string name="masque_summary">Сначала зарегистрируйте профиль Cloudflare WARP, затем подключитесь. В режиме «Авто» приложение пробует HTTP/3, затем HTTP/2.</string>
     <string name="masque_registered">Профиль зарегистрирован</string>
     <string name="masque_not_registered">Профиль не зарегистрирован</string>
