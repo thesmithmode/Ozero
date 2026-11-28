@@ -12,7 +12,6 @@ import ru.ozero.commonvpn.TunnelState
 import ru.ozero.enginescore.settings.GfVpnOptions
 import ru.ozero.enginescore.settings.SettingsModel
 import ru.ozero.enginescore.settings.SettingsRepository
-import ru.ozero.enginescore.settings.SplitTunnelMode
 import javax.inject.Inject
 
 @HiltViewModel
@@ -27,14 +26,6 @@ class GfVpnSettingsViewModel @Inject constructor(
     fun updateOptions(transform: (GfVpnOptions) -> GfVpnOptions) {
         viewModelScope.launch {
             if (tunnelController.state.value is TunnelState.Idle) repository.updateGfVpnOptions(transform)
-        }
-    }
-
-    fun setGlobal(enabled: Boolean, onSelectApps: () -> Unit) {
-        viewModelScope.launch {
-            if (tunnelController.state.value !is TunnelState.Idle) return@launch
-            repository.setSplitMode(if (enabled) SplitTunnelMode.ALL else SplitTunnelMode.ALLOWLIST)
-            if (!enabled) onSelectApps()
         }
     }
 }
