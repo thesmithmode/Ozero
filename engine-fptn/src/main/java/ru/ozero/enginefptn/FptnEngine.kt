@@ -65,6 +65,7 @@ class FptnEngine(
 
     @Volatile
     private var _nativeHandle: Long = 0L
+
     private var _currentServer: FptnServer? = null
     private var _currentServerIp: String? = null
     private var _accessToken: String? = null
