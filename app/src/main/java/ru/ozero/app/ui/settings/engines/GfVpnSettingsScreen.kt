@@ -72,8 +72,11 @@ fun GfVpnSettingsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        if (showAdvanced) stringResource(R.string.gfvpn_advanced_title)
-                        else EngineId.GFVPN.displayName,
+                        if (showAdvanced) {
+                            stringResource(R.string.gfvpn_advanced_title)
+                        } else {
+                            EngineId.GFVPN.displayName
+                        },
                     )
                 },
                 navigationIcon = {
@@ -285,8 +288,11 @@ private fun GfVpnServerModes(
                         Text(
                             label,
                             style = MaterialTheme.typography.labelLarge,
-                            color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
-                            else MaterialTheme.colorScheme.onSurface,
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
                         )
                     }
                 }
