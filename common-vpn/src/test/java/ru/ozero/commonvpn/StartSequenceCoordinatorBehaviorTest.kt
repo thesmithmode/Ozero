@@ -91,7 +91,7 @@ class StartSequenceCoordinatorBehaviorTest {
     @Test
     fun `existing SOCKS engines retain health monitor without routed probe watchdog`() = runTest {
         val ids = EngineId.entries.filterNot {
-            it == EngineId.MASQUE || it == EngineId.OPERA || it.manualStandaloneOnly
+            it == EngineId.MASQUE || it == EngineId.OPERA || it == EngineId.TGWSS || it == EngineId.GFVPN
         }
         for (id in ids) {
             val engine = FakeEnginePlugin(
